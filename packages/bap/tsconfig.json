@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@p2p/shared": ["../shared/src"]
+    },
+    "types": ["node"],
+    "noImplicitAny": false
+  },
+  "include": ["src/**/*", "../shared/src/**/*"]
+}

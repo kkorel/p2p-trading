@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P2P Energy Trading | Beckn v2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0f1a;
+      --bg-secondary: #111827;
+      --bg-card: #1a2332;
+      --bg-hover: #243044;
+      --accent-green: #10b981;
+      --accent-green-dim: rgba(16, 185, 129, 0.15);
+      --accent-yellow: #fbbf24;
+      --accent-yellow-dim: rgba(251, 191, 36, 0.15);
+      --accent-blue: #3b82f6;
+      --accent-blue-dim: rgba(59, 130, 246, 0.15);
+      --accent-purple: #8b5cf6;
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --border: #374151;
+      --solar-gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      --energy-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(ellipse at 20% 0%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(251, 191, 36, 0.06) 0%, transparent 50%);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--energy-gradient);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .logo h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-yellow) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo span {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--accent-green-dim);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 100px;
+      font-size: 0.875rem;
+      color: var(--accent-green);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Main Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 2rem;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .card-title-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent-green-dim);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Discovery Form */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-group.full-width {
+      grid-column: span 2;
+    }
+
+    label {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    input, select {
+      padding: 0.875rem 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent-green);
+      box-shadow: 0 0 0 3px var(--accent-green-dim);
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background: var(--energy-gradient);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-secondary {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Offers List */
+    .offers-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .offer-card {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .offer-card:hover {
+      border-color: var(--accent-green);
+      background: var(--bg-hover);
+    }
+
+    .offer-card.selected {
+      border-color: var(--accent-green);
+      background: var(--accent-green-dim);
+    }
+
+    .offer-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--solar-gradient);
+    }
+
+    .offer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .offer-provider {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .offer-price {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--accent-green);
+    }
+
+    .offer-price span {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .offer-details {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .offer-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .offer-detail-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .offer-detail-value {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .trust-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      background: var(--accent-yellow-dim);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      color: var(--accent-yellow);
+    }
+
+    /* Order Panel */
+    .order-panel {
+      position: sticky;
+      top: 2rem;
+    }
+
+    .order-summary {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .order-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .order-row:last-child {
+      border-bottom: none;
+      padding-top: 1rem;
+      font-weight: 600;
+      font-size: 1.125rem;
+    }
+
+    .order-row-label {
+      color: var(--text-secondary);
+    }
+
+    .order-row-value {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Transaction Status */
+    .transaction-status {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-top: 1.5rem;
+    }
+
+    .status-step {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 0;
+      position: relative;
+    }
+
+    .status-step::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 100%;
+      width: 2px;
+      height: 100%;
+      background: var(--border);
+    }
+
+    .status-step:last-child::before {
+      display: none;
+    }
+
+    .status-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      font-size: 0.875rem;
+      z-index: 1;
+    }
+
+    .status-icon.complete {
+      background: var(--accent-green);
+      border-color: var(--accent-green);
+    }
+
+    .status-icon.active {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      animation: pulse 1s infinite;
+    }
+
+    .status-label {
+      font-size: 0.875rem;
+    }
+
+    .status-label.complete {
+      color: var(--accent-green);
+    }
+
+    .status-label.active {
+      color: var(--accent-blue);
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent-green);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      padding: 1rem 1.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--accent-green);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.error {
+      border-color: #ef4444;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .order-panel {
+        position: static;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .form-group.full-width {
+        grid-column: span 1;
+      }
+      
+      .offer-details {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1>P2P Energy Trading</h1>
+          <span>Beckn v2 Protocol</span>
+        </div>
+      </div>
+      <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span>Services Online</span>
+      </div>
+    </header>
+
+    <div class="main-grid">
+      <div class="main-content">
+        <!-- Discovery Form -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-title-icon">🔍</div>
+              Discover Energy Offers
+            </div>
+          </div>
+          <form id="discoverForm">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Energy Source</label>
+                <select id="sourceType">
+                  <option value="SOLAR">☀️ Solar</option>
+                  <option value="WIND">💨 Wind</option>
+                  <option value="HYDRO">💧 Hydro</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Minimum Quantity (kWh)</label>
+                <input type="number" id="minQuantity" value="20" min="1">
+              </div>
+              <div class="form-group">
+                <label>Requested Quantity (kWh)</label>
+                <input type="number" id="requestedQuantity" value="30" min="1">
+              </div>
+              <div class="form-group">
+                <label>Schedule Window Start</label>
+                <input type="datetime-local" id="scheduleStartTime" required>
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">When you need energy delivery to start</small>
+              </div>
+              <div class="form-group">
+                <label>Schedule Window End</label>
+                <input type="datetime-local" id="scheduleEndTime" required>
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">When you need energy delivery to end</small>
+              </div>
+              <div class="form-group full-width">
+                <button type="submit" class="btn btn-primary" id="discoverBtn">
+                  🔍 Discover Offers
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Available Offers -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-title-icon">⚡</div>
+              Available Offers
+            </div>
+            <span id="offerCount" style="color: var(--text-muted); font-size: 0.875rem;"></span>
+          </div>
+          <div id="offersContainer" class="offers-grid">
+            <div class="empty-state">
+              <div class="empty-state-icon">🔌</div>
+              <p>Click "Discover Offers" to find available energy</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Panel -->
+      <div class="order-panel">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-title-icon">📋</div>
+              Order Summary
+            </div>
+          </div>
+          
+          <div id="orderSummary">
+            <div class="empty-state" style="padding: 2rem;">
+              <p style="font-size: 0.875rem;">Select an offer to place an order</p>
+            </div>
+          </div>
+
+          <div id="orderActions" style="display: none;">
+            <button class="btn btn-primary" id="placeOrderBtn" style="width: 100%; margin-bottom: 0.75rem;">
+              ⚡ Place Order
+            </button>
+            <button class="btn btn-secondary" id="clearBtn" style="width: 100%;">
+              Clear Selection
+            </button>
+          </div>
+        </div>
+
+        <!-- Transaction Status -->
+        <div class="card" id="transactionCard" style="display: none;">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-title-icon">📊</div>
+              Transaction Status
+            </div>
+          </div>
+          <div id="transactionStatus" class="transaction-status">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <span id="toastIcon">✓</span>
+    <span id="toastMessage"></span>
+  </div>
+
+  <script>
+    // State
+    let currentTransaction = null;
+    let selectedOffer = null;
+    let catalog = null;
+
+    // API Helpers
+    const api = {
+      async discover(params) {
+        const res = await fetch('/api/discover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        });
+        return res.json();
+      },
+      
+      async select(params) {
+        const res = await fetch('/api/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        });
+        return res.json();
+      },
+      
+      async init(transactionId) {
+        const res = await fetch('/api/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transaction_id: transactionId })
+        });
+        return res.json();
+      },
+      
+      async confirm(transactionId, orderId) {
+        const res = await fetch('/api/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transaction_id: transactionId, order_id: orderId })
+        });
+        return res.json();
+      },
+      
+      async getTransaction(transactionId) {
+        const res = await fetch(`/api/transactions/${transactionId}`);
+        return res.json();
+      }
+    };
+
+    // UI Helpers
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastIcon = document.getElementById('toastIcon');
+      const toastMessage = document.getElementById('toastMessage');
+      
+      toastIcon.textContent = isError ? '✕' : '✓';
+      toastMessage.textContent = message;
+      toast.className = 'toast show' + (isError ? ' error' : '');
+      
+      setTimeout(() => {
+        toast.className = 'toast';
+      }, 3000);
+    }
+
+    function formatPrice(value) {
+      return '$' + value.toFixed(2);
+    }
+
+    function formatTime(isoString) {
+      return new Date(isoString).toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    }
+
+    // Render Offers with matching scores
+    function renderOffers(providers, matchingResults = null) {
+      const container = document.getElementById('offersContainer');
+      let offers = [];
+      
+      providers.forEach(provider => {
+        provider.items.forEach(item => {
+          item.offers.forEach(offer => {
+            offers.push({
+              ...offer,
+              providerName: provider.descriptor?.name || provider.id,
+              itemId: item.id,
+              sourceType: item.itemAttributes.sourceType
+            });
+          });
+        });
+      });
+      
+      if (offers.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">😕</div>
+            <p>No offers match your criteria</p>
+          </div>
+        `;
+        document.getElementById('offerCount').textContent = '';
+        return;
+      }
+      
+      // Apply matching scores if available
+      if (matchingResults && matchingResults.allOffers) {
+        const scoreMap = new Map();
+        matchingResults.allOffers.forEach(m => {
+          scoreMap.set(m.offer.id, { score: m.score, breakdown: m.breakdown });
+        });
+        
+        offers = offers.map(o => ({
+          ...o,
+          matchScore: scoreMap.get(o.id)?.score || 0,
+          matchBreakdown: scoreMap.get(o.id)?.breakdown,
+        }));
+        
+        // Sort by score (best first)
+        offers.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+      }
+      
+      const bestOfferId = matchingResults?.selectedOffer?.offer?.id;
+      document.getElementById('offerCount').textContent = `${offers.length} offer${offers.length > 1 ? 's' : ''} found` + 
+        (bestOfferId ? ' • Best match highlighted' : '');
+      
+      container.innerHTML = offers.map((offer, idx) => {
+        const isBest = offer.id === bestOfferId;
+        const scorePercent = offer.matchScore ? Math.round(offer.matchScore * 100) : null;
+        
+        return `
+        <div class="offer-card ${isBest ? 'selected' : ''}" data-offer-id="${offer.id}" data-item-id="${offer.itemId}" data-provider-id="${offer.provider_id}" style="${isBest ? 'border-color: var(--accent-green); box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);' : ''}">
+          ${isBest ? '<div style="position: absolute; top: -10px; right: 10px; background: var(--accent-green); color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">🏆 BEST MATCH</div>' : ''}
+          <div class="offer-header">
+            <div>
+              <div class="offer-provider">${offer.providerName}</div>
+              ${scorePercent !== null ? `
+                <div class="trust-badge" style="background: ${scorePercent > 70 ? 'var(--accent-green-dim)' : 'var(--accent-yellow-dim)'}; color: ${scorePercent > 70 ? 'var(--accent-green)' : 'var(--accent-yellow)'};">
+                  🎯 Match: ${scorePercent}%
+                </div>
+              ` : '<div class="trust-badge">⭐ Trust Score</div>'}
+            </div>
+            <div class="offer-price">
+              ${formatPrice(offer.price.value)} <span>/kWh</span>
+            </div>
+          </div>
+          <div class="offer-details">
+            <div class="offer-detail">
+              <span class="offer-detail-label">Source</span>
+              <span class="offer-detail-value">${offer.sourceType === 'SOLAR' ? '☀️' : offer.sourceType === 'WIND' ? '💨' : '⚡'} ${offer.sourceType}</span>
+            </div>
+            <div class="offer-detail">
+              <span class="offer-detail-label">Max Qty</span>
+              <span class="offer-detail-value">${offer.maxQuantity} kWh</span>
+            </div>
+            <div class="offer-detail">
+              <span class="offer-detail-label">Time Window</span>
+              <span class="offer-detail-value">${formatTime(offer.timeWindow.startTime)} - ${formatTime(offer.timeWindow.endTime)}</span>
+            </div>
+          </div>
+          ${offer.matchBreakdown ? `
+            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.7rem;">
+              <div style="text-align: center;">
+                <div style="color: var(--text-muted);">Price</div>
+                <div style="color: var(--accent-green);">${Math.round(offer.matchBreakdown.priceScore * 100)}%</div>
+              </div>
+              <div style="text-align: center;">
+                <div style="color: var(--text-muted);">Trust</div>
+                <div style="color: var(--accent-yellow);">${Math.round(offer.matchBreakdown.trustScore * 100)}%</div>
+              </div>
+              <div style="text-align: center;">
+                <div style="color: var(--text-muted);">Time</div>
+                <div style="color: var(--accent-blue);">${Math.round(offer.matchBreakdown.timeScore * 100)}%</div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `}).join('');
+      
+      // Add click handlers
+      container.querySelectorAll('.offer-card').forEach(card => {
+        card.addEventListener('click', () => selectOffer(card, offers.find(o => o.id === card.dataset.offerId)));
+      });
+      
+      // Auto-select best match
+      if (bestOfferId) {
+        const bestCard = container.querySelector(`[data-offer-id="${bestOfferId}"]`);
+        const bestOffer = offers.find(o => o.id === bestOfferId);
+        if (bestCard && bestOffer) {
+          selectOffer(bestCard, bestOffer);
+        }
+      }
+    }
+
+    // Select Offer
+    function selectOffer(card, offer) {
+      // Update UI
+      document.querySelectorAll('.offer-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      
+      selectedOffer = offer;
+      
+      const quantity = parseInt(document.getElementById('requestedQuantity').value);
+      const totalPrice = offer.price.value * quantity;
+      
+      document.getElementById('orderSummary').innerHTML = `
+        <div class="order-summary">
+          <div class="order-row">
+            <span class="order-row-label">Provider</span>
+            <span class="order-row-value">${offer.providerName}</span>
+          </div>
+          <div class="order-row">
+            <span class="order-row-label">Quantity</span>
+            <span class="order-row-value">${quantity} kWh</span>
+          </div>
+          <div class="order-row">
+            <span class="order-row-label">Unit Price</span>
+            <span class="order-row-value">${formatPrice(offer.price.value)}/kWh</span>
+          </div>
+          <div class="order-row">
+            <span class="order-row-label">Total</span>
+            <span class="order-row-value" style="color: var(--accent-green);">${formatPrice(totalPrice)}</span>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('orderActions').style.display = 'block';
+    }
+
+    // Render Transaction Status
+    function renderTransactionStatus(status, order) {
+      const steps = [
+        { id: 'discover', label: 'Catalog Discovered', icon: '🔍' },
+        { id: 'select', label: 'Offer Selected', icon: '✓' },
+        { id: 'init', label: 'Order Initialized', icon: '📝' },
+        { id: 'confirm', label: 'Order Confirmed', icon: '✓' },
+        { id: 'active', label: 'Trade Active', icon: '⚡' }
+      ];
+      
+      const statusMap = {
+        'DISCOVERING': 0,
+        'SELECTING': 1,
+        'INITIALIZING': 2,
+        'CONFIRMING': 3,
+        'ACTIVE': 4,
+        'COMPLETED': 4
+      };
+      
+      const currentStep = statusMap[status] ?? 0;
+      
+      document.getElementById('transactionCard').style.display = 'block';
+      document.getElementById('transactionStatus').innerHTML = steps.map((step, idx) => {
+        const isComplete = idx < currentStep;
+        const isActive = idx === currentStep;
+        
+        return `
+          <div class="status-step">
+            <div class="status-icon ${isComplete ? 'complete' : ''} ${isActive ? 'active' : ''}">
+              ${isComplete ? '✓' : step.icon}
+            </div>
+            <span class="status-label ${isComplete ? 'complete' : ''} ${isActive ? 'active' : ''}">
+              ${step.label}
+            </span>
+          </div>
+        `;
+      }).join('');
+      
+      if (order) {
+        document.getElementById('transactionStatus').innerHTML += `
+          <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">
+            Order ID: ${order.id?.substring(0, 8)}...<br>
+            Status: <span style="color: var(--accent-green);">${order.status}</span>
+          </div>
+        `;
+      }
+    }
+
+    // Event Handlers
+    document.getElementById('discoverForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const btn = document.getElementById('discoverBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span> Discovering...';
+      
+      try {
+        const startTimeInput = document.getElementById('scheduleStartTime').value;
+        const endTimeInput = document.getElementById('scheduleEndTime').value;
+        
+        if (!startTimeInput || !endTimeInput) {
+          showToast('Please select both start and end times for the schedule window', true);
+          return;
+        }
+        
+        const startTime = new Date(startTimeInput);
+        const endTime = new Date(endTimeInput);
+        
+        if (endTime <= startTime) {
+          showToast('End time must be after start time', true);
+          return;
+        }
+        
+        const params = {
+          sourceType: document.getElementById('sourceType').value,
+          deliveryMode: 'SCHEDULED', // Always scheduled for P2P energy trading
+          minQuantity: parseInt(document.getElementById('minQuantity').value),
+          timeWindow: {
+            startTime: new Date(startTimeInput).toISOString(),
+            endTime: new Date(endTimeInput).toISOString()
+          }
+        };
+        
+        const result = await api.discover(params);
+        currentTransaction = result.transaction_id;
+        
+        showToast('Discovering offers & running matching algorithm...');
+        
+        // Wait for callback with matching results
+        await new Promise(r => setTimeout(r, 600));
+        
+        const txState = await api.getTransaction(currentTransaction);
+        catalog = txState.catalog;
+        
+        if (catalog?.providers) {
+          // Pass matching results to render function
+          renderOffers(catalog.providers, txState.matchingResults);
+          renderTransactionStatus('SELECTING');
+          
+          if (txState.matchingResults?.selectedOffer) {
+            showToast(`Best match found: ${Math.round(txState.matchingResults.selectedOffer.score * 100)}% score!`);
+          }
+        }
+      } catch (err) {
+        showToast('Discovery failed: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🔍 Discover Offers';
+      }
+    });
+
+    document.getElementById('placeOrderBtn').addEventListener('click', async () => {
+      if (!selectedOffer || !currentTransaction) return;
+      
+      const btn = document.getElementById('placeOrderBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span> Processing...';
+      
+      try {
+        const quantity = parseInt(document.getElementById('requestedQuantity').value);
+        
+        // Select
+        showToast('Selecting offer...');
+        await api.select({
+          transaction_id: currentTransaction,
+          offer_id: selectedOffer.id,
+          item_id: selectedOffer.itemId,
+          quantity: quantity
+        });
+        await new Promise(r => setTimeout(r, 300));
+        renderTransactionStatus('INITIALIZING');
+        
+        // Init
+        showToast('Initializing order...');
+        await api.init(currentTransaction);
+        await new Promise(r => setTimeout(r, 300));
+        
+        const txState = await api.getTransaction(currentTransaction);
+        const orderId = txState.order?.id;
+        renderTransactionStatus('CONFIRMING', txState.order);
+        
+        // Confirm
+        showToast('Confirming order...');
+        await api.confirm(currentTransaction, orderId);
+        await new Promise(r => setTimeout(r, 300));
+        
+        const finalState = await api.getTransaction(currentTransaction);
+        // #region agent log
+        console.log('[DEBUG] finalState:', JSON.stringify(finalState, null, 2));
+        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1030',message:'finalState after confirm',data:{hasFinalState:!!finalState,hasOrder:!!finalState?.order,orderKeys:finalState?.order?Object.keys(finalState.order):null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        renderTransactionStatus('ACTIVE', finalState.order);
+        
+        // Show detailed confirmation and update order summary
+        const order = finalState.order;
+        // #region agent log
+        console.log('[DEBUG] order:', order);
+        console.log('[DEBUG] order.quote:', order?.quote);
+        console.log('[DEBUG] order.quote.price:', order?.quote?.price);
+        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1034',message:'order object structure',data:{hasOrder:!!order,hasQuote:!!order?.quote,quoteKeys:order?.quote?Object.keys(order.quote):null,hasPrice:!!order?.quote?.price,priceValue:order?.quote?.price?.value,totalQuantity:order?.quote?.totalQuantity},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C'})}).catch(()=>{});
+        // #endregion
+        const quantity = order?.quote?.totalQuantity || 0;
+        const price = order?.quote?.price?.value || 0;
+        // #region agent log
+        console.log('[DEBUG] quantity:', quantity, 'price:', price);
+        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1036',message:'extracted values',data:{quantity:quantity,quantityType:typeof quantity,price:price,priceType:typeof price},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+        
+        // Update order summary to show confirmed order
+        if (order) {
+          document.getElementById('orderSummary').innerHTML = `
+            <div class="order-summary">
+              <div style="background: var(--accent-green-dim); border: 2px solid var(--accent-green); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
+                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✅</div>
+                <div style="font-weight: 600; color: var(--accent-green); font-size: 1.1rem;">Trade Confirmed!</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">Order is now ACTIVE</div>
+              </div>
+              <div class="order-row">
+                <span class="order-row-label">Order ID</span>
+                <span class="order-row-value" style="font-size: 0.75rem;">${order.id.substring(0, 12)}...</span>
+              </div>
+              <div class="order-row">
+                <span class="order-row-label">Status</span>
+                <span class="order-row-value" style="color: var(--accent-green); font-weight: 600;">${order.status}</span>
+              </div>
+              <div class="order-row">
+                <span class="order-row-label">Quantity</span>
+                <span class="order-row-value">${quantity} kWh</span>
+              </div>
+              <div class="order-row">
+                <span class="order-row-label">Total Price</span>
+                <span class="order-row-value" style="color: var(--accent-green); font-weight: 600;">$${price.toFixed(2)}</span>
+              </div>
+            </div>
+          `;
+        }
+        
+        showToast(`🎉 Trade Confirmed! ${quantity} kWh for $${price.toFixed(2)} - Order is now ACTIVE`);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1067',message:'confirm success',data:{quantity,price},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'success'})}).catch(()=>{});
+        // #endregion
+        
+      } catch (err) {
+        // #region agent log
+        console.error('[DEBUG] Error caught:', err.message, err.stack);
+        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:catch',message:'error caught',data:{errorMessage:err.message,errorStack:err.stack},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'error'})}).catch(()=>{});
+        // #endregion
+        showToast('Order failed: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '⚡ Place Order';
+      }
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      selectedOffer = null;
+      document.querySelectorAll('.offer-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById('orderSummary').innerHTML = `
+        <div class="empty-state" style="padding: 2rem;">
+          <p style="font-size: 0.875rem;">Select an offer to place an order</p>
+        </div>
+      `;
+      document.getElementById('orderActions').style.display = 'none';
+    });
+
+    // Set default schedule window (tomorrow 8 AM - 8 PM)
+    function setDefaultScheduleWindow() {
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 86400000);
+      const format = d => d.toISOString().slice(0, 16);
+      
+      const startTime = new Date(tomorrow);
+      startTime.setHours(8, 0, 0, 0);
+      
+      const endTime = new Date(tomorrow);
+      endTime.setHours(20, 0, 0, 0);
+      
+      document.getElementById('scheduleStartTime').value = format(startTime);
+      document.getElementById('scheduleEndTime').value = format(endTime);
+    }
+
+    // Initialize default schedule window on page load
+    setDefaultScheduleWindow();
+  </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "p2p-energy-trading",
+  "version": "1.0.0",
+  "description": "Beckn v2 P2P Energy Trading MVP - Phase 1",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "kill-ports": "lsof -ti:4000 | xargs kill -9 2>/dev/null; lsof -ti:4001 | xargs kill -9 2>/dev/null; lsof -ti:4002 | xargs kill -9 2>/dev/null; echo 'Ports cleared'",
+    "predev": "npm run kill-ports || true",
+    "dev": "concurrently \"npm run dev -w @p2p/cds-mock\" \"npm run dev -w @p2p/bpp-mock\" \"npm run dev -w @p2p/bap\"",
+    "dev:cds": "npm run dev -w @p2p/cds-mock",
+    "dev:bpp": "npm run dev -w @p2p/bpp-mock",
+    "dev:bap": "npm run dev -w @p2p/bap",
+    "seed": "npm run seed -w @p2p/bpp-mock && npm run seed -w @p2p/cds-mock",
+    "clean": "rm -rf packages/*/dist packages/*/*.db",
+    "clean:db": "rm -f packages/*/*.db && echo '✅ All databases cleared (restart services to clear in-memory state)'",
+    "clear:all": "bash scripts/clear-all.sh",
+    "reset": "npm run clean:db && npm run seed",
+    "flow": "bash scripts/run-flow.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

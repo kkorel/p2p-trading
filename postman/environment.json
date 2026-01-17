@@ -1,0 +1,73 @@
+{
+  "id": "p2p-trading-local",
+  "name": "P2P Energy Trading - Local",
+  "values": [
+    {
+      "key": "bap_url",
+      "value": "http://localhost:4000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "cds_url",
+      "value": "http://localhost:4001",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "bpp_url",
+      "value": "http://localhost:4002",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "bap_id",
+      "value": "bap.p2p-trading.local",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "bap_uri",
+      "value": "http://localhost:4000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "bpp_id",
+      "value": "bpp.p2p-trading.local",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "bpp_uri",
+      "value": "http://localhost:4002",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "transaction_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "offer_id",
+      "value": "offer-alpha-morning",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "item_id",
+      "value": "item-solar-001",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

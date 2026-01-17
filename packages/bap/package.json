@@ -1,0 +1,26 @@
+{
+  "name": "@p2p/bap",
+  "version": "1.0.0",
+  "description": "Beckn Application Platform (Consumer) for P2P Energy Trading",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node -r tsconfig-paths/register src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@p2p/shared": "^1.0.0",
+    "axios": "^1.6.7",
+    "sql.js": "^1.10.2",
+    "express": "^4.18.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.16",
+    "@types/uuid": "^9.0.8",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.3.3"
+  }
+}
