@@ -32,7 +32,22 @@ export type BecknAction =
   | 'confirm' 
   | 'on_confirm' 
   | 'status' 
-  | 'on_status';
+  | 'on_status'
+  // Phase-3: Verification actions
+  | 'verification_start'
+  | 'on_verification_start'
+  | 'submit_proofs'
+  | 'on_proofs_submitted'
+  | 'accept_verification'
+  | 'on_verification_accepted'
+  | 'reject_verification'
+  | 'on_verification_rejected'
+  // Phase-3: Settlement actions
+  | 'settlement_start'
+  | 'on_settlement_initiated'
+  | 'on_settlement_pending'
+  | 'on_settlement_settled'
+  | 'on_settlement_failed';
 
 // ACK response
 export interface BecknAck {

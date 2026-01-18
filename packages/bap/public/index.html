@@ -839,6 +839,44 @@
         return res.json();
       },
       
+      // Phase-3 APIs
+      async startVerification(orderId, params) {
+        const res = await fetch(`/phase3/orders/${orderId}/verification/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        });
+        return res.json();
+      },
+      async submitProofs(orderId, params) {
+        const res = await fetch(`/phase3/orders/${orderId}/proofs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        });
+        return res.json();
+      },
+      async acceptVerification(orderId) {
+        const res = await fetch(`/phase3/orders/${orderId}/verification/accept`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        return res.json();
+      },
+      async startSettlement(orderId, params) {
+        const res = await fetch(`/phase3/orders/${orderId}/settlement/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        });
+        return res.json();
+      },
+      async getPhase3State(orderId) {
+        const res = await fetch(`/phase3/orders/${orderId}`);
+        return res.json();
+      },
+      
       // Seller APIs
       async getProviders() {
         const res = await fetch('/seller/providers');
@@ -1193,7 +1231,7 @@
         const qty = order?.quote?.totalQuantity || 0;
         const price = order?.quote?.price?.value || 0;
         
-        document.getElementById('orderSummary').innerHTML = `
+        const orderSummaryHTML = `
           <div class="order-summary">
             <div style="background: var(--accent-green-dim); border: 2px solid var(--accent-green); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
               <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✅</div>
@@ -1204,7 +1242,32 @@
             <div class="order-row"><span class="order-row-label">Quantity</span><span class="order-row-value">${qty} kWh</span></div>
             <div class="order-row"><span class="order-row-label">Total Price</span><span class="order-row-value" style="color: var(--accent-green);">$${price.toFixed(2)}</span></div>
           </div>
+          ${order.status === 'ACTIVE' ? `
+            <div id="phase3Section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+              <div style="font-weight: 600; margin-bottom: 1rem; color: var(--accent-purple);">🔍 Phase-3: Verification & Settlement</div>
+              <button class="btn btn-secondary" id="startVerificationBtn" style="width: 100%; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                🔍 Start Verification
+              </button>
+              <button class="btn btn-secondary" id="submitProofsBtn" style="width: 100%; margin-bottom: 0.5rem; font-size: 0.9rem; display: none;">
+                📊 Submit Proofs
+              </button>
+              <button class="btn btn-secondary" id="acceptVerificationBtn" style="width: 100%; margin-bottom: 0.5rem; font-size: 0.9rem; display: none;">
+                ✅ Accept Verification
+              </button>
+              <button class="btn btn-secondary" id="startSettlementBtn" style="width: 100%; margin-bottom: 0.5rem; font-size: 0.9rem; display: none;">
+                💰 Start Settlement
+              </button>
+              <div id="phase3Status" style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; font-size: 0.875rem; display: none;"></div>
+            </div>
+          ` : ''}
         `;
+        
+        document.getElementById('orderSummary').innerHTML = orderSummaryHTML;
+        
+        if (order.status === 'ACTIVE') {
+          // Small delay to ensure DOM is ready
+          setTimeout(() => setupPhase3UI(order.id), 100);
+        }
         
         showToast(`🎉 Trade Confirmed! ${qty} kWh for $${price.toFixed(2)}`);
       } catch (err) {
@@ -1276,6 +1339,207 @@
       document.getElementById('scheduleEndTime').value = format(end);
       document.getElementById('offerStartTime').value = format(start);
       document.getElementById('offerEndTime').value = format(end);
+    }
+
+    // ==================== PHASE-3 UI ====================
+    async function setupPhase3UI(orderId) {
+      // Check current Phase-3 state
+      try {
+        const state = await api.getPhase3State(orderId);
+        updatePhase3UI(state, orderId);
+      } catch (err) {
+        console.log('No Phase-3 state yet');
+      }
+      
+      // Event handlers
+      document.getElementById('startVerificationBtn')?.addEventListener('click', () => startVerification(orderId));
+      document.getElementById('submitProofsBtn')?.addEventListener('click', () => submitProofs(orderId));
+      document.getElementById('acceptVerificationBtn')?.addEventListener('click', () => acceptVerification(orderId));
+      document.getElementById('startSettlementBtn')?.addEventListener('click', () => startSettlement(orderId));
+    }
+    
+    function updatePhase3UI(state, orderId) {
+      const statusDiv = document.getElementById('phase3Status');
+      if (!statusDiv) return;
+      
+      if (state.verification_case) {
+        const vc = state.verification_case;
+        document.getElementById('startVerificationBtn').style.display = 'none';
+        document.getElementById('submitProofsBtn').style.display = vc.state === 'PENDING' ? 'block' : 'none';
+        document.getElementById('acceptVerificationBtn').style.display = vc.state === 'PROOFS_SUBMITTED' ? 'block' : 'none';
+        document.getElementById('startSettlementBtn').style.display = (vc.decision === 'VERIFIED' || vc.decision === 'DEVIATED') && !state.settlement ? 'block' : 'none';
+        
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = `
+          <div style="font-weight: 600; margin-bottom: 0.5rem;">Verification: <span style="color: ${getStateColor(vc.state)}">${vc.state}</span></div>
+          ${vc.decision ? `<div>Decision: <span style="color: ${getDecisionColor(vc.decision)}">${vc.decision}</span></div>` : ''}
+          ${vc.delivered_qty_value ? `<div>Delivered: ${vc.delivered_qty_value} ${vc.delivered_qty_unit}</div>` : ''}
+        `;
+      }
+      
+      if (state.settlement) {
+        const s = state.settlement;
+        document.getElementById('startSettlementBtn').style.display = 'none';
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML += `
+          <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">Settlement: <span style="color: ${getStateColor(s.state)}">${s.state}</span></div>
+            <div>Amount: <span style="color: var(--accent-green);">$${s.amount_value.toFixed(2)} ${s.currency}</span></div>
+          </div>
+        `;
+      }
+    }
+    
+    function getStateColor(state) {
+      const colors = {
+        'PENDING': 'var(--accent-yellow)',
+        'VERIFIED': 'var(--accent-green)',
+        'DEVIATED': 'var(--accent-orange)',
+        'FAILED': '#ef4444',
+        'DISPUTED': '#ef4444',
+        'INITIATED': 'var(--accent-blue)',
+        'SETTLED': 'var(--accent-green)',
+      };
+      return colors[state] || 'var(--text-secondary)';
+    }
+    
+    function getDecisionColor(decision) {
+      const colors = {
+        'VERIFIED': 'var(--accent-green)',
+        'DEVIATED': 'var(--accent-orange)',
+        'FAILED': '#ef4444',
+        'DISPUTED': '#ef4444',
+      };
+      return colors[decision] || 'var(--text-secondary)';
+    }
+    
+    async function startVerification(orderId) {
+      const btn = document.getElementById('startVerificationBtn');
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Starting...';
+      
+      try {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const format = d => d.toISOString();
+        
+        const params = {
+          verification_window: {
+            startTime: format(new Date(tomorrow.setHours(11, 0, 0, 0))),
+            endTime: format(new Date(tomorrow.setHours(15, 0, 0, 0))),
+          },
+          required_proofs: [{
+            type: 'METER_READING',
+            source: 'meter-123',
+            deadline: format(new Date(tomorrow.setHours(16, 0, 0, 0))),
+          }],
+          expected_quantity: { value: 30, unit: 'kWh' },
+          tolerance_rules: { max_deviation_percent: 5.0, min_quantity: 28.5 },
+        };
+        
+        await api.startVerification(orderId, params);
+        showToast('Verification started!');
+        await new Promise(r => setTimeout(r, 500));
+        const state = await api.getPhase3State(orderId);
+        updatePhase3UI(state, orderId);
+      } catch (err) {
+        showToast('Failed to start verification: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🔍 Start Verification';
+      }
+    }
+    
+    async function submitProofs(orderId) {
+      const btn = document.getElementById('submitProofsBtn');
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Submitting...';
+      
+      try {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const format = d => d.toISOString();
+        
+        const params = {
+          proofs: [
+            {
+              type: 'METER_READING',
+              source: 'meter-123',
+              timestamp: format(new Date(tomorrow.setHours(12, 0, 0, 0))),
+              value: { quantity: 15.5, unit: 'kWh' },
+              metadata: { reading_type: 'START' },
+            },
+            {
+              type: 'METER_READING',
+              source: 'meter-123',
+              timestamp: format(new Date(tomorrow.setHours(14, 30, 0, 0))),
+              value: { quantity: 14.5, unit: 'kWh' },
+              metadata: { reading_type: 'END' },
+            },
+          ],
+        };
+        
+        await api.submitProofs(orderId, params);
+        showToast('Proofs submitted!');
+        await new Promise(r => setTimeout(r, 500));
+        const state = await api.getPhase3State(orderId);
+        updatePhase3UI(state, orderId);
+      } catch (err) {
+        showToast('Failed to submit proofs: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📊 Submit Proofs';
+      }
+    }
+    
+    async function acceptVerification(orderId) {
+      const btn = document.getElementById('acceptVerificationBtn');
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Accepting...';
+      
+      try {
+        await api.acceptVerification(orderId);
+        showToast('Verification accepted!');
+        await new Promise(r => setTimeout(r, 500));
+        const state = await api.getPhase3State(orderId);
+        updatePhase3UI(state, orderId);
+      } catch (err) {
+        showToast('Failed to accept verification: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '✅ Accept Verification';
+      }
+    }
+    
+    async function startSettlement(orderId) {
+      const btn = document.getElementById('startSettlementBtn');
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Starting...';
+      
+      try {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const format = d => d.toISOString();
+        
+        const params = {
+          settlement_type: 'DAILY',
+          period: {
+            startTime: format(new Date(tomorrow.setHours(0, 0, 0, 0))),
+            endTime: format(new Date(tomorrow.setHours(23, 59, 59, 999))),
+          },
+        };
+        
+        await api.startSettlement(orderId, params);
+        showToast('Settlement started!');
+        await new Promise(r => setTimeout(r, 1000));
+        const state = await api.getPhase3State(orderId);
+        updatePhase3UI(state, orderId);
+      } catch (err) {
+        showToast('Failed to start settlement: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '💰 Start Settlement';
+      }
     }
 
     setDefaultDates();

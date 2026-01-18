@@ -23,10 +23,10 @@ export interface CatalogItem {
     offers: CatalogOffer[];
 }
 export type PricingModel = 'PER_KWH' | 'FLAT_RATE' | 'TIME_OF_USE';
-export type SettlementType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'INSTANT';
+export type OfferSettlementType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'INSTANT';
 export interface OfferAttributes {
     pricingModel: PricingModel;
-    settlementType: SettlementType;
+    settlementType: OfferSettlementType;
 }
 export interface CatalogOffer {
     id: string;

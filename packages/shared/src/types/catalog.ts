@@ -35,13 +35,13 @@ export interface CatalogItem {
 // Pricing model
 export type PricingModel = 'PER_KWH' | 'FLAT_RATE' | 'TIME_OF_USE';
 
-// Settlement type
-export type SettlementType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'INSTANT';
+// Settlement type (for offer attributes)
+export type OfferSettlementType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'INSTANT';
 
 // Offer attributes following EnergyTradeOffer schema
 export interface OfferAttributes {
   pricingModel: PricingModel;
-  settlementType: SettlementType;
+  settlementType: OfferSettlementType;
 }
 
 // Catalog offer

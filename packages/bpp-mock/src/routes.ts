@@ -14,6 +14,19 @@ import {
   OnConfirmMessage,
   StatusMessage,
   OnStatusMessage,
+  VerificationStartMessage,
+  OnVerificationStartMessage,
+  SubmitProofsMessage,
+  OnProofsSubmittedMessage,
+  AcceptVerificationMessage,
+  OnVerificationAcceptedMessage,
+  RejectVerificationMessage,
+  OnVerificationRejectedMessage,
+  SettlementStartMessage,
+  OnSettlementInitiatedMessage,
+  OnSettlementPendingMessage,
+  OnSettlementSettledMessage,
+  OnSettlementFailedMessage,
   createAck,
   createNack,
   createCallbackContext,
@@ -22,6 +35,7 @@ import {
   ErrorCodes,
   OrderItem,
   Quote,
+  SettlementType,
 } from '@p2p/shared';
 import { 
   getOfferById, 
@@ -811,6 +825,517 @@ router.get('/seller/orders', (req: Request, res: Response) => {
   });
   
   res.json({ orders: enrichedOrders });
+});
+
+// ============ PHASE-3: VERIFICATION & SETTLEMENT ============
+
+/**
+ * POST /verification_start - Handle verification start request
+ */
+router.post('/verification_start', async (req: Request, res: Response) => {
+  const message = req.body as VerificationStartMessage;
+  const { context, message: content } = message;
+  
+  logger.info('Received verification_start request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    order_id: content.order_id,
+  });
+  
+  if (isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+  
+  logEvent(context.transaction_id, context.message_id, 'verification_start', 'INBOUND', JSON.stringify(message));
+  
+  // Get order
+  const order = getOrderById(content.order_id);
+  if (!order) {
+    return res.json(createNack(context, {
+      code: ErrorCodes.ORDER_NOT_FOUND,
+      message: `Order ${content.order_id} not found`,
+    }));
+  }
+  
+  res.json(createAck(context));
+  
+  setTimeout(async () => {
+    try {
+      const callbackContext = createCallbackContext(context, 'on_verification_start');
+      const caseId = uuidv4();
+      
+      // Create verification case in DB
+      const db = getDb();
+      db.run(
+        `INSERT INTO verification_cases (
+          id, order_id, transaction_id, state, required_proofs_json,
+          tolerance_rules_json, window_json, expected_qty, expires_at, raw_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          caseId,
+          content.order_id,
+          context.transaction_id,
+          'PENDING',
+          JSON.stringify(content.required_proofs),
+          JSON.stringify(content.tolerance_rules),
+          JSON.stringify(content.verification_window),
+          content.expected_quantity.value,
+          content.required_proofs[0]?.deadline || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          JSON.stringify(message),
+        ]
+      );
+      saveDb();
+      
+      const onVerificationStartMessage: OnVerificationStartMessage = {
+        context: callbackContext,
+        message: {
+          verification_case: {
+            id: caseId,
+            order_id: content.order_id,
+            state: 'PENDING',
+            verification_window: content.verification_window,
+            required_proofs: content.required_proofs,
+            expected_quantity: content.expected_quantity,
+            expires_at: content.required_proofs[0]?.deadline || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          },
+        },
+      };
+      
+      logEvent(context.transaction_id, callbackContext.message_id, 'on_verification_start', 'OUTBOUND', JSON.stringify(onVerificationStartMessage));
+      
+      await axios.post(`${context.bap_uri}/callbacks/on_verification_start`, onVerificationStartMessage);
+      logger.info('on_verification_start callback sent successfully', { transaction_id: context.transaction_id });
+    } catch (error: any) {
+      logger.error(`Failed to send on_verification_start callback: ${error.message}`, { transaction_id: context.transaction_id });
+    }
+  }, config.callbackDelay);
+});
+
+/**
+ * POST /submit_proofs - Handle proof submission
+ */
+router.post('/submit_proofs', async (req: Request, res: Response) => {
+  const message = req.body as SubmitProofsMessage;
+  const { context, message: content } = message;
+  
+  logger.info('Received submit_proofs request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    verification_case_id: content.verification_case_id,
+    proof_count: content.proofs.length,
+  });
+  
+  if (isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+  
+  logEvent(context.transaction_id, context.message_id, 'submit_proofs', 'INBOUND', JSON.stringify(message));
+  
+  // Get verification case
+  const db = getDb();
+  const caseResult = db.exec('SELECT * FROM verification_cases WHERE id = ?', [content.verification_case_id]);
+  if (caseResult.length === 0 || caseResult[0].values.length === 0) {
+    return res.json(createNack(context, {
+      code: ErrorCodes.ORDER_NOT_FOUND,
+      message: `Verification case ${content.verification_case_id} not found`,
+    }));
+  }
+  
+  res.json(createAck(context));
+  
+  setTimeout(async () => {
+    try {
+      // Save proofs
+      for (const proof of content.proofs) {
+        const proofId = uuidv4();
+        db.run(
+          `INSERT INTO proofs (
+            id, verification_case_id, type, payload_json, source,
+            quantity_value, timestamp, raw_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            proofId,
+            content.verification_case_id,
+            proof.type,
+            JSON.stringify(proof),
+            proof.source,
+            proof.value.quantity,
+            proof.timestamp,
+            JSON.stringify(proof),
+          ]
+        );
+      }
+      saveDb();
+      
+      // Calculate delivered quantity
+      const deliveredQty = content.proofs.reduce((sum, p) => sum + p.value.quantity, 0);
+      
+      // Get tolerance rules
+      const caseRow = caseResult[0].values[0];
+      const toleranceRules = JSON.parse(caseRow[5] as string); // tolerance_rules_json
+      const expectedQty = caseRow[7] as number; // expected_qty
+      
+      // Calculate deviation
+      const deviationQty = expectedQty - deliveredQty;
+      const deviationPercent = (Math.abs(deviationQty) / expectedQty) * 100;
+      const withinTolerance = deviationPercent <= toleranceRules.max_deviation_percent;
+      
+      // Determine state
+      const state = withinTolerance ? 'VERIFIED' : 'DEVIATED';
+      
+      // Update verification case
+      db.run(
+        `UPDATE verification_cases 
+         SET delivered_qty = ?, deviation_qty = ?, deviation_percent = ?,
+             state = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [deliveredQty, deviationQty, deviationPercent, state, content.verification_case_id]
+      );
+      saveDb();
+      
+      const callbackContext = createCallbackContext(context, 'on_proofs_submitted');
+      const onProofsSubmittedMessage: OnProofsSubmittedMessage = {
+        context: callbackContext,
+        message: {
+          verification_case: {
+            id: content.verification_case_id,
+            order_id: content.order_id,
+            state,
+            verification_window: JSON.parse(caseRow[6] as string), // window_json
+            required_proofs: JSON.parse(caseRow[4] as string), // required_proofs_json
+            expected_quantity: { value: expectedQty, unit: 'kWh' },
+            delivered_quantity: { value: deliveredQty, unit: 'kWh' },
+            deviation: {
+              quantity: deviationQty,
+              percent: deviationPercent,
+            },
+            expires_at: caseRow[9] as string, // expires_at
+          },
+          proofs_received: content.proofs,
+        },
+      };
+      
+      logEvent(context.transaction_id, callbackContext.message_id, 'on_proofs_submitted', 'OUTBOUND', JSON.stringify(onProofsSubmittedMessage));
+      
+      await axios.post(`${context.bap_uri}/callbacks/on_proofs_submitted`, onProofsSubmittedMessage);
+      logger.info('on_proofs_submitted callback sent successfully', { transaction_id: context.transaction_id });
+    } catch (error: any) {
+      logger.error(`Failed to send on_proofs_submitted callback: ${error.message}`, { transaction_id: context.transaction_id });
+    }
+  }, config.callbackDelay);
+});
+
+/**
+ * POST /accept_verification - Handle verification acceptance
+ */
+router.post('/accept_verification', async (req: Request, res: Response) => {
+  const message = req.body as AcceptVerificationMessage;
+  const { context, message: content } = message;
+  
+  logger.info('Received accept_verification request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    verification_case_id: content.verification_case_id,
+  });
+  
+  if (isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+  
+  logEvent(context.transaction_id, context.message_id, 'accept_verification', 'INBOUND', JSON.stringify(message));
+  
+  res.json(createAck(context));
+  
+  setTimeout(async () => {
+    try {
+      // Update verification case
+      const db = getDb();
+      db.run(
+        `UPDATE verification_cases 
+         SET state = 'VERIFIED', decision = 'ACCEPTED', decided_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [content.verification_case_id]
+      );
+      saveDb();
+      
+      const callbackContext = createCallbackContext(context, 'on_verification_accepted');
+      
+      // Get verification case for callback
+      const caseResult = db.exec('SELECT * FROM verification_cases WHERE id = ?', [content.verification_case_id]);
+      const caseRow = caseResult[0].values[0];
+      
+      const onVerificationAcceptedMessage: OnVerificationAcceptedMessage = {
+        context: callbackContext,
+        message: {
+          verification_case: {
+            id: content.verification_case_id,
+            order_id: content.order_id,
+            state: 'VERIFIED',
+            verification_window: JSON.parse(caseRow[6] as string),
+            required_proofs: JSON.parse(caseRow[4] as string),
+            expected_quantity: { value: caseRow[7] as number, unit: 'kWh' },
+            delivered_quantity: caseRow[8] ? { value: caseRow[8] as number, unit: 'kWh' } : undefined,
+            expires_at: caseRow[9] as string,
+          },
+        },
+      };
+      
+      logEvent(context.transaction_id, callbackContext.message_id, 'on_verification_accepted', 'OUTBOUND', JSON.stringify(onVerificationAcceptedMessage));
+      
+      await axios.post(`${context.bap_uri}/callbacks/on_verification_accepted`, onVerificationAcceptedMessage);
+      logger.info('on_verification_accepted callback sent successfully', { transaction_id: context.transaction_id });
+    } catch (error: any) {
+      logger.error(`Failed to send on_verification_accepted callback: ${error.message}`, { transaction_id: context.transaction_id });
+    }
+  }, config.callbackDelay);
+});
+
+/**
+ * POST /reject_verification - Handle verification rejection
+ */
+router.post('/reject_verification', async (req: Request, res: Response) => {
+  const message = req.body as RejectVerificationMessage;
+  const { context, message: content } = message;
+  
+  logger.info('Received reject_verification request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    verification_case_id: content.verification_case_id,
+    reason: content.reason,
+  });
+  
+  if (isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+  
+  logEvent(context.transaction_id, context.message_id, 'reject_verification', 'INBOUND', JSON.stringify(message));
+  
+  res.json(createAck(context));
+  
+  setTimeout(async () => {
+    try {
+      // Update verification case
+      const db = getDb();
+      const state = content.reason?.toLowerCase().includes('dispute') ? 'DISPUTED' : 'REJECTED';
+      db.run(
+        `UPDATE verification_cases 
+         SET state = ?, decision = 'REJECTED', rejection_reason = ?, decided_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [state, content.reason || 'Buyer rejected', content.verification_case_id]
+      );
+      saveDb();
+      
+      const callbackContext = createCallbackContext(context, 'on_verification_rejected');
+      
+      // Get verification case for callback
+      const caseResult = db.exec('SELECT * FROM verification_cases WHERE id = ?', [content.verification_case_id]);
+      const caseRow = caseResult[0].values[0];
+      
+      const onVerificationRejectedMessage: OnVerificationRejectedMessage = {
+        context: callbackContext,
+        message: {
+          verification_case: {
+            id: content.verification_case_id,
+            order_id: content.order_id,
+            state,
+            verification_window: JSON.parse(caseRow[6] as string),
+            required_proofs: JSON.parse(caseRow[4] as string),
+            expected_quantity: { value: caseRow[7] as number, unit: 'kWh' },
+            expires_at: caseRow[9] as string,
+          },
+        },
+      };
+      
+      logEvent(context.transaction_id, callbackContext.message_id, 'on_verification_rejected', 'OUTBOUND', JSON.stringify(onVerificationRejectedMessage));
+      
+      await axios.post(`${context.bap_uri}/callbacks/on_verification_rejected`, onVerificationRejectedMessage);
+      logger.info('on_verification_rejected callback sent successfully', { transaction_id: context.transaction_id });
+    } catch (error: any) {
+      logger.error(`Failed to send on_verification_rejected callback: ${error.message}`, { transaction_id: context.transaction_id });
+    }
+  }, config.callbackDelay);
+});
+
+/**
+ * POST /settlement_start - Handle settlement start request
+ */
+router.post('/settlement_start', async (req: Request, res: Response) => {
+  const message = req.body as SettlementStartMessage;
+  const { context, message: content } = message;
+  
+  logger.info('Received settlement_start request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    order_id: content.order_id,
+    settlement_type: content.settlement_type,
+  });
+  
+  if (isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+  
+  logEvent(context.transaction_id, context.message_id, 'settlement_start', 'INBOUND', JSON.stringify(message));
+  
+  // Get order
+  const order = getOrderById(content.order_id);
+  if (!order) {
+    return res.json(createNack(context, {
+      code: ErrorCodes.ORDER_NOT_FOUND,
+      message: `Order ${content.order_id} not found`,
+    }));
+  }
+  
+  // Get verification case
+  const db = getDb();
+  const caseResult = db.exec('SELECT * FROM verification_cases WHERE id = ?', [content.verification_case_id]);
+  if (caseResult.length === 0 || caseResult[0].values.length === 0) {
+    return res.json(createNack(context, {
+      code: ErrorCodes.ORDER_NOT_FOUND,
+      message: `Verification case ${content.verification_case_id} not found`,
+    }));
+  }
+  
+  res.json(createAck(context));
+  
+  setTimeout(async () => {
+    try {
+      const settlementId = uuidv4();
+      const caseRow = caseResult[0].values[0];
+      const deliveredQty = caseRow[8] as number || order.total_qty || 0;
+      const pricePerUnit = order.total_price && order.total_qty ? order.total_price / order.total_qty : 0.10; // Default
+      const currency = order.currency || 'USD';
+      
+      // Calculate settlement amount
+      const baseAmount = deliveredQty * pricePerUnit;
+      const deviationQty = caseRow[10] as number || 0;
+      const deviationPercent = caseRow[11] as number || 0;
+      
+      // Simple penalty calculation (5% penalty if deviation > 5%)
+      let penalty = 0;
+      if (deviationPercent > 5.0) {
+        penalty = baseAmount * 0.05;
+      }
+      
+      const finalAmount = baseAmount - penalty;
+      
+      const breakdown = {
+        base_amount: baseAmount,
+        delivered_quantity: deliveredQty,
+        price_per_unit: pricePerUnit,
+        penalty: penalty > 0 ? penalty : undefined,
+        deviation_adjustment: deviationQty !== 0 ? -deviationQty * pricePerUnit : undefined,
+      };
+      
+      // Create settlement
+      db.run(
+        `INSERT INTO settlements (
+          id, order_id, verification_case_id, transaction_id, settlement_type,
+          state, amount_value, currency, period_json, breakdown_json, raw_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          settlementId,
+          content.order_id,
+          content.verification_case_id,
+          context.transaction_id,
+          content.settlement_type,
+          'INITIATED',
+          finalAmount,
+          currency,
+          content.period ? JSON.stringify(content.period) : null,
+          JSON.stringify(breakdown),
+          JSON.stringify(message),
+        ]
+      );
+      saveDb();
+      
+      const callbackContext = createCallbackContext(context, 'on_settlement_initiated');
+      const onSettlementInitiatedMessage: OnSettlementInitiatedMessage = {
+        context: callbackContext,
+        message: {
+          settlement: {
+            id: settlementId,
+            order_id: content.order_id,
+            state: 'INITIATED',
+            amount: { value: finalAmount, currency },
+            period: content.period,
+            breakdown,
+            initiated_at: new Date().toISOString(),
+          },
+        },
+      };
+      
+      logEvent(context.transaction_id, callbackContext.message_id, 'on_settlement_initiated', 'OUTBOUND', JSON.stringify(onSettlementInitiatedMessage));
+      
+      await axios.post(`${context.bap_uri}/callbacks/on_settlement_initiated`, onSettlementInitiatedMessage);
+      logger.info('on_settlement_initiated callback sent successfully', { transaction_id: context.transaction_id });
+      
+      // Simulate settlement progression: INITIATED → PENDING → SETTLED
+      setTimeout(async () => {
+        try {
+          // Update to PENDING
+          db.run('UPDATE settlements SET state = ? WHERE id = ?', ['PENDING', settlementId]);
+          saveDb();
+          
+          const pendingContext = createCallbackContext(callbackContext, 'on_settlement_pending');
+          const onSettlementPendingMessage: OnSettlementPendingMessage = {
+            context: pendingContext,
+            message: {
+              settlement: {
+                id: settlementId,
+                order_id: content.order_id,
+                state: 'PENDING',
+                amount: { value: finalAmount, currency },
+                period: content.period,
+                breakdown,
+                initiated_at: onSettlementInitiatedMessage.message.settlement.initiated_at,
+              },
+            },
+          };
+          
+          logEvent(context.transaction_id, pendingContext.message_id, 'on_settlement_pending', 'OUTBOUND', JSON.stringify(onSettlementPendingMessage));
+          await axios.post(`${context.bap_uri}/callbacks/on_settlement_pending`, onSettlementPendingMessage);
+          
+          // After another delay, mark as SETTLED
+          setTimeout(async () => {
+            try {
+              db.run(
+                'UPDATE settlements SET state = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?',
+                ['SETTLED', settlementId]
+              );
+              saveDb();
+              
+              const settledContext = createCallbackContext(pendingContext, 'on_settlement_settled');
+              const onSettlementSettledMessage: OnSettlementSettledMessage = {
+                context: settledContext,
+                message: {
+                  settlement: {
+                    id: settlementId,
+                    order_id: content.order_id,
+                    state: 'SETTLED',
+                    amount: { value: finalAmount, currency },
+                    period: content.period,
+                    breakdown,
+                    initiated_at: onSettlementInitiatedMessage.message.settlement.initiated_at,
+                    completed_at: new Date().toISOString(),
+                  },
+                },
+              };
+              
+              logEvent(context.transaction_id, settledContext.message_id, 'on_settlement_settled', 'OUTBOUND', JSON.stringify(onSettlementSettledMessage));
+              await axios.post(`${context.bap_uri}/callbacks/on_settlement_settled`, onSettlementSettledMessage);
+              logger.info('Settlement completed successfully', { transaction_id: context.transaction_id, settlementId });
+            } catch (error: any) {
+              logger.error(`Failed to send on_settlement_settled callback: ${error.message}`, { transaction_id: context.transaction_id });
+            }
+          }, config.callbackDelay * 2);
+        } catch (error: any) {
+          logger.error(`Failed to send on_settlement_pending callback: ${error.message}`, { transaction_id: context.transaction_id });
+        }
+      }, config.callbackDelay);
+    } catch (error: any) {
+      logger.error(`Failed to send on_settlement_initiated callback: ${error.message}`, { transaction_id: context.transaction_id });
+    }
+  }, config.callbackDelay);
 });
 
 export default router;

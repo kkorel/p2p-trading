@@ -29,8 +29,15 @@ export async function initDb(): Promise<Database> {
     db = new SQL.Database();
   }
   
-  initializeSchema(db);
-  saveDb();
+  // Always initialize schema (CREATE TABLE IF NOT EXISTS ensures idempotency)
+  try {
+    initializeSchema(db);
+    saveDb();
+  } catch (error: any) {
+    console.error('Database schema initialization error:', error?.message || error);
+    // If schema init fails, try to continue anyway - tables might already exist
+    saveDb();
+  }
   
   return db;
 }

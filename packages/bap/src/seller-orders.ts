@@ -63,6 +63,21 @@ export function getOrderById(orderId: string): Order | null {
 }
 
 /**
+ * Get provider_id from order (from database row or order items)
+ */
+export function getOrderProviderId(orderId: string): string | null {
+  const db = getDb();
+  const result = db.exec('SELECT provider_id FROM orders WHERE id = ?', [orderId]);
+  
+  if (result.length === 0 || result[0].values.length === 0) {
+    return null;
+  }
+  
+  const row = rowToObject(result[0].columns, result[0].values[0]);
+  return row.provider_id || null;
+}
+
+/**
  * Create a new order (draft/pending state)
  */
 export function createOrder(

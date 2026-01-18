@@ -18,7 +18,8 @@
     "clean:db": "rm -f packages/*/*.db && echo '✅ All databases cleared (restart services to clear in-memory state)'",
     "clear:all": "bash scripts/clear-all.sh",
     "reset": "npm run clean:db && npm run seed",
-    "flow": "bash scripts/run-flow.sh"
+    "flow": "bash scripts/run-flow.sh",
+    "flow:phase3": "bash scripts/run-phase3.sh"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

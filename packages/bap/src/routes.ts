@@ -11,6 +11,11 @@ import {
   InitMessage,
   ConfirmMessage,
   StatusMessage,
+  VerificationStartMessage,
+  SubmitProofsMessage,
+  AcceptVerificationMessage,
+  RejectVerificationMessage,
+  SettlementStartMessage,
   createContext,
   createLogger,
   config,
@@ -21,9 +26,20 @@ import {
   DeliveryMode,
   CatalogOffer,
   Provider,
+  SettlementType,
 } from '@p2p/shared';
-import { logEvent } from './events';
+import { logEvent, getEventsByTransactionId } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
+import { getOrderById, getOrderProviderId } from './seller-orders';
+import { 
+  getVerificationCaseByOrderId, 
+  createVerificationCase,
+  getProofsByVerificationCaseId,
+} from './verification';
+import { 
+  getSettlementByOrderId,
+  calculateSettlementAmount,
+} from './settlement';
 
 const router = Router();
 const logger = createLogger('BAP');
@@ -494,6 +510,562 @@ router.delete('/api/transactions', (req: Request, res: Response) => {
   clearAllTransactions();
   logger.info(`Cleared ${count} in-memory transactions`);
   res.json({ status: 'ok', cleared: count });
+});
+
+// ============ PHASE-3: VERIFICATION & SETTLEMENT ============
+
+/**
+ * POST /phase3/orders/:orderId/verification/start - Start verification for an ACTIVE order
+ */
+router.post('/phase3/orders/:orderId/verification/start', async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  const { 
+    verification_window,
+    required_proofs,
+    expected_quantity,
+    tolerance_rules,
+    transaction_id
+  } = req.body as {
+    verification_window: TimeWindow;
+    required_proofs: any[];
+    expected_quantity: { value: number; unit: string };
+    tolerance_rules: { max_deviation_percent: number; min_quantity?: number };
+    transaction_id?: string;
+  };
+  
+  // Get order to verify it exists and is ACTIVE
+  const order = getOrderById(orderId);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+  
+  if (order.status !== 'ACTIVE') {
+    return res.status(400).json({ error: `Order must be ACTIVE to start verification. Current status: ${order.status}` });
+  }
+  
+  const txnId = transaction_id || order.transaction_id;
+  
+  // Check if verification case already exists (idempotency)
+  const existingCase = getVerificationCaseByOrderId(orderId);
+  if (existingCase) {
+    logger.info('Verification case already exists', { orderId, caseId: existingCase.id });
+    return res.json({
+      status: 'ok',
+      verification_case_id: existingCase.id,
+      message: 'Verification case already exists',
+    });
+  }
+  
+  // Calculate expiration (default: 24 hours from now, or use deadline from required_proofs)
+  const expiresAt = new Date();
+  if (required_proofs && required_proofs.length > 0) {
+    const latestDeadline = required_proofs
+      .map(p => new Date(p.deadline))
+      .reduce((latest, current) => current > latest ? current : latest, expiresAt);
+    expiresAt.setTime(latestDeadline.getTime());
+  } else {
+    expiresAt.setHours(expiresAt.getHours() + 24);
+  }
+  
+  // Get provider_id from database
+  const providerId = getOrderProviderId(orderId) || order.items[0]?.provider_id || config.bpp.id;
+  
+  // Create context
+  const context = createContext({
+    action: 'verification_start',
+    transaction_id: txnId,
+    bap_id: config.bap.id,
+    bap_uri: config.bap.uri,
+    bpp_id: providerId,
+    bpp_uri: config.bpp.uri,
+  });
+  
+  // Build verification_start message
+  const verificationStartMessage: VerificationStartMessage = {
+    context,
+    message: {
+      order_id: orderId,
+      verification_window,
+      required_proofs,
+      expected_quantity,
+      tolerance_rules,
+    },
+  };
+  
+  logger.info('Sending verification_start request', {
+    transaction_id: txnId,
+    message_id: context.message_id,
+    order_id: orderId,
+  });
+  
+  logEvent(txnId, context.message_id, 'verification_start', 'OUTBOUND', JSON.stringify(verificationStartMessage));
+  
+  try {
+    const response = await axios.post(`${config.urls.bpp}/verification_start`, verificationStartMessage);
+    
+    res.json({
+      status: 'ok',
+      transaction_id: txnId,
+      message_id: context.message_id,
+      order_id: orderId,
+      ack: response.data,
+    });
+  } catch (error: any) {
+    logger.error(`Verification start request failed: ${error.message}`, { transaction_id: txnId, orderId });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /phase3/orders/:orderId/proofs - Submit proof artifacts
+ */
+router.post('/phase3/orders/:orderId/proofs', async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  const { 
+    verification_case_id,
+    proofs,
+    transaction_id
+  } = req.body as {
+    verification_case_id?: string;
+    proofs: any[];
+    transaction_id?: string;
+  };
+  
+  // Get order
+  const order = getOrderById(orderId);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+  
+  // Get verification case
+  const verificationCase = verification_case_id 
+    ? null // TODO: get by ID
+    : getVerificationCaseByOrderId(orderId);
+  
+  if (!verificationCase) {
+    return res.status(404).json({ error: 'Verification case not found. Start verification first.' });
+  }
+  
+  const txnId = transaction_id || order.transaction_id;
+  
+  // Get provider_id from database
+  const providerId = getOrderProviderId(orderId) || order.items[0]?.provider_id || config.bpp.id;
+  
+  // Create context
+  const context = createContext({
+    action: 'submit_proofs',
+    transaction_id: txnId,
+    bap_id: config.bap.id,
+    bap_uri: config.bap.uri,
+    bpp_id: providerId,
+    bpp_uri: config.bpp.uri,
+  });
+  
+  // Build submit_proofs message
+  const submitProofsMessage: SubmitProofsMessage = {
+    context,
+    message: {
+      order_id: orderId,
+      verification_case_id: verificationCase.id,
+      proofs,
+    },
+  };
+  
+  logger.info('Sending submit_proofs request', {
+    transaction_id: txnId,
+    message_id: context.message_id,
+    order_id: orderId,
+    proof_count: proofs.length,
+  });
+  
+  logEvent(txnId, context.message_id, 'submit_proofs', 'OUTBOUND', JSON.stringify(submitProofsMessage));
+  
+  try {
+    const response = await axios.post(`${config.urls.bpp}/submit_proofs`, submitProofsMessage);
+    
+    res.json({
+      status: 'ok',
+      transaction_id: txnId,
+      message_id: context.message_id,
+      order_id: orderId,
+      verification_case_id: verificationCase.id,
+      proof_count: proofs.length,
+      ack: response.data,
+    });
+  } catch (error: any) {
+    logger.error(`Submit proofs request failed: ${error.message}`, { transaction_id: txnId, orderId });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /phase3/orders/:orderId/verification/accept - Buyer accepts verification result
+ */
+router.post('/phase3/orders/:orderId/verification/accept', async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  const { 
+    verification_case_id,
+    transaction_id
+  } = req.body as {
+    verification_case_id?: string;
+    transaction_id?: string;
+  };
+  
+  // Get order
+  const order = getOrderById(orderId);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+  
+  // Get verification case
+  const verificationCase = verification_case_id 
+    ? null // TODO: get by ID
+    : getVerificationCaseByOrderId(orderId);
+  
+  if (!verificationCase) {
+    return res.status(404).json({ error: 'Verification case not found' });
+  }
+  
+  const txnId = transaction_id || order.transaction_id;
+  
+  // Get provider_id from database
+  const providerId = getOrderProviderId(orderId) || order.items[0]?.provider_id || config.bpp.id;
+  
+  // Create context
+  const context = createContext({
+    action: 'accept_verification',
+    transaction_id: txnId,
+    bap_id: config.bap.id,
+    bap_uri: config.bap.uri,
+    bpp_id: providerId,
+    bpp_uri: config.bpp.uri,
+  });
+  
+  // Build accept_verification message
+  const acceptVerificationMessage: AcceptVerificationMessage = {
+    context,
+    message: {
+      order_id: orderId,
+      verification_case_id: verificationCase.id,
+      decision: 'ACCEPTED',
+      timestamp: new Date().toISOString(),
+    },
+  };
+  
+  logger.info('Sending accept_verification request', {
+    transaction_id: txnId,
+    message_id: context.message_id,
+    order_id: orderId,
+  });
+  
+  logEvent(txnId, context.message_id, 'accept_verification', 'OUTBOUND', JSON.stringify(acceptVerificationMessage));
+  
+  try {
+    const response = await axios.post(`${config.urls.bpp}/accept_verification`, acceptVerificationMessage);
+    
+    res.json({
+      status: 'ok',
+      transaction_id: txnId,
+      message_id: context.message_id,
+      order_id: orderId,
+      verification_case_id: verificationCase.id,
+      ack: response.data,
+    });
+  } catch (error: any) {
+    logger.error(`Accept verification request failed: ${error.message}`, { transaction_id: txnId, orderId });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /phase3/orders/:orderId/verification/reject - Buyer rejects verification
+ */
+router.post('/phase3/orders/:orderId/verification/reject', async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  const { 
+    verification_case_id,
+    reason,
+    transaction_id
+  } = req.body as {
+    verification_case_id?: string;
+    reason?: string;
+    transaction_id?: string;
+  };
+  
+  // Get order
+  const order = getOrderById(orderId);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+  
+  // Get verification case
+  const verificationCase = verification_case_id 
+    ? null // TODO: get by ID
+    : getVerificationCaseByOrderId(orderId);
+  
+  if (!verificationCase) {
+    return res.status(404).json({ error: 'Verification case not found' });
+  }
+  
+  const txnId = transaction_id || order.transaction_id;
+  
+  // Get provider_id from database
+  const providerId = getOrderProviderId(orderId) || order.items[0]?.provider_id || config.bpp.id;
+  
+  // Create context
+  const context = createContext({
+    action: 'reject_verification',
+    transaction_id: txnId,
+    bap_id: config.bap.id,
+    bap_uri: config.bap.uri,
+    bpp_id: providerId,
+    bpp_uri: config.bpp.uri,
+  });
+  
+  // Build reject_verification message
+  const rejectVerificationMessage: RejectVerificationMessage = {
+    context,
+    message: {
+      order_id: orderId,
+      verification_case_id: verificationCase.id,
+      decision: 'REJECTED',
+      reason: reason || 'Buyer rejected verification',
+      timestamp: new Date().toISOString(),
+    },
+  };
+  
+  logger.info('Sending reject_verification request', {
+    transaction_id: txnId,
+    message_id: context.message_id,
+    order_id: orderId,
+    reason,
+  });
+  
+  logEvent(txnId, context.message_id, 'reject_verification', 'OUTBOUND', JSON.stringify(rejectVerificationMessage));
+  
+  try {
+    const response = await axios.post(`${config.urls.bpp}/reject_verification`, rejectVerificationMessage);
+    
+    res.json({
+      status: 'ok',
+      transaction_id: txnId,
+      message_id: context.message_id,
+      order_id: orderId,
+      verification_case_id: verificationCase.id,
+      ack: response.data,
+    });
+  } catch (error: any) {
+    logger.error(`Reject verification request failed: ${error.message}`, { transaction_id: txnId, orderId });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /phase3/orders/:orderId/settlement/start - Initiate settlement after verification success
+ */
+router.post('/phase3/orders/:orderId/settlement/start', async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  const { 
+    verification_case_id,
+    settlement_type,
+    period,
+    transaction_id
+  } = req.body as {
+    verification_case_id?: string;
+    settlement_type?: SettlementType;
+    period?: TimeWindow;
+    transaction_id?: string;
+  };
+  
+  // Get order
+  const order = getOrderById(orderId);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+  
+  // Get verification case
+  const verificationCase = verification_case_id 
+    ? null // TODO: get by ID
+    : getVerificationCaseByOrderId(orderId);
+  
+  if (!verificationCase || verificationCase.state !== 'VERIFIED') {
+    return res.status(400).json({ error: 'Verification must be VERIFIED before starting settlement' });
+  }
+  
+  // Check if settlement already exists (idempotency)
+  const existingSettlement = getSettlementByOrderId(orderId);
+  if (existingSettlement) {
+    logger.info('Settlement already exists', { orderId, settlementId: existingSettlement.id });
+    return res.json({
+      status: 'ok',
+      settlement_id: existingSettlement.id,
+      message: 'Settlement already exists',
+    });
+  }
+  
+  const txnId = transaction_id || order.transaction_id;
+  const stlType = settlement_type || 'DAILY';
+  
+  // Get provider_id from database
+  const providerId = getOrderProviderId(orderId) || order.items[0]?.provider_id || config.bpp.id;
+  
+  // Create context
+  const context = createContext({
+    action: 'settlement_start',
+    transaction_id: txnId,
+    bap_id: config.bap.id,
+    bap_uri: config.bap.uri,
+    bpp_id: providerId,
+    bpp_uri: config.bpp.uri,
+  });
+  
+  // Build settlement_start message
+  const settlementStartMessage: SettlementStartMessage = {
+    context,
+    message: {
+      order_id: orderId,
+      verification_case_id: verificationCase.id,
+      settlement_type: stlType,
+      period: period || undefined,
+    },
+  };
+  
+  logger.info('Sending settlement_start request', {
+    transaction_id: txnId,
+    message_id: context.message_id,
+    order_id: orderId,
+    settlement_type: stlType,
+  });
+  
+  logEvent(txnId, context.message_id, 'settlement_start', 'OUTBOUND', JSON.stringify(settlementStartMessage));
+  
+  try {
+    const response = await axios.post(`${config.urls.bpp}/settlement_start`, settlementStartMessage);
+    
+    res.json({
+      status: 'ok',
+      transaction_id: txnId,
+      message_id: context.message_id,
+      order_id: orderId,
+      settlement_type: stlType,
+      ack: response.data,
+    });
+  } catch (error: any) {
+    logger.error(`Settlement start request failed: ${error.message}`, { transaction_id: txnId, orderId });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /phase3/orders/:orderId - Get current verification + settlement state
+ */
+router.get('/phase3/orders/:orderId', (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    
+    // Get order
+    const order = getOrderById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    // Get verification case (may not exist yet)
+    let verificationCase = null;
+    let proofs: any[] = [];
+    try {
+      verificationCase = getVerificationCaseByOrderId(orderId);
+      if (verificationCase) {
+        proofs = getProofsByVerificationCaseId(verificationCase.id);
+      }
+    } catch (error: any) {
+      // Table might not exist yet, or other DB error - just return null
+      logger.warn('Error getting verification case:', { orderId, error: error?.message });
+    }
+    
+    // Get settlement (may not exist yet)
+    let settlement = null;
+    try {
+      settlement = getSettlementByOrderId(orderId);
+    } catch (error: any) {
+      // Table might not exist yet, or other DB error - just return null
+      logger.warn('Error getting settlement:', { orderId, error: error?.message });
+    }
+    
+    // Determine verification decision from state
+    let verificationDecision = null;
+    if (verificationCase) {
+      if (verificationCase.state === 'VERIFIED') {
+        verificationDecision = 'VERIFIED';
+      } else if (verificationCase.state === 'DEVIATED') {
+        verificationDecision = 'DEVIATED';
+      } else if (verificationCase.decision === 'ACCEPTED') {
+        verificationDecision = 'VERIFIED';
+      } else if (verificationCase.decision === 'REJECTED') {
+        verificationDecision = 'DISPUTED';
+      }
+    }
+    
+    res.json({
+      order_id: orderId,
+      order_status: order.status,
+      verification_case: verificationCase ? {
+        id: verificationCase.id,
+        state: verificationCase.state,
+        decision: verificationDecision,
+        expected_qty: verificationCase.expected_qty,
+        delivered_qty_value: verificationCase.delivered_qty,
+        delivered_qty_unit: 'kWh', // Default unit
+        deviation_qty: verificationCase.deviation_qty,
+        deviation_percent: verificationCase.deviation_percent,
+        proofs: proofs.map(p => ({
+          id: p.id,
+          type: p.type,
+          source: p.source,
+          quantity_value: p.quantity_value,
+          timestamp: p.timestamp,
+        })),
+      } : null,
+      settlement: settlement ? {
+        id: settlement.id,
+        state: settlement.state,
+        amount_value: settlement.amount_value,
+        currency: settlement.currency,
+        period: settlement.period_json ? JSON.parse(settlement.period_json) : null,
+        breakdown: settlement.breakdown_json ? JSON.parse(settlement.breakdown_json) : null,
+      } : null,
+    });
+  } catch (error: any) {
+    logger.error('Error in GET /phase3/orders/:orderId', { error: error?.message, stack: error?.stack });
+    res.status(500).json({ error: 'Internal server error', message: error?.message });
+  }
+});
+
+/**
+ * GET /phase3/orders/:orderId/events - Inspect all protocol events for an order
+ */
+router.get('/phase3/orders/:orderId/events', (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  
+  // Get order
+  const order = getOrderById(orderId);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+  
+  // Get events by transaction_id
+  const events = getEventsByTransactionId(order.transaction_id);
+  
+  res.json({
+    order_id: orderId,
+    transaction_id: order.transaction_id,
+    events: events.map(e => ({
+      id: e.id,
+      message_id: e.message_id,
+      action: e.action,
+      direction: e.direction,
+      created_at: e.created_at,
+    })),
+  });
 });
 
 export default router;

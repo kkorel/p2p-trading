@@ -308,6 +308,162 @@
       ]
     },
     {
+      "name": "Phase-3 Flow",
+      "item": [
+        {
+          "name": "1. Start Verification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.verification_case_id) {",
+                  "    pm.environment.set('verification_case_id', jsonData.verification_case_id);",
+                  "    console.log('Verification case ID:', jsonData.verification_case_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verification_window\": {\n    \"startTime\": \"2026-01-18T11:00:00Z\",\n    \"endTime\": \"2026-01-18T15:00:00Z\"\n  },\n  \"required_proofs\": [\n    {\n      \"type\": \"METER_READING\",\n      \"source\": \"meter-123\",\n      \"deadline\": \"2026-01-18T16:00:00Z\"\n    }\n  ],\n  \"expected_quantity\": {\n    \"value\": 30,\n    \"unit\": \"kWh\"\n  },\n  \"tolerance_rules\": {\n    \"max_deviation_percent\": 5.0,\n    \"min_quantity\": 28.5\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bap_url}}/phase3/orders/{{order_id}}/verification/start",
+              "host": ["{{bap_url}}"],
+              "path": ["phase3", "orders", "{{order_id}}", "verification", "start"]
+            },
+            "description": "Start verification for an ACTIVE order. Requires order_id from Phase-1."
+          }
+        },
+        {
+          "name": "2. Submit Proofs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proofs\": [\n    {\n      \"type\": \"METER_READING\",\n      \"source\": \"meter-123\",\n      \"timestamp\": \"2026-01-18T12:00:00Z\",\n      \"value\": {\n        \"quantity\": 15.5,\n        \"unit\": \"kWh\"\n      },\n      \"metadata\": {\n        \"reading_type\": \"START\"\n      }\n    },\n    {\n      \"type\": \"METER_READING\",\n      \"source\": \"meter-123\",\n      \"timestamp\": \"2026-01-18T14:30:00Z\",\n      \"value\": {\n        \"quantity\": 14.5,\n        \"unit\": \"kWh\"\n      },\n      \"metadata\": {\n        \"reading_type\": \"END\"\n      }\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{bap_url}}/phase3/orders/{{order_id}}/proofs",
+              "host": ["{{bap_url}}"],
+              "path": ["phase3", "orders", "{{order_id}}", "proofs"]
+            },
+            "description": "Submit proof artifacts (meter readings, telemetry, etc.) for verification."
+          }
+        },
+        {
+          "name": "3. Accept Verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{bap_url}}/phase3/orders/{{order_id}}/verification/accept",
+              "host": ["{{bap_url}}"],
+              "path": ["phase3", "orders", "{{order_id}}", "verification", "accept"]
+            },
+            "description": "Buyer accepts the verification result."
+          }
+        },
+        {
+          "name": "3b. Reject Verification (Negative Path)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Quantity mismatch\"\n}"
+            },
+            "url": {
+              "raw": "{{bap_url}}/phase3/orders/{{order_id}}/verification/reject",
+              "host": ["{{bap_url}}"],
+              "path": ["phase3", "orders", "{{order_id}}", "verification", "reject"]
+            },
+            "description": "Buyer rejects the verification result (creates dispute)."
+          }
+        },
+        {
+          "name": "4. Start Settlement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"settlement_type\": \"DAILY\",\n  \"period\": {\n    \"startTime\": \"2026-01-18T00:00:00Z\",\n    \"endTime\": \"2026-01-18T23:59:59Z\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bap_url}}/phase3/orders/{{order_id}}/settlement/start",
+              "host": ["{{bap_url}}"],
+              "path": ["phase3", "orders", "{{order_id}}", "settlement", "start"]
+            },
+            "description": "Initiate settlement after verification success."
+          }
+        },
+        {
+          "name": "5. Get Verification & Settlement State",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bap_url}}/phase3/orders/{{order_id}}",
+              "host": ["{{bap_url}}"],
+              "path": ["phase3", "orders", "{{order_id}}"]
+            },
+            "description": "Get current verification and settlement state for an order."
+          }
+        },
+        {
+          "name": "6. Get Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bap_url}}/phase3/orders/{{order_id}}/events",
+              "host": ["{{bap_url}}"],
+              "path": ["phase3", "orders", "{{order_id}}", "events"]
+            },
+            "description": "Inspect all protocol events for an order."
+          }
+        }
+      ]
+    },
+    {
       "name": "Utilities",
       "item": [
         {
