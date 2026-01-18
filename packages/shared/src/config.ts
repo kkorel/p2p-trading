@@ -10,11 +10,11 @@ export const config = {
     bpp: parseInt(process.env.BPP_PORT || '4002'),
   },
   
-  // Service URLs
+  // Service URLs (BAP and BPP now on same host)
   urls: {
     bap: process.env.BAP_URL || 'http://localhost:4000',
     cds: process.env.CDS_URL || 'http://localhost:4001',
-    bpp: process.env.BPP_URL || 'http://localhost:4002',
+    bpp: process.env.BPP_URL || 'http://localhost:4000',
   },
   
   // BAP identity
@@ -23,10 +23,10 @@ export const config = {
     uri: process.env.BAP_URI || 'http://localhost:4000',
   },
   
-  // BPP identity
+  // BPP identity (now on same host as BAP)
   bpp: {
     id: process.env.BPP_ID || 'bpp.p2p-trading.local',
-    uri: process.env.BPP_URI || 'http://localhost:4002',
+    uri: process.env.BPP_URI || 'http://localhost:4000',
   },
   
   // CDS identity

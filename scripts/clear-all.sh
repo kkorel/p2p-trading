@@ -16,7 +16,6 @@ echo "✅ Database files deleted"
 echo "🛑 Stopping all services..."
 lsof -ti:4000 | xargs kill -9 2>/dev/null
 lsof -ti:4001 | xargs kill -9 2>/dev/null
-lsof -ti:4002 | xargs kill -9 2>/dev/null
 echo "✅ Services stopped (in-memory state cleared)"
 
 echo ""

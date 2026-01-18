@@ -20,9 +20,13 @@ export function logEvent(
   saveDb();
 }
 
-export function isDuplicateMessage(message_id: string): boolean {
+/**
+ * Check if we've already processed an INBOUND message with this ID
+ * Only checks INBOUND direction since we share DB between BAP and BPP
+ */
+export function isDuplicateMessage(message_id: string, direction: EventDirection = 'INBOUND'): boolean {
   const db = getDb();
-  const result = db.exec('SELECT 1 FROM events WHERE message_id = ?', [message_id]);
+  const result = db.exec('SELECT 1 FROM events WHERE message_id = ? AND direction = ?', [message_id, direction]);
   return result.length > 0 && result[0].values.length > 0;
 }
 

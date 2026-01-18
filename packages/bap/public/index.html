@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>P2P Energy Trading | Beckn v2</title>
+  <title>P2P Energy Trading | Prosumer Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -20,19 +20,19 @@
       --accent-blue: #3b82f6;
       --accent-blue-dim: rgba(59, 130, 246, 0.15);
       --accent-purple: #8b5cf6;
+      --accent-purple-dim: rgba(139, 92, 246, 0.15);
+      --accent-orange: #f97316;
+      --accent-orange-dim: rgba(249, 115, 22, 0.15);
       --text-primary: #f3f4f6;
       --text-secondary: #9ca3af;
       --text-muted: #6b7280;
       --border: #374151;
       --solar-gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
       --energy-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      --seller-gradient: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
     }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Outfit', sans-serif;
@@ -44,27 +44,18 @@
         radial-gradient(ellipse at 80% 100%, rgba(251, 191, 36, 0.06) 0%, transparent 50%);
     }
 
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
 
-    /* Header */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 3rem;
+      margin-bottom: 2rem;
       padding-bottom: 1.5rem;
       border-bottom: 1px solid var(--border);
     }
 
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
+    .logo { display: flex; align-items: center; gap: 1rem; }
 
     .logo-icon {
       width: 48px;
@@ -116,6 +107,60 @@
       50% { opacity: 0.5; }
     }
 
+    /* Main Tabs */
+    .main-tabs {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .main-tab {
+      padding: 1rem 2rem;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .main-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+    
+    .main-tab.active.buy-tab { 
+      background: var(--accent-green-dim); 
+      border-color: var(--accent-green); 
+      color: var(--accent-green);
+    }
+    
+    .main-tab.active.sell-tab { 
+      background: var(--accent-orange-dim); 
+      border-color: var(--accent-orange); 
+      color: var(--accent-orange);
+    }
+
+    .main-tab-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    .buy-tab .main-tab-icon { background: var(--accent-green-dim); }
+    .sell-tab .main-tab-icon { background: var(--accent-orange-dim); }
+
+    /* Tab Content */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
     /* Main Grid */
     .main-grid {
       display: grid;
@@ -157,28 +202,14 @@
       justify-content: center;
     }
 
-    /* Discovery Form */
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-    }
+    .sell-view .card-title-icon { background: var(--accent-orange-dim); }
 
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
+    /* Form */
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    .form-group.full-width { grid-column: span 2; }
 
-    .form-group.full-width {
-      grid-column: span 2;
-    }
-
-    label {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
+    label { font-size: 0.875rem; color: var(--text-secondary); font-weight: 500; }
 
     input, select {
       padding: 0.875rem 1rem;
@@ -197,6 +228,11 @@
       box-shadow: 0 0 0 3px var(--accent-green-dim);
     }
 
+    .sell-view input:focus, .sell-view select:focus {
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 0 3px var(--accent-orange-dim);
+    }
+
     /* Buttons */
     .btn {
       padding: 1rem 2rem;
@@ -213,38 +249,20 @@
       gap: 0.5rem;
     }
 
-    .btn-primary {
-      background: var(--energy-gradient);
-      color: white;
-    }
+    .btn-primary { background: var(--energy-gradient); color: white; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3); }
+    
+    .btn-seller { background: var(--seller-gradient); color: white; }
+    .btn-seller:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(249, 115, 22, 0.3); }
 
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-    }
-
-    .btn-secondary {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      background: var(--border);
-    }
-
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
+    .btn-secondary { background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-small { padding: 0.5rem 1rem; font-size: 0.875rem; }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
     /* Offers List */
-    .offers-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
+    .offers-grid { display: flex; flex-direction: column; gap: 1rem; }
 
     .offer-card {
       background: var(--bg-secondary);
@@ -257,15 +275,8 @@
       overflow: hidden;
     }
 
-    .offer-card:hover {
-      border-color: var(--accent-green);
-      background: var(--bg-hover);
-    }
-
-    .offer-card.selected {
-      border-color: var(--accent-green);
-      background: var(--accent-green-dim);
-    }
+    .offer-card:hover { border-color: var(--accent-green); background: var(--bg-hover); }
+    .offer-card.selected { border-color: var(--accent-green); background: var(--accent-green-dim); }
 
     .offer-card::before {
       content: '';
@@ -277,17 +288,8 @@
       background: var(--solar-gradient);
     }
 
-    .offer-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1rem;
-    }
-
-    .offer-provider {
-      font-weight: 600;
-      font-size: 1rem;
-    }
+    .offer-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+    .offer-provider { font-weight: 600; font-size: 1rem; }
 
     .offer-price {
       font-family: 'JetBrains Mono', monospace;
@@ -296,34 +298,12 @@
       color: var(--accent-green);
     }
 
-    .offer-price span {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
+    .offer-price span { font-size: 0.75rem; color: var(--text-muted); }
 
-    .offer-details {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-    }
-
-    .offer-detail {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .offer-detail-label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .offer-detail-value {
-      font-size: 0.875rem;
-      font-weight: 500;
-    }
+    .offer-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .offer-detail { display: flex; flex-direction: column; gap: 0.25rem; }
+    .offer-detail-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .offer-detail-value { font-size: 0.875rem; font-weight: 500; }
 
     .trust-badge {
       display: inline-flex;
@@ -337,17 +317,9 @@
     }
 
     /* Order Panel */
-    .order-panel {
-      position: sticky;
-      top: 2rem;
-    }
+    .order-panel { position: sticky; top: 2rem; }
 
-    .order-summary {
-      background: var(--bg-secondary);
-      border-radius: 12px;
-      padding: 1.25rem;
-      margin-bottom: 1.5rem;
-    }
+    .order-summary { background: var(--bg-secondary); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
 
     .order-row {
       display: flex;
@@ -356,28 +328,12 @@
       border-bottom: 1px solid var(--border);
     }
 
-    .order-row:last-child {
-      border-bottom: none;
-      padding-top: 1rem;
-      font-weight: 600;
-      font-size: 1.125rem;
-    }
-
-    .order-row-label {
-      color: var(--text-secondary);
-    }
-
-    .order-row-value {
-      font-family: 'JetBrains Mono', monospace;
-    }
+    .order-row:last-child { border-bottom: none; padding-top: 1rem; font-weight: 600; font-size: 1.125rem; }
+    .order-row-label { color: var(--text-secondary); }
+    .order-row-value { font-family: 'JetBrains Mono', monospace; }
 
     /* Transaction Status */
-    .transaction-status {
-      background: var(--bg-secondary);
-      border-radius: 12px;
-      padding: 1.25rem;
-      margin-top: 1.5rem;
-    }
+    .transaction-status { background: var(--bg-secondary); border-radius: 12px; padding: 1.25rem; margin-top: 1.5rem; }
 
     .status-step {
       display: flex;
@@ -397,9 +353,7 @@
       background: var(--border);
     }
 
-    .status-step:last-child::before {
-      display: none;
-    }
+    .status-step:last-child::before { display: none; }
 
     .status-icon {
       width: 32px;
@@ -414,50 +368,76 @@
       z-index: 1;
     }
 
-    .status-icon.complete {
-      background: var(--accent-green);
-      border-color: var(--accent-green);
+    .status-icon.complete { background: var(--accent-green); border-color: var(--accent-green); }
+    .status-icon.active { background: var(--accent-blue); border-color: var(--accent-blue); animation: pulse 1s infinite; }
+    .status-label { font-size: 0.875rem; }
+    .status-label.complete { color: var(--accent-green); }
+    .status-label.active { color: var(--accent-blue); }
+
+    /* Stats Grid (Seller) */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
     }
 
-    .status-icon.active {
-      background: var(--accent-blue);
-      border-color: var(--accent-blue);
-      animation: pulse 1s infinite;
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      background: linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
-    .status-label {
-      font-size: 0.875rem;
+    .stat-label { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+    /* Seller Tabs */
+    .seller-tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
+
+    .seller-tab {
+      padding: 0.75rem 1.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
     }
 
-    .status-label.complete {
-      color: var(--accent-green);
+    .seller-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .seller-tab.active { background: var(--accent-orange-dim); border-color: var(--accent-orange); color: var(--accent-orange); }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-weight: 500; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    tr:hover { background: var(--bg-hover); }
+
+    .badge {
+      display: inline-flex;
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
     }
 
-    .status-label.active {
-      color: var(--accent-blue);
-    }
+    .badge-solar { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+    .badge-wind { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+    .badge-active { background: var(--accent-green-dim); color: var(--accent-green); }
+    .badge-pending { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
 
     /* Empty State */
-    .empty-state {
-      text-align: center;
-      padding: 3rem;
-      color: var(--text-muted);
-    }
-
-    .empty-state-icon {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-      opacity: 0.5;
-    }
+    .empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
+    .empty-state-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
 
     /* Loading */
-    .loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem;
-    }
-
     .spinner {
       width: 32px;
       height: 32px;
@@ -467,9 +447,7 @@
       animation: spin 1s linear infinite;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Toast */
     .toast {
@@ -490,38 +468,24 @@
       z-index: 1000;
     }
 
-    .toast.show {
-      transform: translateY(0);
-      opacity: 1;
-    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.error { border-color: #ef4444; }
 
-    .toast.error {
-      border-color: #ef4444;
-    }
+    /* Provider Setup */
+    .provider-setup { margin-bottom: 2rem; }
 
     /* Responsive */
     @media (max-width: 1024px) {
-      .main-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      .order-panel {
-        position: static;
-      }
+      .main-grid { grid-template-columns: 1fr; }
+      .order-panel { position: static; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
     @media (max-width: 640px) {
-      .form-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      .form-group.full-width {
-        grid-column: span 1;
-      }
-      
-      .offer-details {
-        grid-template-columns: 1fr 1fr;
-      }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-group.full-width { grid-column: span 1; }
+      .offer-details { grid-template-columns: 1fr 1fr; }
+      .main-tabs { flex-direction: column; }
     }
   </style>
 </head>
@@ -532,7 +496,7 @@
         <div class="logo-icon">⚡</div>
         <div>
           <h1>P2P Energy Trading</h1>
-          <span>Beckn v2 Protocol</span>
+          <span>Prosumer Dashboard • Beckn v2</span>
         </div>
       </div>
       <div class="status-indicator">
@@ -541,106 +505,269 @@
       </div>
     </header>
 
-    <div class="main-grid">
-      <div class="main-content">
-        <!-- Discovery Form -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <div class="card-title-icon">🔍</div>
-              Discover Energy Offers
+    <!-- Main Role Tabs -->
+    <div class="main-tabs">
+      <button class="main-tab buy-tab active" onclick="switchMainTab('buy')">
+        <div class="main-tab-icon">🛒</div>
+        Buy Energy
+      </button>
+      <button class="main-tab sell-tab" onclick="switchMainTab('sell')">
+        <div class="main-tab-icon">🏪</div>
+        Sell Energy
+      </button>
+    </div>
+
+    <!-- BUY ENERGY TAB -->
+    <div id="buy-content" class="tab-content active">
+      <div class="main-grid">
+        <div class="main-content">
+          <!-- Discovery Form -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">🔍</div>
+                Discover Energy Offers
+              </div>
+            </div>
+            <form id="discoverForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Energy Source</label>
+                  <select id="sourceType">
+                    <option value="SOLAR">☀️ Solar</option>
+                    <option value="WIND">💨 Wind</option>
+                    <option value="HYDRO">💧 Hydro</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Minimum Quantity (kWh)</label>
+                  <input type="number" id="minQuantity" value="20" min="1">
+                </div>
+                <div class="form-group">
+                  <label>Requested Quantity (kWh)</label>
+                  <input type="number" id="requestedQuantity" value="30" min="1">
+                </div>
+                <div class="form-group">
+                  <label>Schedule Window Start</label>
+                  <input type="datetime-local" id="scheduleStartTime" required>
+                </div>
+                <div class="form-group">
+                  <label>Schedule Window End</label>
+                  <input type="datetime-local" id="scheduleEndTime" required>
+                </div>
+                <div class="form-group full-width">
+                  <button type="submit" class="btn btn-primary" id="discoverBtn">
+                    🔍 Discover Offers
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Available Offers -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">⚡</div>
+                Available Offers
+              </div>
+              <span id="offerCount" style="color: var(--text-muted); font-size: 0.875rem;"></span>
+            </div>
+            <div id="offersContainer" class="offers-grid">
+              <div class="empty-state">
+                <div class="empty-state-icon">🔌</div>
+                <p>Click "Discover Offers" to find available energy</p>
+              </div>
             </div>
           </div>
-          <form id="discoverForm">
-            <div class="form-grid">
+        </div>
+
+        <!-- Order Panel -->
+        <div class="order-panel">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">📋</div>
+                Order Summary
+              </div>
+            </div>
+            <div id="orderSummary">
+              <div class="empty-state" style="padding: 2rem;">
+                <p style="font-size: 0.875rem;">Select an offer to place an order</p>
+              </div>
+            </div>
+            <div id="orderActions" style="display: none;">
+              <button class="btn btn-primary" id="placeOrderBtn" style="width: 100%; margin-bottom: 0.75rem;">
+                ⚡ Place Order
+              </button>
+              <button class="btn btn-secondary" id="clearBtn" style="width: 100%;">
+                Clear Selection
+              </button>
+            </div>
+          </div>
+
+          <div class="card" id="transactionCard" style="display: none;">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">📊</div>
+                Transaction Status
+              </div>
+            </div>
+            <div id="transactionStatus" class="transaction-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SELL ENERGY TAB -->
+    <div id="sell-content" class="tab-content sell-view">
+      <!-- Provider Setup -->
+      <div id="providerSetup" class="card provider-setup">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-title-icon">👤</div>
+            Get Started as Seller
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Select Existing Provider</label>
+            <select id="existingProvider">
+              <option value="">-- Select Provider --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-secondary" onclick="selectProvider()">Continue</button>
+          </div>
+          <div class="form-group full-width" style="text-align: center; padding: 1rem 0; color: var(--text-muted);">
+            — or register as a new provider —
+          </div>
+          <div class="form-group">
+            <label>Provider Name</label>
+            <input type="text" id="newProviderName" placeholder="e.g., SunPower Farms">
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-seller" onclick="registerProvider()">Register</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seller Dashboard (hidden until provider selected) -->
+      <div id="sellerContent" style="display: none;">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="statItems">0</div>
+            <div class="stat-label">Energy Listings</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statOffers">0</div>
+            <div class="stat-label">Active Offers</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statOrders">0</div>
+            <div class="stat-label">Total Orders</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statTrust">0%</div>
+            <div class="stat-label">Trust Score</div>
+          </div>
+        </div>
+
+        <div class="seller-tabs">
+          <button class="seller-tab active" data-tab="listings" onclick="switchSellerTab('listings')">📦 My Listings</button>
+          <button class="seller-tab" data-tab="offers" onclick="switchSellerTab('offers')">💰 Offers</button>
+          <button class="seller-tab" data-tab="orders" onclick="switchSellerTab('orders')">📋 Orders</button>
+          <button class="seller-tab" data-tab="add" onclick="switchSellerTab('add')">➕ Add New</button>
+        </div>
+
+        <div id="seller-tab-listings" class="seller-tab-content">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-title-icon">⚡</div>My Energy Listings</div>
+            </div>
+            <div id="itemsTable"></div>
+          </div>
+        </div>
+
+        <div id="seller-tab-offers" class="seller-tab-content" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-title-icon">💰</div>My Offers</div>
+            </div>
+            <div id="offersTable"></div>
+          </div>
+        </div>
+
+        <div id="seller-tab-orders" class="seller-tab-content" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-title-icon">📋</div>Incoming Orders</div>
+            </div>
+            <div id="ordersTable"></div>
+          </div>
+        </div>
+
+        <div id="seller-tab-add" class="seller-tab-content" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-title-icon">📦</div>Add Energy Listing</div>
+            </div>
+            <form id="addItemForm" class="form-grid">
               <div class="form-group">
                 <label>Energy Source</label>
-                <select id="sourceType">
+                <select id="itemSourceType" required>
                   <option value="SOLAR">☀️ Solar</option>
                   <option value="WIND">💨 Wind</option>
                   <option value="HYDRO">💧 Hydro</option>
                 </select>
               </div>
               <div class="form-group">
-                <label>Minimum Quantity (kWh)</label>
-                <input type="number" id="minQuantity" value="20" min="1">
+                <label>Available Quantity (kWh)</label>
+                <input type="number" id="itemAvailableQty" value="100" min="1" required>
               </div>
               <div class="form-group">
-                <label>Requested Quantity (kWh)</label>
-                <input type="number" id="requestedQuantity" value="30" min="1">
-              </div>
-              <div class="form-group">
-                <label>Schedule Window Start</label>
-                <input type="datetime-local" id="scheduleStartTime" required>
-                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">When you need energy delivery to start</small>
-              </div>
-              <div class="form-group">
-                <label>Schedule Window End</label>
-                <input type="datetime-local" id="scheduleEndTime" required>
-                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">When you need energy delivery to end</small>
+                <label>Meter ID</label>
+                <input type="text" id="itemMeterId" placeholder="auto-generated">
               </div>
               <div class="form-group full-width">
-                <button type="submit" class="btn btn-primary" id="discoverBtn">
-                  🔍 Discover Offers
-                </button>
+                <button type="submit" class="btn btn-seller">➕ Add Listing</button>
               </div>
-            </div>
-          </form>
-        </div>
-
-        <!-- Available Offers -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <div class="card-title-icon">⚡</div>
-              Available Offers
-            </div>
-            <span id="offerCount" style="color: var(--text-muted); font-size: 0.875rem;"></span>
-          </div>
-          <div id="offersContainer" class="offers-grid">
-            <div class="empty-state">
-              <div class="empty-state-icon">🔌</div>
-              <p>Click "Discover Offers" to find available energy</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Order Panel -->
-      <div class="order-panel">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <div class="card-title-icon">📋</div>
-              Order Summary
-            </div>
-          </div>
-          
-          <div id="orderSummary">
-            <div class="empty-state" style="padding: 2rem;">
-              <p style="font-size: 0.875rem;">Select an offer to place an order</p>
-            </div>
+            </form>
           </div>
 
-          <div id="orderActions" style="display: none;">
-            <button class="btn btn-primary" id="placeOrderBtn" style="width: 100%; margin-bottom: 0.75rem;">
-              ⚡ Place Order
-            </button>
-            <button class="btn btn-secondary" id="clearBtn" style="width: 100%;">
-              Clear Selection
-            </button>
-          </div>
-        </div>
-
-        <!-- Transaction Status -->
-        <div class="card" id="transactionCard" style="display: none;">
-          <div class="card-header">
-            <div class="card-title">
-              <div class="card-title-icon">📊</div>
-              Transaction Status
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-title-icon">💰</div>Add Offer for Item</div>
             </div>
-          </div>
-          <div id="transactionStatus" class="transaction-status">
+            <form id="addOfferForm" class="form-grid">
+              <div class="form-group full-width">
+                <label>Select Item</label>
+                <select id="offerItemId" required>
+                  <option value="">-- Select Item --</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Price ($/kWh)</label>
+                <input type="number" id="offerPrice" value="0.10" min="0.01" step="0.01" required>
+              </div>
+              <div class="form-group">
+                <label>Max Quantity (kWh)</label>
+                <input type="number" id="offerMaxQty" value="50" min="1" required>
+              </div>
+              <div class="form-group">
+                <label>Time Window Start</label>
+                <input type="datetime-local" id="offerStartTime" required>
+              </div>
+              <div class="form-group">
+                <label>Time Window End</label>
+                <input type="datetime-local" id="offerEndTime" required>
+              </div>
+              <div class="form-group full-width">
+                <button type="submit" class="btn btn-seller">💰 Create Offer</button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
@@ -653,13 +780,28 @@
   </div>
 
   <script>
-    // State
+    // ==================== STATE ====================
     let currentTransaction = null;
     let selectedOffer = null;
     let catalog = null;
+    let currentProvider = null;
 
-    // API Helpers
+    // ==================== MAIN TAB SWITCHING ====================
+    function switchMainTab(tab) {
+      document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      document.querySelector(`.${tab}-tab`).classList.add('active');
+      document.getElementById(`${tab}-content`).classList.add('active');
+      
+      if (tab === 'sell') {
+        loadProviders();
+      }
+    }
+
+    // ==================== API ====================
     const api = {
+      // Buyer APIs
       async discover(params) {
         const res = await fetch('/api/discover', {
           method: 'POST',
@@ -668,7 +810,6 @@
         });
         return res.json();
       },
-      
       async select(params) {
         const res = await fetch('/api/select', {
           method: 'POST',
@@ -677,7 +818,6 @@
         });
         return res.json();
       },
-      
       async init(transactionId) {
         const res = await fetch('/api/init', {
           method: 'POST',
@@ -686,7 +826,6 @@
         });
         return res.json();
       },
-      
       async confirm(transactionId, orderId) {
         const res = await fetch('/api/confirm', {
           method: 'POST',
@@ -695,40 +834,68 @@
         });
         return res.json();
       },
-      
       async getTransaction(transactionId) {
         const res = await fetch(`/api/transactions/${transactionId}`);
         return res.json();
+      },
+      
+      // Seller APIs
+      async getProviders() {
+        const res = await fetch('/seller/providers');
+        return res.json();
+      },
+      async registerProvider(name) {
+        const res = await fetch('/seller/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        return res.json();
+      },
+      async getProviderDetails(id) {
+        const res = await fetch(`/seller/providers/${id}`);
+        return res.json();
+      },
+      async addItem(data) {
+        const res = await fetch('/seller/items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return res.json();
+      },
+      async addOffer(data) {
+        const res = await fetch('/seller/offers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return res.json();
+      },
+      async getOrders(providerId) {
+        const res = await fetch(`/seller/orders?provider_id=${providerId}`);
+        return res.json();
+      },
+      async deleteOffer(id) {
+        await fetch(`/seller/offers/${id}`, { method: 'DELETE' });
       }
     };
 
-    // UI Helpers
+    // ==================== UI HELPERS ====================
     function showToast(message, isError = false) {
       const toast = document.getElementById('toast');
-      const toastIcon = document.getElementById('toastIcon');
-      const toastMessage = document.getElementById('toastMessage');
-      
-      toastIcon.textContent = isError ? '✕' : '✓';
-      toastMessage.textContent = message;
+      document.getElementById('toastIcon').textContent = isError ? '✕' : '✓';
+      document.getElementById('toastMessage').textContent = message;
       toast.className = 'toast show' + (isError ? ' error' : '');
-      
-      setTimeout(() => {
-        toast.className = 'toast';
-      }, 3000);
+      setTimeout(() => { toast.className = 'toast'; }, 3000);
     }
 
-    function formatPrice(value) {
-      return '$' + value.toFixed(2);
-    }
-
+    function formatPrice(value) { return '$' + value.toFixed(2); }
     function formatTime(isoString) {
-      return new Date(isoString).toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
+      return new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // Render Offers with matching scores
+    // ==================== BUYER FUNCTIONS ====================
     function renderOffers(providers, matchingResults = null) {
       const container = document.getElementById('offersContainer');
       let offers = [];
@@ -747,30 +914,21 @@
       });
       
       if (offers.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">😕</div>
-            <p>No offers match your criteria</p>
-          </div>
-        `;
+        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">😕</div><p>No offers match your criteria</p></div>`;
         document.getElementById('offerCount').textContent = '';
         return;
       }
       
-      // Apply matching scores if available
       if (matchingResults && matchingResults.allOffers) {
         const scoreMap = new Map();
         matchingResults.allOffers.forEach(m => {
           scoreMap.set(m.offer.id, { score: m.score, breakdown: m.breakdown });
         });
-        
         offers = offers.map(o => ({
           ...o,
           matchScore: scoreMap.get(o.id)?.score || 0,
           matchBreakdown: scoreMap.get(o.id)?.breakdown,
         }));
-        
-        // Sort by score (best first)
         offers.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
       }
       
@@ -778,7 +936,7 @@
       document.getElementById('offerCount').textContent = `${offers.length} offer${offers.length > 1 ? 's' : ''} found` + 
         (bestOfferId ? ' • Best match highlighted' : '');
       
-      container.innerHTML = offers.map((offer, idx) => {
+      container.innerHTML = offers.map(offer => {
         const isBest = offer.id === bestOfferId;
         const scorePercent = offer.matchScore ? Math.round(offer.matchScore * 100) : null;
         
@@ -788,100 +946,47 @@
           <div class="offer-header">
             <div>
               <div class="offer-provider">${offer.providerName}</div>
-              ${scorePercent !== null ? `
-                <div class="trust-badge" style="background: ${scorePercent > 70 ? 'var(--accent-green-dim)' : 'var(--accent-yellow-dim)'}; color: ${scorePercent > 70 ? 'var(--accent-green)' : 'var(--accent-yellow)'};">
-                  🎯 Match: ${scorePercent}%
-                </div>
-              ` : '<div class="trust-badge">⭐ Trust Score</div>'}
+              ${scorePercent !== null ? `<div class="trust-badge" style="background: ${scorePercent > 70 ? 'var(--accent-green-dim)' : 'var(--accent-yellow-dim)'}; color: ${scorePercent > 70 ? 'var(--accent-green)' : 'var(--accent-yellow)'};">🎯 Match: ${scorePercent}%</div>` : '<div class="trust-badge">⭐ Trust Score</div>'}
             </div>
-            <div class="offer-price">
-              ${formatPrice(offer.price.value)} <span>/kWh</span>
-            </div>
+            <div class="offer-price">${formatPrice(offer.price.value)} <span>/kWh</span></div>
           </div>
           <div class="offer-details">
-            <div class="offer-detail">
-              <span class="offer-detail-label">Source</span>
-              <span class="offer-detail-value">${offer.sourceType === 'SOLAR' ? '☀️' : offer.sourceType === 'WIND' ? '💨' : '⚡'} ${offer.sourceType}</span>
-            </div>
-            <div class="offer-detail">
-              <span class="offer-detail-label">Max Qty</span>
-              <span class="offer-detail-value">${offer.maxQuantity} kWh</span>
-            </div>
-            <div class="offer-detail">
-              <span class="offer-detail-label">Time Window</span>
-              <span class="offer-detail-value">${formatTime(offer.timeWindow.startTime)} - ${formatTime(offer.timeWindow.endTime)}</span>
-            </div>
+            <div class="offer-detail"><span class="offer-detail-label">Source</span><span class="offer-detail-value">${offer.sourceType === 'SOLAR' ? '☀️' : offer.sourceType === 'WIND' ? '💨' : '⚡'} ${offer.sourceType}</span></div>
+            <div class="offer-detail"><span class="offer-detail-label">Max Qty</span><span class="offer-detail-value">${offer.maxQuantity} kWh</span></div>
+            <div class="offer-detail"><span class="offer-detail-label">Time Window</span><span class="offer-detail-value">${formatTime(offer.timeWindow.startTime)} - ${formatTime(offer.timeWindow.endTime)}</span></div>
           </div>
-          ${offer.matchBreakdown ? `
-            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.7rem;">
-              <div style="text-align: center;">
-                <div style="color: var(--text-muted);">Price</div>
-                <div style="color: var(--accent-green);">${Math.round(offer.matchBreakdown.priceScore * 100)}%</div>
-              </div>
-              <div style="text-align: center;">
-                <div style="color: var(--text-muted);">Trust</div>
-                <div style="color: var(--accent-yellow);">${Math.round(offer.matchBreakdown.trustScore * 100)}%</div>
-              </div>
-              <div style="text-align: center;">
-                <div style="color: var(--text-muted);">Time</div>
-                <div style="color: var(--accent-blue);">${Math.round(offer.matchBreakdown.timeScore * 100)}%</div>
-              </div>
-            </div>
-          ` : ''}
         </div>
       `}).join('');
       
-      // Add click handlers
       container.querySelectorAll('.offer-card').forEach(card => {
         card.addEventListener('click', () => selectOffer(card, offers.find(o => o.id === card.dataset.offerId)));
       });
       
-      // Auto-select best match
       if (bestOfferId) {
         const bestCard = container.querySelector(`[data-offer-id="${bestOfferId}"]`);
         const bestOffer = offers.find(o => o.id === bestOfferId);
-        if (bestCard && bestOffer) {
-          selectOffer(bestCard, bestOffer);
-        }
+        if (bestCard && bestOffer) selectOffer(bestCard, bestOffer);
       }
     }
 
-    // Select Offer
     function selectOffer(card, offer) {
-      // Update UI
       document.querySelectorAll('.offer-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
-      
       selectedOffer = offer;
-      
       const quantity = parseInt(document.getElementById('requestedQuantity').value);
       const totalPrice = offer.price.value * quantity;
       
       document.getElementById('orderSummary').innerHTML = `
         <div class="order-summary">
-          <div class="order-row">
-            <span class="order-row-label">Provider</span>
-            <span class="order-row-value">${offer.providerName}</span>
-          </div>
-          <div class="order-row">
-            <span class="order-row-label">Quantity</span>
-            <span class="order-row-value">${quantity} kWh</span>
-          </div>
-          <div class="order-row">
-            <span class="order-row-label">Unit Price</span>
-            <span class="order-row-value">${formatPrice(offer.price.value)}/kWh</span>
-          </div>
-          <div class="order-row">
-            <span class="order-row-label">Total</span>
-            <span class="order-row-value" style="color: var(--accent-green);">${formatPrice(totalPrice)}</span>
-          </div>
+          <div class="order-row"><span class="order-row-label">Provider</span><span class="order-row-value">${offer.providerName}</span></div>
+          <div class="order-row"><span class="order-row-label">Quantity</span><span class="order-row-value">${quantity} kWh</span></div>
+          <div class="order-row"><span class="order-row-label">Unit Price</span><span class="order-row-value">${formatPrice(offer.price.value)}/kWh</span></div>
+          <div class="order-row"><span class="order-row-label">Total</span><span class="order-row-value" style="color: var(--accent-green);">${formatPrice(totalPrice)}</span></div>
         </div>
       `;
-      
       document.getElementById('orderActions').style.display = 'block';
     }
 
-    // Render Transaction Status
     function renderTransactionStatus(status, order) {
       const steps = [
         { id: 'discover', label: 'Catalog Discovered', icon: '🔍' },
@@ -890,49 +995,129 @@
         { id: 'confirm', label: 'Order Confirmed', icon: '✓' },
         { id: 'active', label: 'Trade Active', icon: '⚡' }
       ];
-      
-      const statusMap = {
-        'DISCOVERING': 0,
-        'SELECTING': 1,
-        'INITIALIZING': 2,
-        'CONFIRMING': 3,
-        'ACTIVE': 4,
-        'COMPLETED': 4
-      };
-      
+      const statusMap = { 'DISCOVERING': 0, 'SELECTING': 1, 'INITIALIZING': 2, 'CONFIRMING': 3, 'ACTIVE': 4, 'COMPLETED': 4 };
       const currentStep = statusMap[status] ?? 0;
       
       document.getElementById('transactionCard').style.display = 'block';
       document.getElementById('transactionStatus').innerHTML = steps.map((step, idx) => {
         const isComplete = idx < currentStep;
         const isActive = idx === currentStep;
-        
-        return `
-          <div class="status-step">
-            <div class="status-icon ${isComplete ? 'complete' : ''} ${isActive ? 'active' : ''}">
-              ${isComplete ? '✓' : step.icon}
-            </div>
-            <span class="status-label ${isComplete ? 'complete' : ''} ${isActive ? 'active' : ''}">
-              ${step.label}
-            </span>
-          </div>
-        `;
+        return `<div class="status-step"><div class="status-icon ${isComplete ? 'complete' : ''} ${isActive ? 'active' : ''}">${isComplete ? '✓' : step.icon}</div><span class="status-label ${isComplete ? 'complete' : ''} ${isActive ? 'active' : ''}">${step.label}</span></div>`;
       }).join('');
       
       if (order) {
-        document.getElementById('transactionStatus').innerHTML += `
-          <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">
-            Order ID: ${order.id?.substring(0, 8)}...<br>
-            Status: <span style="color: var(--accent-green);">${order.status}</span>
-          </div>
-        `;
+        document.getElementById('transactionStatus').innerHTML += `<div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">Order ID: ${order.id?.substring(0, 8)}...<br>Status: <span style="color: var(--accent-green);">${order.status}</span></div>`;
       }
     }
 
-    // Event Handlers
+    // ==================== SELLER FUNCTIONS ====================
+    async function loadProviders() {
+      const { providers } = await api.getProviders();
+      const select = document.getElementById('existingProvider');
+      select.innerHTML = '<option value="">-- Select Provider --</option>';
+      providers.forEach(p => {
+        select.innerHTML += `<option value="${p.id}">${p.name} (Trust: ${(p.trust_score * 100).toFixed(0)}%)</option>`;
+      });
+    }
+
+    async function registerProvider() {
+      const name = document.getElementById('newProviderName').value.trim();
+      if (!name) return showToast('Enter a provider name', true);
+      const { provider } = await api.registerProvider(name);
+      currentProvider = provider;
+      showToast(`Registered as ${provider.name}!`);
+      await loadProviders();
+      showSellerDashboard();
+    }
+
+    async function selectProvider() {
+      const id = document.getElementById('existingProvider').value;
+      if (!id) return showToast('Select a provider', true);
+      const { provider } = await api.getProviderDetails(id);
+      currentProvider = provider;
+      showSellerDashboard();
+    }
+
+    async function showSellerDashboard() {
+      document.getElementById('providerSetup').style.display = 'none';
+      document.getElementById('sellerContent').style.display = 'block';
+      await refreshSellerData();
+    }
+
+    async function refreshSellerData() {
+      const { provider, items, offers } = await api.getProviderDetails(currentProvider.id);
+      const { orders } = await api.getOrders(currentProvider.id);
+      
+      document.getElementById('statItems').textContent = items.length;
+      document.getElementById('statOffers').textContent = offers.length;
+      document.getElementById('statOrders').textContent = orders.length;
+      document.getElementById('statTrust').textContent = `${(provider.trust_score * 100).toFixed(0)}%`;
+      
+      renderSellerItems(items);
+      renderSellerOffers(offers);
+      renderSellerOrders(orders);
+      updateItemSelect(items);
+    }
+
+    function renderSellerItems(items) {
+      const container = document.getElementById('itemsTable');
+      if (items.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><p>No energy listings yet.</p></div>';
+        return;
+      }
+      container.innerHTML = `<table><thead><tr><th>ID</th><th>Source</th><th>Mode</th><th>Available</th></tr></thead><tbody>${items.map(i => `<tr><td><code>${i.id}</code></td><td><span class="badge badge-${i.source_type.toLowerCase()}">${i.source_type}</span></td><td>${i.delivery_mode}</td><td>${i.available_qty} kWh</td></tr>`).join('')}</tbody></table>`;
+    }
+
+    function renderSellerOffers(offers) {
+      const container = document.getElementById('offersTable');
+      if (offers.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💰</div><p>No offers yet.</p></div>';
+        return;
+      }
+      container.innerHTML = `<table><thead><tr><th>ID</th><th>Item</th><th>Price</th><th>Blocks</th><th>Available</th><th></th></tr></thead><tbody>${offers.map(o => {
+        const stats = o.blockStats || { total: o.maxQuantity, available: 0 };
+        return `<tr><td><code>${o.id}</code></td><td><code>${o.item_id}</code></td><td style="color: var(--accent-green);">$${o.price.value.toFixed(2)}/kWh</td><td>${stats.total}</td><td style="color: ${stats.available > 0 ? 'var(--accent-green)' : 'var(--text-muted)'};">${stats.available}</td><td><button class="btn btn-small btn-danger" onclick="removeOffer('${o.id}')">Delete</button></td></tr>`;
+      }).join('')}</tbody></table>`;
+    }
+
+    function renderSellerOrders(orders) {
+      const container = document.getElementById('ordersTable');
+      if (orders.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No orders received yet.</p></div>';
+        return;
+      }
+      container.innerHTML = `<table><thead><tr><th>Order ID</th><th>Status</th><th>Qty</th><th>Price</th><th>Created</th></tr></thead><tbody>${orders.map(o => {
+        const qty = o.quote?.totalQuantity || 0;
+        const price = o.quote?.price?.value || 0;
+        return `<tr><td><code>${o.id.substring(0, 8)}...</code></td><td><span class="badge badge-${o.status.toLowerCase()}">${o.status}</span></td><td>${qty} kWh</td><td style="color: var(--accent-green);">$${price.toFixed(2)}</td><td style="font-size: 0.8rem;">${new Date(o.created_at).toLocaleString()}</td></tr>`;
+      }).join('')}</tbody></table>`;
+    }
+
+    function updateItemSelect(items) {
+      const select = document.getElementById('offerItemId');
+      select.innerHTML = '<option value="">-- Select Item --</option>';
+      items.forEach(i => {
+        select.innerHTML += `<option value="${i.id}">${i.id} (${i.source_type}, ${i.available_qty} kWh)</option>`;
+      });
+    }
+
+    function switchSellerTab(tabId) {
+      document.querySelectorAll('.seller-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`.seller-tab[data-tab="${tabId}"]`).classList.add('active');
+      document.querySelectorAll('.seller-tab-content').forEach(c => c.style.display = 'none');
+      document.getElementById(`seller-tab-${tabId}`).style.display = 'block';
+    }
+
+    async function removeOffer(id) {
+      if (!confirm('Delete this offer?')) return;
+      await api.deleteOffer(id);
+      showToast('Offer deleted');
+      await refreshSellerData();
+    }
+
+    // ==================== EVENT HANDLERS ====================
     document.getElementById('discoverForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
       const btn = document.getElementById('discoverBtn');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span> Discovering...';
@@ -942,21 +1127,12 @@
         const endTimeInput = document.getElementById('scheduleEndTime').value;
         
         if (!startTimeInput || !endTimeInput) {
-          showToast('Please select both start and end times for the schedule window', true);
-          return;
-        }
-        
-        const startTime = new Date(startTimeInput);
-        const endTime = new Date(endTimeInput);
-        
-        if (endTime <= startTime) {
-          showToast('End time must be after start time', true);
+          showToast('Please select both start and end times', true);
           return;
         }
         
         const params = {
           sourceType: document.getElementById('sourceType').value,
-          deliveryMode: 'SCHEDULED', // Always scheduled for P2P energy trading
           minQuantity: parseInt(document.getElementById('minQuantity').value),
           timeWindow: {
             startTime: new Date(startTimeInput).toISOString(),
@@ -966,23 +1142,15 @@
         
         const result = await api.discover(params);
         currentTransaction = result.transaction_id;
-        
-        showToast('Discovering offers & running matching algorithm...');
-        
-        // Wait for callback with matching results
+        showToast('Discovering offers...');
         await new Promise(r => setTimeout(r, 600));
         
         const txState = await api.getTransaction(currentTransaction);
         catalog = txState.catalog;
         
         if (catalog?.providers) {
-          // Pass matching results to render function
           renderOffers(catalog.providers, txState.matchingResults);
           renderTransactionStatus('SELECTING');
-          
-          if (txState.matchingResults?.selectedOffer) {
-            showToast(`Best match found: ${Math.round(txState.matchingResults.selectedOffer.score * 100)}% score!`);
-          }
         }
       } catch (err) {
         showToast('Discovery failed: ' + err.message, true);
@@ -994,7 +1162,6 @@
 
     document.getElementById('placeOrderBtn').addEventListener('click', async () => {
       if (!selectedOffer || !currentTransaction) return;
-      
       const btn = document.getElementById('placeOrderBtn');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span> Processing...';
@@ -1002,18 +1169,11 @@
       try {
         const quantity = parseInt(document.getElementById('requestedQuantity').value);
         
-        // Select
         showToast('Selecting offer...');
-        await api.select({
-          transaction_id: currentTransaction,
-          offer_id: selectedOffer.id,
-          item_id: selectedOffer.itemId,
-          quantity: quantity
-        });
+        await api.select({ transaction_id: currentTransaction, offer_id: selectedOffer.id, item_id: selectedOffer.itemId, quantity });
         await new Promise(r => setTimeout(r, 300));
         renderTransactionStatus('INITIALIZING');
         
-        // Init
         showToast('Initializing order...');
         await api.init(currentTransaction);
         await new Promise(r => setTimeout(r, 300));
@@ -1022,7 +1182,6 @@
         const orderId = txState.order?.id;
         renderTransactionStatus('CONFIRMING', txState.order);
         
-        // Confirm
         showToast('Confirming order...');
         await api.confirm(currentTransaction, orderId);
         await new Promise(r => setTimeout(r, 300));
@@ -1030,42 +1189,24 @@
         const finalState = await api.getTransaction(currentTransaction);
         renderTransactionStatus('ACTIVE', finalState.order);
         
-        // Show detailed confirmation and update order summary
         const order = finalState.order;
-        const confirmedQuantity = order?.quote?.totalQuantity || 0;
-        const confirmedPrice = order?.quote?.price?.value || 0;
+        const qty = order?.quote?.totalQuantity || 0;
+        const price = order?.quote?.price?.value || 0;
         
-        // Update order summary to show confirmed order
-        if (order) {
-          document.getElementById('orderSummary').innerHTML = `
-            <div class="order-summary">
-              <div style="background: var(--accent-green-dim); border: 2px solid var(--accent-green); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
-                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✅</div>
-                <div style="font-weight: 600; color: var(--accent-green); font-size: 1.1rem;">Trade Confirmed!</div>
-                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">Order is now ACTIVE</div>
-              </div>
-              <div class="order-row">
-                <span class="order-row-label">Order ID</span>
-                <span class="order-row-value" style="font-size: 0.75rem;">${order.id.substring(0, 12)}...</span>
-              </div>
-              <div class="order-row">
-                <span class="order-row-label">Status</span>
-                <span class="order-row-value" style="color: var(--accent-green); font-weight: 600;">${order.status}</span>
-              </div>
-              <div class="order-row">
-                <span class="order-row-label">Quantity</span>
-                <span class="order-row-value">${confirmedQuantity} kWh</span>
-              </div>
-              <div class="order-row">
-                <span class="order-row-label">Total Price</span>
-                <span class="order-row-value" style="color: var(--accent-green); font-weight: 600;">$${confirmedPrice.toFixed(2)}</span>
-              </div>
+        document.getElementById('orderSummary').innerHTML = `
+          <div class="order-summary">
+            <div style="background: var(--accent-green-dim); border: 2px solid var(--accent-green); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
+              <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✅</div>
+              <div style="font-weight: 600; color: var(--accent-green);">Trade Confirmed!</div>
             </div>
-          `;
-        }
+            <div class="order-row"><span class="order-row-label">Order ID</span><span class="order-row-value" style="font-size: 0.75rem;">${order.id.substring(0, 12)}...</span></div>
+            <div class="order-row"><span class="order-row-label">Status</span><span class="order-row-value" style="color: var(--accent-green);">${order.status}</span></div>
+            <div class="order-row"><span class="order-row-label">Quantity</span><span class="order-row-value">${qty} kWh</span></div>
+            <div class="order-row"><span class="order-row-label">Total Price</span><span class="order-row-value" style="color: var(--accent-green);">$${price.toFixed(2)}</span></div>
+          </div>
+        `;
         
-        showToast(`🎉 Trade Confirmed! ${confirmedQuantity} kWh for $${confirmedPrice.toFixed(2)} - Order is now ACTIVE`);
-        
+        showToast(`🎉 Trade Confirmed! ${qty} kWh for $${price.toFixed(2)}`);
       } catch (err) {
         showToast('Order failed: ' + err.message, true);
       } finally {
@@ -1077,32 +1218,67 @@
     document.getElementById('clearBtn').addEventListener('click', () => {
       selectedOffer = null;
       document.querySelectorAll('.offer-card').forEach(c => c.classList.remove('selected'));
-      document.getElementById('orderSummary').innerHTML = `
-        <div class="empty-state" style="padding: 2rem;">
-          <p style="font-size: 0.875rem;">Select an offer to place an order</p>
-        </div>
-      `;
+      document.getElementById('orderSummary').innerHTML = `<div class="empty-state" style="padding: 2rem;"><p style="font-size: 0.875rem;">Select an offer to place an order</p></div>`;
       document.getElementById('orderActions').style.display = 'none';
     });
 
-    // Set default schedule window (tomorrow 8 AM - 8 PM)
-    function setDefaultScheduleWindow() {
+    document.getElementById('addItemForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {
+        provider_id: currentProvider.id,
+        source_type: document.getElementById('itemSourceType').value,
+        available_qty: parseInt(document.getElementById('itemAvailableQty').value),
+        meter_id: document.getElementById('itemMeterId').value || undefined,
+      };
+      const result = await api.addItem(data);
+      if (result.status === 'ok') {
+        showToast('Energy listing added!');
+        await refreshSellerData();
+        switchSellerTab('listings');
+      } else {
+        showToast(result.error || 'Failed to add item', true);
+      }
+    });
+
+    document.getElementById('addOfferForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {
+        provider_id: currentProvider.id,
+        item_id: document.getElementById('offerItemId').value,
+        price_per_kwh: parseFloat(document.getElementById('offerPrice').value),
+        currency: 'USD',
+        max_qty: parseInt(document.getElementById('offerMaxQty').value),
+        time_window: {
+          startTime: new Date(document.getElementById('offerStartTime').value).toISOString(),
+          endTime: new Date(document.getElementById('offerEndTime').value).toISOString(),
+        }
+      };
+      const result = await api.addOffer(data);
+      if (result.status === 'ok') {
+        showToast('Offer created!');
+        await refreshSellerData();
+        switchSellerTab('offers');
+      } else {
+        showToast(result.error || 'Failed to create offer', true);
+      }
+    });
+
+    // ==================== INITIALIZATION ====================
+    function setDefaultDates() {
       const now = new Date();
       const tomorrow = new Date(now.getTime() + 86400000);
       const format = d => d.toISOString().slice(0, 16);
       
-      const startTime = new Date(tomorrow);
-      startTime.setHours(8, 0, 0, 0);
+      const start = new Date(tomorrow); start.setHours(8, 0, 0, 0);
+      const end = new Date(tomorrow); end.setHours(20, 0, 0, 0);
       
-      const endTime = new Date(tomorrow);
-      endTime.setHours(20, 0, 0, 0);
-      
-      document.getElementById('scheduleStartTime').value = format(startTime);
-      document.getElementById('scheduleEndTime').value = format(endTime);
+      document.getElementById('scheduleStartTime').value = format(start);
+      document.getElementById('scheduleEndTime').value = format(end);
+      document.getElementById('offerStartTime').value = format(start);
+      document.getElementById('offerEndTime').value = format(end);
     }
 
-    // Initialize default schedule window on page load
-    setDefaultScheduleWindow();
+    setDefaultDates();
   </script>
 </body>
 </html>

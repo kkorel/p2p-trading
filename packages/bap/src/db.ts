@@ -1,5 +1,6 @@
 /**
- * BAP Database Connection using sql.js
+ * Combined Database Connection using sql.js
+ * Handles both BAP (consumer) and BPP (provider) data
  */
 
 import initSqlJs, { Database } from 'sql.js';
@@ -7,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { initializeSchema } from '@p2p/shared';
 
-const DB_PATH = path.join(__dirname, '..', 'bap.db');
+const DB_PATH = path.join(__dirname, '..', 'prosumer.db');
 
 let db: Database | null = null;
 
