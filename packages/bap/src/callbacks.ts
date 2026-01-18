@@ -186,7 +186,7 @@ router.post('/on_init', (req: Request, res: Response) => {
 /**
  * POST /callbacks/on_confirm - Receive order confirmation from BPP
  */
-router.post('/on_confirm', (req: Request, res: Response) => {
+router.post('/on_confirm', async (req: Request, res: Response) => {
   const message = req.body as OnConfirmMessage;
   const { context, message: content } = message;
   
@@ -210,7 +210,7 @@ router.post('/on_confirm', (req: Request, res: Response) => {
   logger.info(`Order confirmed: ${content.order.id}, status: ${content.order.status}`, {
     transaction_id: context.transaction_id,
   });
-  
+
   res.json({ status: 'ok', order_id: content.order.id, order_status: content.order.status });
 });
 

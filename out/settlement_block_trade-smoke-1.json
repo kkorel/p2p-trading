@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "tradeId": "trade-smoke-1",
+  "transaction_id": "tx-smoke-1",
+  "order_id": "trade-smoke-1",
+  "status": "BLOCK_CONFIRMED",
+  "quote": {
+    "tradeId": "trade-smoke-1",
+    "principalInr": 100,
+    "feeInr": 0.03,
+    "totalBlockedInr": 100.03
+  },
+  "bank": {
+    "blockId": "blk_trade-smoke-1",
+    "tradeId": "trade-smoke-1",
+    "blockedAmountInr": 100.03,
+    "status": "BLOCKED"
+  },
+  "ts": "2026-01-18T12:45:33.832Z"
+}

@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "kill-ports": "lsof -ti:4000 | xargs kill -9 2>/dev/null; lsof -ti:4001 | xargs kill -9 2>/dev/null; echo 'Ports cleared'",
-    "predev": "npm run kill-ports || true",
+    "kill-ports": "node -e \"const killPort=require('kill-port'); Promise.all([4000,4001,4002].map((port)=>killPort(port).catch(()=>{}))).then(()=>console.log('Ports cleared'));\"",
+    "predev": "npm run kill-ports",
     "dev": "concurrently \"npm run dev -w @p2p/cds-mock\" \"npm run dev -w @p2p/bap\"",
     "dev:cds": "npm run dev -w @p2p/cds-mock",
     "dev:prosumer": "npm run dev -w @p2p/bap",
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "kill-port": "^2.0.1",
     "typescript": "^5.3.3"
   },
   "engines": {

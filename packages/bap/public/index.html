@@ -374,6 +374,229 @@
     .status-label.complete { color: var(--accent-green); }
     .status-label.active { color: var(--accent-blue); }
 
+    /* Payment Workflow */
+    .payment-workflow { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .payment-step { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); font-size: 0.85rem; }
+    .payment-step.complete { border-color: var(--accent-green); }
+    .payment-step.pending { color: var(--text-muted); }
+    .payment-step.error { border-color: #ef4444; }
+    .payment-step.skipped { border-color: var(--accent-yellow); color: var(--accent-yellow); }
+    .payment-step .step-id { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-secondary); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--text-secondary); flex-shrink: 0; border: 1px solid var(--border); }
+    .payment-step.complete .step-id { background: var(--accent-green); color: white; border-color: var(--accent-green); }
+    .payment-step.error .step-id { background: #ef4444; color: white; border-color: #ef4444; }
+    .payment-step.skipped .step-id { background: var(--accent-yellow); color: #111827; border-color: var(--accent-yellow); }
+    .payment-step .step-text { display: flex; flex-direction: column; gap: 0.2rem; }
+    .payment-step .step-detail { font-size: 0.75rem; color: var(--text-muted); }
+    .verification-actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; }
+
+    /* Transfer Flow Visualization */
+    .transfer-flow { display: flex; align-items: center; justify-content: space-between; padding: 1rem 0; }
+    .transfer-step { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; flex: 1; }
+    .transfer-icon { font-size: 2rem; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: var(--bg-secondary); border-radius: 50%; border: 2px solid var(--border); }
+    .transfer-step.complete .transfer-icon { border-color: var(--accent-green); background: var(--accent-green-dim); }
+    .transfer-step.active .transfer-icon { border-color: var(--accent-blue); background: var(--accent-blue-dim); animation: pulse 1s infinite; }
+    .transfer-step.pending .transfer-icon { opacity: 0.5; }
+    .transfer-label { font-size: 0.875rem; font-weight: 500; }
+    .transfer-amount { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--accent-green); }
+    .transfer-receipt { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-muted); }
+    .transfer-status { font-size: 0.7rem; color: var(--text-muted); }
+    .transfer-arrow { font-size: 1.5rem; color: var(--border); padding: 0 0.5rem; }
+    .transfer-arrow.complete { color: var(--accent-green); }
+
+    /* Settlement Grid */
+    .settlement-grid { display: flex; flex-direction: column; gap: 1rem; }
+    .settlement-section { padding: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; }
+    .settlement-section h4 { font-size: 0.9rem; margin-bottom: 0.75rem; color: var(--text-secondary); }
+    .settlement-row { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.85rem; }
+    .settlement-row span { color: var(--text-muted); }
+    .settlement-value { font-family: 'JetBrains Mono', monospace; color: var(--text-primary); }
+    .settlement-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; font-style: italic; }
+
+    /* Demo Accounts Panel */
+    .demo-accounts-panel {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      width: 320px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      z-index: 100;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      cursor: default;
+    }
+    .demo-accounts-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      cursor: grab;
+      user-select: none;
+    }
+    .demo-accounts-header:active {
+      cursor: grabbing;
+    }
+    .demo-accounts-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .demo-accounts-drag-hint {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      margin-left: 0.5rem;
+    }
+    /* Transaction History */
+    .demo-transactions {
+      margin-top: 1rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .demo-transactions-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .demo-transaction {
+      padding: 0.5rem;
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      margin-bottom: 0.4rem;
+      font-size: 0.75rem;
+      animation: txFadeIn 0.3s ease;
+    }
+    @keyframes txFadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .demo-transaction-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .demo-transaction-parties {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--text-secondary);
+    }
+    .demo-transaction-arrow {
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+    .demo-transaction-amount {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+    .demo-transaction-amount.debit { color: #ef4444; }
+    .demo-transaction-amount.credit { color: var(--accent-green); }
+    .demo-transaction-desc {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .demo-transaction-time {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+    .demo-no-transactions {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 0.5rem;
+    }
+    .demo-account {
+      padding: 0.75rem;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      transition: all 0.3s ease;
+    }
+    .demo-account.highlight-decrease {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+    }
+    .demo-account.highlight-increase {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid var(--accent-green);
+    }
+    .demo-account-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .demo-account-name {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .demo-account-name .icon {
+      font-size: 1.1rem;
+    }
+    .demo-account-balance {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent-green);
+    }
+    .demo-account-balance.zero {
+      color: var(--text-muted);
+    }
+    .demo-account-change {
+      font-size: 0.7rem;
+      margin-top: 0.25rem;
+      text-align: right;
+    }
+    .demo-account-change.negative { color: #ef4444; }
+    .demo-account-change.positive { color: var(--accent-green); }
+    .demo-reset-btn {
+      width: 100%;
+      padding: 0.5rem;
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 0.5rem;
+    }
+    .demo-reset-btn:hover {
+      background: var(--border);
+      color: var(--text-primary);
+    }
+
+    /* Settlement Panel */
+    .settlement-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    .settlement-section { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
+    .settlement-section h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary); }
+    .settlement-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0; font-size: 0.85rem; }
+    .settlement-row span { color: var(--text-secondary); }
+    .settlement-value { font-family: 'JetBrains Mono', monospace; color: var(--text-primary); }
+    .settlement-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .badge-status { padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border); }
+    .badge-status.complete { background: var(--accent-green-dim); color: var(--accent-green); border-color: rgba(16, 185, 129, 0.4); }
+    .badge-status.pending { color: var(--text-muted); }
+    .badge-status.error { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+    .badge-status.skipped { background: var(--accent-yellow-dim); color: var(--accent-yellow); border-color: rgba(251, 191, 36, 0.4); }
+    .settlement-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
+    .settlement-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .settlement-actions input { flex: 1; min-width: 220px; }
+    .settlement-highlight { padding: 0.6rem 0.8rem; border-radius: 10px; background: var(--accent-green-dim); border: 1px solid rgba(16, 185, 129, 0.4); color: var(--accent-green); font-size: 0.85rem; }
+
     /* Stats Grid (Seller) */
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
 
@@ -505,6 +728,29 @@
       </div>
     </header>
 
+    <!-- Demo Accounts Panel (Draggable) -->
+    <div class="demo-accounts-panel" id="demoAccountsPanel">
+      <div class="demo-accounts-header" id="demoAccountsDragHandle">
+        <div class="demo-accounts-title">
+          <span>💰</span> Demo Accounts
+          <span class="demo-accounts-drag-hint">⋮⋮ drag</span>
+        </div>
+        <div style="font-size: 0.65rem; color: var(--text-muted);">LIVE</div>
+      </div>
+      <div id="demoAccountsList">
+        <!-- Populated by JS -->
+      </div>
+      <div class="demo-transactions">
+        <div class="demo-transactions-title">
+          <span>📜</span> Transaction History
+        </div>
+        <div id="demoTransactionsList">
+          <div class="demo-no-transactions">No transactions yet</div>
+        </div>
+      </div>
+      <button class="demo-reset-btn" onclick="resetDemoAccounts()">🔄 Reset All</button>
+    </div>
+
     <!-- Main Role Tabs -->
     <div class="main-tabs">
       <button class="main-tab buy-tab active" onclick="switchMainTab('buy')">
@@ -597,6 +843,20 @@
               </div>
             </div>
             <div id="orderActions" style="display: none;">
+              <div class="scenario-selector" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 10px;">
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Demo Scenario (simulated outcome)</label>
+                <div style="display: flex; gap: 1rem;">
+                  <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="radio" name="demoScenario" value="SUCCESS" checked style="accent-color: var(--accent-green);">
+                    <span style="color: var(--accent-green);">✅ SUCCESS</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="radio" name="demoScenario" value="FAIL" style="accent-color: var(--accent-orange);">
+                    <span style="color: var(--accent-orange);">❌ FAIL (Refund)</span>
+                  </label>
+                </div>
+                <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem;">Payment simulation runs automatically after placing order</div>
+              </div>
               <button class="btn btn-primary" id="placeOrderBtn" style="width: 100%; margin-bottom: 0.75rem;">
                 ⚡ Place Order
               </button>
@@ -614,6 +874,17 @@
               </div>
             </div>
             <div id="transactionStatus" class="transaction-status"></div>
+            <div id="paymentWorkflow" class="payment-workflow"></div>
+          </div>
+
+          <div class="card" id="settlementCard" style="display: none;">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">🏦</div>
+                Payment & Settlement
+              </div>
+            </div>
+            <div id="settlementContent"></div>
           </div>
         </div>
       </div>
@@ -785,6 +1056,12 @@
     let selectedOffer = null;
     let catalog = null;
     let currentProvider = null;
+    let settlementPollTimer = null;
+    let accountsPollTimer = null;
+    let currentOrderId = null;
+    let currentOrder = null;
+    let currentSettlement = null;
+    let previousBalances = {}; // Track previous balances for change detection
 
     // ==================== MAIN TAB SWITCHING ====================
     function switchMainTab(tab) {
@@ -836,6 +1113,65 @@
       },
       async getTransaction(transactionId) {
         const res = await fetch(`/api/transactions/${transactionId}`);
+        return res.json();
+      },
+      async getSettlement(tradeId) {
+        const res = await fetch(`/api/settlement/${tradeId}`);
+        if (!res.ok) return { steps: getDefaultPaymentSteps() };
+        return res.json();
+      },
+      async initiateSettlement(payload) {
+        const res = await fetch('/api/settlement/initiate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return res.json();
+      },
+      async confirmFunded(tradeId, receipt) {
+        const res = await fetch('/api/settlement/confirm-funded', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tradeId, receipt })
+        });
+        return res.json();
+      },
+      async verifySettlement(tradeId, outcome) {
+        const res = await fetch('/api/settlement/verify-outcome', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tradeId, outcome })
+        });
+        return res.json();
+      },
+      async confirmPayout(tradeId, receipt, action) {
+        const res = await fetch('/api/settlement/confirm-payout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tradeId, receipt, action })
+        });
+        return res.json();
+      },
+      async autoRunSettlement(tradeId, scenario) {
+        const res = await fetch('/api/settlement/auto-run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tradeId, scenario })
+        });
+        return res.json();
+      },
+      
+      // Demo Account APIs
+      async getDemoAccounts() {
+        const res = await fetch('/api/demo/accounts');
+        return res.json();
+      },
+      async resetDemoAccounts() {
+        const res = await fetch('/api/demo/accounts/reset', { method: 'POST' });
+        return res.json();
+      },
+      async resetAll() {
+        const res = await fetch('/api/demo/reset-all', { method: 'POST' });
         return res.json();
       },
       
@@ -891,8 +1227,188 @@
     }
 
     function formatPrice(value) { return '$' + value.toFixed(2); }
+    function formatInr(value) { return '₹' + Number(value || 0).toFixed(2); }
     function formatTime(isoString) {
       return new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+    function formatTimestamp(timestamp) {
+      return timestamp ? new Date(timestamp).toLocaleString() : '—';
+    }
+
+    // ==================== DEMO ACCOUNTS ====================
+    const accountIcons = {
+      buyer: '👤',
+      seller: '🏪',
+      escrow: '🏦',
+      platform: '💼'
+    };
+
+    const accountColors = {
+      buyer: 'var(--accent-blue)',
+      seller: 'var(--accent-orange)',
+      escrow: 'var(--accent-purple)',
+      platform: 'var(--accent-yellow)'
+    };
+
+    let lastTransactionCount = 0;
+
+    async function loadDemoAccounts() {
+      try {
+        const { accounts, transactions } = await api.getDemoAccounts();
+        renderDemoAccounts(accounts);
+        renderDemoTransactions(transactions || []);
+      } catch (err) {
+        console.error('Failed to load demo accounts:', err);
+      }
+    }
+
+    function renderDemoAccounts(accounts) {
+      const container = document.getElementById('demoAccountsList');
+      if (!container || !accounts) return;
+
+      container.innerHTML = accounts.map(account => {
+        const prevBalance = previousBalances[account.id];
+        const change = prevBalance !== undefined ? account.balance - prevBalance : 0;
+        const hasChange = Math.abs(change) > 0.01;
+        const changeClass = hasChange ? (change > 0 ? 'highlight-increase' : 'highlight-decrease') : '';
+        const changeText = hasChange ? (change > 0 ? `+₹${change.toFixed(2)}` : `-₹${Math.abs(change).toFixed(2)}`) : '';
+        const changeColor = change > 0 ? 'positive' : 'negative';
+        const balanceClass = account.balance === 0 ? 'zero' : '';
+        const icon = accountIcons[account.type] || '💰';
+
+        // Clear highlight after animation
+        if (hasChange) {
+          setTimeout(() => {
+            const el = document.querySelector(`[data-account-id="${account.id}"]`);
+            if (el) el.classList.remove('highlight-increase', 'highlight-decrease');
+          }, 1500);
+        }
+
+        return `
+          <div class="demo-account ${changeClass}" data-account-id="${account.id}">
+            <div class="demo-account-row">
+              <div class="demo-account-name">
+                <span class="icon">${icon}</span>
+                <span>${account.name.split(' (')[0]}</span>
+              </div>
+              <div class="demo-account-balance ${balanceClass}">${formatInr(account.balance)}</div>
+            </div>
+            ${hasChange ? `<div class="demo-account-change ${changeColor}">${changeText}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      // Store current balances for next comparison
+      accounts.forEach(a => previousBalances[a.id] = a.balance);
+    }
+
+    function renderDemoTransactions(transactions) {
+      const container = document.getElementById('demoTransactionsList');
+      if (!container) return;
+
+      if (!transactions || transactions.length === 0) {
+        container.innerHTML = '<div class="demo-no-transactions">No transactions yet</div>';
+        lastTransactionCount = 0;
+        return;
+      }
+
+      // Only re-render if count changed (new transaction)
+      if (transactions.length === lastTransactionCount) return;
+      lastTransactionCount = transactions.length;
+
+      container.innerHTML = transactions.slice(0, 10).map((tx, idx) => {
+        const timeAgo = getTimeAgo(tx.timestamp);
+        const isNew = idx === 0;
+        return `
+          <div class="demo-transaction" ${isNew ? 'style="border-left: 2px solid var(--accent-green);"' : ''}>
+            <div class="demo-transaction-row">
+              <div class="demo-transaction-parties">
+                <span>${tx.fromName}</span>
+                <span class="demo-transaction-arrow">→</span>
+                <span>${tx.toName}</span>
+              </div>
+              <div class="demo-transaction-amount credit">₹${tx.amount.toFixed(2)}</div>
+            </div>
+            <div class="demo-transaction-row">
+              <div class="demo-transaction-desc">${tx.description}</div>
+              <div class="demo-transaction-time">${timeAgo}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function getTimeAgo(timestamp) {
+      const now = new Date();
+      const then = new Date(timestamp);
+      const seconds = Math.floor((now - then) / 1000);
+      if (seconds < 5) return 'just now';
+      if (seconds < 60) return `${seconds}s ago`;
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      return then.toLocaleTimeString();
+    }
+
+    function startAccountsPoll() {
+      if (accountsPollTimer) return;
+      loadDemoAccounts();
+      accountsPollTimer = setInterval(loadDemoAccounts, 500); // Fast polling for smooth updates
+    }
+
+    function stopAccountsPoll() {
+      if (accountsPollTimer) {
+        clearInterval(accountsPollTimer);
+        accountsPollTimer = null;
+      }
+    }
+
+    // ==================== DRAGGABLE PANEL ====================
+    function initDraggablePanel() {
+      const panel = document.getElementById('demoAccountsPanel');
+      const handle = document.getElementById('demoAccountsDragHandle');
+      if (!panel || !handle) return;
+
+      let isDragging = false;
+      let startX, startY, startLeft, startTop;
+
+      handle.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = panel.getBoundingClientRect();
+        startLeft = rect.left;
+        startTop = rect.top;
+        panel.style.transition = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        panel.style.left = (startLeft + dx) + 'px';
+        panel.style.top = (startTop + dy) + 'px';
+        panel.style.right = 'auto';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          panel.style.transition = '';
+        }
+      });
+    }
+
+    async function resetDemoAccounts() {
+      if (!confirm('Reset all demo data (accounts + transactions)?')) return;
+      try {
+        await api.resetAll();
+        previousBalances = {}; // Clear change tracking
+        await loadDemoAccounts();
+        showToast('Demo reset complete! All balances restored.');
+      } catch (err) {
+        showToast('Reset failed: ' + err.message, true);
+      }
     }
 
     // ==================== BUYER FUNCTIONS ====================
@@ -1008,6 +1524,233 @@
       if (order) {
         document.getElementById('transactionStatus').innerHTML += `<div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">Order ID: ${order.id?.substring(0, 8)}...<br>Status: <span style="color: var(--accent-green);">${order.status}</span></div>`;
       }
+    }
+
+    function getDefaultPaymentSteps() {
+      return [
+        { id: 1, label: 'TE -> Bank: Request to block funds', status: 'pending' },
+        { id: 2, label: 'Bank (internal): Block funds in buyer account', status: 'pending' },
+        { id: 3, label: 'Bank -> TE: Block confirmed', status: 'pending' },
+        { id: 4, label: 'Bank -> Buyer: Funds blocked notification', status: 'pending' },
+        { id: 5, label: 'TE decides outcome using verification result + timing', status: 'pending' },
+        { id: 6, label: 'TE -> Bank: Execute settlement instruction', status: 'pending' },
+        { id: 7, label: 'Bank (internal): Unblock & transfer/refund', status: 'pending' },
+        { id: 8, label: 'Bank -> Seller: Payment credited', status: 'pending' },
+        { id: 9, label: 'Bank -> Buyer: Funds released/refunded notification', status: 'pending' },
+      ];
+    }
+
+    function renderPaymentWorkflow(steps) {
+      const container = document.getElementById('paymentWorkflow');
+      if (!container) return;
+      const list = steps && steps.length ? steps : getDefaultPaymentSteps();
+      container.innerHTML = list.map(step => {
+        const detail = step.detail ? `<div class="step-detail">${step.detail}</div>` : '';
+        const time = step.time ? `<div class="step-detail">🕒 ${formatTimestamp(step.time)}</div>` : '';
+        return `<div class="payment-step ${step.status}">
+          <div class="step-id">${step.id}</div>
+          <div class="step-text">
+            <div>${step.label}</div>
+            ${detail}
+            ${time}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function stopSettlementPoll() {
+      if (settlementPollTimer) {
+        clearInterval(settlementPollTimer);
+        settlementPollTimer = null;
+      }
+    }
+
+    function renderOrderSummary(order, settlement) {
+      if (!order) return;
+      const qty = order?.quote?.totalQuantity || 0;
+      const price = order?.quote?.price?.value || 0;
+      const status = settlement?.status;
+      const outcome = settlement?.verificationOutcome;
+      const settled = status === 'RELEASED' || status === 'REFUNDED';
+      const funded = status === 'FUNDED' || settled;
+      
+      let title, titleColor, statusText, icon;
+      if (settled) {
+        if (outcome === 'SUCCESS') {
+          title = 'Payment Released!';
+          titleColor = 'var(--accent-green)';
+          statusText = 'Seller has received payment ✅';
+          icon = '🎉';
+        } else {
+          title = 'Payment Refunded';
+          titleColor = 'var(--accent-orange)';
+          statusText = 'Buyer has been refunded ↩️';
+          icon = '↩️';
+        }
+      } else if (funded) {
+        title = 'Processing Payment...';
+        titleColor = 'var(--accent-blue)';
+        statusText = 'Escrow funded, verifying trade';
+        icon = '⏳';
+      } else {
+        title = 'Funding Escrow...';
+        titleColor = 'var(--accent-yellow)';
+        statusText = 'Buyer → Escrow transfer in progress';
+        icon = '⏳';
+      }
+
+      document.getElementById('orderSummary').innerHTML = `
+        <div class="order-summary">
+          <div style="background: ${settled ? (outcome === 'SUCCESS' ? 'var(--accent-green-dim)' : 'var(--accent-orange-dim)') : funded ? 'var(--accent-blue-dim)' : 'var(--accent-yellow-dim)'}; border: 2px solid ${titleColor}; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">${icon}</div>
+            <div style="font-weight: 600; color: ${titleColor};">${title}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">${statusText}</div>
+          </div>
+          <div class="order-row"><span class="order-row-label">Order ID</span><span class="order-row-value" style="font-size: 0.75rem;">${order.id.substring(0, 12)}...</span></div>
+          <div class="order-row"><span class="order-row-label">Settlement</span><span class="order-row-value" style="color: ${titleColor};">${status || 'PENDING'}</span></div>
+          <div class="order-row"><span class="order-row-label">Quantity</span><span class="order-row-value">${qty} kWh</span></div>
+          <div class="order-row"><span class="order-row-label">Total Price</span><span class="order-row-value" style="color: var(--accent-green);">$${price.toFixed(2)}</span></div>
+        </div>
+      `;
+    }
+
+    function renderSettlementPanel(data) {
+      const card = document.getElementById('settlementCard');
+      const container = document.getElementById('settlementContent');
+      if (!data || !data.record) {
+        card.style.display = 'none';
+        return;
+      }
+
+      card.style.display = 'block';
+      const record = data.record;
+      const escrow = data.escrow || {};
+      const payout = data.payout;
+      const funded = record.status === 'FUNDED' || record.status === 'RELEASED' || record.status === 'REFUNDED';
+      const verified = record.verificationOutcome !== null;
+      const settled = record.status === 'RELEASED' || record.status === 'REFUNDED';
+      const outcome = record.verificationOutcome;
+      
+      // Determine current stage for animation
+      let currentStage = 'initiating';
+      let stageMessage = 'Initiating escrow request...';
+      if (funded && !verified) {
+        currentStage = 'verifying';
+        stageMessage = 'Verifying trade delivery...';
+      } else if (verified && !settled) {
+        currentStage = 'settling';
+        stageMessage = outcome === 'SUCCESS' ? 'Releasing payment to seller...' : 'Refunding buyer...';
+      } else if (settled) {
+        currentStage = 'complete';
+        stageMessage = outcome === 'SUCCESS' ? 'Payment Released to Seller ✅' : 'Payment Refunded to Buyer ✅';
+      } else if (funded) {
+        currentStage = 'funded';
+        stageMessage = 'Escrow funded. Verifying...';
+      }
+
+      const isProcessing = !settled;
+
+      container.innerHTML = `
+        <div class="settlement-grid">
+          <!-- Live Status Banner -->
+          <div class="settlement-section" style="background: ${settled ? (outcome === 'SUCCESS' ? 'var(--accent-green-dim)' : 'var(--accent-orange-dim)') : 'var(--accent-blue-dim)'}; border: 2px solid ${settled ? (outcome === 'SUCCESS' ? 'var(--accent-green)' : 'var(--accent-orange)') : 'var(--accent-blue)'}; border-radius: 12px; padding: 1.25rem; text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">${settled ? (outcome === 'SUCCESS' ? '✅' : '↩️') : '⏳'}</div>
+            <div style="font-weight: 600; font-size: 1.1rem; color: ${settled ? (outcome === 'SUCCESS' ? 'var(--accent-green)' : 'var(--accent-orange)') : 'var(--accent-blue)'};">${stageMessage}</div>
+            ${isProcessing ? '<div class="spinner" style="margin: 0.75rem auto 0; width: 24px; height: 24px; border-width: 2px;"></div>' : ''}
+          </div>
+
+          <!-- Transfer Progress -->
+          <div class="settlement-section">
+            <h4>Transfer Progress</h4>
+            <div class="transfer-flow">
+              <div class="transfer-step ${funded ? 'complete' : 'active'}">
+                <div class="transfer-icon">👤</div>
+                <div class="transfer-label">Buyer</div>
+                <div class="transfer-amount">${formatInr(record.total)}</div>
+              </div>
+              <div class="transfer-arrow ${funded ? 'complete' : ''}">→</div>
+              <div class="transfer-step ${funded ? 'complete' : 'pending'}">
+                <div class="transfer-icon">🏦</div>
+                <div class="transfer-label">Escrow</div>
+                ${funded ? `<div class="transfer-receipt">UTR: ${record.fundedReceipt?.slice(-12) || '—'}</div>` : '<div class="transfer-status">Waiting...</div>'}
+              </div>
+              <div class="transfer-arrow ${settled ? 'complete' : ''}">→</div>
+              <div class="transfer-step ${settled ? 'complete' : 'pending'}">
+                <div class="transfer-icon">${outcome === 'FAIL' ? '👤' : '🏪'}</div>
+                <div class="transfer-label">${outcome === 'FAIL' ? 'Buyer (Refund)' : 'Seller'}</div>
+                ${settled ? `<div class="transfer-receipt">Ref: ${record.payoutReceipt?.slice(-12) || '—'}</div>` : '<div class="transfer-status">Waiting...</div>'}
+              </div>
+            </div>
+          </div>
+
+          <!-- Amount Details -->
+          <div class="settlement-section">
+            <h4>Amount Details</h4>
+            <div class="settlement-row"><span>Principal</span><div class="settlement-value">${formatInr(record.principal)}</div></div>
+            <div class="settlement-row"><span>Platform Fee</span><div class="settlement-value">${formatInr(record.fee)}</div></div>
+            <div class="settlement-row" style="border-top: 1px solid var(--border); padding-top: 0.5rem;"><span><strong>Total to Escrow</strong></span><div class="settlement-value"><strong>${formatInr(record.total)}</strong></div></div>
+            ${settled ? `
+              <div class="settlement-row" style="color: ${outcome === 'SUCCESS' ? 'var(--accent-green)' : 'var(--accent-orange)'};">
+                <span><strong>${outcome === 'SUCCESS' ? 'Paid to Seller' : 'Refunded to Buyer'}</strong></span>
+                <div class="settlement-value"><strong>${formatInr(outcome === 'SUCCESS' ? record.principal : record.total)}</strong></div>
+              </div>
+              ${outcome === 'SUCCESS' ? `<div class="settlement-note">Platform fee (${formatInr(record.fee)}) retained.</div>` : `<div class="settlement-note">Full amount refunded including fee.</div>`}
+            ` : ''}
+          </div>
+
+          <!-- Escrow Account Info -->
+          <div class="settlement-section">
+            <h4>Escrow Account</h4>
+            <div class="settlement-row"><span>Bank</span><div class="settlement-value">${escrow.bank?.bankName || '—'}</div></div>
+            <div class="settlement-row"><span>Account</span><div class="settlement-value">${escrow.bank?.accountNumber || '—'}</div></div>
+            <div class="settlement-row"><span>IFSC</span><div class="settlement-value">${escrow.bank?.ifsc || '—'}</div></div>
+            <div class="settlement-row"><span>Reference</span><div class="settlement-value">${record.tradeId.slice(0, 12)}...</div></div>
+          </div>
+
+          <!-- Timestamps -->
+          <div class="settlement-section">
+            <h4>Timeline</h4>
+            <div class="settlement-row"><span>Order Created</span><div class="settlement-value">${formatTimestamp(record.createdAt)}</div></div>
+            ${funded ? `<div class="settlement-row"><span>Escrow Funded</span><div class="settlement-value">${formatTimestamp(record.fundedAt)}</div></div>` : ''}
+            ${verified ? `<div class="settlement-row"><span>Verified (${outcome})</span><div class="settlement-value">${formatTimestamp(record.verifiedAt)}</div></div>` : ''}
+            ${settled ? `<div class="settlement-row"><span>${outcome === 'SUCCESS' ? 'Released' : 'Refunded'}</span><div class="settlement-value">${formatTimestamp(record.payoutAt)}</div></div>` : ''}
+          </div>
+
+          <!-- Receipts (when complete) -->
+          ${settled ? `
+          <div class="settlement-section" style="background: var(--bg-secondary); border-radius: 10px; padding: 1rem;">
+            <h4>Transaction Receipts</h4>
+            <div class="settlement-row"><span>Escrow UTR</span><div class="settlement-value" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${record.fundedReceipt || '—'}</div></div>
+            <div class="settlement-row"><span>Payout Reference</span><div class="settlement-value" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${record.payoutReceipt || '—'}</div></div>
+          </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    async function startSettlementPoll(tradeId) {
+      stopSettlementPoll();
+      renderPaymentWorkflow(getDefaultPaymentSteps());
+      const fetchAndRender = async () => {
+        try {
+          const data = await api.getSettlement(tradeId);
+          currentSettlement = data.record || currentSettlement;
+          renderPaymentWorkflow(data.steps);
+          renderSettlementPanel(data);
+          renderOrderSummary(currentOrder, currentSettlement);
+          
+          // Stop polling when settlement is complete
+          if (currentSettlement?.status === 'RELEASED' || currentSettlement?.status === 'REFUNDED') {
+            stopSettlementPoll();
+            const outcome = currentSettlement.verificationOutcome;
+            showToast(outcome === 'SUCCESS' ? '🎉 Payment released to seller!' : '↩️ Payment refunded to buyer');
+          }
+        } catch (err) {
+          // Keep polling silently
+        }
+      };
+      await fetchAndRender();
+      settlementPollTimer = setInterval(fetchAndRender, 800); // Faster polling for smoother updates
     }
 
     // ==================== SELLER FUNCTIONS ====================
@@ -1166,6 +1909,10 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span> Processing...';
       
+      // Get selected demo scenario
+      const scenarioRadio = document.querySelector('input[name="demoScenario"]:checked');
+      const demoScenario = scenarioRadio ? scenarioRadio.value : 'SUCCESS';
+      
       try {
         const quantity = parseInt(document.getElementById('requestedQuantity').value);
         
@@ -1191,22 +1938,29 @@
         
         const order = finalState.order;
         const qty = order?.quote?.totalQuantity || 0;
-        const price = order?.quote?.price?.value || 0;
+        currentOrderId = order.id;
+        currentOrder = order;
         
-        document.getElementById('orderSummary').innerHTML = `
-          <div class="order-summary">
-            <div style="background: var(--accent-green-dim); border: 2px solid var(--accent-green); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
-              <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✅</div>
-              <div style="font-weight: 600; color: var(--accent-green);">Trade Confirmed!</div>
-            </div>
-            <div class="order-row"><span class="order-row-label">Order ID</span><span class="order-row-value" style="font-size: 0.75rem;">${order.id.substring(0, 12)}...</span></div>
-            <div class="order-row"><span class="order-row-label">Status</span><span class="order-row-value" style="color: var(--accent-green);">${order.status}</span></div>
-            <div class="order-row"><span class="order-row-label">Quantity</span><span class="order-row-value">${qty} kWh</span></div>
-            <div class="order-row"><span class="order-row-label">Total Price</span><span class="order-row-value" style="color: var(--accent-green);">$${price.toFixed(2)}</span></div>
-          </div>
-        `;
+        // Initiate settlement
+        const settlementInit = await api.initiateSettlement({
+          tradeId: order.id,
+          order_id: order.id,
+          transaction_id: currentTransaction
+        });
+        if (settlementInit.error) {
+          showToast(settlementInit.error, true);
+        }
+        currentSettlement = settlementInit.record || null;
         
-        showToast(`🎉 Trade Confirmed! ${qty} kWh for $${price.toFixed(2)}`);
+        // Start polling to show progress
+        startSettlementPoll(order.id);
+        renderOrderSummary(order, currentSettlement);
+        
+        showToast(`Order placed! Running ${demoScenario} payment simulation...`);
+        
+        // Trigger automatic settlement simulation
+        await api.autoRunSettlement(order.id, demoScenario);
+        
       } catch (err) {
         showToast('Order failed: ' + err.message, true);
       } finally {
@@ -1220,6 +1974,12 @@
       document.querySelectorAll('.offer-card').forEach(c => c.classList.remove('selected'));
       document.getElementById('orderSummary').innerHTML = `<div class="empty-state" style="padding: 2rem;"><p style="font-size: 0.875rem;">Select an offer to place an order</p></div>`;
       document.getElementById('orderActions').style.display = 'none';
+      document.getElementById('paymentWorkflow').innerHTML = '';
+      stopSettlementPoll();
+      currentOrderId = null;
+      currentOrder = null;
+      currentSettlement = null;
+      document.getElementById('settlementCard').style.display = 'none';
     });
 
     document.getElementById('addItemForm').addEventListener('submit', async (e) => {
@@ -1278,7 +2038,10 @@
       document.getElementById('offerEndTime').value = format(end);
     }
 
+    // Initialize on page load
     setDefaultDates();
+    startAccountsPoll(); // Start demo accounts polling
+    initDraggablePanel(); // Make demo accounts panel draggable
   </script>
 </body>
 </html>

@@ -104,6 +104,30 @@ export const SCHEMA = {
       FOREIGN KEY (order_id) REFERENCES orders(id)
     )
   `,
+
+  // Settlement records - manual escrow flow (Phase 4)
+  settlement_records: `
+    CREATE TABLE IF NOT EXISTS settlement_records (
+      trade_id TEXT PRIMARY KEY,
+      order_id TEXT,
+      transaction_id TEXT,
+      buyer_id TEXT,
+      seller_id TEXT,
+      principal REAL NOT NULL,
+      fee REAL NOT NULL,
+      total REAL NOT NULL,
+      expires_at DATETIME NOT NULL,
+      status TEXT NOT NULL,
+      verification_outcome TEXT,
+      funded_receipt TEXT,
+      payout_receipt TEXT,
+      funded_at DATETIME,
+      verified_at DATETIME,
+      payout_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `,
   
   // Index for faster event lookups
   events_index: `
@@ -122,6 +146,10 @@ export const SCHEMA = {
   blocks_status_index: `
     CREATE INDEX IF NOT EXISTS idx_blocks_status ON offer_blocks(offer_id, status)
   `,
+  
+  settlement_trade_index: `
+    CREATE INDEX IF NOT EXISTS idx_settlement_trade_id ON settlement_records(trade_id)
+  `,
 };
 
 /**
@@ -134,8 +162,10 @@ export function initializeSchema(db: any): void {
   db.run(SCHEMA.orders);
   db.run(SCHEMA.events);
   db.run(SCHEMA.offer_blocks);
+  db.run(SCHEMA.settlement_records);
   db.run(SCHEMA.events_index);
   db.run(SCHEMA.events_message_index);
   db.run(SCHEMA.blocks_offer_index);
   db.run(SCHEMA.blocks_status_index);
+  db.run(SCHEMA.settlement_trade_index);
 }

@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "report": {
+    "checked": 2,
+    "expired": 2,
+    "expiredTradeIds": [
+      "td-replay",
+      "td-conflict"
+    ]
+  }
+}

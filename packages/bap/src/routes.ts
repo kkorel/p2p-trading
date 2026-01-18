@@ -24,9 +24,323 @@ import {
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
+import { waitForDb, saveDb } from './db';
 
 const router = Router();
 const logger = createLogger('BAP');
+
+const ESCROW_ACCOUNT = {
+  bankName: 'HDFC Bank',
+  accountName: 'P2P Energy Escrow',
+  accountNumber: '001234567890',
+  ifsc: 'HDFC0001234',
+  branch: 'Powai, Mumbai',
+};
+
+const DEFAULT_ESCROW_DURATION_SEC = 30 * 60;
+
+// ==================== DEMO ACCOUNTS ====================
+// In-memory demo accounts with balances for visualization
+
+type DemoAccount = {
+  id: string;
+  name: string;
+  type: 'buyer' | 'seller' | 'escrow' | 'platform';
+  balance: number;
+  currency: string;
+};
+
+type DemoTransaction = {
+  id: string;
+  fromId: string;
+  fromName: string;
+  toId: string;
+  toName: string;
+  amount: number;
+  description: string;
+  timestamp: string;
+};
+
+const INITIAL_BALANCES = {
+  buyer: 10000,    // ₹10,000
+  seller: 5000,    // ₹5,000
+  escrow: 0,       // ₹0 (starts empty)
+  platform: 0,     // ₹0 (fees collected)
+};
+
+let demoAccounts: Map<string, DemoAccount> = new Map();
+let demoTransactions: DemoTransaction[] = [];
+
+function initializeDemoAccounts(): void {
+  demoAccounts = new Map([
+    ['buyer', { id: 'buyer', name: 'Rahul Kumar (Buyer)', type: 'buyer', balance: INITIAL_BALANCES.buyer, currency: 'INR' }],
+    ['seller', { id: 'seller', name: 'SunPower Energy (Seller)', type: 'seller', balance: INITIAL_BALANCES.seller, currency: 'INR' }],
+    ['escrow', { id: 'escrow', name: 'P2P Escrow Account', type: 'escrow', balance: INITIAL_BALANCES.escrow, currency: 'INR' }],
+    ['platform', { id: 'platform', name: 'Platform Fees', type: 'platform', balance: INITIAL_BALANCES.platform, currency: 'INR' }],
+  ]);
+  demoTransactions = []; // Clear transaction history
+  logger.info('Demo accounts initialized', {
+    buyer: INITIAL_BALANCES.buyer,
+    seller: INITIAL_BALANCES.seller,
+    escrow: INITIAL_BALANCES.escrow,
+  });
+}
+
+// Initialize on module load
+initializeDemoAccounts();
+
+function getDemoAccount(id: string): DemoAccount | undefined {
+  return demoAccounts.get(id);
+}
+
+function getAllDemoAccounts(): DemoAccount[] {
+  return Array.from(demoAccounts.values());
+}
+
+function getAllDemoTransactions(): DemoTransaction[] {
+  return demoTransactions;
+}
+
+function updateDemoBalance(id: string, delta: number): void {
+  const account = demoAccounts.get(id);
+  if (account) {
+    account.balance = roundMoney(account.balance + delta);
+    logger.info(`[BALANCE] ${account.name}: ${delta >= 0 ? '+' : ''}₹${delta.toFixed(2)} = ₹${account.balance.toFixed(2)}`);
+  }
+}
+
+function transferMoney(fromId: string, toId: string, amount: number, description: string): boolean {
+  const from = demoAccounts.get(fromId);
+  const to = demoAccounts.get(toId);
+  
+  if (!from || !to) {
+    logger.error(`Transfer failed: account not found (from=${fromId}, to=${toId})`);
+    return false;
+  }
+  
+  if (from.balance < amount) {
+    logger.error(`Transfer failed: insufficient balance (${from.name} has ₹${from.balance}, needs ₹${amount})`);
+    return false;
+  }
+  
+  from.balance = roundMoney(from.balance - amount);
+  to.balance = roundMoney(to.balance + amount);
+  
+  // Record the transaction
+  const tx: DemoTransaction = {
+    id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+    fromId,
+    fromName: from.name.split(' (')[0], // Short name
+    toId,
+    toName: to.name.split(' (')[0],
+    amount: roundMoney(amount),
+    description,
+    timestamp: new Date().toISOString(),
+  };
+  demoTransactions.unshift(tx); // Add to beginning (newest first)
+  
+  // Keep only last 20 transactions
+  if (demoTransactions.length > 20) {
+    demoTransactions = demoTransactions.slice(0, 20);
+  }
+  
+  logger.info(`[TRANSFER] ${description}: ₹${amount.toFixed(2)} | ${from.name} (₹${from.balance.toFixed(2)}) → ${to.name} (₹${to.balance.toFixed(2)})`);
+  return true;
+}
+
+type SettlementStatus =
+  | 'INITIATED'
+  | 'FUNDED'
+  | 'RELEASED'
+  | 'REFUNDED'
+  | 'ERROR_NO_RECORD'
+  | 'ERROR_EXPIRED'
+  | 'ERROR_ALREADY_SETTLED';
+
+type SettlementOutcome = 'SUCCESS' | 'FAIL';
+
+type SettlementRecord = {
+  tradeId: string;
+  orderId: string | null;
+  transactionId: string | null;
+  buyerId: string | null;
+  sellerId: string | null;
+  principal: number;
+  fee: number;
+  total: number;
+  expiresAt: string;
+  status: SettlementStatus;
+  verificationOutcome: SettlementOutcome | null;
+  fundedReceipt: string | null;
+  payoutReceipt: string | null;
+  fundedAt: string | null;
+  verifiedAt: string | null;
+  payoutAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function computeFee(principal: number): number {
+  return roundMoney(Math.min(20, principal * 0.0003));
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function toRecord(row: any): SettlementRecord {
+  return {
+    tradeId: row.trade_id,
+    orderId: row.order_id ?? null,
+    transactionId: row.transaction_id ?? null,
+    buyerId: row.buyer_id ?? null,
+    sellerId: row.seller_id ?? null,
+    principal: Number(row.principal ?? 0),
+    fee: Number(row.fee ?? 0),
+    total: Number(row.total ?? 0),
+    expiresAt: row.expires_at,
+    status: row.status,
+    verificationOutcome: row.verification_outcome ?? null,
+    fundedReceipt: row.funded_receipt ?? null,
+    payoutReceipt: row.payout_receipt ?? null,
+    fundedAt: row.funded_at ?? null,
+    verifiedAt: row.verified_at ?? null,
+    payoutAt: row.payout_at ?? null,
+    createdAt: row.created_at ?? null,
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+async function getSettlementRecord(tradeId: string): Promise<SettlementRecord | null> {
+  const db = (await waitForDb()) as any;
+  const stmt = db.prepare('SELECT * FROM settlement_records WHERE trade_id = ?');
+  stmt.bind([tradeId]);
+  let record: SettlementRecord | null = null;
+  if (stmt.step()) {
+    record = toRecord(stmt.getAsObject());
+  }
+  stmt.free();
+  return record;
+}
+
+async function insertSettlementRecord(record: SettlementRecord): Promise<void> {
+  const db = (await waitForDb()) as any;
+  db.run(
+    `INSERT INTO settlement_records (
+      trade_id, order_id, transaction_id, buyer_id, seller_id,
+      principal, fee, total, expires_at, status,
+      verification_outcome, funded_receipt, payout_receipt,
+      funded_at, verified_at, payout_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      record.tradeId,
+      record.orderId,
+      record.transactionId,
+      record.buyerId,
+      record.sellerId,
+      record.principal,
+      record.fee,
+      record.total,
+      record.expiresAt,
+      record.status,
+      record.verificationOutcome,
+      record.fundedReceipt,
+      record.payoutReceipt,
+      record.fundedAt,
+      record.verifiedAt,
+      record.payoutAt,
+      record.createdAt,
+      record.updatedAt,
+    ]
+  );
+  saveDb();
+}
+
+async function updateSettlementRecord(tradeId: string, fields: Partial<SettlementRecord>): Promise<void> {
+  const db = (await waitForDb()) as any;
+  const updatedAt = nowIso();
+  const updates: string[] = [];
+  const values: any[] = [];
+  const mapField = (column: string, value: any) => {
+    updates.push(`${column} = ?`);
+    values.push(value);
+  };
+
+  if (fields.status) mapField('status', fields.status);
+  if (fields.verificationOutcome !== undefined) mapField('verification_outcome', fields.verificationOutcome);
+  if (fields.fundedReceipt !== undefined) mapField('funded_receipt', fields.fundedReceipt);
+  if (fields.payoutReceipt !== undefined) mapField('payout_receipt', fields.payoutReceipt);
+  if (fields.fundedAt !== undefined) mapField('funded_at', fields.fundedAt);
+  if (fields.verifiedAt !== undefined) mapField('verified_at', fields.verifiedAt);
+  if (fields.payoutAt !== undefined) mapField('payout_at', fields.payoutAt);
+  if (fields.orderId !== undefined) mapField('order_id', fields.orderId);
+  if (fields.transactionId !== undefined) mapField('transaction_id', fields.transactionId);
+  if (fields.buyerId !== undefined) mapField('buyer_id', fields.buyerId);
+  if (fields.sellerId !== undefined) mapField('seller_id', fields.sellerId);
+  if (fields.principal !== undefined) mapField('principal', fields.principal);
+  if (fields.fee !== undefined) mapField('fee', fields.fee);
+  if (fields.total !== undefined) mapField('total', fields.total);
+  if (fields.expiresAt !== undefined) mapField('expires_at', fields.expiresAt);
+
+  mapField('updated_at', updatedAt);
+
+  if (!updates.length) {
+    return;
+  }
+
+  values.push(tradeId);
+  db.run(`UPDATE settlement_records SET ${updates.join(', ')} WHERE trade_id = ?`, values);
+  saveDb();
+}
+
+function buildPaymentSteps(record: SettlementRecord | null) {
+  const hasRecord = !!record;
+  const funded = record?.status === 'FUNDED' || record?.status === 'RELEASED' || record?.status === 'REFUNDED';
+  const settled = record?.status === 'RELEASED' || record?.status === 'REFUNDED';
+  const isError = record?.status?.startsWith('ERROR_');
+  const outcome = record?.verificationOutcome;
+  const isRelease = record?.status === 'RELEASED';
+  const isRefund = record?.status === 'REFUNDED';
+
+  const steps = [
+    { id: 1, label: 'TE -> Bank: Request to block funds', status: hasRecord ? 'complete' : 'pending', time: record?.createdAt ?? null },
+    { id: 2, label: 'Bank (internal): Block funds in buyer account', status: funded ? 'complete' : 'pending', time: record?.fundedAt ?? null },
+    { id: 3, label: 'Bank -> TE: Block confirmed', status: funded ? 'complete' : 'pending', time: record?.fundedAt ?? null },
+    { id: 4, label: 'Bank -> Buyer: Funds blocked notification', status: funded ? 'complete' : 'pending', time: record?.fundedAt ?? null },
+    { id: 5, label: 'TE decides outcome using verification result + timing', status: outcome ? 'complete' : isError ? 'error' : 'pending', detail: outcome ?? (isError ? record?.status : null), time: record?.verifiedAt ?? null },
+    { id: 6, label: 'TE -> Bank: Execute settlement instruction', status: outcome ? 'complete' : isError ? 'error' : 'pending', detail: outcome === 'SUCCESS' ? 'RELEASE to seller' : outcome === 'FAIL' ? 'REFUND to buyer' : null },
+    { id: 7, label: 'Bank (internal): Unblock & transfer/refund', status: settled ? 'complete' : isError ? 'error' : 'pending', time: record?.payoutAt ?? null },
+    { id: 8, label: 'Bank -> Seller: Payment credited', status: isRelease ? 'complete' : isRefund ? 'skipped' : isError ? 'error' : 'pending', time: isRelease ? record?.payoutAt ?? null : null },
+    { id: 9, label: 'Bank -> Buyer: Funds released/refunded notification', status: settled ? 'complete' : isError ? 'error' : 'pending', time: record?.payoutAt ?? null },
+  ];
+
+  return steps;
+}
+
+function buildEscrowInstructions(record: SettlementRecord) {
+  return {
+    bank: ESCROW_ACCOUNT,
+    reference: record.tradeId,
+    note: 'Use NEFT/RTGS/IMPS. Reference must match Trade ID.',
+  };
+}
+
+function buildPayoutInstruction(record: SettlementRecord, outcome: SettlementOutcome | null) {
+  if (!outcome) return null;
+  const amount = outcome === 'SUCCESS' ? record.principal : record.total;
+  return {
+    action: outcome === 'SUCCESS' ? 'RELEASE' : 'REFUND',
+    amount,
+    currency: 'INR',
+    note: outcome === 'SUCCESS'
+      ? 'Pay seller principal from escrow; fee stays with platform.'
+      : 'Refund buyer principal + fee in full.',
+  };
+}
 
 /**
  * POST /api/discover - Initiate catalog discovery
@@ -395,6 +709,56 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
   
   try {
     const response = await axios.post(`${config.urls.bpp}/confirm`, confirmMessage);
+
+    // Best-effort settlement initiation (idempotent)
+    try {
+      const txState = getTransaction(transaction_id);
+      const order = txState?.order;
+      const tradeId = order?.id || orderId;
+      const orderPrice = Number(order?.quote?.price?.value ?? 0);
+      const quantity = Number(order?.quote?.totalQuantity ?? txState?.selectedQuantity ?? 1);
+      const unitPrice = Number(txState?.selectedOffer?.price?.value ?? 0);
+      const principalValue = orderPrice || roundMoney(unitPrice * quantity);
+
+      if (tradeId && principalValue > 0) {
+        const existing = await getSettlementRecord(tradeId);
+        if (!existing) {
+          const fee = computeFee(principalValue);
+          const total = roundMoney(principalValue + fee);
+          const expiresAt = new Date(Date.now() + DEFAULT_ESCROW_DURATION_SEC * 1000).toISOString();
+          const record: SettlementRecord = {
+            tradeId,
+            orderId: order?.id || orderId || null,
+            transactionId: transaction_id,
+            buyerId: config.bap.id,
+            sellerId: order?.items?.[0]?.provider_id || txState?.selectedOffer?.provider_id || null,
+            principal: roundMoney(principalValue),
+            fee,
+            total,
+            expiresAt,
+            status: 'INITIATED',
+            verificationOutcome: null,
+            fundedReceipt: null,
+            payoutReceipt: null,
+            fundedAt: null,
+            verifiedAt: null,
+            payoutAt: null,
+            createdAt: nowIso(),
+            updatedAt: nowIso(),
+          };
+          logger.info('=== [STEP 1] TE -> Bank: Request to block funds', {
+            tradeId,
+            orderId: record.orderId,
+            principal: record.principal,
+            fee: record.fee,
+            total: record.total,
+          });
+          await insertSettlementRecord(record);
+        }
+      }
+    } catch (error: any) {
+      logger.warn(`Settlement initiation skipped: ${error.message}`, { transaction_id });
+    }
     
     res.json({
       status: 'ok',
@@ -487,6 +851,339 @@ router.get('/api/transactions/:id', (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/settlement/:tradeId - Get settlement progress for UI
+ */
+router.get('/api/settlement/:tradeId', async (req: Request, res: Response) => {
+  const tradeId = req.params.tradeId;
+
+  try {
+    const record = await getSettlementRecord(tradeId);
+    if (!record) {
+      return res.status(404).json({ error: 'Settlement record not found' });
+    }
+    const steps = buildPaymentSteps(record);
+    res.json({
+      tradeId,
+      record,
+      steps,
+      escrow: buildEscrowInstructions(record),
+      payout: buildPayoutInstruction(record, record.verificationOutcome),
+    });
+  } catch (error: any) {
+    logger.error(`Settlement status read failed: ${error.message}`, { tradeId });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/settlement/initiate - Create settlement record (manual escrow)
+ */
+router.post('/api/settlement/initiate', async (req: Request, res: Response) => {
+  const { tradeId, order_id, transaction_id, durationSec } = req.body as {
+    tradeId?: string;
+    order_id?: string;
+    transaction_id?: string;
+    durationSec?: number;
+  };
+
+  const txState = transaction_id ? getTransaction(transaction_id) : null;
+  const order = txState?.order;
+  const resolvedTradeId = tradeId || order?.id || order_id;
+
+  if (!resolvedTradeId) {
+    return res.status(400).json({ error: 'tradeId or order_id is required' });
+  }
+
+  const existing = await getSettlementRecord(resolvedTradeId);
+  if (existing) {
+    return res.json({
+      status: 'ok',
+      record: existing,
+      steps: buildPaymentSteps(existing),
+      escrow: buildEscrowInstructions(existing),
+      payout: buildPayoutInstruction(existing, existing.verificationOutcome),
+    });
+  }
+
+  const principalFromOrder = Number(order?.quote?.price?.value ?? 0);
+  const quantity = Number(order?.quote?.totalQuantity ?? txState?.selectedQuantity ?? 1);
+  const priceFromOffer = Number(txState?.selectedOffer?.price?.value ?? 0);
+  const principal = principalFromOrder || roundMoney(priceFromOffer * quantity);
+
+  if (!principal || principal <= 0) {
+    return res.status(400).json({ error: 'Unable to determine principal amount' });
+  }
+
+  const fee = computeFee(principal);
+  const total = roundMoney(principal + fee);
+  const expiresAt = new Date(Date.now() + (durationSec || DEFAULT_ESCROW_DURATION_SEC) * 1000).toISOString();
+
+  const record: SettlementRecord = {
+    tradeId: resolvedTradeId,
+    orderId: order?.id || order_id || null,
+    transactionId: transaction_id || null,
+    buyerId: config.bap.id,
+    sellerId: order?.items?.[0]?.provider_id || txState?.selectedOffer?.provider_id || null,
+    principal: roundMoney(principal),
+    fee,
+    total,
+    expiresAt,
+    status: 'INITIATED',
+    verificationOutcome: null,
+    fundedReceipt: null,
+    payoutReceipt: null,
+    fundedAt: null,
+    verifiedAt: null,
+    payoutAt: null,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+
+  logger.info('=== [STEP 1] TE -> Bank: Request to block funds', {
+    tradeId: record.tradeId,
+    orderId: record.orderId,
+    principal: record.principal,
+    fee: record.fee,
+    total: record.total,
+    expiresAt: record.expiresAt,
+  });
+
+  await insertSettlementRecord(record);
+
+  res.json({
+    status: 'ok',
+    record,
+    steps: buildPaymentSteps(record),
+    escrow: buildEscrowInstructions(record),
+    payout: buildPayoutInstruction(record, record.verificationOutcome),
+  });
+});
+
+/**
+ * POST /api/settlement/confirm-funded - Record escrow funding receipt (idempotent)
+ */
+router.post('/api/settlement/confirm-funded', async (req: Request, res: Response) => {
+  const { tradeId, receipt } = req.body as { tradeId?: string; receipt?: string };
+  if (!tradeId || !receipt) {
+    return res.status(400).json({ error: 'tradeId and receipt are required' });
+  }
+
+  const record = await getSettlementRecord(tradeId);
+  if (!record) {
+    return res.status(404).json({ error: 'Settlement record not found', status: 'ERROR_NO_RECORD' });
+  }
+
+  if (record.status === 'RELEASED' || record.status === 'REFUNDED' || record.status === 'FUNDED') {
+    return res.json({ status: 'ok', record, steps: buildPaymentSteps(record) });
+  }
+
+  await updateSettlementRecord(tradeId, {
+    status: 'FUNDED',
+    fundedReceipt: receipt,
+    fundedAt: nowIso(),
+  });
+
+  const updated = await getSettlementRecord(tradeId);
+  logger.info('=== [STEP 2] Bank (internal): Block funds in buyer account', { tradeId });
+  logger.info('=== [STEP 3] Bank -> TE: Block confirmed', { tradeId, receipt });
+  logger.info('=== [STEP 4] Bank -> Buyer: Funds blocked notification', { tradeId });
+
+  res.json({ status: 'ok', record: updated, steps: buildPaymentSteps(updated) });
+});
+
+/**
+ * POST /api/settlement/verify-outcome - Decide release/refund (demo hook)
+ */
+router.post('/api/settlement/verify-outcome', async (req: Request, res: Response) => {
+  const { tradeId, outcome } = req.body as { tradeId?: string; outcome?: SettlementOutcome };
+  if (!tradeId || (outcome !== 'SUCCESS' && outcome !== 'FAIL')) {
+    return res.status(400).json({ error: 'tradeId and outcome=SUCCESS|FAIL are required' });
+  }
+
+  const record = await getSettlementRecord(tradeId);
+  if (!record) {
+    return res.status(404).json({ error: 'Settlement record not found', status: 'ERROR_NO_RECORD' });
+  }
+
+  if (record.status === 'RELEASED' || record.status === 'REFUNDED') {
+    return res.json({ status: 'ok', record, payout: buildPayoutInstruction(record, record.verificationOutcome) });
+  }
+
+  if (record.status !== 'FUNDED') {
+    return res.status(400).json({ error: 'Escrow not funded yet' });
+  }
+
+  const expired = new Date(record.expiresAt).getTime() < Date.now();
+  if (expired) {
+    await updateSettlementRecord(tradeId, { status: 'ERROR_EXPIRED' });
+    const updated = await getSettlementRecord(tradeId);
+    return res.status(400).json({ error: 'Settlement expired', record: updated, status: 'ERROR_EXPIRED' });
+  }
+
+  await updateSettlementRecord(tradeId, {
+    verificationOutcome: outcome,
+    verifiedAt: nowIso(),
+  });
+
+  const updated = await getSettlementRecord(tradeId);
+  logger.info('=== [STEP 5] TE decides outcome using verification result + timing', { tradeId, outcome });
+  logger.info('=== [STEP 6] TE -> Bank: Execute settlement instruction', {
+    tradeId,
+    action: outcome === 'SUCCESS' ? 'RELEASE' : 'REFUND',
+  });
+
+  res.json({
+    status: 'ok',
+    record: updated,
+    payout: buildPayoutInstruction(updated, outcome),
+    steps: buildPaymentSteps(updated),
+  });
+});
+
+/**
+ * POST /api/settlement/confirm-payout - Record payout receipt (idempotent)
+ */
+router.post('/api/settlement/confirm-payout', async (req: Request, res: Response) => {
+  const { tradeId, receipt, action } = req.body as { tradeId?: string; receipt?: string; action?: 'RELEASE' | 'REFUND' };
+  if (!tradeId || !receipt) {
+    return res.status(400).json({ error: 'tradeId and receipt are required' });
+  }
+
+  const record = await getSettlementRecord(tradeId);
+  if (!record) {
+    return res.status(404).json({ error: 'Settlement record not found', status: 'ERROR_NO_RECORD' });
+  }
+
+  if (record.status === 'RELEASED' || record.status === 'REFUNDED') {
+    return res.json({ status: 'ok', record, steps: buildPaymentSteps(record) });
+  }
+
+  const outcomeAction =
+    action ||
+    (record.verificationOutcome === 'SUCCESS' ? 'RELEASE' : record.verificationOutcome === 'FAIL' ? 'REFUND' : null);
+
+  if (!outcomeAction) {
+    return res.status(400).json({ error: 'Verification outcome missing; provide action=RELEASE|REFUND' });
+  }
+
+  const newStatus: SettlementStatus = outcomeAction === 'RELEASE' ? 'RELEASED' : 'REFUNDED';
+  await updateSettlementRecord(tradeId, {
+    status: newStatus,
+    payoutReceipt: receipt,
+    payoutAt: nowIso(),
+  });
+
+  const updated = await getSettlementRecord(tradeId);
+  logger.info('=== [STEP 7] Bank (internal): Unblock & transfer/refund', { tradeId, action: outcomeAction });
+  logger.info('=== [STEP 8] Bank -> Seller/Buyer: Payout recorded', { tradeId, action: outcomeAction, receipt });
+  logger.info('=== [STEP 9] Bank -> Buyer: Settlement complete', { tradeId, status: newStatus });
+
+  res.json({ status: 'ok', record: updated, steps: buildPaymentSteps(updated) });
+});
+
+/**
+ * POST /api/settlement/auto-run - Fully automated settlement simulation
+ * Runs the complete flow: INITIATED -> FUNDED -> VERIFIED -> RELEASED/REFUNDED
+ * with realistic delays and auto-generated receipts
+ */
+router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
+  const { tradeId, scenario } = req.body as { tradeId?: string; scenario?: 'SUCCESS' | 'FAIL' };
+  
+  if (!tradeId) {
+    return res.status(400).json({ error: 'tradeId is required' });
+  }
+  
+  const finalOutcome: SettlementOutcome = scenario === 'FAIL' ? 'FAIL' : 'SUCCESS';
+  
+  const record = await getSettlementRecord(tradeId);
+  if (!record) {
+    return res.status(404).json({ error: 'Settlement record not found. Initiate settlement first.' });
+  }
+  
+  // If already in progress or completed, just return current state
+  if (record.status === 'RELEASED' || record.status === 'REFUNDED') {
+    return res.json({ status: 'ok', message: 'Settlement already completed', record });
+  }
+  
+  logger.info('=== [AUTO-RUN] Starting automated settlement simulation', { tradeId, scenario: finalOutcome });
+  
+  // Respond immediately - processing happens async
+  res.json({ status: 'ok', message: 'Auto-run started', tradeId, scenario: finalOutcome });
+  
+  // Run the simulation in background
+  (async () => {
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    const genUtr = () => `UTR${Date.now()}${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+    const genPayout = () => `PAYOUT${Date.now()}${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+    
+    try {
+      // Step 1-4: Escrow funding (3 seconds)
+      // Transfer: Buyer -> Escrow (total = principal + fee)
+      if (record.status === 'INITIATED') {
+        logger.info('=== [AUTO-RUN STEP 2-4] Simulating buyer -> escrow transfer...', { tradeId, amount: record.total });
+        await delay(3000);
+        
+        // BALANCE TRANSFER: Buyer pays total (principal + fee) to Escrow
+        transferMoney('buyer', 'escrow', record.total, 'Buyer → Escrow (funding)');
+        
+        const fundedReceipt = genUtr();
+        await updateSettlementRecord(tradeId, {
+          status: 'FUNDED',
+          fundedReceipt,
+          fundedAt: nowIso(),
+        });
+        logger.info('=== [AUTO-RUN STEP 2-4] Escrow funded', { tradeId, receipt: fundedReceipt, amount: record.total });
+      }
+      
+      // Step 5-6: Verification - wait longer so escrow balance is visible (5 seconds)
+      logger.info('=== [AUTO-RUN STEP 5] Simulating trade verification (escrow holding funds)...', { tradeId, outcome: finalOutcome });
+      await delay(5000);
+      await updateSettlementRecord(tradeId, {
+        verificationOutcome: finalOutcome,
+        verifiedAt: nowIso(),
+      });
+      logger.info('=== [AUTO-RUN STEP 5-6] Verification complete', { tradeId, outcome: finalOutcome });
+      
+      // Step 7-9: Payout (3 seconds)
+      logger.info('=== [AUTO-RUN STEP 7-9] Simulating escrow -> ' + (finalOutcome === 'SUCCESS' ? 'seller' : 'buyer refund') + '...', { tradeId });
+      await delay(3000);
+      
+      if (finalOutcome === 'SUCCESS') {
+        // BALANCE TRANSFER: Escrow pays principal to Seller, fee stays as platform revenue
+        transferMoney('escrow', 'seller', record.principal, 'Escrow → Seller (principal)');
+        transferMoney('escrow', 'platform', record.fee, 'Escrow → Platform (fee)');
+      } else {
+        // BALANCE TRANSFER: Escrow refunds total (principal + fee) to Buyer
+        transferMoney('escrow', 'buyer', record.total, 'Escrow → Buyer (refund)');
+      }
+      
+      const payoutReceipt = genPayout();
+      const newStatus: SettlementStatus = finalOutcome === 'SUCCESS' ? 'RELEASED' : 'REFUNDED';
+      await updateSettlementRecord(tradeId, {
+        status: newStatus,
+        payoutReceipt,
+        payoutAt: nowIso(),
+      });
+      logger.info('=== [AUTO-RUN COMPLETE] Settlement finished', { tradeId, status: newStatus, receipt: payoutReceipt });
+      
+    } catch (error: any) {
+      logger.error('=== [AUTO-RUN ERROR] Settlement simulation failed', { tradeId, error: error.message });
+    }
+  })();
+});
+
+/**
+ * POST /api/settlement/reset - Clear settlement records (demo reset)
+ */
+router.post('/api/settlement/reset', async (req: Request, res: Response) => {
+  const db = (await waitForDb()) as any;
+  db.run('DELETE FROM settlement_records');
+  saveDb();
+  logger.info('Cleared settlement_records for demo reset');
+  res.json({ status: 'ok' });
+});
+
+/**
  * DELETE /api/transactions - Clear all in-memory transactions
  */
 router.delete('/api/transactions', (req: Request, res: Response) => {
@@ -494,6 +1191,69 @@ router.delete('/api/transactions', (req: Request, res: Response) => {
   clearAllTransactions();
   logger.info(`Cleared ${count} in-memory transactions`);
   res.json({ status: 'ok', cleared: count });
+});
+
+// ==================== DEMO ACCOUNT ENDPOINTS ====================
+
+/**
+ * GET /api/demo/accounts - Get all demo account balances and transactions
+ */
+router.get('/api/demo/accounts', (req: Request, res: Response) => {
+  const accounts = getAllDemoAccounts();
+  const transactions = getAllDemoTransactions();
+  res.json({ accounts, transactions });
+});
+
+/**
+ * GET /api/demo/accounts/:id - Get specific demo account
+ */
+router.get('/api/demo/accounts/:id', (req: Request, res: Response) => {
+  const account = getDemoAccount(req.params.id);
+  if (!account) {
+    return res.status(404).json({ error: 'Account not found' });
+  }
+  res.json({ account });
+});
+
+/**
+ * GET /api/demo/transactions - Get transaction history
+ */
+router.get('/api/demo/transactions', (req: Request, res: Response) => {
+  const transactions = getAllDemoTransactions();
+  res.json({ transactions });
+});
+
+/**
+ * POST /api/demo/accounts/reset - Reset all demo accounts to initial balances
+ */
+router.post('/api/demo/accounts/reset', (req: Request, res: Response) => {
+  initializeDemoAccounts();
+  const accounts = getAllDemoAccounts();
+  res.json({ status: 'ok', message: 'Demo accounts reset to initial balances', accounts });
+});
+
+/**
+ * POST /api/demo/reset-all - Reset everything for a fresh demo
+ */
+router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
+  // Reset settlement records
+  const db = (await waitForDb()) as any;
+  db.run('DELETE FROM settlement_records');
+  saveDb();
+  
+  // Reset in-memory transactions
+  clearAllTransactions();
+  
+  // Reset demo accounts
+  initializeDemoAccounts();
+  
+  logger.info('=== DEMO RESET === All data cleared, accounts reset');
+  
+  res.json({
+    status: 'ok',
+    message: 'Full demo reset complete',
+    accounts: getAllDemoAccounts(),
+  });
 });
 
 export default router;

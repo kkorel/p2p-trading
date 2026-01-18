@@ -1,0 +1,187 @@
+{
+  "ok": true,
+  "scenarios": [
+    {
+      "name": "happy-success",
+      "tradeId": "td-happy-success",
+      "attempts": [
+        {
+          "label": "verify",
+          "status": "PAYMENT_RELEASED",
+          "bankAction": {
+            "kind": "RELEASE",
+            "amountInr": 100,
+            "bankReceiptId": "tx_td-happy-success"
+          },
+          "counts": {
+            "trades": 1,
+            "fund_blocks": 1,
+            "transfers": 1
+          }
+        }
+      ],
+      "status": "PAYMENT_RELEASED",
+      "bankAction": {
+        "kind": "RELEASE",
+        "amountInr": 100,
+        "bankReceiptId": "tx_td-happy-success"
+      },
+      "counts": {
+        "trades": 1,
+        "fund_blocks": 1,
+        "transfers": 1
+      }
+    },
+    {
+      "name": "happy-fail",
+      "tradeId": "td-happy-fail",
+      "attempts": [
+        {
+          "label": "verify",
+          "status": "PAYMENT_REFUNDED",
+          "bankAction": {
+            "kind": "REFUND",
+            "amountInr": 110.03,
+            "bankReceiptId": "rf_td-happy-fail"
+          },
+          "counts": {
+            "trades": 2,
+            "fund_blocks": 2,
+            "transfers": 2
+          }
+        }
+      ],
+      "status": "PAYMENT_REFUNDED",
+      "bankAction": {
+        "kind": "REFUND",
+        "amountInr": 110.03,
+        "bankReceiptId": "rf_td-happy-fail"
+      },
+      "counts": {
+        "trades": 2,
+        "fund_blocks": 2,
+        "transfers": 2
+      }
+    },
+    {
+      "name": "missing-block",
+      "tradeId": "td-missing-block",
+      "attempts": [
+        {
+          "label": "verify",
+          "status": "ERROR_NO_BLOCK",
+          "bankAction": null,
+          "counts": {
+            "trades": 0,
+            "fund_blocks": 0,
+            "transfers": 0
+          }
+        }
+      ],
+      "status": "ERROR_NO_BLOCK",
+      "bankAction": null,
+      "counts": {
+        "trades": 0,
+        "fund_blocks": 0,
+        "transfers": 0
+      }
+    },
+    {
+      "name": "expired-before-verify",
+      "tradeId": "td-expired",
+      "attempts": [
+        {
+          "label": "verify",
+          "status": "ERROR_BLOCK_EXPIRED",
+          "bankAction": null,
+          "counts": {
+            "trades": 3,
+            "fund_blocks": 3,
+            "transfers": 2
+          }
+        }
+      ],
+      "status": "ERROR_BLOCK_EXPIRED",
+      "bankAction": null,
+      "counts": {
+        "trades": 3,
+        "fund_blocks": 3,
+        "transfers": 2
+      }
+    },
+    {
+      "name": "replay-success",
+      "tradeId": "td-replay",
+      "attempts": [
+        {
+          "label": "verify",
+          "status": "PAYMENT_RELEASED",
+          "bankAction": {
+            "kind": "RELEASE",
+            "amountInr": 130,
+            "bankReceiptId": "tx_td-replay"
+          },
+          "counts": {
+            "trades": 4,
+            "fund_blocks": 4,
+            "transfers": 3
+          }
+        },
+        {
+          "label": "replay",
+          "status": "ERROR_ALREADY_SETTLED",
+          "bankAction": null,
+          "counts": {
+            "trades": 4,
+            "fund_blocks": 4,
+            "transfers": 3
+          }
+        }
+      ],
+      "status": "ERROR_ALREADY_SETTLED",
+      "bankAction": null,
+      "counts": {
+        "trades": 4,
+        "fund_blocks": 4,
+        "transfers": 3
+      }
+    },
+    {
+      "name": "conflicting",
+      "tradeId": "td-conflict",
+      "attempts": [
+        {
+          "label": "verify",
+          "status": "PAYMENT_RELEASED",
+          "bankAction": {
+            "kind": "RELEASE",
+            "amountInr": 140,
+            "bankReceiptId": "tx_td-conflict"
+          },
+          "counts": {
+            "trades": 5,
+            "fund_blocks": 5,
+            "transfers": 4
+          }
+        },
+        {
+          "label": "conflict_attempt",
+          "status": "ERROR_ALREADY_SETTLED",
+          "bankAction": null,
+          "counts": {
+            "trades": 5,
+            "fund_blocks": 5,
+            "transfers": 4
+          }
+        }
+      ],
+      "status": "ERROR_ALREADY_SETTLED",
+      "bankAction": null,
+      "counts": {
+        "trades": 5,
+        "fund_blocks": 5,
+        "transfers": 4
+      }
+    }
+  ]
+}
