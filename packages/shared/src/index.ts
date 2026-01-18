@@ -17,3 +17,6 @@ export * from './config';
 
 // Export seed data
 export * from './seed';
+
+// Export authentication
+export * from './auth';

@@ -9,6 +9,7 @@ import { config, createLogger } from '@p2p/shared';
 import routes from './routes';
 import callbacks from './callbacks';
 import sellerRoutes from './seller-routes';
+import authRoutes from './auth-routes';
 import { initDb, closeDb, checkDbHealth } from './db';
 
 const app = express();
@@ -26,6 +27,9 @@ app.use((req, res, next) => {
   logger.debug(`${req.method} ${req.path}`);
   next();
 });
+
+// Authentication routes (public - no auth required for login/OTP)
+app.use('/auth', authRoutes);
 
 // Consumer API routes (BAP)
 app.use('/', routes);
@@ -64,9 +68,10 @@ app.get('/health', async (req, res) => {
 // Serve frontend for all non-API routes (SPA fallback)
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/callbacks') || 
-      req.path.startsWith('/seller') || req.path.startsWith('/select') ||
-      req.path.startsWith('/init') || req.path.startsWith('/confirm') ||
-      req.path.startsWith('/status') || req.path === '/health') {
+      req.path.startsWith('/auth') || req.path.startsWith('/seller') || 
+      req.path.startsWith('/select') || req.path.startsWith('/init') || 
+      req.path.startsWith('/confirm') || req.path.startsWith('/status') || 
+      req.path === '/health') {
     return next();
   }
   res.sendFile(path.join(__dirname, '../public/index.html'));

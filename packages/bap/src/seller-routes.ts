@@ -63,6 +63,7 @@ import {
   getAllOrders,
 } from './seller-orders';
 import { logEvent, isDuplicateMessage } from './events';
+import { authMiddleware } from './middleware/auth';
 
 const router = Router();
 const logger = createLogger('BPP');
@@ -580,10 +581,113 @@ async function deleteOfferFromCDS(offerId: string) {
   }
 }
 
-// ==================== SELLER APIs ====================
+// ==================== SELLER APIs (Authenticated) ====================
+
+import { prisma } from '@p2p/shared';
 
 /**
- * POST /seller/register - Register as a new provider
+ * GET /seller/my-profile - Get or create the authenticated user's seller profile
+ * Auto-creates provider if user doesn't have one
+ */
+router.get('/seller/my-profile', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    let providerId = req.user!.providerId;
+    let provider;
+    
+    // If user doesn't have a provider, create one
+    if (!providerId) {
+      const providerName = req.user!.name || req.user!.email?.split('@')[0] || 'My Energy';
+      provider = await registerProvider(providerName);
+      providerId = provider.id;
+      
+      // Link provider to user
+      await prisma.user.update({
+        where: { id: req.user!.id },
+        data: { providerId: provider.id },
+      });
+      
+      logger.info(`Auto-created provider ${provider.id} for user ${req.user!.id}`);
+      
+      // Sync to CDS
+      await syncProviderToCDS(provider);
+    } else {
+      provider = await getProvider(providerId);
+    }
+    
+    if (!provider) {
+      return res.status(500).json({ success: false, error: 'Failed to get provider' });
+    }
+    
+    const items = await getProviderItems(providerId);
+    const offers = await getProviderOffers(providerId);
+    
+    // Add block stats to offers
+    const offersWithStats = await Promise.all(offers.map(async (offer) => {
+      const blockStats = await getBlockStats(offer.id);
+      return { ...offer, blockStats };
+    }));
+    
+    res.json({ 
+      success: true,
+      provider, 
+      items, 
+      offers: offersWithStats 
+    });
+  } catch (error: any) {
+    logger.error('Failed to get seller profile:', error);
+    res.status(500).json({ success: false, error: 'Failed to load seller profile' });
+  }
+});
+
+/**
+ * GET /seller/my-orders - Get orders for the authenticated user's provider
+ */
+router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const providerId = req.user!.providerId;
+    
+    if (!providerId) {
+      return res.json({ orders: [] });
+    }
+    
+    const orders = await getOrdersByProviderId(providerId);
+    
+    // Enrich orders with block information
+    const enrichedOrders = await Promise.all(orders.map(async (order) => {
+      try {
+        if (order.items && order.items.length > 0) {
+          const firstItem = order.items[0];
+          const orderBlocks = await getBlocksForOrder(order.id);
+          const actualSoldQty = orderBlocks.length;
+          const blockStats = await getBlockStats(firstItem.offer_id);
+          
+          return {
+            ...order,
+            itemInfo: {
+              item_id: firstItem.item_id,
+              offer_id: firstItem.offer_id,
+              sold_quantity: actualSoldQty,
+              block_stats: blockStats,
+            },
+          };
+        }
+      } catch (error: any) {
+        logger.error(`Error enriching order ${order.id}: ${error.message}`);
+      }
+      return order;
+    }));
+    
+    res.json({ orders: enrichedOrders });
+  } catch (error: any) {
+    logger.error('Failed to get seller orders:', error);
+    res.status(500).json({ error: 'Failed to load orders' });
+  }
+});
+
+// ==================== Legacy SELLER APIs (for backward compatibility) ====================
+
+/**
+ * POST /seller/register - Register as a new provider (legacy)
  */
 router.post('/seller/register', async (req: Request, res: Response) => {
   const { name } = req.body as { name: string };
@@ -602,15 +706,15 @@ router.post('/seller/register', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /seller/providers - List all providers
+ * GET /seller/providers - List all providers (legacy - now returns empty for privacy)
  */
 router.get('/seller/providers', async (req: Request, res: Response) => {
-  const providers = await getAllProviders();
-  res.json({ providers });
+  // Don't expose all providers for privacy
+  res.json({ providers: [] });
 });
 
 /**
- * GET /seller/providers/:id - Get provider details
+ * GET /seller/providers/:id - Get provider details (legacy)
  */
 router.get('/seller/providers/:id', async (req: Request, res: Response) => {
   const provider = await getProvider(req.params.id);
@@ -627,10 +731,10 @@ router.get('/seller/providers/:id', async (req: Request, res: Response) => {
 
 /**
  * POST /seller/items - Add a new catalog item (energy listing)
+ * Uses authenticated user's provider
  */
-router.post('/seller/items', async (req: Request, res: Response) => {
+router.post('/seller/items', authMiddleware, async (req: Request, res: Response) => {
   const { 
-    provider_id, 
     source_type, 
     delivery_mode, 
     available_qty, 
@@ -638,8 +742,15 @@ router.post('/seller/items', async (req: Request, res: Response) => {
     meter_id 
   } = req.body;
   
-  if (!provider_id || !source_type || !available_qty) {
-    return res.status(400).json({ error: 'provider_id, source_type, and available_qty are required' });
+  // Use authenticated user's provider
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(400).json({ error: 'No seller profile found. Please set up your seller profile first.' });
+  }
+  
+  if (!source_type || !available_qty) {
+    return res.status(400).json({ error: 'source_type and available_qty are required' });
   }
   
   const provider = await getProvider(provider_id);
@@ -703,21 +814,35 @@ router.put('/seller/items/:id/quantity', async (req: Request, res: Response) => 
 
 /**
  * POST /seller/offers - Add a new offer for an item
+ * Uses authenticated user's provider
  */
-router.post('/seller/offers', async (req: Request, res: Response) => {
+router.post('/seller/offers', authMiddleware, async (req: Request, res: Response) => {
   const { 
     item_id, 
-    provider_id, 
     price_per_kwh, 
     currency, 
     max_qty, 
     time_window 
   } = req.body;
   
-  if (!item_id || !provider_id || !price_per_kwh || !max_qty || !time_window) {
+  // Use authenticated user's provider
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(400).json({ error: 'No seller profile found. Please set up your seller profile first.' });
+  }
+  
+  if (!item_id || !price_per_kwh || !max_qty || !time_window) {
     return res.status(400).json({ 
-      error: 'item_id, provider_id, price_per_kwh, max_qty, and time_window are required' 
+      error: 'item_id, price_per_kwh, max_qty, and time_window are required' 
     });
+  }
+  
+  // Verify the item belongs to this provider
+  const items = await getProviderItems(provider_id);
+  const itemExists = items.some(i => i.id === item_id);
+  if (!itemExists) {
+    return res.status(403).json({ error: 'Item does not belong to your seller profile' });
   }
   
   const offer = await addOffer(
@@ -761,10 +886,27 @@ router.get('/seller/offers', async (req: Request, res: Response) => {
 
 /**
  * DELETE /seller/offers/:id - Delete an offer
+ * Only allows deleting own offers
  */
-router.delete('/seller/offers/:id', async (req: Request, res: Response) => {
+router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Response) => {
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(403).json({ error: 'No seller profile found' });
+  }
+  
+  // Verify offer belongs to user's provider
+  const offer = await getOfferById(req.params.id);
+  if (!offer) {
+    return res.status(404).json({ error: 'Offer not found' });
+  }
+  
+  if (offer.provider_id !== provider_id) {
+    return res.status(403).json({ error: 'You can only delete your own offers' });
+  }
+  
   await deleteOffer(req.params.id);
-  logger.info(`Offer ${req.params.id} deleted`);
+  logger.info(`Offer ${req.params.id} deleted by provider ${provider_id}`);
   
   // Sync deletion to CDS
   await deleteOfferFromCDS(req.params.id);

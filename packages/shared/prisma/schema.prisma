@@ -11,6 +11,56 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// Authentication Models
+// ============================================
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  name            String?
+  picture         String?   // Google profile picture URL
+  googleId        String?   @unique @map("google_id")
+  profileComplete Boolean   @default(false) @map("profile_complete")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lastLoginAt     DateTime? @map("last_login_at")
+
+  // Prosumer can be both provider and consumer
+  provider   Provider? @relation(fields: [providerId], references: [id])
+  providerId String?   @unique @map("provider_id")
+
+  // User's orders as buyer
+  orders   Order[]
+  // Sessions
+  sessions Session[]
+
+  @@index([email])
+  @@index([googleId])
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  token      String   @unique
+  deviceInfo String?  @map("device_info")
+  ipAddress  String?  @map("ip_address")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ============================================
+// Business Models
+// ============================================
+
 model Provider {
   id               String   @id
   name             String
@@ -19,6 +69,9 @@ model Provider {
   successfulOrders Int      @default(0) @map("successful_orders")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Link to user (prosumer who created this provider profile)
+  user User?
 
   items  CatalogItem[]
   offers CatalogOffer[]
@@ -104,6 +157,7 @@ model Order {
   transactionId   String   @unique @map("transaction_id")
   providerId      String?  @map("provider_id")
   selectedOfferId String?  @map("selected_offer_id")
+  buyerId         String?  @map("buyer_id") // User who placed the order
   status          String   @default("DRAFT")
   totalQty        Float?   @map("total_qty")
   totalPrice      Float?   @map("total_price")
@@ -116,9 +170,11 @@ model Order {
 
   provider      Provider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
   selectedOffer CatalogOffer? @relation(fields: [selectedOfferId], references: [id], onDelete: SetNull)
+  buyer         User?         @relation(fields: [buyerId], references: [id], onDelete: SetNull)
   blocks        OfferBlock[]
 
   @@index([providerId])
+  @@index([buyerId])
   @@index([status])
   @@map("orders")
 }

@@ -474,6 +474,221 @@
     /* Provider Setup */
     .provider-setup { margin-bottom: 2rem; }
 
+    /* Auth Screens */
+    .auth-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-primary);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image: 
+        radial-gradient(ellipse at 20% 0%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(251, 191, 36, 0.06) 0%, transparent 50%);
+    }
+
+    .auth-overlay.hidden { display: none; }
+
+    .auth-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+
+    .auth-header {
+      margin-bottom: 2rem;
+    }
+
+    .auth-logo {
+      width: 80px;
+      height: 80px;
+      background: var(--energy-gradient);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      margin: 0 auto 1.5rem;
+    }
+
+    .auth-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .auth-subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .auth-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .auth-error.show { display: block; }
+
+    .google-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      background: white;
+      border: 1px solid #dadce0;
+      border-radius: 10px;
+      color: #3c4043;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .google-btn:hover {
+      background: #f8f9fa;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .google-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .google-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      margin: 1.5rem 0;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .auth-divider span {
+      padding: 0 1rem;
+    }
+
+    .auth-features {
+      text-align: left;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border-radius: 10px;
+    }
+
+    .auth-feature {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .auth-feature-icon {
+      width: 24px;
+      height: 24px;
+      background: var(--accent-green-dim);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+    }
+
+    /* User Menu */
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      background: var(--accent-purple-dim);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      overflow: hidden;
+    }
+
+    .user-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .user-name {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .user-email {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .logout-btn {
+      padding: 0.5rem 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: 'Outfit', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .logout-btn:hover {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
     /* Responsive */
     @media (max-width: 1024px) {
       .main-grid { grid-template-columns: 1fr; }
@@ -490,6 +705,45 @@
   </style>
 </head>
 <body>
+  <!-- Auth Overlay -->
+  <div class="auth-overlay" id="authOverlay">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">⚡</div>
+        <h2 class="auth-title">P2P Energy Trading</h2>
+        <p class="auth-subtitle">Buy and sell renewable energy directly from your neighbors</p>
+      </div>
+
+      <div class="auth-error" id="authError"></div>
+
+      <!-- Google Sign-In Button Container -->
+      <div id="googleSignInBtn" style="display: flex; justify-content: center;"></div>
+      <div id="googleLoading" style="text-align: center; padding: 1rem; color: var(--text-muted);">
+        <span class="spinner" style="display: inline-block; margin-bottom: 0.5rem;"></span><br>
+        Loading Google Sign-In...
+      </div>
+
+      <div class="auth-features">
+        <div class="auth-feature">
+          <div class="auth-feature-icon">🔋</div>
+          <span>Trade solar, wind & hydro energy</span>
+        </div>
+        <div class="auth-feature">
+          <div class="auth-feature-icon">💰</div>
+          <span>Competitive peer-to-peer pricing</span>
+        </div>
+        <div class="auth-feature">
+          <div class="auth-feature-icon">🌱</div>
+          <span>Support local renewable energy</span>
+        </div>
+      </div>
+
+      <p style="margin-top: 1.5rem; font-size: 0.75rem; color: var(--text-muted);">
+        By signing in, you agree to our Terms of Service and Privacy Policy
+      </p>
+    </div>
+  </div>
+
   <div class="container">
     <header>
       <div class="logo">
@@ -499,7 +753,17 @@
           <span>Prosumer Dashboard • Beckn v2</span>
         </div>
       </div>
-      <div class="status-indicator">
+      <div class="user-menu" id="userMenu" style="display: none;">
+        <div class="user-info">
+          <div class="user-avatar" id="userAvatar">👤</div>
+          <div>
+            <div class="user-name" id="userDisplayName">User</div>
+            <div class="user-email" id="userDisplayEmail"></div>
+          </div>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </div>
+      <div class="status-indicator" id="statusIndicator">
         <div class="status-dot"></div>
         <span>Services Online</span>
       </div>
@@ -621,40 +885,13 @@
 
     <!-- SELL ENERGY TAB -->
     <div id="sell-content" class="tab-content sell-view">
-      <!-- Provider Setup -->
-      <div id="providerSetup" class="card provider-setup">
-        <div class="card-header">
-          <div class="card-title">
-            <div class="card-title-icon">👤</div>
-            Get Started as Seller
-          </div>
-        </div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Select Existing Provider</label>
-            <select id="existingProvider">
-              <option value="">-- Select Provider --</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>&nbsp;</label>
-            <button class="btn btn-secondary" onclick="selectProvider()">Continue</button>
-          </div>
-          <div class="form-group full-width" style="text-align: center; padding: 1rem 0; color: var(--text-muted);">
-            — or register as a new provider —
-          </div>
-          <div class="form-group">
-            <label>Provider Name</label>
-            <input type="text" id="newProviderName" placeholder="e.g., SunPower Farms">
-          </div>
-          <div class="form-group">
-            <label>&nbsp;</label>
-            <button class="btn btn-seller" onclick="registerProvider()">Register</button>
-          </div>
-        </div>
+      <!-- Loading State -->
+      <div id="sellerLoading" class="card" style="text-align: center; padding: 3rem;">
+        <div class="spinner" style="margin: 0 auto 1rem;"></div>
+        <p style="color: var(--text-muted);">Setting up your seller profile...</p>
       </div>
 
-      <!-- Seller Dashboard (hidden until provider selected) -->
+      <!-- Seller Dashboard -->
       <div id="sellerContent" style="display: none;">
         <div class="stats-grid">
           <div class="stat-card">
@@ -785,6 +1022,212 @@
     let selectedOffer = null;
     let catalog = null;
     let currentProvider = null;
+    let currentUser = null;
+    let authToken = localStorage.getItem('authToken');
+    let googleClientId = null;
+
+    // ==================== AUTH FUNCTIONS ====================
+    function getAuthHeaders() {
+      return authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+    }
+
+    function showAuthError(message) {
+      const errorEl = document.getElementById('authError');
+      errorEl.textContent = message;
+      errorEl.classList.add('show');
+      setTimeout(() => errorEl.classList.remove('show'), 5000);
+    }
+
+    async function loadGoogleScript() {
+      const loadingEl = document.getElementById('googleLoading');
+      
+      // Get Google Client ID from server
+      try {
+        const res = await fetch('/auth/config');
+        const config = await res.json();
+        googleClientId = config.googleClientId;
+        
+        if (!googleClientId) {
+          console.warn('Google Client ID not configured');
+          loadingEl.innerHTML = '<span style="color: #ef4444;">⚠️ Google Sign-In not configured.<br>Add GOOGLE_CLIENT_ID to .env</span>';
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to load auth config:', err);
+        loadingEl.innerHTML = '<span style="color: #ef4444;">Failed to load configuration</span>';
+        return;
+      }
+
+      // Load Google Identity Services
+      return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          initializeGoogle();
+          resolve();
+        };
+        script.onerror = () => {
+          console.error('Failed to load Google script');
+          loadingEl.innerHTML = '<span style="color: #ef4444;">Failed to load Google Sign-In</span>';
+          resolve();
+        };
+        document.head.appendChild(script);
+      });
+    }
+
+    function initializeGoogle() {
+      if (!googleClientId || !window.google) return;
+
+      const loadingEl = document.getElementById('googleLoading');
+      const btnContainer = document.getElementById('googleSignInBtn');
+      
+      // Initialize Google Sign-In
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCallback,
+        auto_select: false,
+      });
+
+      // Render the Google Sign-In button
+      google.accounts.id.renderButton(btnContainer, {
+        theme: 'outline',
+        size: 'large',
+        width: 300,
+        text: 'continue_with',
+        shape: 'rectangular',
+      });
+
+      // Hide loading indicator
+      loadingEl.style.display = 'none';
+    }
+
+    async function handleGoogleCallback(response) {
+      console.log('Google callback received');
+      
+      if (!response.credential) {
+        showAuthError('Google sign-in was cancelled');
+        return;
+      }
+
+      // Show loading state
+      const btnContainer = document.getElementById('googleSignInBtn');
+      btnContainer.innerHTML = '<div style="padding: 12px; color: #666;">Signing in...</div>';
+
+      await authenticateWithBackend(response.credential);
+    }
+
+    async function authenticateWithBackend(idToken) {
+      try {
+        const res = await fetch('/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          authToken = data.token;
+          localStorage.setItem('authToken', authToken);
+          currentUser = data.user;
+          hideAuthOverlay();
+          updateUserUI();
+          showToast(data.isNewUser ? 'Welcome to P2P Energy Trading!' : 'Welcome back!');
+        } else {
+          showAuthError(data.error || 'Authentication failed');
+          // Re-render button
+          initializeGoogle();
+        }
+      } catch (err) {
+        console.error('Auth error:', err);
+        showAuthError('Authentication failed. Please try again.');
+        // Re-render button
+        initializeGoogle();
+      }
+    }
+
+    async function checkAuth() {
+      if (!authToken) {
+        showAuthOverlay();
+        return;
+      }
+
+      try {
+        const res = await fetch('/auth/me', { headers: getAuthHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          currentUser = data.user;
+          hideAuthOverlay();
+          updateUserUI();
+        } else {
+          localStorage.removeItem('authToken');
+          authToken = null;
+          showAuthOverlay();
+        }
+      } catch (err) {
+        console.error('Auth check failed:', err);
+        showAuthOverlay();
+      }
+    }
+
+    function showAuthOverlay() {
+      document.getElementById('authOverlay').classList.remove('hidden');
+    }
+
+    function hideAuthOverlay() {
+      document.getElementById('authOverlay').classList.add('hidden');
+    }
+
+    function updateUserUI() {
+      if (currentUser) {
+        document.getElementById('userMenu').style.display = 'flex';
+        document.getElementById('statusIndicator').style.display = 'none';
+        document.getElementById('userDisplayName').textContent = currentUser.name || 'User';
+        document.getElementById('userDisplayEmail').textContent = currentUser.email || '';
+        
+        const avatarEl = document.getElementById('userAvatar');
+        if (currentUser.picture) {
+          avatarEl.innerHTML = `<img src="${currentUser.picture}" alt="Avatar">`;
+        } else {
+          avatarEl.innerHTML = '👤';
+        }
+      } else {
+        document.getElementById('userMenu').style.display = 'none';
+        document.getElementById('statusIndicator').style.display = 'flex';
+      }
+    }
+
+    async function logout() {
+      try {
+        await fetch('/auth/logout', {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
+
+      localStorage.removeItem('authToken');
+      authToken = null;
+      currentUser = null;
+      
+      // Revoke Google session
+      if (window.google && google.accounts) {
+        google.accounts.id.disableAutoSelect();
+      }
+      
+      showAuthOverlay();
+      updateUserUI();
+      
+      // Re-render Google button
+      if (window.google) {
+        initializeGoogle();
+      }
+      
+      showToast('Logged out');
+    }
 
     // ==================== MAIN TAB SWITCHING ====================
     function switchMainTab(tab) {
@@ -795,7 +1238,7 @@
       document.getElementById(`${tab}-content`).classList.add('active');
       
       if (tab === 'sell') {
-        loadProviders();
+        initSellerProfile();
       }
     }
 
@@ -805,61 +1248,57 @@
       async discover(params) {
         const res = await fetch('/api/discover', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(params)
         });
+        if (res.status === 401) { showAuthOverlay(); throw new Error('Please log in'); }
         return res.json();
       },
       async select(params) {
         const res = await fetch('/api/select', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(params)
         });
+        if (res.status === 401) { showAuthOverlay(); throw new Error('Please log in'); }
         return res.json();
       },
       async init(transactionId) {
         const res = await fetch('/api/init', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ transaction_id: transactionId })
         });
+        if (res.status === 401) { showAuthOverlay(); throw new Error('Please log in'); }
         return res.json();
       },
       async confirm(transactionId, orderId) {
         const res = await fetch('/api/confirm', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ transaction_id: transactionId, order_id: orderId })
         });
+        if (res.status === 401) { showAuthOverlay(); throw new Error('Please log in'); }
         return res.json();
       },
       async getTransaction(transactionId) {
-        const res = await fetch(`/api/transactions/${transactionId}`);
+        const res = await fetch(`/api/transactions/${transactionId}`, {
+          headers: getAuthHeaders()
+        });
+        if (res.status === 401) { showAuthOverlay(); throw new Error('Please log in'); }
         return res.json();
       },
       
-      // Seller APIs
-      async getProviders() {
-        const res = await fetch('/seller/providers');
-        return res.json();
-      },
-      async registerProvider(name) {
-        const res = await fetch('/seller/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name })
-        });
-        return res.json();
-      },
-      async getProviderDetails(id) {
-        const res = await fetch(`/seller/providers/${id}`);
+      // Seller APIs - all use the authenticated user's provider
+      async getMyProvider() {
+        const res = await fetch('/seller/my-profile', { headers: getAuthHeaders() });
+        if (res.status === 401) { showAuthOverlay(); throw new Error('Please log in'); }
         return res.json();
       },
       async addItem(data) {
         const res = await fetch('/seller/items', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(data)
         });
         return res.json();
@@ -867,17 +1306,17 @@
       async addOffer(data) {
         const res = await fetch('/seller/offers', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(data)
         });
         return res.json();
       },
-      async getOrders(providerId) {
-        const res = await fetch(`/seller/orders?provider_id=${providerId}`);
+      async getMyOrders() {
+        const res = await fetch('/seller/my-orders', { headers: getAuthHeaders() });
         return res.json();
       },
       async deleteOffer(id) {
-        await fetch(`/seller/offers/${id}`, { method: 'DELETE' });
+        await fetch(`/seller/offers/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
       }
     };
 
@@ -1011,52 +1450,65 @@
     }
 
     // ==================== SELLER FUNCTIONS ====================
-    async function loadProviders() {
-      const { providers } = await api.getProviders();
-      const select = document.getElementById('existingProvider');
-      select.innerHTML = '<option value="">-- Select Provider --</option>';
-      providers.forEach(p => {
-        select.innerHTML += `<option value="${p.id}">${p.name} (Trust: ${(p.trust_score * 100).toFixed(0)}%)</option>`;
-      });
-    }
-
-    async function registerProvider() {
-      const name = document.getElementById('newProviderName').value.trim();
-      if (!name) return showToast('Enter a provider name', true);
-      const { provider } = await api.registerProvider(name);
-      currentProvider = provider;
-      showToast(`Registered as ${provider.name}!`);
-      await loadProviders();
-      showSellerDashboard();
-    }
-
-    async function selectProvider() {
-      const id = document.getElementById('existingProvider').value;
-      if (!id) return showToast('Select a provider', true);
-      const { provider } = await api.getProviderDetails(id);
-      currentProvider = provider;
-      showSellerDashboard();
-    }
-
-    async function showSellerDashboard() {
-      document.getElementById('providerSetup').style.display = 'none';
-      document.getElementById('sellerContent').style.display = 'block';
-      await refreshSellerData();
+    async function initSellerProfile() {
+      const loadingEl = document.getElementById('sellerLoading');
+      const contentEl = document.getElementById('sellerContent');
+      
+      loadingEl.style.display = 'block';
+      contentEl.style.display = 'none';
+      
+      try {
+        const data = await api.getMyProvider();
+        
+        if (data.success) {
+          currentProvider = data.provider;
+          loadingEl.style.display = 'none';
+          contentEl.style.display = 'block';
+          await refreshSellerData();
+        } else {
+          loadingEl.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+              <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+              <p style="color: var(--text-muted);">${data.error || 'Failed to load seller profile'}</p>
+              <button class="btn btn-seller" style="margin-top: 1rem;" onclick="initSellerProfile()">Try Again</button>
+            </div>
+          `;
+        }
+      } catch (err) {
+        console.error('Failed to init seller:', err);
+        loadingEl.innerHTML = `
+          <div style="text-align: center; padding: 2rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+            <p style="color: var(--text-muted);">Failed to load seller profile</p>
+            <button class="btn btn-seller" style="margin-top: 1rem;" onclick="initSellerProfile()">Try Again</button>
+          </div>
+        `;
+      }
     }
 
     async function refreshSellerData() {
-      const { provider, items, offers } = await api.getProviderDetails(currentProvider.id);
-      const { orders } = await api.getOrders(currentProvider.id);
-      
-      document.getElementById('statItems').textContent = items.length;
-      document.getElementById('statOffers').textContent = offers.length;
-      document.getElementById('statOrders').textContent = orders.length;
-      document.getElementById('statTrust').textContent = `${(provider.trust_score * 100).toFixed(0)}%`;
-      
-      renderSellerItems(items);
-      renderSellerOffers(offers);
-      renderSellerOrders(orders);
-      updateItemSelect(items);
+      try {
+        const data = await api.getMyProvider();
+        if (!data.success) return;
+        
+        const { provider, items, offers } = data;
+        const ordersData = await api.getMyOrders();
+        const orders = ordersData.orders || [];
+        
+        currentProvider = provider;
+        
+        document.getElementById('statItems').textContent = items.length;
+        document.getElementById('statOffers').textContent = offers.length;
+        document.getElementById('statOrders').textContent = orders.length;
+        document.getElementById('statTrust').textContent = `${(provider.trust_score * 100).toFixed(0)}%`;
+        
+        renderSellerItems(items);
+        renderSellerOffers(offers);
+        renderSellerOrders(orders);
+        updateItemSelect(items);
+      } catch (err) {
+        console.error('Failed to refresh seller data:', err);
+      }
     }
 
     function renderSellerItems(items) {
@@ -1278,7 +1730,14 @@
       document.getElementById('offerEndTime').value = format(end);
     }
 
-    setDefaultDates();
+    // Initialize app
+    async function init() {
+      setDefaultDates();
+      await loadGoogleScript();
+      checkAuth();
+    }
+
+    init();
   </script>
 </body>
 </html>

@@ -24,14 +24,16 @@ import {
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
+import { optionalAuthMiddleware } from './middleware/auth';
 
 const router = Router();
 const logger = createLogger('BAP');
 
 /**
  * POST /api/discover - Initiate catalog discovery
+ * Uses optional auth to filter out user's own offers
  */
-router.post('/api/discover', async (req: Request, res: Response) => {
+router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: Response) => {
   const { 
     sourceType, 
     deliveryMode, 
@@ -48,6 +50,9 @@ router.post('/api/discover', async (req: Request, res: Response) => {
   
   const txnId = transaction_id || uuidv4();
   
+  // Get user's provider ID to exclude their own offers
+  const excludeProviderId = req.user?.providerId || null;
+  
   // Create transaction state with discovery criteria for matching
   await createTransaction(txnId);
   await updateTransaction(txnId, {
@@ -57,6 +62,7 @@ router.post('/api/discover', async (req: Request, res: Response) => {
       minQuantity,
       timeWindow,
     },
+    excludeProviderId, // Store for filtering in callback
   });
   logger.debug('Discovery criteria', {
     sourceType,

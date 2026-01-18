@@ -44,11 +44,23 @@ router.post('/on_discover', async (req: Request, res: Response) => {
   // Log event
   await logEvent(context.transaction_id, context.message_id, 'on_discover', 'INBOUND', JSON.stringify(message));
   
-  // Extract providers and offers for matching
+  // Update transaction state
+  let txState = await getTransaction(context.transaction_id);
+  if (!txState) {
+    txState = await createTransaction(context.transaction_id);
+  }
+  
+  // Get the provider ID to exclude (user's own provider)
+  const excludeProviderId = txState.excludeProviderId;
+  
+  // Filter out user's own provider from catalog
+  const filteredProviders = content.catalog.providers.filter(p => p.id !== excludeProviderId);
+  
+  // Extract providers and offers for matching (excluding user's own)
   const providers = new Map<string, Provider>();
   const allOffers: CatalogOffer[] = [];
   
-  for (const providerCatalog of content.catalog.providers) {
+  for (const providerCatalog of filteredProviders) {
     // Create basic provider entry (trust scores would come from a real provider registry)
     providers.set(providerCatalog.id, {
       id: providerCatalog.id,
@@ -63,11 +75,11 @@ router.post('/on_discover', async (req: Request, res: Response) => {
     }
   }
   
-  // Update transaction state
-  let txState = await getTransaction(context.transaction_id);
-  if (!txState) {
-    txState = await createTransaction(context.transaction_id);
-  }
+  // Update catalog with filtered providers
+  const filteredCatalog = {
+    ...content.catalog,
+    providers: filteredProviders,
+  };
   
   // Run matching algorithm if we have discovery criteria stored
   let matchingResults = null;
@@ -96,22 +108,28 @@ router.post('/on_discover', async (req: Request, res: Response) => {
   }
   
   await updateTransaction(context.transaction_id, {
-    catalog: content.catalog,
+    catalog: filteredCatalog,
     providers,
     matchingResults,
     status: 'SELECTING',
   });
   
-  const itemCount = content.catalog.providers.reduce((sum, p) => sum + p.items.length, 0);
+  const itemCount = filteredCatalog.providers.reduce((sum, p) => sum + p.items.length, 0);
   const offerCount = allOffers.length;
   
-  logger.info(`Catalog received: ${content.catalog.providers.length} providers, ${itemCount} items, ${offerCount} offers`, {
+  if (excludeProviderId) {
+    logger.info(`Filtered out user's own provider ${excludeProviderId} from catalog`, {
+      transaction_id: context.transaction_id,
+    });
+  }
+  
+  logger.info(`Catalog received: ${filteredCatalog.providers.length} providers, ${itemCount} items, ${offerCount} offers`, {
     transaction_id: context.transaction_id,
   });
   
   res.json({ 
     status: 'ok', 
-    providers: content.catalog.providers.length, 
+    providers: filteredCatalog.providers.length, 
     items: itemCount, 
     offers: offerCount,
     bestMatch: matchingResults?.selectedOffer ? {

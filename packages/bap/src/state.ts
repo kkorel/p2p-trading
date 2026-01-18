@@ -51,6 +51,7 @@ export interface TransactionState {
   order?: Order;
   discoveryCriteria?: DiscoveryCriteria;
   matchingResults?: MatchingResult | null;
+  excludeProviderId?: string | null; // User's own provider to exclude from results
   status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED';
   created_at: string;
   updated_at: string;
