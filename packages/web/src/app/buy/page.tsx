@@ -47,38 +47,42 @@ export default function BuyPage() {
         const txState = await buyerApi.getTransaction(result.transaction_id);
         setTransaction(txState);
         
-        if (txState.catalog && txState.catalog.providers.length > 0) {
-          // Extract offers from catalog
-          const discoveredOffers: DiscoveredOffer[] = [];
-          
-          for (const provider of txState.catalog.providers) {
-            for (const item of provider.items) {
-              for (const offer of item.offers) {
-                // Find score from matching results
-                const matchedOffer = txState.matchingResults?.allOffers?.find(
-                  m => m.offer.id === offer.id
-                );
-                
-                discoveredOffers.push({
-                  offer,
-                  providerName: provider.descriptor?.name || 'Provider',
-                  sourceType: item.itemAttributes?.sourceType || 'MIXED',
-                  availableQty: item.itemAttributes?.availableQuantity || offer.maxQuantity,
-                  score: matchedOffer?.score,
-                });
+        // Check if catalog has been received (even if empty)
+        if (txState.catalog) {
+          if (txState.catalog.providers.length > 0) {
+            // Extract offers from catalog
+            const discoveredOffers: DiscoveredOffer[] = [];
+            
+            for (const provider of txState.catalog.providers) {
+              for (const item of provider.items) {
+                for (const offer of item.offers) {
+                  // Find score from matching results
+                  const matchedOffer = txState.matchingResults?.allOffers?.find(
+                    m => m.offer.id === offer.id
+                  );
+                  
+                  discoveredOffers.push({
+                    offer,
+                    providerName: provider.descriptor?.name || 'Provider',
+                    sourceType: item.itemAttributes?.sourceType || 'MIXED',
+                    availableQty: item.itemAttributes?.availableQuantity || offer.maxQuantity,
+                    score: matchedOffer?.score,
+                  });
+                }
               }
             }
+            
+            // Sort by score (if available) or price
+            discoveredOffers.sort((a, b) => {
+              if (a.score !== undefined && b.score !== undefined) {
+                return b.score - a.score;
+              }
+              return a.offer.price.value - b.offer.price.value;
+            });
+            
+            setOffers(discoveredOffers);
           }
-          
-          // Sort by score (if available) or price
-          discoveredOffers.sort((a, b) => {
-            if (a.score !== undefined && b.score !== undefined) {
-              return b.score - a.score;
-            }
-            return a.offer.price.value - b.offer.price.value;
-          });
-          
-          setOffers(discoveredOffers);
+          // Catalog received (even if empty) - stop polling
           break;
         }
         

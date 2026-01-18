@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/auth-context';
 import { Zap } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 interface HeaderProps {
   title?: string;
@@ -24,7 +25,10 @@ export function Header({ title }: HeaderProps) {
         </div>
 
         {user && (
-          <div className="flex items-center gap-2">
+          <Link 
+            href="/profile" 
+            className="flex items-center gap-2 rounded-full transition-opacity hover:opacity-80"
+          >
             {user.picture ? (
               <Image
                 src={user.picture}
@@ -40,7 +44,7 @@ export function Header({ title }: HeaderProps) {
                 </span>
               </div>
             )}
-          </div>
+          </Link>
         )}
       </div>
     </header>
