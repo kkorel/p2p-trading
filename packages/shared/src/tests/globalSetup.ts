@@ -4,14 +4,16 @@
  */
 
 export default async function globalSetup() {
-  // Set test environment variables
-  process.env.NODE_ENV = 'test';
+  // Note: NODE_ENV is already set to 'test' by Jest
   
   // Use test database (in case we want to isolate test data)
-  process.env.DATABASE_URL = process.env.DATABASE_URL || 
-    'postgresql://p2p_user:p2p_password@localhost:5432/p2p_trading';
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = 'postgresql://p2p_user:p2p_password@localhost:5432/p2p_trading';
+  }
   
-  process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+  if (!process.env.REDIS_URL) {
+    process.env.REDIS_URL = 'redis://localhost:6379';
+  }
   
   console.log('\n🧪 Global test setup complete');
   console.log(`   Database: ${process.env.DATABASE_URL}`);

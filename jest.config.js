@@ -29,6 +29,9 @@ module.exports = {
   verbose: true,
   testTimeout: 30000, // 30 seconds for async tests
   
+  // Run tests sequentially to avoid database race conditions
+  maxWorkers: 1,
+  
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/packages/shared/src/tests/setup.ts'],
   
