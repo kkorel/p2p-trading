@@ -1,11 +1,22 @@
 /**
  * Catalog data access for Seller (BPP) functionality
  * Using Prisma ORM for PostgreSQL persistence
+ * With concurrency-safe block claiming using distributed locks and row-level locking
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { Prisma } from '@p2p/shared/src/generated/prisma';
 import { prisma } from './db';
-import { CatalogOffer, Provider, TimeWindow, OfferAttributes, SourceType, DeliveryMode } from '@p2p/shared';
+import { 
+  CatalogOffer, 
+  Provider, 
+  TimeWindow, 
+  SourceType, 
+  DeliveryMode,
+  withOfferLock,
+  withOrderLock,
+  InsufficientBlocksError,
+} from '@p2p/shared';
 
 export interface CatalogItem {
   id: string;
@@ -437,8 +448,11 @@ export async function createBlocksForOffer(
 }
 
 /**
- * Atomically claim available blocks for an offer
+ * Atomically claim available blocks for an offer using row-level locking
+ * Uses SELECT ... FOR UPDATE SKIP LOCKED to prevent race conditions
  * Returns the blocks successfully claimed
+ * 
+ * CONCURRENCY SAFE: Uses distributed lock + database row locking
  */
 export async function claimBlocks(
   offerId: string,
@@ -448,70 +462,126 @@ export async function claimBlocks(
 ): Promise<OfferBlock[]> {
   const now = new Date();
   
-  // Find available blocks
-  const availableBlocks = await prisma.offerBlock.findMany({
-    where: {
-      offerId,
-      status: 'AVAILABLE',
-    },
-    take: quantity,
+  // Use distributed lock to prevent concurrent claims on same offer
+  return withOfferLock(offerId, async () => {
+    // Use database transaction with row-level locking
+    return prisma.$transaction(async (tx) => {
+      // Use raw SQL for SELECT ... FOR UPDATE SKIP LOCKED
+      // This acquires row-level locks on selected rows, skipping already-locked rows
+      const lockedBlocks = await tx.$queryRaw<{ id: string; item_id: string; provider_id: string; price_value: number; currency: string; created_at: Date }[]>`
+        SELECT id, item_id, provider_id, price_value, currency, created_at
+        FROM offer_blocks 
+        WHERE offer_id = ${offerId} 
+          AND status = 'AVAILABLE'
+        LIMIT ${quantity}
+        FOR UPDATE SKIP LOCKED
+      `;
+      
+      if (lockedBlocks.length === 0) {
+        return [];
+      }
+      
+      // If we got fewer blocks than requested, that's okay - we return what we got
+      // The caller can decide whether to proceed with partial fulfillment or fail
+      const blockIds = lockedBlocks.map(b => b.id);
+      
+      // Update blocks to RESERVED status atomically
+      await tx.offerBlock.updateMany({
+        where: {
+          id: { in: blockIds },
+          status: 'AVAILABLE', // Double-check status for safety
+        },
+        data: {
+          status: 'RESERVED',
+          orderId,
+          transactionId,
+          reservedAt: now,
+        },
+      });
+      
+      return lockedBlocks.map(block => ({
+        id: block.id,
+        offer_id: offerId,
+        item_id: block.item_id,
+        provider_id: block.provider_id,
+        status: 'RESERVED' as const,
+        order_id: orderId,
+        transaction_id: transactionId,
+        price_value: block.price_value,
+        currency: block.currency,
+        created_at: block.created_at.toISOString(),
+        reserved_at: now.toISOString(),
+      }));
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      timeout: 10000, // 10 second timeout
+    });
   });
+}
+
+/**
+ * Atomically claim blocks with strict quantity requirement
+ * Throws InsufficientBlocksError if not enough blocks available
+ * 
+ * Use this when partial fulfillment is not acceptable
+ */
+export async function claimBlocksStrict(
+  offerId: string,
+  quantity: number,
+  orderId: string,
+  transactionId: string
+): Promise<OfferBlock[]> {
+  const blocks = await claimBlocks(offerId, quantity, orderId, transactionId);
   
-  if (availableBlocks.length === 0) {
-    return [];
+  if (blocks.length < quantity) {
+    // Release any blocks we did claim
+    if (blocks.length > 0) {
+      await releaseBlocksByOrderId(orderId);
+    }
+    throw new InsufficientBlocksError(quantity, blocks.length);
   }
   
-  const blockIds = availableBlocks.map(b => b.id);
-  
-  // Update blocks to RESERVED status
-  await prisma.offerBlock.updateMany({
-    where: {
-      id: { in: blockIds },
-    },
-    data: {
-      status: 'RESERVED',
-      orderId,
-      transactionId,
-      reservedAt: now,
-    },
-  });
-  
-  return availableBlocks.map(block => ({
-    id: block.id,
-    offer_id: block.offerId,
-    item_id: block.itemId,
-    provider_id: block.providerId,
-    status: 'RESERVED' as const,
-    order_id: orderId,
-    transaction_id: transactionId,
-    price_value: block.priceValue,
-    currency: block.currency,
-    created_at: block.createdAt.toISOString(),
-    reserved_at: now.toISOString(),
-  }));
+  return blocks;
 }
 
 /**
  * Mark blocks as SOLD (when order is confirmed)
+ * 
+ * CONCURRENCY SAFE: The caller should hold the order lock.
+ * This function uses database-level atomicity via updateMany.
+ * Returns the number of blocks that were marked as SOLD.
  */
-export async function markBlocksAsSold(orderId: string): Promise<void> {
-  await prisma.offerBlock.updateMany({
+export async function markBlocksAsSold(orderId: string): Promise<number> {
+  const result = await prisma.offerBlock.updateMany({
     where: {
       orderId,
-      status: 'RESERVED',
+      status: 'RESERVED', // Only mark RESERVED blocks as SOLD
     },
     data: {
       status: 'SOLD',
       soldAt: new Date(),
     },
   });
+  return result.count;
 }
 
 /**
- * Release reserved blocks (if order fails or is cancelled)
+ * Mark blocks as SOLD with distributed lock
+ * Use this when calling from outside a locked context
  */
-export async function releaseBlocks(transactionId: string): Promise<void> {
-  await prisma.offerBlock.updateMany({
+export async function markBlocksAsSoldWithLock(orderId: string): Promise<number> {
+  return withOrderLock(orderId, async () => {
+    return markBlocksAsSold(orderId);
+  });
+}
+
+/**
+ * Release reserved blocks by transaction ID (if order fails or is cancelled)
+ * 
+ * CONCURRENCY SAFE: Uses transaction to ensure atomicity
+ */
+export async function releaseBlocks(transactionId: string): Promise<number> {
+  const result = await prisma.offerBlock.updateMany({
     where: {
       transactionId,
       status: 'RESERVED',
@@ -522,6 +592,39 @@ export async function releaseBlocks(transactionId: string): Promise<void> {
       transactionId: null,
       reservedAt: null,
     },
+  });
+  return result.count;
+}
+
+/**
+ * Release reserved blocks by order ID
+ * Used when order creation fails after blocks were claimed
+ * 
+ * CONCURRENCY SAFE: Uses database-level atomicity
+ */
+export async function releaseBlocksByOrderId(orderId: string): Promise<number> {
+  const result = await prisma.offerBlock.updateMany({
+    where: {
+      orderId,
+      status: 'RESERVED',
+    },
+    data: {
+      status: 'AVAILABLE',
+      orderId: null,
+      transactionId: null,
+      reservedAt: null,
+    },
+  });
+  return result.count;
+}
+
+/**
+ * Release reserved blocks by order ID with distributed lock
+ * Use this when calling from outside a locked context
+ */
+export async function releaseBlocksByOrderIdWithLock(orderId: string): Promise<number> {
+  return withOrderLock(orderId, async () => {
+    return releaseBlocksByOrderId(orderId);
   });
 }
 

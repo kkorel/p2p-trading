@@ -4717,10 +4717,12 @@ export namespace Prisma {
 
   export type OfferBlockAvgAggregateOutputType = {
     priceValue: number | null
+    version: number | null
   }
 
   export type OfferBlockSumAggregateOutputType = {
     priceValue: number | null
+    version: number | null
   }
 
   export type OfferBlockMinAggregateOutputType = {
@@ -4733,6 +4735,7 @@ export namespace Prisma {
     transactionId: string | null
     priceValue: number | null
     currency: string | null
+    version: number | null
     createdAt: Date | null
     updatedAt: Date | null
     reservedAt: Date | null
@@ -4749,6 +4752,7 @@ export namespace Prisma {
     transactionId: string | null
     priceValue: number | null
     currency: string | null
+    version: number | null
     createdAt: Date | null
     updatedAt: Date | null
     reservedAt: Date | null
@@ -4765,6 +4769,7 @@ export namespace Prisma {
     transactionId: number
     priceValue: number
     currency: number
+    version: number
     createdAt: number
     updatedAt: number
     reservedAt: number
@@ -4775,10 +4780,12 @@ export namespace Prisma {
 
   export type OfferBlockAvgAggregateInputType = {
     priceValue?: true
+    version?: true
   }
 
   export type OfferBlockSumAggregateInputType = {
     priceValue?: true
+    version?: true
   }
 
   export type OfferBlockMinAggregateInputType = {
@@ -4791,6 +4798,7 @@ export namespace Prisma {
     transactionId?: true
     priceValue?: true
     currency?: true
+    version?: true
     createdAt?: true
     updatedAt?: true
     reservedAt?: true
@@ -4807,6 +4815,7 @@ export namespace Prisma {
     transactionId?: true
     priceValue?: true
     currency?: true
+    version?: true
     createdAt?: true
     updatedAt?: true
     reservedAt?: true
@@ -4823,6 +4832,7 @@ export namespace Prisma {
     transactionId?: true
     priceValue?: true
     currency?: true
+    version?: true
     createdAt?: true
     updatedAt?: true
     reservedAt?: true
@@ -4926,6 +4936,7 @@ export namespace Prisma {
     transactionId: string | null
     priceValue: number
     currency: string
+    version: number
     createdAt: Date
     updatedAt: Date
     reservedAt: Date | null
@@ -4961,6 +4972,7 @@ export namespace Prisma {
     transactionId?: boolean
     priceValue?: boolean
     currency?: boolean
+    version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     reservedAt?: boolean
@@ -4981,6 +4993,7 @@ export namespace Prisma {
     transactionId?: boolean
     priceValue?: boolean
     currency?: boolean
+    version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     reservedAt?: boolean
@@ -5001,6 +5014,7 @@ export namespace Prisma {
     transactionId?: boolean
     priceValue?: boolean
     currency?: boolean
+    version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     reservedAt?: boolean
@@ -5038,6 +5052,7 @@ export namespace Prisma {
       transactionId: string | null
       priceValue: number
       currency: string
+      version: number
       createdAt: Date
       updatedAt: Date
       reservedAt: Date | null
@@ -5448,6 +5463,7 @@ export namespace Prisma {
     readonly transactionId: FieldRef<"OfferBlock", 'String'>
     readonly priceValue: FieldRef<"OfferBlock", 'Float'>
     readonly currency: FieldRef<"OfferBlock", 'String'>
+    readonly version: FieldRef<"OfferBlock", 'Int'>
     readonly createdAt: FieldRef<"OfferBlock", 'DateTime'>
     readonly updatedAt: FieldRef<"OfferBlock", 'DateTime'>
     readonly reservedAt: FieldRef<"OfferBlock", 'DateTime'>
@@ -5814,11 +5830,13 @@ export namespace Prisma {
   export type OrderAvgAggregateOutputType = {
     totalQty: number | null
     totalPrice: number | null
+    version: number | null
   }
 
   export type OrderSumAggregateOutputType = {
     totalQty: number | null
     totalPrice: number | null
+    version: number | null
   }
 
   export type OrderMinAggregateOutputType = {
@@ -5832,6 +5850,7 @@ export namespace Prisma {
     currency: string | null
     itemsJson: string | null
     quoteJson: string | null
+    version: number | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -5847,6 +5866,7 @@ export namespace Prisma {
     currency: string | null
     itemsJson: string | null
     quoteJson: string | null
+    version: number | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -5862,6 +5882,7 @@ export namespace Prisma {
     currency: number
     itemsJson: number
     quoteJson: number
+    version: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -5871,11 +5892,13 @@ export namespace Prisma {
   export type OrderAvgAggregateInputType = {
     totalQty?: true
     totalPrice?: true
+    version?: true
   }
 
   export type OrderSumAggregateInputType = {
     totalQty?: true
     totalPrice?: true
+    version?: true
   }
 
   export type OrderMinAggregateInputType = {
@@ -5889,6 +5912,7 @@ export namespace Prisma {
     currency?: true
     itemsJson?: true
     quoteJson?: true
+    version?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -5904,6 +5928,7 @@ export namespace Prisma {
     currency?: true
     itemsJson?: true
     quoteJson?: true
+    version?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -5919,6 +5944,7 @@ export namespace Prisma {
     currency?: true
     itemsJson?: true
     quoteJson?: true
+    version?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -6021,6 +6047,7 @@ export namespace Prisma {
     currency: string | null
     itemsJson: string
     quoteJson: string
+    version: number
     createdAt: Date
     updatedAt: Date
     _count: OrderCountAggregateOutputType | null
@@ -6055,6 +6082,7 @@ export namespace Prisma {
     currency?: boolean
     itemsJson?: boolean
     quoteJson?: boolean
+    version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     provider?: boolean | Order$providerArgs<ExtArgs>
@@ -6074,6 +6102,7 @@ export namespace Prisma {
     currency?: boolean
     itemsJson?: boolean
     quoteJson?: boolean
+    version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     provider?: boolean | Order$providerArgs<ExtArgs>
@@ -6091,6 +6120,7 @@ export namespace Prisma {
     currency?: boolean
     itemsJson?: boolean
     quoteJson?: boolean
+    version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
@@ -6124,6 +6154,7 @@ export namespace Prisma {
       currency: string | null
       itemsJson: string
       quoteJson: string
+      version: number
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["order"]>
@@ -6532,6 +6563,7 @@ export namespace Prisma {
     readonly currency: FieldRef<"Order", 'String'>
     readonly itemsJson: FieldRef<"Order", 'String'>
     readonly quoteJson: FieldRef<"Order", 'String'>
+    readonly version: FieldRef<"Order", 'Int'>
     readonly createdAt: FieldRef<"Order", 'DateTime'>
     readonly updatedAt: FieldRef<"Order", 'DateTime'>
   }
@@ -7922,6 +7954,7 @@ export namespace Prisma {
     transactionId: 'transactionId',
     priceValue: 'priceValue',
     currency: 'currency',
+    version: 'version',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     reservedAt: 'reservedAt',
@@ -7942,6 +7975,7 @@ export namespace Prisma {
     currency: 'currency',
     itemsJson: 'itemsJson',
     quoteJson: 'quoteJson',
+    version: 'version',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -8323,6 +8357,7 @@ export namespace Prisma {
     transactionId?: StringNullableFilter<"OfferBlock"> | string | null
     priceValue?: FloatFilter<"OfferBlock"> | number
     currency?: StringFilter<"OfferBlock"> | string
+    version?: IntFilter<"OfferBlock"> | number
     createdAt?: DateTimeFilter<"OfferBlock"> | Date | string
     updatedAt?: DateTimeFilter<"OfferBlock"> | Date | string
     reservedAt?: DateTimeNullableFilter<"OfferBlock"> | Date | string | null
@@ -8343,6 +8378,7 @@ export namespace Prisma {
     transactionId?: SortOrderInput | SortOrder
     priceValue?: SortOrder
     currency?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     reservedAt?: SortOrderInput | SortOrder
@@ -8366,6 +8402,7 @@ export namespace Prisma {
     transactionId?: StringNullableFilter<"OfferBlock"> | string | null
     priceValue?: FloatFilter<"OfferBlock"> | number
     currency?: StringFilter<"OfferBlock"> | string
+    version?: IntFilter<"OfferBlock"> | number
     createdAt?: DateTimeFilter<"OfferBlock"> | Date | string
     updatedAt?: DateTimeFilter<"OfferBlock"> | Date | string
     reservedAt?: DateTimeNullableFilter<"OfferBlock"> | Date | string | null
@@ -8386,6 +8423,7 @@ export namespace Prisma {
     transactionId?: SortOrderInput | SortOrder
     priceValue?: SortOrder
     currency?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     reservedAt?: SortOrderInput | SortOrder
@@ -8410,6 +8448,7 @@ export namespace Prisma {
     transactionId?: StringNullableWithAggregatesFilter<"OfferBlock"> | string | null
     priceValue?: FloatWithAggregatesFilter<"OfferBlock"> | number
     currency?: StringWithAggregatesFilter<"OfferBlock"> | string
+    version?: IntWithAggregatesFilter<"OfferBlock"> | number
     createdAt?: DateTimeWithAggregatesFilter<"OfferBlock"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"OfferBlock"> | Date | string
     reservedAt?: DateTimeNullableWithAggregatesFilter<"OfferBlock"> | Date | string | null
@@ -8430,6 +8469,7 @@ export namespace Prisma {
     currency?: StringNullableFilter<"Order"> | string | null
     itemsJson?: StringFilter<"Order"> | string
     quoteJson?: StringFilter<"Order"> | string
+    version?: IntFilter<"Order"> | number
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
     provider?: XOR<ProviderNullableRelationFilter, ProviderWhereInput> | null
@@ -8448,6 +8488,7 @@ export namespace Prisma {
     currency?: SortOrderInput | SortOrder
     itemsJson?: SortOrder
     quoteJson?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     provider?: ProviderOrderByWithRelationInput
@@ -8469,6 +8510,7 @@ export namespace Prisma {
     currency?: StringNullableFilter<"Order"> | string | null
     itemsJson?: StringFilter<"Order"> | string
     quoteJson?: StringFilter<"Order"> | string
+    version?: IntFilter<"Order"> | number
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
     provider?: XOR<ProviderNullableRelationFilter, ProviderWhereInput> | null
@@ -8487,6 +8529,7 @@ export namespace Prisma {
     currency?: SortOrderInput | SortOrder
     itemsJson?: SortOrder
     quoteJson?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: OrderCountOrderByAggregateInput
@@ -8510,6 +8553,7 @@ export namespace Prisma {
     currency?: StringNullableWithAggregatesFilter<"Order"> | string | null
     itemsJson?: StringWithAggregatesFilter<"Order"> | string
     quoteJson?: StringWithAggregatesFilter<"Order"> | string
+    version?: IntWithAggregatesFilter<"Order"> | number
     createdAt?: DateTimeWithAggregatesFilter<"Order"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Order"> | Date | string
   }
@@ -8872,6 +8916,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -8892,6 +8937,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -8904,6 +8950,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -8924,6 +8971,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -8940,6 +8988,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -8952,6 +9001,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -8968,6 +9018,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -8983,6 +9034,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     provider?: ProviderCreateNestedOneWithoutOrdersInput
@@ -9001,6 +9053,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
@@ -9015,6 +9068,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
@@ -9033,6 +9087,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
@@ -9049,6 +9104,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -9062,6 +9118,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -9077,6 +9134,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -9520,6 +9578,7 @@ export namespace Prisma {
     transactionId?: SortOrder
     priceValue?: SortOrder
     currency?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     reservedAt?: SortOrder
@@ -9528,6 +9587,7 @@ export namespace Prisma {
 
   export type OfferBlockAvgOrderByAggregateInput = {
     priceValue?: SortOrder
+    version?: SortOrder
   }
 
   export type OfferBlockMaxOrderByAggregateInput = {
@@ -9540,6 +9600,7 @@ export namespace Prisma {
     transactionId?: SortOrder
     priceValue?: SortOrder
     currency?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     reservedAt?: SortOrder
@@ -9556,6 +9617,7 @@ export namespace Prisma {
     transactionId?: SortOrder
     priceValue?: SortOrder
     currency?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     reservedAt?: SortOrder
@@ -9564,6 +9626,7 @@ export namespace Prisma {
 
   export type OfferBlockSumOrderByAggregateInput = {
     priceValue?: SortOrder
+    version?: SortOrder
   }
 
   export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -9612,6 +9675,7 @@ export namespace Prisma {
     currency?: SortOrder
     itemsJson?: SortOrder
     quoteJson?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -9619,6 +9683,7 @@ export namespace Prisma {
   export type OrderAvgOrderByAggregateInput = {
     totalQty?: SortOrder
     totalPrice?: SortOrder
+    version?: SortOrder
   }
 
   export type OrderMaxOrderByAggregateInput = {
@@ -9632,6 +9697,7 @@ export namespace Prisma {
     currency?: SortOrder
     itemsJson?: SortOrder
     quoteJson?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -9647,6 +9713,7 @@ export namespace Prisma {
     currency?: SortOrder
     itemsJson?: SortOrder
     quoteJson?: SortOrder
+    version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -9654,6 +9721,7 @@ export namespace Prisma {
   export type OrderSumOrderByAggregateInput = {
     totalQty?: SortOrder
     totalPrice?: SortOrder
+    version?: SortOrder
   }
 
   export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -10551,6 +10619,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
@@ -10567,6 +10636,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
@@ -10588,6 +10658,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -10606,6 +10677,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -10717,6 +10789,7 @@ export namespace Prisma {
     currency?: StringNullableFilter<"Order"> | string | null
     itemsJson?: StringFilter<"Order"> | string
     quoteJson?: StringFilter<"Order"> | string
+    version?: IntFilter<"Order"> | number
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
   }
@@ -10750,6 +10823,7 @@ export namespace Prisma {
     transactionId?: StringNullableFilter<"OfferBlock"> | string | null
     priceValue?: FloatFilter<"OfferBlock"> | number
     currency?: StringFilter<"OfferBlock"> | string
+    version?: IntFilter<"OfferBlock"> | number
     createdAt?: DateTimeFilter<"OfferBlock"> | Date | string
     updatedAt?: DateTimeFilter<"OfferBlock"> | Date | string
     reservedAt?: DateTimeNullableFilter<"OfferBlock"> | Date | string | null
@@ -10835,6 +10909,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -10853,6 +10928,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -11006,6 +11082,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -11024,6 +11101,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -11049,6 +11127,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     provider?: ProviderCreateNestedOneWithoutOrdersInput
@@ -11065,6 +11144,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
@@ -11294,6 +11374,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     provider?: ProviderCreateNestedOneWithoutOrdersInput
@@ -11311,6 +11392,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -11457,6 +11539,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
@@ -11474,6 +11557,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -11552,6 +11636,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -11570,6 +11655,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -11717,6 +11803,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -11730,6 +11817,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -11828,6 +11916,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
@@ -11844,6 +11933,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
@@ -11859,6 +11949,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -11869,6 +11960,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -11887,6 +11979,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -11902,6 +11995,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -11931,6 +12025,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -11989,6 +12084,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -12007,6 +12103,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -12022,6 +12119,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -12037,6 +12135,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -12053,6 +12152,7 @@ export namespace Prisma {
     currency?: string | null
     itemsJson: string
     quoteJson: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -12063,6 +12163,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -12081,6 +12182,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -12096,6 +12198,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -12111,6 +12214,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
@@ -12127,6 +12231,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
@@ -12142,6 +12247,7 @@ export namespace Prisma {
     currency?: NullableStringFieldUpdateOperationsInput | string | null
     itemsJson?: StringFieldUpdateOperationsInput | string
     quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -12155,6 +12261,7 @@ export namespace Prisma {
     transactionId?: string | null
     priceValue: number
     currency?: string
+    version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     reservedAt?: Date | string | null
@@ -12167,6 +12274,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -12185,6 +12293,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -12200,6 +12309,7 @@ export namespace Prisma {
     transactionId?: NullableStringFieldUpdateOperationsInput | string | null
     priceValue?: FloatFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reservedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null

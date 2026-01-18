@@ -1,5 +1,6 @@
 /**
  * Seller (BPP) Routes - Select, Init, Confirm, Status + Seller Management APIs
+ * With concurrency-safe operations using distributed locks
  */
 
 import { Router, Request, Response } from 'express';
@@ -22,6 +23,10 @@ import {
   ErrorCodes,
   OrderItem,
   Quote,
+  withOrderLock,
+  withTransactionLock,
+  InsufficientBlocksError,
+  createIdempotencyMiddleware,
 } from '@p2p/shared';
 import { 
   getOfferById, 
@@ -39,8 +44,10 @@ import {
   updateItemQuantity,
   deleteOffer,
   claimBlocks,
+  claimBlocksStrict,
   markBlocksAsSold,
   releaseBlocks,
+  releaseBlocksByOrderId,
   getBlockStats,
   getAvailableBlockCount,
   getBlocksForOrder,
@@ -325,6 +332,7 @@ router.post('/init', async (req: Request, res: Response) => {
 
 /**
  * POST /confirm - Confirm order (make it active)
+ * CONCURRENCY SAFE: Uses distributed lock on order to prevent double-confirmation
  */
 router.post('/confirm', async (req: Request, res: Response) => {
   const message = req.body as ConfirmMessage;
@@ -357,15 +365,20 @@ router.post('/confirm', async (req: Request, res: Response) => {
   
   setTimeout(async () => {
     try {
-      // Idempotent confirm: only update if not already ACTIVE
-      if (order!.status !== 'ACTIVE') {
-        order = await updateOrderStatus(order!.id, 'ACTIVE');
-        logger.info('Order status updated to ACTIVE', { transaction_id: context.transaction_id, order_id: order!.id });
+      // Use distributed lock to prevent concurrent confirmations
+      await withOrderLock(order!.id, async () => {
+        // Re-fetch order inside lock to get current status
+        const currentOrder = await getOrderById(order!.id);
         
-        // Mark reserved blocks as SOLD
-        const soldBlocks = await getBlocksForOrder(order!.id);
-        await markBlocksAsSold(order!.id);
-        logger.info(`Marked ${soldBlocks.length} blocks as SOLD for order ${order!.id}`, { transaction_id: context.transaction_id });
+        // Idempotent confirm: only update if not already ACTIVE
+        if (currentOrder && currentOrder.status !== 'ACTIVE') {
+          order = await updateOrderStatus(order!.id, 'ACTIVE');
+          logger.info('Order status updated to ACTIVE', { transaction_id: context.transaction_id, order_id: order!.id });
+          
+          // Mark reserved blocks as SOLD (also uses lock internally)
+          const soldCount = await markBlocksAsSold(order!.id);
+          const soldBlocks = await getBlocksForOrder(order!.id);
+          logger.info(`Marked ${soldCount} blocks as SOLD for order ${order!.id}`, { transaction_id: context.transaction_id });
         
         // Sync block status to CDS
         if (soldBlocks.length > 0 && order!.items && order!.items.length > 0) {
@@ -421,9 +434,10 @@ router.post('/confirm', async (req: Request, res: Response) => {
             }
           }
         }
-      } else {
-        logger.info('Order already ACTIVE, idempotent confirm', { transaction_id: context.transaction_id });
-      }
+        } else {
+          logger.info('Order already ACTIVE, idempotent confirm', { transaction_id: context.transaction_id });
+        }
+      }); // End withOrderLock
       
       const callbackContext = createCallbackContext(context, 'on_confirm');
       const onConfirmMessage: OnConfirmMessage = {

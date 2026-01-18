@@ -1,11 +1,22 @@
 /**
  * Order management for Seller (BPP) functionality
  * Using Prisma ORM for PostgreSQL persistence
+ * With optimistic locking for concurrent update safety
  */
 
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from './db';
-import { Order, OrderStatus, OrderItem, Quote } from '@p2p/shared';
+import { Order, OrderStatus, OrderItem, Quote, withOrderLock } from '@p2p/shared';
+
+/**
+ * Error thrown when optimistic locking fails
+ */
+export class OptimisticLockError extends Error {
+  constructor(orderId: string) {
+    super(`Order ${orderId} was modified by another process`);
+    this.name = 'OptimisticLockError';
+  }
+}
 
 /**
  * Convert Prisma order to Order type
@@ -103,8 +114,38 @@ export async function createOrder(
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order | null> {
   await prisma.order.update({
     where: { id: orderId },
-    data: { status },
+    data: { 
+      status,
+      version: { increment: 1 }, // Increment version for tracking
+    },
   });
+  
+  return getOrderById(orderId);
+}
+
+/**
+ * Update order status with optimistic locking
+ * Only updates if the version matches, preventing concurrent modification
+ */
+export async function updateOrderStatusWithVersion(
+  orderId: string, 
+  status: OrderStatus,
+  expectedVersion: number
+): Promise<Order | null> {
+  const result = await prisma.order.updateMany({
+    where: { 
+      id: orderId,
+      version: expectedVersion,
+    },
+    data: { 
+      status,
+      version: { increment: 1 },
+    },
+  });
+  
+  if (result.count === 0) {
+    throw new OptimisticLockError(orderId);
+  }
   
   return getOrderById(orderId);
 }
@@ -115,10 +156,26 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
 export async function updateOrderStatusByTransactionId(transactionId: string, status: OrderStatus): Promise<Order | null> {
   await prisma.order.update({
     where: { transactionId },
-    data: { status },
+    data: { 
+      status,
+      version: { increment: 1 },
+    },
   });
   
   return getOrderByTransactionId(transactionId);
+}
+
+/**
+ * Safe order status update with distributed lock
+ * Use this when you need to ensure exclusive access to an order
+ */
+export async function updateOrderStatusSafely(
+  orderId: string, 
+  status: OrderStatus
+): Promise<Order | null> {
+  return withOrderLock(orderId, async () => {
+    return updateOrderStatus(orderId, status);
+  });
 }
 
 /**

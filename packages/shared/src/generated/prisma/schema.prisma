@@ -81,6 +81,7 @@ model OfferBlock {
   transactionId String?   @map("transaction_id")
   priceValue    Float     @map("price_value")
   currency      String    @default("USD")
+  version       Int       @default(0) // Optimistic locking version
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   reservedAt    DateTime? @map("reserved_at")
@@ -109,6 +110,7 @@ model Order {
   currency        String?
   itemsJson       String   @map("items_json")
   quoteJson       String   @map("quote_json")
+  version         Int      @default(0) // Optimistic locking version
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

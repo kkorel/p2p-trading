@@ -169,6 +169,7 @@ exports.Prisma.OfferBlockScalarFieldEnum = {
   transactionId: 'transactionId',
   priceValue: 'priceValue',
   currency: 'currency',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   reservedAt: 'reservedAt',
@@ -186,6 +187,7 @@ exports.Prisma.OrderScalarFieldEnum = {
   currency: 'currency',
   itemsJson: 'itemsJson',
   quoteJson: 'quoteJson',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
