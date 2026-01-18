@@ -3,66 +3,17 @@
  * With concurrency-safe operations using distributed locks
  */
 
-import { Router, Request, Response } from 'express';
+import {AcceptVerificationMessage, config, ConfirmMessage, createAck, createCallbackContext, createIdempotencyMiddleware, createLogger, createNack, ErrorCodes, InitMessage, InsufficientBlocksError, OnConfirmMessage, OnInitMessage, OnProofsSubmittedMessage, OnSelectMessage, OnSettlementInitiatedMessage, OnSettlementPendingMessage, OnSettlementSettledMessage, OnStatusMessage, OnVerificationAcceptedMessage, OnVerificationRejectedMessage, OnVerificationStartMessage, OrderItem, Quote, RejectVerificationMessage, SelectMessage, SettlementStartMessage, StatusMessage, SubmitProofsMessage, VerificationStartMessage, withOrderLock, withTransactionLock,} from '@p2p/shared';
 import axios from 'axios';
-import { v4 as uuidv4 } from 'uuid';
-import {
-  SelectMessage,
-  OnSelectMessage,
-  InitMessage,
-  OnInitMessage,
-  ConfirmMessage,
-  OnConfirmMessage,
-  StatusMessage,
-  OnStatusMessage,
-  createAck,
-  createNack,
-  createCallbackContext,
-  createLogger,
-  config,
-  ErrorCodes,
-  OrderItem,
-  Quote,
-  withOrderLock,
-  withTransactionLock,
-  InsufficientBlocksError,
-  createIdempotencyMiddleware,
-} from '@p2p/shared';
-import { 
-  getOfferById, 
-  getItemAvailableQuantity, 
-  getProvider, 
-  updateProviderStats,
-  registerProvider,
-  getAllProviders,
-  addCatalogItem,
-  getProviderItems,
-  getAllItems,
-  addOffer,
-  getProviderOffers,
-  getAllOffers,
-  updateItemQuantity,
-  deleteOffer,
-  claimBlocks,
-  claimBlocksStrict,
-  markBlocksAsSold,
-  releaseBlocks,
-  releaseBlocksByOrderId,
-  getBlockStats,
-  getAvailableBlockCount,
-  getBlocksForOrder,
-  updateBlocksOrderId,
-} from './seller-catalog';
-import { 
-  getOrderByTransactionId, 
-  getOrderById, 
-  createOrder, 
-  updateOrderStatus,
-  updateOrderStatusByTransactionId,
-  getOrdersByProviderId,
-  getAllOrders,
-} from './seller-orders';
-import { logEvent, isDuplicateMessage } from './events';
+import {Request, Response, Router} from 'express';
+import {v4 as uuidv4} from 'uuid';
+
+import {prisma} from './db';
+import {isDuplicateMessage, logEvent} from './events';
+import {addCatalogItem, addOffer, claimBlocks, claimBlocksStrict, deleteOffer, getAllItems, getAllOffers, getAllProviders, getAvailableBlockCount, getBlocksForOrder, getBlockStats, getItemAvailableQuantity, getOfferById, getProvider, getProviderItems, getProviderOffers, markBlocksAsSold, registerProvider, releaseBlocks, releaseBlocksByOrderId, updateBlocksOrderId, updateItemQuantity, updateProviderStats,} from './seller-catalog';
+import {createOrder, getAllOrders, getOrderById, getOrderByTransactionId, getOrdersByProviderId, updateOrderStatus, updateOrderStatusByTransactionId,} from './seller-orders';
+import {calculateSettlementAmount, createSettlement, updateSettlementState,} from './settlement';
+import {calculateDeliveredQuantity, calculateDeviation, createVerificationCase, determineVerificationState, getVerificationCaseById, saveProof, updateVerificationCaseState, updateVerificationCaseWithProofs,} from './verification';
 
 const router = Router();
 const logger = createLogger('BPP');
@@ -819,6 +770,560 @@ router.get('/seller/orders', async (req: Request, res: Response) => {
   }));
   
   res.json({ orders: enrichedOrders });
+});
+
+// ============ PHASE-3: VERIFICATION & SETTLEMENT ============
+
+/**
+ * POST /verification_start - Handle verification start request
+ */
+router.post('/verification_start', async (req: Request, res: Response) => {
+  const message = req.body as VerificationStartMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received verification_start request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    order_id: content.order_id,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'verification_start',
+      'INBOUND', JSON.stringify(message));
+
+  // Get order
+  const order = await getOrderById(content.order_id);
+  if (!order) {
+    return res.json(createNack(context, {
+      code: ErrorCodes.ORDER_NOT_FOUND,
+      message: `Order ${content.order_id} not found`,
+    }));
+  }
+
+  res.json(createAck(context));
+
+  // Send callback asynchronously
+  setTimeout(async () => {
+    try {
+      const callbackContext =
+          createCallbackContext(context, 'on_verification_start');
+      const caseId = uuidv4();
+
+      // Calculate expiration
+      let expiresAt = new Date();
+      if (content.required_proofs && content.required_proofs.length > 0) {
+        const latestDeadline =
+            content.required_proofs.map(p => new Date(p.deadline))
+                .reduce(
+                    (latest, current) => current > latest ? current : latest,
+                    expiresAt);
+        expiresAt = latestDeadline;
+      } else {
+        expiresAt.setHours(expiresAt.getHours() + 24);
+      }
+
+      // Create verification case in DB
+      await createVerificationCase(
+          caseId, content.order_id, context.transaction_id,
+          content.verification_window, content.required_proofs,
+          content.tolerance_rules, content.expected_quantity.value, expiresAt,
+          JSON.stringify(message));
+
+      const onVerificationStartMessage: OnVerificationStartMessage = {
+        context: callbackContext,
+        message: {
+          verification_case: {
+            id: caseId,
+            order_id: content.order_id,
+            state: 'PENDING',
+            verification_window: content.verification_window,
+            required_proofs: content.required_proofs,
+            expected_quantity: content.expected_quantity,
+            expires_at: expiresAt.toISOString(),
+          },
+        },
+      };
+
+      await logEvent(
+          context.transaction_id, callbackContext.message_id,
+          'on_verification_start', 'OUTBOUND',
+          JSON.stringify(onVerificationStartMessage));
+
+      await axios.post(
+          `${context.bap_uri}/callbacks/on_verification_start`,
+          onVerificationStartMessage);
+      logger.info(
+          'on_verification_start callback sent successfully',
+          {transaction_id: context.transaction_id});
+    } catch (error: any) {
+      logger.error(
+          `Failed to send on_verification_start callback: ${error.message}`,
+          {transaction_id: context.transaction_id});
+    }
+  }, config.callbackDelay);
+});
+
+/**
+ * POST /submit_proofs - Handle proof submission
+ */
+router.post('/submit_proofs', async (req: Request, res: Response) => {
+  const message = req.body as SubmitProofsMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received submit_proofs request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    verification_case_id: content.verification_case_id,
+    proof_count: content.proofs.length,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'submit_proofs', 'INBOUND',
+      JSON.stringify(message));
+
+  // Get verification case
+  const verificationCase =
+      await getVerificationCaseById(content.verification_case_id);
+  if (!verificationCase) {
+    return res.json(createNack(context, {
+      code: ErrorCodes.ORDER_NOT_FOUND,
+      message: `Verification case ${content.verification_case_id} not found`,
+    }));
+  }
+
+  res.json(createAck(context));
+
+  setTimeout(async () => {
+    try {
+      // Save proofs
+      for (const proof of content.proofs) {
+        const proofId = uuidv4();
+        await saveProof(
+            proofId, content.verification_case_id, proof,
+            JSON.stringify(proof));
+      }
+
+      // Calculate delivered quantity
+      const deliveredQty = calculateDeliveredQuantity(content.proofs);
+
+      // Get tolerance rules
+      const toleranceRules = JSON.parse(verificationCase.toleranceRulesJson);
+      const expectedQty = verificationCase.expectedQty;
+
+      // Calculate deviation
+      const deviation =
+          calculateDeviation(expectedQty, deliveredQty, toleranceRules);
+
+      // Determine state
+      const state = determineVerificationState(deviation, true);
+
+      // Update verification case
+      await updateVerificationCaseWithProofs(
+          content.verification_case_id, deliveredQty, deviation, state);
+
+      const callbackContext =
+          createCallbackContext(context, 'on_proofs_submitted');
+      const onProofsSubmittedMessage: OnProofsSubmittedMessage = {
+        context: callbackContext,
+        message: {
+          verification_case: {
+            id: content.verification_case_id,
+            order_id: content.order_id,
+            state,
+            verification_window: JSON.parse(verificationCase.windowJson),
+            required_proofs: JSON.parse(verificationCase.requiredProofsJson),
+            expected_quantity: {value: expectedQty, unit: 'kWh'},
+            delivered_quantity: {value: deliveredQty, unit: 'kWh'},
+            deviation: {
+              quantity: deviation.deviation_quantity,
+              percent: deviation.deviation_percent,
+            },
+            expires_at: verificationCase.expiresAt.toISOString(),
+          },
+          proofs_received: content.proofs,
+        },
+      };
+
+      await logEvent(
+          context.transaction_id, callbackContext.message_id,
+          'on_proofs_submitted', 'OUTBOUND',
+          JSON.stringify(onProofsSubmittedMessage));
+
+      await axios.post(
+          `${context.bap_uri}/callbacks/on_proofs_submitted`,
+          onProofsSubmittedMessage);
+      logger.info(
+          'on_proofs_submitted callback sent successfully',
+          {transaction_id: context.transaction_id});
+    } catch (error: any) {
+      logger.error(
+          `Failed to send on_proofs_submitted callback: ${error.message}`,
+          {transaction_id: context.transaction_id});
+    }
+  }, config.callbackDelay);
+});
+
+/**
+ * POST /accept_verification - Handle verification acceptance
+ */
+router.post('/accept_verification', async (req: Request, res: Response) => {
+  const message = req.body as AcceptVerificationMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received accept_verification request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    verification_case_id: content.verification_case_id,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'accept_verification',
+      'INBOUND', JSON.stringify(message));
+
+  res.json(createAck(context));
+
+  setTimeout(async () => {
+    try {
+      // Update verification case
+      await updateVerificationCaseState(
+          content.verification_case_id, 'VERIFIED', 'ACCEPTED');
+
+      const callbackContext =
+          createCallbackContext(context, 'on_verification_accepted');
+
+      // Get verification case for callback
+      const verificationCase =
+          await getVerificationCaseById(content.verification_case_id);
+      if (!verificationCase) {
+        throw new Error('Verification case not found');
+      }
+
+      const onVerificationAcceptedMessage: OnVerificationAcceptedMessage = {
+        context: callbackContext,
+        message: {
+          verification_case: {
+            id: content.verification_case_id,
+            order_id: content.order_id,
+            state: 'VERIFIED',
+            verification_window: JSON.parse(verificationCase.windowJson),
+            required_proofs: JSON.parse(verificationCase.requiredProofsJson),
+            expected_quantity:
+                {value: verificationCase.expectedQty, unit: 'kWh'},
+            delivered_quantity: verificationCase.deliveredQty ?
+                {value: verificationCase.deliveredQty, unit: 'kWh'} :
+                undefined,
+            expires_at: verificationCase.expiresAt.toISOString(),
+          },
+        },
+      };
+
+      await logEvent(
+          context.transaction_id, callbackContext.message_id,
+          'on_verification_accepted', 'OUTBOUND',
+          JSON.stringify(onVerificationAcceptedMessage));
+
+      await axios.post(
+          `${context.bap_uri}/callbacks/on_verification_accepted`,
+          onVerificationAcceptedMessage);
+      logger.info(
+          'on_verification_accepted callback sent successfully',
+          {transaction_id: context.transaction_id});
+    } catch (error: any) {
+      logger.error(
+          `Failed to send on_verification_accepted callback: ${error.message}`,
+          {transaction_id: context.transaction_id});
+    }
+  }, config.callbackDelay);
+});
+
+/**
+ * POST /reject_verification - Handle verification rejection
+ */
+router.post('/reject_verification', async (req: Request, res: Response) => {
+  const message = req.body as RejectVerificationMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received reject_verification request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    verification_case_id: content.verification_case_id,
+    reason: content.reason,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'reject_verification',
+      'INBOUND', JSON.stringify(message));
+
+  res.json(createAck(context));
+
+  setTimeout(async () => {
+    try {
+      // Update verification case
+      const state = content.reason?.toLowerCase().includes('dispute') ?
+          'DISPUTED' :
+          'REJECTED';
+      await updateVerificationCaseState(
+          content.verification_case_id, state, 'REJECTED',
+          content.reason || 'Buyer rejected');
+
+      const callbackContext =
+          createCallbackContext(context, 'on_verification_rejected');
+
+      // Get verification case for callback
+      const verificationCase =
+          await getVerificationCaseById(content.verification_case_id);
+      if (!verificationCase) {
+        throw new Error('Verification case not found');
+      }
+
+      const onVerificationRejectedMessage: OnVerificationRejectedMessage = {
+        context: callbackContext,
+        message: {
+          verification_case: {
+            id: content.verification_case_id,
+            order_id: content.order_id,
+            state,
+            verification_window: JSON.parse(verificationCase.windowJson),
+            required_proofs: JSON.parse(verificationCase.requiredProofsJson),
+            expected_quantity:
+                {value: verificationCase.expectedQty, unit: 'kWh'},
+            expires_at: verificationCase.expiresAt.toISOString(),
+          },
+        },
+      };
+
+      await logEvent(
+          context.transaction_id, callbackContext.message_id,
+          'on_verification_rejected', 'OUTBOUND',
+          JSON.stringify(onVerificationRejectedMessage));
+
+      await axios.post(
+          `${context.bap_uri}/callbacks/on_verification_rejected`,
+          onVerificationRejectedMessage);
+      logger.info(
+          'on_verification_rejected callback sent successfully',
+          {transaction_id: context.transaction_id});
+    } catch (error: any) {
+      logger.error(
+          `Failed to send on_verification_rejected callback: ${error.message}`,
+          {transaction_id: context.transaction_id});
+    }
+  }, config.callbackDelay);
+});
+
+/**
+ * POST /settlement_start - Handle settlement start request
+ */
+router.post('/settlement_start', async (req: Request, res: Response) => {
+  const message = req.body as SettlementStartMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received settlement_start request', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    order_id: content.order_id,
+    settlement_type: content.settlement_type,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    return res.json(createAck(context));
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'settlement_start', 'INBOUND',
+      JSON.stringify(message));
+
+  // Get order
+  const order = await getOrderById(content.order_id);
+  if (!order) {
+    return res.json(createNack(context, {
+      code: ErrorCodes.ORDER_NOT_FOUND,
+      message: `Order ${content.order_id} not found`,
+    }));
+  }
+
+  // Get verification case
+  const verificationCase =
+      await getVerificationCaseById(content.verification_case_id);
+  if (!verificationCase) {
+    return res.json(createNack(context, {
+      code: ErrorCodes.ORDER_NOT_FOUND,
+      message: `Verification case ${content.verification_case_id} not found`,
+    }));
+  }
+
+  res.json(createAck(context));
+
+  setTimeout(async () => {
+    try {
+      const settlementId = uuidv4();
+      const deliveredQty =
+          verificationCase.deliveredQty || order.quote?.totalQuantity || 0;
+      const totalQty = order.quote?.totalQuantity || 0;
+      const totalPrice = order.quote?.price?.value || 0;
+      const pricePerUnit = totalQty > 0 ? totalPrice / totalQty : 0.10;
+      const currency = order.quote?.price?.currency || 'USD';
+
+      // Calculate settlement amount
+      const deviation =
+          verificationCase.deviationQty && verificationCase.deviationPercent ?
+          {
+            quantity: verificationCase.deviationQty,
+            percent: verificationCase.deviationPercent
+          } :
+          undefined;
+
+      const penaltyRules = {
+        deviation_threshold_percent: 5.0,
+        penalty_percent: 5.0,
+      };
+
+      const settlementCalc = calculateSettlementAmount({
+        deliveredQuantity: deliveredQty,
+        pricePerUnit,
+        currency,
+        deviation,
+        penaltyRules,
+      });
+
+      // Create settlement
+      await createSettlement(
+          settlementId, content.order_id, content.verification_case_id,
+          context.transaction_id, content.settlement_type,
+          settlementCalc.finalAmount, currency, content.period || null,
+          settlementCalc.breakdown, JSON.stringify(message));
+
+      const callbackContext =
+          createCallbackContext(context, 'on_settlement_initiated');
+      const onSettlementInitiatedMessage: OnSettlementInitiatedMessage = {
+        context: callbackContext,
+        message: {
+          settlement: {
+            id: settlementId,
+            order_id: content.order_id,
+            state: 'INITIATED',
+            amount: {value: settlementCalc.finalAmount, currency},
+            period: content.period,
+            breakdown: settlementCalc.breakdown,
+            initiated_at: new Date().toISOString(),
+          },
+        },
+      };
+
+      await logEvent(
+          context.transaction_id, callbackContext.message_id,
+          'on_settlement_initiated', 'OUTBOUND',
+          JSON.stringify(onSettlementInitiatedMessage));
+
+      await axios.post(
+          `${context.bap_uri}/callbacks/on_settlement_initiated`,
+          onSettlementInitiatedMessage);
+      logger.info(
+          'on_settlement_initiated callback sent successfully',
+          {transaction_id: context.transaction_id});
+
+      // Simulate settlement progression: INITIATED → PENDING → SETTLED
+      setTimeout(async () => {
+        try {
+          // Update to PENDING
+          await updateSettlementState(settlementId, 'PENDING');
+
+          const pendingContext =
+              createCallbackContext(callbackContext, 'on_settlement_pending');
+          const onSettlementPendingMessage: OnSettlementPendingMessage = {
+            context: pendingContext,
+            message: {
+              settlement: {
+                id: settlementId,
+                order_id: content.order_id,
+                state: 'PENDING',
+                amount: {value: settlementCalc.finalAmount, currency},
+                period: content.period,
+                breakdown: settlementCalc.breakdown,
+                initiated_at: onSettlementInitiatedMessage.message.settlement
+                                  .initiated_at,
+              },
+            },
+          };
+
+          await logEvent(
+              context.transaction_id, pendingContext.message_id,
+              'on_settlement_pending', 'OUTBOUND',
+              JSON.stringify(onSettlementPendingMessage));
+          await axios.post(
+              `${context.bap_uri}/callbacks/on_settlement_pending`,
+              onSettlementPendingMessage);
+
+          // After another delay, mark as SETTLED
+          setTimeout(async () => {
+            try {
+              await updateSettlementState(
+                  settlementId, 'SETTLED', settlementCalc.breakdown);
+
+              const settledContext = createCallbackContext(
+                  pendingContext, 'on_settlement_settled');
+              const onSettlementSettledMessage: OnSettlementSettledMessage = {
+                context: settledContext,
+                message: {
+                  settlement: {
+                    id: settlementId,
+                    order_id: content.order_id,
+                    state: 'SETTLED',
+                    amount: {value: settlementCalc.finalAmount, currency},
+                    period: content.period,
+                    breakdown: settlementCalc.breakdown,
+                    initiated_at: onSettlementInitiatedMessage.message
+                                      .settlement.initiated_at,
+                    completed_at: new Date().toISOString(),
+                  },
+                },
+              };
+
+              await logEvent(
+                  context.transaction_id, settledContext.message_id,
+                  'on_settlement_settled', 'OUTBOUND',
+                  JSON.stringify(onSettlementSettledMessage));
+              await axios.post(
+                  `${context.bap_uri}/callbacks/on_settlement_settled`,
+                  onSettlementSettledMessage);
+              logger.info(
+                  'Settlement completed successfully',
+                  {transaction_id: context.transaction_id, settlementId});
+            } catch (error: any) {
+              logger.error(
+                  `Failed to send on_settlement_settled callback: ${
+                      error.message}`,
+                  {transaction_id: context.transaction_id});
+            }
+          }, config.callbackDelay * 2);
+        } catch (error: any) {
+          logger.error(
+              `Failed to send on_settlement_pending callback: ${error.message}`,
+              {transaction_id: context.transaction_id});
+        }
+      }, config.callbackDelay);
+    } catch (error: any) {
+      logger.error(
+          `Failed to send on_settlement_initiated callback: ${error.message}`,
+          {transaction_id: context.transaction_id});
+    }
+  }, config.callbackDelay);
 });
 
 export default router;

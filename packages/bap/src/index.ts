@@ -1,6 +1,8 @@
 /**
  * Combined Prosumer Application - BAP (Consumer) + BPP (Provider)
  * Single Express server hosting both buyer and seller functionality
+ * 
+ * Note: Environment variables are loaded via ts-node's -r dotenv/config flag
  */
 
 import express from 'express';

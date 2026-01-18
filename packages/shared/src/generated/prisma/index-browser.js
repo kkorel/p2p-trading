@@ -202,6 +202,58 @@ exports.Prisma.EventScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.VerificationCaseScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  transactionId: 'transactionId',
+  state: 'state',
+  requiredProofsJson: 'requiredProofsJson',
+  toleranceRulesJson: 'toleranceRulesJson',
+  windowJson: 'windowJson',
+  expectedQty: 'expectedQty',
+  deliveredQty: 'deliveredQty',
+  deviationQty: 'deviationQty',
+  deviationPercent: 'deviationPercent',
+  decision: 'decision',
+  decidedAt: 'decidedAt',
+  expiresAt: 'expiresAt',
+  rejectionReason: 'rejectionReason',
+  rawJson: 'rawJson',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ProofScalarFieldEnum = {
+  id: 'id',
+  verificationCaseId: 'verificationCaseId',
+  type: 'type',
+  payloadJson: 'payloadJson',
+  source: 'source',
+  quantityValue: 'quantityValue',
+  timestamp: 'timestamp',
+  receivedAt: 'receivedAt',
+  hash: 'hash',
+  rawJson: 'rawJson'
+};
+
+exports.Prisma.SettlementScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  verificationCaseId: 'verificationCaseId',
+  transactionId: 'transactionId',
+  settlementType: 'settlementType',
+  state: 'state',
+  amountValue: 'amountValue',
+  currency: 'currency',
+  periodJson: 'periodJson',
+  breakdownJson: 'breakdownJson',
+  initiatedAt: 'initiatedAt',
+  completedAt: 'completedAt',
+  rawJson: 'rawJson',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -224,7 +276,10 @@ exports.Prisma.ModelName = {
   CatalogOffer: 'CatalogOffer',
   OfferBlock: 'OfferBlock',
   Order: 'Order',
-  Event: 'Event'
+  Event: 'Event',
+  VerificationCase: 'VerificationCase',
+  Proof: 'Proof',
+  Settlement: 'Settlement'
 };
 
 /**

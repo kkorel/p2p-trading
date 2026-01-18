@@ -114,9 +114,11 @@ model Order {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  provider      Provider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  selectedOffer CatalogOffer? @relation(fields: [selectedOfferId], references: [id], onDelete: SetNull)
-  blocks        OfferBlock[]
+  provider          Provider?          @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  selectedOffer     CatalogOffer?      @relation(fields: [selectedOfferId], references: [id], onDelete: SetNull)
+  blocks            OfferBlock[]
+  verificationCases VerificationCase[]
+  settlements       Settlement[]
 
   @@index([providerId])
   @@index([status])
@@ -135,4 +137,76 @@ model Event {
   @@index([transactionId])
   @@index([messageId, direction])
   @@map("events")
+}
+
+// ============ PHASE-3: VERIFICATION & SETTLEMENT ============
+
+model VerificationCase {
+  id                 String    @id
+  orderId            String    @map("order_id")
+  transactionId      String    @map("transaction_id")
+  state              String    @default("PENDING")
+  requiredProofsJson String    @map("required_proofs_json")
+  toleranceRulesJson String    @map("tolerance_rules_json")
+  windowJson         String    @map("window_json")
+  expectedQty        Float     @map("expected_qty")
+  deliveredQty       Float?    @map("delivered_qty")
+  deviationQty       Float?    @map("deviation_qty")
+  deviationPercent   Float?    @map("deviation_percent")
+  decision           String?
+  decidedAt          DateTime? @map("decided_at")
+  expiresAt          DateTime  @map("expires_at")
+  rejectionReason    String?   @map("rejection_reason")
+  rawJson            String    @map("raw_json")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  proofs      Proof[]
+  settlements Settlement[]
+
+  @@index([orderId])
+  @@map("verification_cases")
+}
+
+model Proof {
+  id                 String   @id
+  verificationCaseId String   @map("verification_case_id")
+  type               String
+  payloadJson        String   @map("payload_json")
+  source             String
+  quantityValue      Float?   @map("quantity_value")
+  timestamp          DateTime
+  receivedAt         DateTime @default(now()) @map("received_at")
+  hash               String?
+  rawJson            String   @map("raw_json")
+
+  verificationCase VerificationCase @relation(fields: [verificationCaseId], references: [id], onDelete: Cascade)
+
+  @@index([verificationCaseId])
+  @@map("proofs")
+}
+
+model Settlement {
+  id                 String    @id
+  orderId            String    @map("order_id")
+  verificationCaseId String?   @map("verification_case_id")
+  transactionId      String    @map("transaction_id")
+  settlementType     String    @map("settlement_type")
+  state              String    @default("INITIATED")
+  amountValue        Float     @map("amount_value")
+  currency           String
+  periodJson         String?   @map("period_json")
+  breakdownJson      String?   @map("breakdown_json")
+  initiatedAt        DateTime  @default(now()) @map("initiated_at")
+  completedAt        DateTime? @map("completed_at")
+  rawJson            String    @map("raw_json")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  verificationCase VerificationCase? @relation(fields: [verificationCaseId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@map("settlements")
 }

@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node src/index.ts",
-    "seed": "ts-node src/seed.ts",
+    "dev": "DOTENV_CONFIG_PATH=../../.env ts-node -r dotenv/config src/index.ts",
+    "seed": "DOTENV_CONFIG_PATH=../../.env ts-node -r dotenv/config src/seed.ts",
     "start": "node dist/index.js"
   },
   "dependencies": {

@@ -179,6 +179,17 @@ export async function updateOrderStatusSafely(
 }
 
 /**
+ * Get provider ID for a given order ID
+ */
+export async function getOrderProviderId(orderId: string): Promise<string | null> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { providerId: true },
+  });
+  return order?.providerId || null;
+}
+
+/**
  * Get all orders for a provider
  */
 export async function getOrdersByProviderId(providerId: string): Promise<Order[]> {

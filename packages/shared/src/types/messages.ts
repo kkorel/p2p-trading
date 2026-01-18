@@ -122,3 +122,162 @@ export interface OnStatusMessageContent {
 }
 
 export type OnStatusMessage = BecknMessage<OnStatusMessageContent>;
+
+// ============ PHASE-3: VERIFICATION ============
+
+export interface VerificationWindow extends TimeWindow {}
+
+export interface RequiredProof {
+  type: 'METER_READING' | 'TELEMETRY' | 'ATTESTATION' | 'OTP';
+  source: string;
+  deadline: string; // ISO 8601
+}
+
+export interface ToleranceRules {
+  max_deviation_percent: number;
+  min_quantity?: number;
+}
+
+// Export for use in verification module
+export type { ToleranceRules };
+
+export interface VerificationStartMessageContent {
+  order_id: string;
+  verification_window: VerificationWindow;
+  required_proofs: RequiredProof[];
+  expected_quantity: Quantity;
+  tolerance_rules: ToleranceRules;
+}
+
+export type VerificationStartMessage = BecknMessage<VerificationStartMessageContent>;
+
+export interface VerificationCase {
+  id: string;
+  order_id: string;
+  state: 'PENDING' | 'PROOFS_RECEIVED' | 'VERIFYING' | 'VERIFIED' | 'DEVIATED' | 'REJECTED' | 'DISPUTED' | 'FAILED' | 'TIMEOUT';
+  verification_window: VerificationWindow;
+  required_proofs: RequiredProof[];
+  expected_quantity: Quantity;
+  delivered_quantity?: Quantity;
+  deviation?: {
+    quantity: number;
+    percent: number;
+  };
+  expires_at: string;
+}
+
+export interface OnVerificationStartMessageContent {
+  verification_case: VerificationCase;
+}
+
+export type OnVerificationStartMessage = BecknMessage<OnVerificationStartMessageContent>;
+
+export interface Proof {
+  type: 'METER_READING' | 'TELEMETRY' | 'ATTESTATION' | 'OTP';
+  source: string;
+  timestamp: string; // ISO 8601
+  value: Quantity;
+  metadata?: Record<string, any>;
+}
+
+export interface SubmitProofsMessageContent {
+  order_id: string;
+  verification_case_id: string;
+  proofs: Proof[];
+}
+
+export type SubmitProofsMessage = BecknMessage<SubmitProofsMessageContent>;
+
+export interface OnProofsSubmittedMessageContent {
+  verification_case: VerificationCase;
+  proofs_received: Proof[];
+}
+
+export type OnProofsSubmittedMessage = BecknMessage<OnProofsSubmittedMessageContent>;
+
+export interface AcceptVerificationMessageContent {
+  order_id: string;
+  verification_case_id: string;
+}
+
+export type AcceptVerificationMessage = BecknMessage<AcceptVerificationMessageContent>;
+
+export interface OnVerificationAcceptedMessageContent {
+  verification_case: VerificationCase;
+}
+
+export type OnVerificationAcceptedMessage = BecknMessage<OnVerificationAcceptedMessageContent>;
+
+export interface RejectVerificationMessageContent {
+  order_id: string;
+  verification_case_id: string;
+  reason?: string;
+}
+
+export type RejectVerificationMessage = BecknMessage<RejectVerificationMessageContent>;
+
+export interface OnVerificationRejectedMessageContent {
+  verification_case: VerificationCase;
+}
+
+export type OnVerificationRejectedMessage = BecknMessage<OnVerificationRejectedMessageContent>;
+
+// ============ PHASE-3: SETTLEMENT ============
+
+export type SettlementType = 'DAILY' | 'PERIODIC' | 'IMMEDIATE';
+
+export interface SettlementBreakdown {
+  base_amount: number;
+  delivered_quantity: number;
+  price_per_unit: number;
+  penalty?: number;
+  deviation_adjustment?: number;
+}
+
+export interface SettlementStartMessageContent {
+  order_id: string;
+  verification_case_id: string;
+  settlement_type: SettlementType;
+  period?: TimeWindow;
+}
+
+export type SettlementStartMessage = BecknMessage<SettlementStartMessageContent>;
+
+export interface Settlement {
+  id: string;
+  order_id: string;
+  state: 'INITIATED' | 'PENDING' | 'SETTLED' | 'FAILED';
+  amount: Price;
+  period?: TimeWindow;
+  breakdown?: SettlementBreakdown;
+  initiated_at: string;
+  completed_at?: string;
+}
+
+export interface OnSettlementInitiatedMessageContent {
+  settlement: Settlement;
+}
+
+export type OnSettlementInitiatedMessage = BecknMessage<OnSettlementInitiatedMessageContent>;
+
+export interface OnSettlementPendingMessageContent {
+  settlement: Settlement;
+}
+
+export type OnSettlementPendingMessage = BecknMessage<OnSettlementPendingMessageContent>;
+
+export interface OnSettlementSettledMessageContent {
+  settlement: Settlement;
+}
+
+export type OnSettlementSettledMessage = BecknMessage<OnSettlementSettledMessageContent>;
+
+export interface OnSettlementFailedMessageContent {
+  settlement: Settlement;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+export type OnSettlementFailedMessage = BecknMessage<OnSettlementFailedMessageContent>;

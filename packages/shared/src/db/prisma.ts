@@ -1,6 +1,9 @@
 /**
  * Prisma Client Singleton
  * Provides connection pooling and proper cleanup
+ * 
+ * Note: Environment variables are loaded via dotenv/config in the entry points
+ * (packages/bap/src/index.ts and packages/cds-mock/src/index.ts)
  */
 
 import { PrismaClient } from '../generated/prisma';
@@ -12,16 +15,12 @@ declare global {
 }
 
 // Connection pool configuration for production
+// Prisma will automatically read DATABASE_URL from .env file (via schema.prisma)
 const prismaClientSingleton = () => {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' 
       ? ['query', 'error', 'warn'] 
       : ['error'],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
   });
 };
 

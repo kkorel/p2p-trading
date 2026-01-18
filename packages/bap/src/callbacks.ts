@@ -2,22 +2,13 @@
  * BAP Callback Endpoints - Receives async responses from CDS/BPP
  */
 
-import { Router, Request, Response } from 'express';
-import {
-  OnDiscoverMessage,
-  OnSelectMessage,
-  OnInitMessage,
-  OnConfirmMessage,
-  OnStatusMessage,
-  createLogger,
-  CatalogOffer,
-  Provider,
-  matchOffers,
-  MatchingCriteria,
-  config,
-} from '@p2p/shared';
-import { logEvent, isDuplicateMessage } from './events';
-import { updateTransaction, getTransaction, createTransaction } from './state';
+import {CatalogOffer, config, createLogger, MatchingCriteria, matchOffers, OnConfirmMessage, OnDiscoverMessage, OnInitMessage, OnProofsSubmittedMessage, OnSelectMessage, OnSettlementFailedMessage, OnSettlementInitiatedMessage, OnSettlementPendingMessage, OnSettlementSettledMessage, OnStatusMessage, OnVerificationAcceptedMessage, OnVerificationRejectedMessage, OnVerificationStartMessage, Provider,} from '@p2p/shared';
+import {Request, Response, Router} from 'express';
+
+import {isDuplicateMessage, logEvent} from './events';
+import {updateSettlementState} from './settlement';
+import {createTransaction, getTransaction, updateTransaction} from './state';
+import {calculateDeliveredQuantity, calculateDeviation, determineVerificationState, getVerificationCaseById, updateVerificationCaseState, updateVerificationCaseWithProofs,} from './verification';
 
 const router = Router();
 const logger = createLogger('BAP');
@@ -249,6 +240,238 @@ router.post('/on_status', async (req: Request, res: Response) => {
     order_status: content.order.status,
     fulfillment: fulfillmentState,
   });
+});
+
+// ============ PHASE-3: VERIFICATION & SETTLEMENT CALLBACKS ============
+
+/**
+ * POST /callbacks/on_verification_start - Receive verification case from BPP
+ */
+router.post('/on_verification_start', async (req: Request, res: Response) => {
+  const message = req.body as OnVerificationStartMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received on_verification_start callback', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    logger.warn(
+        'Duplicate on_verification_start callback ignored',
+        {message_id: context.message_id});
+    return res.json({status: 'ok', message: 'duplicate ignored'});
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'on_verification_start',
+      'INBOUND', JSON.stringify(message));
+
+  res.json({status: 'ok'});
+});
+
+/**
+ * POST /callbacks/on_proofs_submitted - Receive proof submission result
+ */
+router.post('/on_proofs_submitted', async (req: Request, res: Response) => {
+  const message = req.body as OnProofsSubmittedMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received on_proofs_submitted callback', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    verification_case_id: content.verification_case.id,
+    state: content.verification_case.state,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    logger.warn(
+        'Duplicate on_proofs_submitted callback ignored',
+        {message_id: context.message_id});
+    return res.json({status: 'ok', message: 'duplicate ignored'});
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'on_proofs_submitted',
+      'INBOUND', JSON.stringify(message));
+
+  res.json({status: 'ok'});
+});
+
+/**
+ * POST /callbacks/on_verification_accepted - Receive verification acceptance
+ * confirmation
+ */
+router.post(
+    '/on_verification_accepted', async (req: Request, res: Response) => {
+      const message = req.body as OnVerificationAcceptedMessage;
+      const {context, message: content} = message;
+
+      logger.info('Received on_verification_accepted callback', {
+        transaction_id: context.transaction_id,
+        message_id: context.message_id,
+        verification_case_id: content.verification_case.id,
+        state: content.verification_case.state,
+      });
+
+      if (await isDuplicateMessage(context.message_id)) {
+        logger.warn(
+            'Duplicate on_verification_accepted callback ignored',
+            {message_id: context.message_id});
+        return res.json({status: 'ok', message: 'duplicate ignored'});
+      }
+
+      await logEvent(
+          context.transaction_id, context.message_id,
+          'on_verification_accepted', 'INBOUND', JSON.stringify(message));
+
+      res.json({status: 'ok'});
+    });
+
+/**
+ * POST /callbacks/on_verification_rejected - Receive verification rejection
+ * confirmation
+ */
+router.post(
+    '/on_verification_rejected', async (req: Request, res: Response) => {
+      const message = req.body as OnVerificationRejectedMessage;
+      const {context, message: content} = message;
+
+      logger.info('Received on_verification_rejected callback', {
+        transaction_id: context.transaction_id,
+        message_id: context.message_id,
+        verification_case_id: content.verification_case.id,
+        state: content.verification_case.state,
+      });
+
+      if (await isDuplicateMessage(context.message_id)) {
+        logger.warn(
+            'Duplicate on_verification_rejected callback ignored',
+            {message_id: context.message_id});
+        return res.json({status: 'ok', message: 'duplicate ignored'});
+      }
+
+      await logEvent(
+          context.transaction_id, context.message_id,
+          'on_verification_rejected', 'INBOUND', JSON.stringify(message));
+
+      res.json({status: 'ok'});
+    });
+
+/**
+ * POST /callbacks/on_settlement_initiated - Receive settlement initiation
+ * confirmation
+ */
+router.post('/on_settlement_initiated', async (req: Request, res: Response) => {
+  const message = req.body as OnSettlementInitiatedMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received on_settlement_initiated callback', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    settlement_id: content.settlement.id,
+    state: content.settlement.state,
+    amount: content.settlement.amount.value,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    logger.warn(
+        'Duplicate on_settlement_initiated callback ignored',
+        {message_id: context.message_id});
+    return res.json({status: 'ok', message: 'duplicate ignored'});
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'on_settlement_initiated',
+      'INBOUND', JSON.stringify(message));
+
+  res.json({status: 'ok'});
+});
+
+/**
+ * POST /callbacks/on_settlement_pending - Receive settlement pending update
+ */
+router.post('/on_settlement_pending', async (req: Request, res: Response) => {
+  const message = req.body as OnSettlementPendingMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received on_settlement_pending callback', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    settlement_id: content.settlement.id,
+    state: content.settlement.state,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    logger.warn(
+        'Duplicate on_settlement_pending callback ignored',
+        {message_id: context.message_id});
+    return res.json({status: 'ok', message: 'duplicate ignored'});
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'on_settlement_pending',
+      'INBOUND', JSON.stringify(message));
+
+  res.json({status: 'ok'});
+});
+
+/**
+ * POST /callbacks/on_settlement_settled - Receive settlement completion
+ */
+router.post('/on_settlement_settled', async (req: Request, res: Response) => {
+  const message = req.body as OnSettlementSettledMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received on_settlement_settled callback', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    settlement_id: content.settlement.id,
+    state: content.settlement.state,
+    amount: content.settlement.amount.value,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    logger.warn(
+        'Duplicate on_settlement_settled callback ignored',
+        {message_id: context.message_id});
+    return res.json({status: 'ok', message: 'duplicate ignored'});
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'on_settlement_settled',
+      'INBOUND', JSON.stringify(message));
+
+  res.json({status: 'ok'});
+});
+
+/**
+ * POST /callbacks/on_settlement_failed - Receive settlement failure
+ */
+router.post('/on_settlement_failed', async (req: Request, res: Response) => {
+  const message = req.body as OnSettlementFailedMessage;
+  const {context, message: content} = message;
+
+  logger.info('Received on_settlement_failed callback', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    settlement_id: content.settlement.id,
+    state: content.settlement.state,
+    error: content.error,
+  });
+
+  if (await isDuplicateMessage(context.message_id)) {
+    logger.warn(
+        'Duplicate on_settlement_failed callback ignored',
+        {message_id: context.message_id});
+    return res.json({status: 'ok', message: 'duplicate ignored'});
+  }
+
+  await logEvent(
+      context.transaction_id, context.message_id, 'on_settlement_failed',
+      'INBOUND', JSON.stringify(message));
+
+  res.json({status: 'ok'});
 });
 
 export default router;

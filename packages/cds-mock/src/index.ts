@@ -1,5 +1,7 @@
 /**
  * CDS Mock - Catalog Discovery Service
+ * 
+ * Note: Environment variables are loaded via ts-node's -r dotenv/config flag
  */
 
 import express from 'express';

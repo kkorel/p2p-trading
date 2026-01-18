@@ -43,6 +43,21 @@ export type Order = $Result.DefaultSelection<Prisma.$OrderPayload>
  * 
  */
 export type Event = $Result.DefaultSelection<Prisma.$EventPayload>
+/**
+ * Model VerificationCase
+ * 
+ */
+export type VerificationCase = $Result.DefaultSelection<Prisma.$VerificationCasePayload>
+/**
+ * Model Proof
+ * 
+ */
+export type Proof = $Result.DefaultSelection<Prisma.$ProofPayload>
+/**
+ * Model Settlement
+ * 
+ */
+export type Settlement = $Result.DefaultSelection<Prisma.$SettlementPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -226,6 +241,36 @@ export class PrismaClient<
     * ```
     */
   get event(): Prisma.EventDelegate<ExtArgs>;
+
+  /**
+   * `prisma.verificationCase`: Exposes CRUD operations for the **VerificationCase** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more VerificationCases
+    * const verificationCases = await prisma.verificationCase.findMany()
+    * ```
+    */
+  get verificationCase(): Prisma.VerificationCaseDelegate<ExtArgs>;
+
+  /**
+   * `prisma.proof`: Exposes CRUD operations for the **Proof** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Proofs
+    * const proofs = await prisma.proof.findMany()
+    * ```
+    */
+  get proof(): Prisma.ProofDelegate<ExtArgs>;
+
+  /**
+   * `prisma.settlement`: Exposes CRUD operations for the **Settlement** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Settlements
+    * const settlements = await prisma.settlement.findMany()
+    * ```
+    */
+  get settlement(): Prisma.SettlementDelegate<ExtArgs>;
 }
 
 export namespace Prisma {
@@ -672,7 +717,10 @@ export namespace Prisma {
     CatalogOffer: 'CatalogOffer',
     OfferBlock: 'OfferBlock',
     Order: 'Order',
-    Event: 'Event'
+    Event: 'Event',
+    VerificationCase: 'VerificationCase',
+    Proof: 'Proof',
+    Settlement: 'Settlement'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -688,7 +736,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, ClientOptions = {}> = {
     meta: {
-      modelProps: "provider" | "catalogItem" | "catalogOffer" | "offerBlock" | "order" | "event"
+      modelProps: "provider" | "catalogItem" | "catalogOffer" | "offerBlock" | "order" | "event" | "verificationCase" | "proof" | "settlement"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1112,6 +1160,216 @@ export namespace Prisma {
           }
         }
       }
+      VerificationCase: {
+        payload: Prisma.$VerificationCasePayload<ExtArgs>
+        fields: Prisma.VerificationCaseFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.VerificationCaseFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.VerificationCaseFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload>
+          }
+          findFirst: {
+            args: Prisma.VerificationCaseFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.VerificationCaseFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload>
+          }
+          findMany: {
+            args: Prisma.VerificationCaseFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload>[]
+          }
+          create: {
+            args: Prisma.VerificationCaseCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload>
+          }
+          createMany: {
+            args: Prisma.VerificationCaseCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.VerificationCaseCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload>[]
+          }
+          delete: {
+            args: Prisma.VerificationCaseDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload>
+          }
+          update: {
+            args: Prisma.VerificationCaseUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload>
+          }
+          deleteMany: {
+            args: Prisma.VerificationCaseDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.VerificationCaseUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.VerificationCaseUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCasePayload>
+          }
+          aggregate: {
+            args: Prisma.VerificationCaseAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateVerificationCase>
+          }
+          groupBy: {
+            args: Prisma.VerificationCaseGroupByArgs<ExtArgs>
+            result: $Utils.Optional<VerificationCaseGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.VerificationCaseCountArgs<ExtArgs>
+            result: $Utils.Optional<VerificationCaseCountAggregateOutputType> | number
+          }
+        }
+      }
+      Proof: {
+        payload: Prisma.$ProofPayload<ExtArgs>
+        fields: Prisma.ProofFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ProofFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ProofFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          findFirst: {
+            args: Prisma.ProofFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ProofFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          findMany: {
+            args: Prisma.ProofFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>[]
+          }
+          create: {
+            args: Prisma.ProofCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          createMany: {
+            args: Prisma.ProofCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ProofCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>[]
+          }
+          delete: {
+            args: Prisma.ProofDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          update: {
+            args: Prisma.ProofUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          deleteMany: {
+            args: Prisma.ProofDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ProofUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.ProofUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProofPayload>
+          }
+          aggregate: {
+            args: Prisma.ProofAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateProof>
+          }
+          groupBy: {
+            args: Prisma.ProofGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ProofGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ProofCountArgs<ExtArgs>
+            result: $Utils.Optional<ProofCountAggregateOutputType> | number
+          }
+        }
+      }
+      Settlement: {
+        payload: Prisma.$SettlementPayload<ExtArgs>
+        fields: Prisma.SettlementFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SettlementFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SettlementFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload>
+          }
+          findFirst: {
+            args: Prisma.SettlementFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SettlementFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload>
+          }
+          findMany: {
+            args: Prisma.SettlementFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload>[]
+          }
+          create: {
+            args: Prisma.SettlementCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload>
+          }
+          createMany: {
+            args: Prisma.SettlementCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SettlementCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload>[]
+          }
+          delete: {
+            args: Prisma.SettlementDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload>
+          }
+          update: {
+            args: Prisma.SettlementUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload>
+          }
+          deleteMany: {
+            args: Prisma.SettlementDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SettlementUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.SettlementUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementPayload>
+          }
+          aggregate: {
+            args: Prisma.SettlementAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSettlement>
+          }
+          groupBy: {
+            args: Prisma.SettlementGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SettlementGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SettlementCountArgs<ExtArgs>
+            result: $Utils.Optional<SettlementCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1412,10 +1670,14 @@ export namespace Prisma {
 
   export type OrderCountOutputType = {
     blocks: number
+    verificationCases: number
+    settlements: number
   }
 
   export type OrderCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     blocks?: boolean | OrderCountOutputTypeCountBlocksArgs
+    verificationCases?: boolean | OrderCountOutputTypeCountVerificationCasesArgs
+    settlements?: boolean | OrderCountOutputTypeCountSettlementsArgs
   }
 
   // Custom InputTypes
@@ -1434,6 +1696,60 @@ export namespace Prisma {
    */
   export type OrderCountOutputTypeCountBlocksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: OfferBlockWhereInput
+  }
+
+  /**
+   * OrderCountOutputType without action
+   */
+  export type OrderCountOutputTypeCountVerificationCasesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: VerificationCaseWhereInput
+  }
+
+  /**
+   * OrderCountOutputType without action
+   */
+  export type OrderCountOutputTypeCountSettlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SettlementWhereInput
+  }
+
+
+  /**
+   * Count Type VerificationCaseCountOutputType
+   */
+
+  export type VerificationCaseCountOutputType = {
+    proofs: number
+    settlements: number
+  }
+
+  export type VerificationCaseCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    proofs?: boolean | VerificationCaseCountOutputTypeCountProofsArgs
+    settlements?: boolean | VerificationCaseCountOutputTypeCountSettlementsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * VerificationCaseCountOutputType without action
+   */
+  export type VerificationCaseCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCaseCountOutputType
+     */
+    select?: VerificationCaseCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * VerificationCaseCountOutputType without action
+   */
+  export type VerificationCaseCountOutputTypeCountProofsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProofWhereInput
+  }
+
+  /**
+   * VerificationCaseCountOutputType without action
+   */
+  export type VerificationCaseCountOutputTypeCountSettlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SettlementWhereInput
   }
 
 
@@ -6088,6 +6404,8 @@ export namespace Prisma {
     provider?: boolean | Order$providerArgs<ExtArgs>
     selectedOffer?: boolean | Order$selectedOfferArgs<ExtArgs>
     blocks?: boolean | Order$blocksArgs<ExtArgs>
+    verificationCases?: boolean | Order$verificationCasesArgs<ExtArgs>
+    settlements?: boolean | Order$settlementsArgs<ExtArgs>
     _count?: boolean | OrderCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["order"]>
 
@@ -6129,6 +6447,8 @@ export namespace Prisma {
     provider?: boolean | Order$providerArgs<ExtArgs>
     selectedOffer?: boolean | Order$selectedOfferArgs<ExtArgs>
     blocks?: boolean | Order$blocksArgs<ExtArgs>
+    verificationCases?: boolean | Order$verificationCasesArgs<ExtArgs>
+    settlements?: boolean | Order$settlementsArgs<ExtArgs>
     _count?: boolean | OrderCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type OrderIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -6142,6 +6462,8 @@ export namespace Prisma {
       provider: Prisma.$ProviderPayload<ExtArgs> | null
       selectedOffer: Prisma.$CatalogOfferPayload<ExtArgs> | null
       blocks: Prisma.$OfferBlockPayload<ExtArgs>[]
+      verificationCases: Prisma.$VerificationCasePayload<ExtArgs>[]
+      settlements: Prisma.$SettlementPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -6524,6 +6846,8 @@ export namespace Prisma {
     provider<T extends Order$providerArgs<ExtArgs> = {}>(args?: Subset<T, Order$providerArgs<ExtArgs>>): Prisma__ProviderClient<$Result.GetResult<Prisma.$ProviderPayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     selectedOffer<T extends Order$selectedOfferArgs<ExtArgs> = {}>(args?: Subset<T, Order$selectedOfferArgs<ExtArgs>>): Prisma__CatalogOfferClient<$Result.GetResult<Prisma.$CatalogOfferPayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     blocks<T extends Order$blocksArgs<ExtArgs> = {}>(args?: Subset<T, Order$blocksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OfferBlockPayload<ExtArgs>, T, "findMany"> | Null>
+    verificationCases<T extends Order$verificationCasesArgs<ExtArgs> = {}>(args?: Subset<T, Order$verificationCasesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "findMany"> | Null>
+    settlements<T extends Order$settlementsArgs<ExtArgs> = {}>(args?: Subset<T, Order$settlementsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -6931,6 +7255,46 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: OfferBlockScalarFieldEnum | OfferBlockScalarFieldEnum[]
+  }
+
+  /**
+   * Order.verificationCases
+   */
+  export type Order$verificationCasesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    where?: VerificationCaseWhereInput
+    orderBy?: VerificationCaseOrderByWithRelationInput | VerificationCaseOrderByWithRelationInput[]
+    cursor?: VerificationCaseWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: VerificationCaseScalarFieldEnum | VerificationCaseScalarFieldEnum[]
+  }
+
+  /**
+   * Order.settlements
+   */
+  export type Order$settlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    where?: SettlementWhereInput
+    orderBy?: SettlementOrderByWithRelationInput | SettlementOrderByWithRelationInput[]
+    cursor?: SettlementWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SettlementScalarFieldEnum | SettlementScalarFieldEnum[]
   }
 
   /**
@@ -7885,6 +8249,3326 @@ export namespace Prisma {
 
 
   /**
+   * Model VerificationCase
+   */
+
+  export type AggregateVerificationCase = {
+    _count: VerificationCaseCountAggregateOutputType | null
+    _avg: VerificationCaseAvgAggregateOutputType | null
+    _sum: VerificationCaseSumAggregateOutputType | null
+    _min: VerificationCaseMinAggregateOutputType | null
+    _max: VerificationCaseMaxAggregateOutputType | null
+  }
+
+  export type VerificationCaseAvgAggregateOutputType = {
+    expectedQty: number | null
+    deliveredQty: number | null
+    deviationQty: number | null
+    deviationPercent: number | null
+  }
+
+  export type VerificationCaseSumAggregateOutputType = {
+    expectedQty: number | null
+    deliveredQty: number | null
+    deviationQty: number | null
+    deviationPercent: number | null
+  }
+
+  export type VerificationCaseMinAggregateOutputType = {
+    id: string | null
+    orderId: string | null
+    transactionId: string | null
+    state: string | null
+    requiredProofsJson: string | null
+    toleranceRulesJson: string | null
+    windowJson: string | null
+    expectedQty: number | null
+    deliveredQty: number | null
+    deviationQty: number | null
+    deviationPercent: number | null
+    decision: string | null
+    decidedAt: Date | null
+    expiresAt: Date | null
+    rejectionReason: string | null
+    rawJson: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type VerificationCaseMaxAggregateOutputType = {
+    id: string | null
+    orderId: string | null
+    transactionId: string | null
+    state: string | null
+    requiredProofsJson: string | null
+    toleranceRulesJson: string | null
+    windowJson: string | null
+    expectedQty: number | null
+    deliveredQty: number | null
+    deviationQty: number | null
+    deviationPercent: number | null
+    decision: string | null
+    decidedAt: Date | null
+    expiresAt: Date | null
+    rejectionReason: string | null
+    rawJson: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type VerificationCaseCountAggregateOutputType = {
+    id: number
+    orderId: number
+    transactionId: number
+    state: number
+    requiredProofsJson: number
+    toleranceRulesJson: number
+    windowJson: number
+    expectedQty: number
+    deliveredQty: number
+    deviationQty: number
+    deviationPercent: number
+    decision: number
+    decidedAt: number
+    expiresAt: number
+    rejectionReason: number
+    rawJson: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type VerificationCaseAvgAggregateInputType = {
+    expectedQty?: true
+    deliveredQty?: true
+    deviationQty?: true
+    deviationPercent?: true
+  }
+
+  export type VerificationCaseSumAggregateInputType = {
+    expectedQty?: true
+    deliveredQty?: true
+    deviationQty?: true
+    deviationPercent?: true
+  }
+
+  export type VerificationCaseMinAggregateInputType = {
+    id?: true
+    orderId?: true
+    transactionId?: true
+    state?: true
+    requiredProofsJson?: true
+    toleranceRulesJson?: true
+    windowJson?: true
+    expectedQty?: true
+    deliveredQty?: true
+    deviationQty?: true
+    deviationPercent?: true
+    decision?: true
+    decidedAt?: true
+    expiresAt?: true
+    rejectionReason?: true
+    rawJson?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type VerificationCaseMaxAggregateInputType = {
+    id?: true
+    orderId?: true
+    transactionId?: true
+    state?: true
+    requiredProofsJson?: true
+    toleranceRulesJson?: true
+    windowJson?: true
+    expectedQty?: true
+    deliveredQty?: true
+    deviationQty?: true
+    deviationPercent?: true
+    decision?: true
+    decidedAt?: true
+    expiresAt?: true
+    rejectionReason?: true
+    rawJson?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type VerificationCaseCountAggregateInputType = {
+    id?: true
+    orderId?: true
+    transactionId?: true
+    state?: true
+    requiredProofsJson?: true
+    toleranceRulesJson?: true
+    windowJson?: true
+    expectedQty?: true
+    deliveredQty?: true
+    deviationQty?: true
+    deviationPercent?: true
+    decision?: true
+    decidedAt?: true
+    expiresAt?: true
+    rejectionReason?: true
+    rawJson?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type VerificationCaseAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which VerificationCase to aggregate.
+     */
+    where?: VerificationCaseWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VerificationCases to fetch.
+     */
+    orderBy?: VerificationCaseOrderByWithRelationInput | VerificationCaseOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: VerificationCaseWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VerificationCases from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VerificationCases.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned VerificationCases
+    **/
+    _count?: true | VerificationCaseCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: VerificationCaseAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: VerificationCaseSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: VerificationCaseMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: VerificationCaseMaxAggregateInputType
+  }
+
+  export type GetVerificationCaseAggregateType<T extends VerificationCaseAggregateArgs> = {
+        [P in keyof T & keyof AggregateVerificationCase]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateVerificationCase[P]>
+      : GetScalarType<T[P], AggregateVerificationCase[P]>
+  }
+
+
+
+
+  export type VerificationCaseGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: VerificationCaseWhereInput
+    orderBy?: VerificationCaseOrderByWithAggregationInput | VerificationCaseOrderByWithAggregationInput[]
+    by: VerificationCaseScalarFieldEnum[] | VerificationCaseScalarFieldEnum
+    having?: VerificationCaseScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: VerificationCaseCountAggregateInputType | true
+    _avg?: VerificationCaseAvgAggregateInputType
+    _sum?: VerificationCaseSumAggregateInputType
+    _min?: VerificationCaseMinAggregateInputType
+    _max?: VerificationCaseMaxAggregateInputType
+  }
+
+  export type VerificationCaseGroupByOutputType = {
+    id: string
+    orderId: string
+    transactionId: string
+    state: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty: number | null
+    deviationQty: number | null
+    deviationPercent: number | null
+    decision: string | null
+    decidedAt: Date | null
+    expiresAt: Date
+    rejectionReason: string | null
+    rawJson: string
+    createdAt: Date
+    updatedAt: Date
+    _count: VerificationCaseCountAggregateOutputType | null
+    _avg: VerificationCaseAvgAggregateOutputType | null
+    _sum: VerificationCaseSumAggregateOutputType | null
+    _min: VerificationCaseMinAggregateOutputType | null
+    _max: VerificationCaseMaxAggregateOutputType | null
+  }
+
+  type GetVerificationCaseGroupByPayload<T extends VerificationCaseGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<VerificationCaseGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof VerificationCaseGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], VerificationCaseGroupByOutputType[P]>
+            : GetScalarType<T[P], VerificationCaseGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type VerificationCaseSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    orderId?: boolean
+    transactionId?: boolean
+    state?: boolean
+    requiredProofsJson?: boolean
+    toleranceRulesJson?: boolean
+    windowJson?: boolean
+    expectedQty?: boolean
+    deliveredQty?: boolean
+    deviationQty?: boolean
+    deviationPercent?: boolean
+    decision?: boolean
+    decidedAt?: boolean
+    expiresAt?: boolean
+    rejectionReason?: boolean
+    rawJson?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    order?: boolean | OrderDefaultArgs<ExtArgs>
+    proofs?: boolean | VerificationCase$proofsArgs<ExtArgs>
+    settlements?: boolean | VerificationCase$settlementsArgs<ExtArgs>
+    _count?: boolean | VerificationCaseCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["verificationCase"]>
+
+  export type VerificationCaseSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    orderId?: boolean
+    transactionId?: boolean
+    state?: boolean
+    requiredProofsJson?: boolean
+    toleranceRulesJson?: boolean
+    windowJson?: boolean
+    expectedQty?: boolean
+    deliveredQty?: boolean
+    deviationQty?: boolean
+    deviationPercent?: boolean
+    decision?: boolean
+    decidedAt?: boolean
+    expiresAt?: boolean
+    rejectionReason?: boolean
+    rawJson?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    order?: boolean | OrderDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["verificationCase"]>
+
+  export type VerificationCaseSelectScalar = {
+    id?: boolean
+    orderId?: boolean
+    transactionId?: boolean
+    state?: boolean
+    requiredProofsJson?: boolean
+    toleranceRulesJson?: boolean
+    windowJson?: boolean
+    expectedQty?: boolean
+    deliveredQty?: boolean
+    deviationQty?: boolean
+    deviationPercent?: boolean
+    decision?: boolean
+    decidedAt?: boolean
+    expiresAt?: boolean
+    rejectionReason?: boolean
+    rawJson?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type VerificationCaseInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    order?: boolean | OrderDefaultArgs<ExtArgs>
+    proofs?: boolean | VerificationCase$proofsArgs<ExtArgs>
+    settlements?: boolean | VerificationCase$settlementsArgs<ExtArgs>
+    _count?: boolean | VerificationCaseCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type VerificationCaseIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    order?: boolean | OrderDefaultArgs<ExtArgs>
+  }
+
+  export type $VerificationCasePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "VerificationCase"
+    objects: {
+      order: Prisma.$OrderPayload<ExtArgs>
+      proofs: Prisma.$ProofPayload<ExtArgs>[]
+      settlements: Prisma.$SettlementPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      orderId: string
+      transactionId: string
+      state: string
+      requiredProofsJson: string
+      toleranceRulesJson: string
+      windowJson: string
+      expectedQty: number
+      deliveredQty: number | null
+      deviationQty: number | null
+      deviationPercent: number | null
+      decision: string | null
+      decidedAt: Date | null
+      expiresAt: Date
+      rejectionReason: string | null
+      rawJson: string
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["verificationCase"]>
+    composites: {}
+  }
+
+  type VerificationCaseGetPayload<S extends boolean | null | undefined | VerificationCaseDefaultArgs> = $Result.GetResult<Prisma.$VerificationCasePayload, S>
+
+  type VerificationCaseCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<VerificationCaseFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: VerificationCaseCountAggregateInputType | true
+    }
+
+  export interface VerificationCaseDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['VerificationCase'], meta: { name: 'VerificationCase' } }
+    /**
+     * Find zero or one VerificationCase that matches the filter.
+     * @param {VerificationCaseFindUniqueArgs} args - Arguments to find a VerificationCase
+     * @example
+     * // Get one VerificationCase
+     * const verificationCase = await prisma.verificationCase.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends VerificationCaseFindUniqueArgs>(args: SelectSubset<T, VerificationCaseFindUniqueArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one VerificationCase that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {VerificationCaseFindUniqueOrThrowArgs} args - Arguments to find a VerificationCase
+     * @example
+     * // Get one VerificationCase
+     * const verificationCase = await prisma.verificationCase.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends VerificationCaseFindUniqueOrThrowArgs>(args: SelectSubset<T, VerificationCaseFindUniqueOrThrowArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first VerificationCase that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCaseFindFirstArgs} args - Arguments to find a VerificationCase
+     * @example
+     * // Get one VerificationCase
+     * const verificationCase = await prisma.verificationCase.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends VerificationCaseFindFirstArgs>(args?: SelectSubset<T, VerificationCaseFindFirstArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first VerificationCase that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCaseFindFirstOrThrowArgs} args - Arguments to find a VerificationCase
+     * @example
+     * // Get one VerificationCase
+     * const verificationCase = await prisma.verificationCase.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends VerificationCaseFindFirstOrThrowArgs>(args?: SelectSubset<T, VerificationCaseFindFirstOrThrowArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more VerificationCases that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCaseFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all VerificationCases
+     * const verificationCases = await prisma.verificationCase.findMany()
+     * 
+     * // Get first 10 VerificationCases
+     * const verificationCases = await prisma.verificationCase.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const verificationCaseWithIdOnly = await prisma.verificationCase.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends VerificationCaseFindManyArgs>(args?: SelectSubset<T, VerificationCaseFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a VerificationCase.
+     * @param {VerificationCaseCreateArgs} args - Arguments to create a VerificationCase.
+     * @example
+     * // Create one VerificationCase
+     * const VerificationCase = await prisma.verificationCase.create({
+     *   data: {
+     *     // ... data to create a VerificationCase
+     *   }
+     * })
+     * 
+     */
+    create<T extends VerificationCaseCreateArgs>(args: SelectSubset<T, VerificationCaseCreateArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many VerificationCases.
+     * @param {VerificationCaseCreateManyArgs} args - Arguments to create many VerificationCases.
+     * @example
+     * // Create many VerificationCases
+     * const verificationCase = await prisma.verificationCase.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends VerificationCaseCreateManyArgs>(args?: SelectSubset<T, VerificationCaseCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many VerificationCases and returns the data saved in the database.
+     * @param {VerificationCaseCreateManyAndReturnArgs} args - Arguments to create many VerificationCases.
+     * @example
+     * // Create many VerificationCases
+     * const verificationCase = await prisma.verificationCase.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many VerificationCases and only return the `id`
+     * const verificationCaseWithIdOnly = await prisma.verificationCase.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends VerificationCaseCreateManyAndReturnArgs>(args?: SelectSubset<T, VerificationCaseCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a VerificationCase.
+     * @param {VerificationCaseDeleteArgs} args - Arguments to delete one VerificationCase.
+     * @example
+     * // Delete one VerificationCase
+     * const VerificationCase = await prisma.verificationCase.delete({
+     *   where: {
+     *     // ... filter to delete one VerificationCase
+     *   }
+     * })
+     * 
+     */
+    delete<T extends VerificationCaseDeleteArgs>(args: SelectSubset<T, VerificationCaseDeleteArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one VerificationCase.
+     * @param {VerificationCaseUpdateArgs} args - Arguments to update one VerificationCase.
+     * @example
+     * // Update one VerificationCase
+     * const verificationCase = await prisma.verificationCase.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends VerificationCaseUpdateArgs>(args: SelectSubset<T, VerificationCaseUpdateArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more VerificationCases.
+     * @param {VerificationCaseDeleteManyArgs} args - Arguments to filter VerificationCases to delete.
+     * @example
+     * // Delete a few VerificationCases
+     * const { count } = await prisma.verificationCase.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends VerificationCaseDeleteManyArgs>(args?: SelectSubset<T, VerificationCaseDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more VerificationCases.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCaseUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many VerificationCases
+     * const verificationCase = await prisma.verificationCase.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends VerificationCaseUpdateManyArgs>(args: SelectSubset<T, VerificationCaseUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one VerificationCase.
+     * @param {VerificationCaseUpsertArgs} args - Arguments to update or create a VerificationCase.
+     * @example
+     * // Update or create a VerificationCase
+     * const verificationCase = await prisma.verificationCase.upsert({
+     *   create: {
+     *     // ... data to create a VerificationCase
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the VerificationCase we want to update
+     *   }
+     * })
+     */
+    upsert<T extends VerificationCaseUpsertArgs>(args: SelectSubset<T, VerificationCaseUpsertArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of VerificationCases.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCaseCountArgs} args - Arguments to filter VerificationCases to count.
+     * @example
+     * // Count the number of VerificationCases
+     * const count = await prisma.verificationCase.count({
+     *   where: {
+     *     // ... the filter for the VerificationCases we want to count
+     *   }
+     * })
+    **/
+    count<T extends VerificationCaseCountArgs>(
+      args?: Subset<T, VerificationCaseCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], VerificationCaseCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a VerificationCase.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCaseAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends VerificationCaseAggregateArgs>(args: Subset<T, VerificationCaseAggregateArgs>): Prisma.PrismaPromise<GetVerificationCaseAggregateType<T>>
+
+    /**
+     * Group by VerificationCase.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCaseGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends VerificationCaseGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: VerificationCaseGroupByArgs['orderBy'] }
+        : { orderBy?: VerificationCaseGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, VerificationCaseGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetVerificationCaseGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the VerificationCase model
+   */
+  readonly fields: VerificationCaseFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for VerificationCase.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__VerificationCaseClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    order<T extends OrderDefaultArgs<ExtArgs> = {}>(args?: Subset<T, OrderDefaultArgs<ExtArgs>>): Prisma__OrderClient<$Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    proofs<T extends VerificationCase$proofsArgs<ExtArgs> = {}>(args?: Subset<T, VerificationCase$proofsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findMany"> | Null>
+    settlements<T extends VerificationCase$settlementsArgs<ExtArgs> = {}>(args?: Subset<T, VerificationCase$settlementsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findMany"> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the VerificationCase model
+   */ 
+  interface VerificationCaseFieldRefs {
+    readonly id: FieldRef<"VerificationCase", 'String'>
+    readonly orderId: FieldRef<"VerificationCase", 'String'>
+    readonly transactionId: FieldRef<"VerificationCase", 'String'>
+    readonly state: FieldRef<"VerificationCase", 'String'>
+    readonly requiredProofsJson: FieldRef<"VerificationCase", 'String'>
+    readonly toleranceRulesJson: FieldRef<"VerificationCase", 'String'>
+    readonly windowJson: FieldRef<"VerificationCase", 'String'>
+    readonly expectedQty: FieldRef<"VerificationCase", 'Float'>
+    readonly deliveredQty: FieldRef<"VerificationCase", 'Float'>
+    readonly deviationQty: FieldRef<"VerificationCase", 'Float'>
+    readonly deviationPercent: FieldRef<"VerificationCase", 'Float'>
+    readonly decision: FieldRef<"VerificationCase", 'String'>
+    readonly decidedAt: FieldRef<"VerificationCase", 'DateTime'>
+    readonly expiresAt: FieldRef<"VerificationCase", 'DateTime'>
+    readonly rejectionReason: FieldRef<"VerificationCase", 'String'>
+    readonly rawJson: FieldRef<"VerificationCase", 'String'>
+    readonly createdAt: FieldRef<"VerificationCase", 'DateTime'>
+    readonly updatedAt: FieldRef<"VerificationCase", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * VerificationCase findUnique
+   */
+  export type VerificationCaseFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * Filter, which VerificationCase to fetch.
+     */
+    where: VerificationCaseWhereUniqueInput
+  }
+
+  /**
+   * VerificationCase findUniqueOrThrow
+   */
+  export type VerificationCaseFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * Filter, which VerificationCase to fetch.
+     */
+    where: VerificationCaseWhereUniqueInput
+  }
+
+  /**
+   * VerificationCase findFirst
+   */
+  export type VerificationCaseFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * Filter, which VerificationCase to fetch.
+     */
+    where?: VerificationCaseWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VerificationCases to fetch.
+     */
+    orderBy?: VerificationCaseOrderByWithRelationInput | VerificationCaseOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for VerificationCases.
+     */
+    cursor?: VerificationCaseWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VerificationCases from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VerificationCases.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of VerificationCases.
+     */
+    distinct?: VerificationCaseScalarFieldEnum | VerificationCaseScalarFieldEnum[]
+  }
+
+  /**
+   * VerificationCase findFirstOrThrow
+   */
+  export type VerificationCaseFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * Filter, which VerificationCase to fetch.
+     */
+    where?: VerificationCaseWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VerificationCases to fetch.
+     */
+    orderBy?: VerificationCaseOrderByWithRelationInput | VerificationCaseOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for VerificationCases.
+     */
+    cursor?: VerificationCaseWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VerificationCases from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VerificationCases.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of VerificationCases.
+     */
+    distinct?: VerificationCaseScalarFieldEnum | VerificationCaseScalarFieldEnum[]
+  }
+
+  /**
+   * VerificationCase findMany
+   */
+  export type VerificationCaseFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * Filter, which VerificationCases to fetch.
+     */
+    where?: VerificationCaseWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VerificationCases to fetch.
+     */
+    orderBy?: VerificationCaseOrderByWithRelationInput | VerificationCaseOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing VerificationCases.
+     */
+    cursor?: VerificationCaseWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VerificationCases from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VerificationCases.
+     */
+    skip?: number
+    distinct?: VerificationCaseScalarFieldEnum | VerificationCaseScalarFieldEnum[]
+  }
+
+  /**
+   * VerificationCase create
+   */
+  export type VerificationCaseCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * The data needed to create a VerificationCase.
+     */
+    data: XOR<VerificationCaseCreateInput, VerificationCaseUncheckedCreateInput>
+  }
+
+  /**
+   * VerificationCase createMany
+   */
+  export type VerificationCaseCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many VerificationCases.
+     */
+    data: VerificationCaseCreateManyInput | VerificationCaseCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * VerificationCase createManyAndReturn
+   */
+  export type VerificationCaseCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many VerificationCases.
+     */
+    data: VerificationCaseCreateManyInput | VerificationCaseCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * VerificationCase update
+   */
+  export type VerificationCaseUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * The data needed to update a VerificationCase.
+     */
+    data: XOR<VerificationCaseUpdateInput, VerificationCaseUncheckedUpdateInput>
+    /**
+     * Choose, which VerificationCase to update.
+     */
+    where: VerificationCaseWhereUniqueInput
+  }
+
+  /**
+   * VerificationCase updateMany
+   */
+  export type VerificationCaseUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update VerificationCases.
+     */
+    data: XOR<VerificationCaseUpdateManyMutationInput, VerificationCaseUncheckedUpdateManyInput>
+    /**
+     * Filter which VerificationCases to update
+     */
+    where?: VerificationCaseWhereInput
+  }
+
+  /**
+   * VerificationCase upsert
+   */
+  export type VerificationCaseUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * The filter to search for the VerificationCase to update in case it exists.
+     */
+    where: VerificationCaseWhereUniqueInput
+    /**
+     * In case the VerificationCase found by the `where` argument doesn't exist, create a new VerificationCase with this data.
+     */
+    create: XOR<VerificationCaseCreateInput, VerificationCaseUncheckedCreateInput>
+    /**
+     * In case the VerificationCase was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<VerificationCaseUpdateInput, VerificationCaseUncheckedUpdateInput>
+  }
+
+  /**
+   * VerificationCase delete
+   */
+  export type VerificationCaseDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    /**
+     * Filter which VerificationCase to delete.
+     */
+    where: VerificationCaseWhereUniqueInput
+  }
+
+  /**
+   * VerificationCase deleteMany
+   */
+  export type VerificationCaseDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which VerificationCases to delete
+     */
+    where?: VerificationCaseWhereInput
+  }
+
+  /**
+   * VerificationCase.proofs
+   */
+  export type VerificationCase$proofsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    where?: ProofWhereInput
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    cursor?: ProofWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * VerificationCase.settlements
+   */
+  export type VerificationCase$settlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    where?: SettlementWhereInput
+    orderBy?: SettlementOrderByWithRelationInput | SettlementOrderByWithRelationInput[]
+    cursor?: SettlementWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SettlementScalarFieldEnum | SettlementScalarFieldEnum[]
+  }
+
+  /**
+   * VerificationCase without action
+   */
+  export type VerificationCaseDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Proof
+   */
+
+  export type AggregateProof = {
+    _count: ProofCountAggregateOutputType | null
+    _avg: ProofAvgAggregateOutputType | null
+    _sum: ProofSumAggregateOutputType | null
+    _min: ProofMinAggregateOutputType | null
+    _max: ProofMaxAggregateOutputType | null
+  }
+
+  export type ProofAvgAggregateOutputType = {
+    quantityValue: number | null
+  }
+
+  export type ProofSumAggregateOutputType = {
+    quantityValue: number | null
+  }
+
+  export type ProofMinAggregateOutputType = {
+    id: string | null
+    verificationCaseId: string | null
+    type: string | null
+    payloadJson: string | null
+    source: string | null
+    quantityValue: number | null
+    timestamp: Date | null
+    receivedAt: Date | null
+    hash: string | null
+    rawJson: string | null
+  }
+
+  export type ProofMaxAggregateOutputType = {
+    id: string | null
+    verificationCaseId: string | null
+    type: string | null
+    payloadJson: string | null
+    source: string | null
+    quantityValue: number | null
+    timestamp: Date | null
+    receivedAt: Date | null
+    hash: string | null
+    rawJson: string | null
+  }
+
+  export type ProofCountAggregateOutputType = {
+    id: number
+    verificationCaseId: number
+    type: number
+    payloadJson: number
+    source: number
+    quantityValue: number
+    timestamp: number
+    receivedAt: number
+    hash: number
+    rawJson: number
+    _all: number
+  }
+
+
+  export type ProofAvgAggregateInputType = {
+    quantityValue?: true
+  }
+
+  export type ProofSumAggregateInputType = {
+    quantityValue?: true
+  }
+
+  export type ProofMinAggregateInputType = {
+    id?: true
+    verificationCaseId?: true
+    type?: true
+    payloadJson?: true
+    source?: true
+    quantityValue?: true
+    timestamp?: true
+    receivedAt?: true
+    hash?: true
+    rawJson?: true
+  }
+
+  export type ProofMaxAggregateInputType = {
+    id?: true
+    verificationCaseId?: true
+    type?: true
+    payloadJson?: true
+    source?: true
+    quantityValue?: true
+    timestamp?: true
+    receivedAt?: true
+    hash?: true
+    rawJson?: true
+  }
+
+  export type ProofCountAggregateInputType = {
+    id?: true
+    verificationCaseId?: true
+    type?: true
+    payloadJson?: true
+    source?: true
+    quantityValue?: true
+    timestamp?: true
+    receivedAt?: true
+    hash?: true
+    rawJson?: true
+    _all?: true
+  }
+
+  export type ProofAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Proof to aggregate.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Proofs
+    **/
+    _count?: true | ProofCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: ProofAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: ProofSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ProofMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ProofMaxAggregateInputType
+  }
+
+  export type GetProofAggregateType<T extends ProofAggregateArgs> = {
+        [P in keyof T & keyof AggregateProof]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateProof[P]>
+      : GetScalarType<T[P], AggregateProof[P]>
+  }
+
+
+
+
+  export type ProofGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProofWhereInput
+    orderBy?: ProofOrderByWithAggregationInput | ProofOrderByWithAggregationInput[]
+    by: ProofScalarFieldEnum[] | ProofScalarFieldEnum
+    having?: ProofScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ProofCountAggregateInputType | true
+    _avg?: ProofAvgAggregateInputType
+    _sum?: ProofSumAggregateInputType
+    _min?: ProofMinAggregateInputType
+    _max?: ProofMaxAggregateInputType
+  }
+
+  export type ProofGroupByOutputType = {
+    id: string
+    verificationCaseId: string
+    type: string
+    payloadJson: string
+    source: string
+    quantityValue: number | null
+    timestamp: Date
+    receivedAt: Date
+    hash: string | null
+    rawJson: string
+    _count: ProofCountAggregateOutputType | null
+    _avg: ProofAvgAggregateOutputType | null
+    _sum: ProofSumAggregateOutputType | null
+    _min: ProofMinAggregateOutputType | null
+    _max: ProofMaxAggregateOutputType | null
+  }
+
+  type GetProofGroupByPayload<T extends ProofGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ProofGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ProofGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ProofGroupByOutputType[P]>
+            : GetScalarType<T[P], ProofGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ProofSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    verificationCaseId?: boolean
+    type?: boolean
+    payloadJson?: boolean
+    source?: boolean
+    quantityValue?: boolean
+    timestamp?: boolean
+    receivedAt?: boolean
+    hash?: boolean
+    rawJson?: boolean
+    verificationCase?: boolean | VerificationCaseDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["proof"]>
+
+  export type ProofSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    verificationCaseId?: boolean
+    type?: boolean
+    payloadJson?: boolean
+    source?: boolean
+    quantityValue?: boolean
+    timestamp?: boolean
+    receivedAt?: boolean
+    hash?: boolean
+    rawJson?: boolean
+    verificationCase?: boolean | VerificationCaseDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["proof"]>
+
+  export type ProofSelectScalar = {
+    id?: boolean
+    verificationCaseId?: boolean
+    type?: boolean
+    payloadJson?: boolean
+    source?: boolean
+    quantityValue?: boolean
+    timestamp?: boolean
+    receivedAt?: boolean
+    hash?: boolean
+    rawJson?: boolean
+  }
+
+  export type ProofInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    verificationCase?: boolean | VerificationCaseDefaultArgs<ExtArgs>
+  }
+  export type ProofIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    verificationCase?: boolean | VerificationCaseDefaultArgs<ExtArgs>
+  }
+
+  export type $ProofPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Proof"
+    objects: {
+      verificationCase: Prisma.$VerificationCasePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      verificationCaseId: string
+      type: string
+      payloadJson: string
+      source: string
+      quantityValue: number | null
+      timestamp: Date
+      receivedAt: Date
+      hash: string | null
+      rawJson: string
+    }, ExtArgs["result"]["proof"]>
+    composites: {}
+  }
+
+  type ProofGetPayload<S extends boolean | null | undefined | ProofDefaultArgs> = $Result.GetResult<Prisma.$ProofPayload, S>
+
+  type ProofCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<ProofFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: ProofCountAggregateInputType | true
+    }
+
+  export interface ProofDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Proof'], meta: { name: 'Proof' } }
+    /**
+     * Find zero or one Proof that matches the filter.
+     * @param {ProofFindUniqueArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ProofFindUniqueArgs>(args: SelectSubset<T, ProofFindUniqueArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one Proof that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {ProofFindUniqueOrThrowArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ProofFindUniqueOrThrowArgs>(args: SelectSubset<T, ProofFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first Proof that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindFirstArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ProofFindFirstArgs>(args?: SelectSubset<T, ProofFindFirstArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first Proof that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindFirstOrThrowArgs} args - Arguments to find a Proof
+     * @example
+     * // Get one Proof
+     * const proof = await prisma.proof.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ProofFindFirstOrThrowArgs>(args?: SelectSubset<T, ProofFindFirstOrThrowArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more Proofs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Proofs
+     * const proofs = await prisma.proof.findMany()
+     * 
+     * // Get first 10 Proofs
+     * const proofs = await prisma.proof.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const proofWithIdOnly = await prisma.proof.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ProofFindManyArgs>(args?: SelectSubset<T, ProofFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a Proof.
+     * @param {ProofCreateArgs} args - Arguments to create a Proof.
+     * @example
+     * // Create one Proof
+     * const Proof = await prisma.proof.create({
+     *   data: {
+     *     // ... data to create a Proof
+     *   }
+     * })
+     * 
+     */
+    create<T extends ProofCreateArgs>(args: SelectSubset<T, ProofCreateArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many Proofs.
+     * @param {ProofCreateManyArgs} args - Arguments to create many Proofs.
+     * @example
+     * // Create many Proofs
+     * const proof = await prisma.proof.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ProofCreateManyArgs>(args?: SelectSubset<T, ProofCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Proofs and returns the data saved in the database.
+     * @param {ProofCreateManyAndReturnArgs} args - Arguments to create many Proofs.
+     * @example
+     * // Create many Proofs
+     * const proof = await prisma.proof.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Proofs and only return the `id`
+     * const proofWithIdOnly = await prisma.proof.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ProofCreateManyAndReturnArgs>(args?: SelectSubset<T, ProofCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a Proof.
+     * @param {ProofDeleteArgs} args - Arguments to delete one Proof.
+     * @example
+     * // Delete one Proof
+     * const Proof = await prisma.proof.delete({
+     *   where: {
+     *     // ... filter to delete one Proof
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ProofDeleteArgs>(args: SelectSubset<T, ProofDeleteArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one Proof.
+     * @param {ProofUpdateArgs} args - Arguments to update one Proof.
+     * @example
+     * // Update one Proof
+     * const proof = await prisma.proof.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ProofUpdateArgs>(args: SelectSubset<T, ProofUpdateArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more Proofs.
+     * @param {ProofDeleteManyArgs} args - Arguments to filter Proofs to delete.
+     * @example
+     * // Delete a few Proofs
+     * const { count } = await prisma.proof.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ProofDeleteManyArgs>(args?: SelectSubset<T, ProofDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Proofs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Proofs
+     * const proof = await prisma.proof.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ProofUpdateManyArgs>(args: SelectSubset<T, ProofUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one Proof.
+     * @param {ProofUpsertArgs} args - Arguments to update or create a Proof.
+     * @example
+     * // Update or create a Proof
+     * const proof = await prisma.proof.upsert({
+     *   create: {
+     *     // ... data to create a Proof
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Proof we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ProofUpsertArgs>(args: SelectSubset<T, ProofUpsertArgs<ExtArgs>>): Prisma__ProofClient<$Result.GetResult<Prisma.$ProofPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of Proofs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofCountArgs} args - Arguments to filter Proofs to count.
+     * @example
+     * // Count the number of Proofs
+     * const count = await prisma.proof.count({
+     *   where: {
+     *     // ... the filter for the Proofs we want to count
+     *   }
+     * })
+    **/
+    count<T extends ProofCountArgs>(
+      args?: Subset<T, ProofCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ProofCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Proof.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ProofAggregateArgs>(args: Subset<T, ProofAggregateArgs>): Prisma.PrismaPromise<GetProofAggregateType<T>>
+
+    /**
+     * Group by Proof.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProofGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ProofGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ProofGroupByArgs['orderBy'] }
+        : { orderBy?: ProofGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ProofGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetProofGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Proof model
+   */
+  readonly fields: ProofFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Proof.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ProofClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    verificationCase<T extends VerificationCaseDefaultArgs<ExtArgs> = {}>(args?: Subset<T, VerificationCaseDefaultArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Proof model
+   */ 
+  interface ProofFieldRefs {
+    readonly id: FieldRef<"Proof", 'String'>
+    readonly verificationCaseId: FieldRef<"Proof", 'String'>
+    readonly type: FieldRef<"Proof", 'String'>
+    readonly payloadJson: FieldRef<"Proof", 'String'>
+    readonly source: FieldRef<"Proof", 'String'>
+    readonly quantityValue: FieldRef<"Proof", 'Float'>
+    readonly timestamp: FieldRef<"Proof", 'DateTime'>
+    readonly receivedAt: FieldRef<"Proof", 'DateTime'>
+    readonly hash: FieldRef<"Proof", 'String'>
+    readonly rawJson: FieldRef<"Proof", 'String'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Proof findUnique
+   */
+  export type ProofFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof findUniqueOrThrow
+   */
+  export type ProofFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof findFirst
+   */
+  export type ProofFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Proofs.
+     */
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof findFirstOrThrow
+   */
+  export type ProofFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proof to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Proofs.
+     */
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof findMany
+   */
+  export type ProofFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter, which Proofs to fetch.
+     */
+    where?: ProofWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Proofs to fetch.
+     */
+    orderBy?: ProofOrderByWithRelationInput | ProofOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Proofs.
+     */
+    cursor?: ProofWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Proofs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Proofs.
+     */
+    skip?: number
+    distinct?: ProofScalarFieldEnum | ProofScalarFieldEnum[]
+  }
+
+  /**
+   * Proof create
+   */
+  export type ProofCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Proof.
+     */
+    data: XOR<ProofCreateInput, ProofUncheckedCreateInput>
+  }
+
+  /**
+   * Proof createMany
+   */
+  export type ProofCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Proofs.
+     */
+    data: ProofCreateManyInput | ProofCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Proof createManyAndReturn
+   */
+  export type ProofCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many Proofs.
+     */
+    data: ProofCreateManyInput | ProofCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Proof update
+   */
+  export type ProofUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Proof.
+     */
+    data: XOR<ProofUpdateInput, ProofUncheckedUpdateInput>
+    /**
+     * Choose, which Proof to update.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof updateMany
+   */
+  export type ProofUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Proofs.
+     */
+    data: XOR<ProofUpdateManyMutationInput, ProofUncheckedUpdateManyInput>
+    /**
+     * Filter which Proofs to update
+     */
+    where?: ProofWhereInput
+  }
+
+  /**
+   * Proof upsert
+   */
+  export type ProofUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Proof to update in case it exists.
+     */
+    where: ProofWhereUniqueInput
+    /**
+     * In case the Proof found by the `where` argument doesn't exist, create a new Proof with this data.
+     */
+    create: XOR<ProofCreateInput, ProofUncheckedCreateInput>
+    /**
+     * In case the Proof was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ProofUpdateInput, ProofUncheckedUpdateInput>
+  }
+
+  /**
+   * Proof delete
+   */
+  export type ProofDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+    /**
+     * Filter which Proof to delete.
+     */
+    where: ProofWhereUniqueInput
+  }
+
+  /**
+   * Proof deleteMany
+   */
+  export type ProofDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Proofs to delete
+     */
+    where?: ProofWhereInput
+  }
+
+  /**
+   * Proof without action
+   */
+  export type ProofDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Proof
+     */
+    select?: ProofSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProofInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Settlement
+   */
+
+  export type AggregateSettlement = {
+    _count: SettlementCountAggregateOutputType | null
+    _avg: SettlementAvgAggregateOutputType | null
+    _sum: SettlementSumAggregateOutputType | null
+    _min: SettlementMinAggregateOutputType | null
+    _max: SettlementMaxAggregateOutputType | null
+  }
+
+  export type SettlementAvgAggregateOutputType = {
+    amountValue: number | null
+  }
+
+  export type SettlementSumAggregateOutputType = {
+    amountValue: number | null
+  }
+
+  export type SettlementMinAggregateOutputType = {
+    id: string | null
+    orderId: string | null
+    verificationCaseId: string | null
+    transactionId: string | null
+    settlementType: string | null
+    state: string | null
+    amountValue: number | null
+    currency: string | null
+    periodJson: string | null
+    breakdownJson: string | null
+    initiatedAt: Date | null
+    completedAt: Date | null
+    rawJson: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SettlementMaxAggregateOutputType = {
+    id: string | null
+    orderId: string | null
+    verificationCaseId: string | null
+    transactionId: string | null
+    settlementType: string | null
+    state: string | null
+    amountValue: number | null
+    currency: string | null
+    periodJson: string | null
+    breakdownJson: string | null
+    initiatedAt: Date | null
+    completedAt: Date | null
+    rawJson: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SettlementCountAggregateOutputType = {
+    id: number
+    orderId: number
+    verificationCaseId: number
+    transactionId: number
+    settlementType: number
+    state: number
+    amountValue: number
+    currency: number
+    periodJson: number
+    breakdownJson: number
+    initiatedAt: number
+    completedAt: number
+    rawJson: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type SettlementAvgAggregateInputType = {
+    amountValue?: true
+  }
+
+  export type SettlementSumAggregateInputType = {
+    amountValue?: true
+  }
+
+  export type SettlementMinAggregateInputType = {
+    id?: true
+    orderId?: true
+    verificationCaseId?: true
+    transactionId?: true
+    settlementType?: true
+    state?: true
+    amountValue?: true
+    currency?: true
+    periodJson?: true
+    breakdownJson?: true
+    initiatedAt?: true
+    completedAt?: true
+    rawJson?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SettlementMaxAggregateInputType = {
+    id?: true
+    orderId?: true
+    verificationCaseId?: true
+    transactionId?: true
+    settlementType?: true
+    state?: true
+    amountValue?: true
+    currency?: true
+    periodJson?: true
+    breakdownJson?: true
+    initiatedAt?: true
+    completedAt?: true
+    rawJson?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SettlementCountAggregateInputType = {
+    id?: true
+    orderId?: true
+    verificationCaseId?: true
+    transactionId?: true
+    settlementType?: true
+    state?: true
+    amountValue?: true
+    currency?: true
+    periodJson?: true
+    breakdownJson?: true
+    initiatedAt?: true
+    completedAt?: true
+    rawJson?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type SettlementAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Settlement to aggregate.
+     */
+    where?: SettlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Settlements to fetch.
+     */
+    orderBy?: SettlementOrderByWithRelationInput | SettlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SettlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Settlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Settlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Settlements
+    **/
+    _count?: true | SettlementCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SettlementAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SettlementSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SettlementMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SettlementMaxAggregateInputType
+  }
+
+  export type GetSettlementAggregateType<T extends SettlementAggregateArgs> = {
+        [P in keyof T & keyof AggregateSettlement]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSettlement[P]>
+      : GetScalarType<T[P], AggregateSettlement[P]>
+  }
+
+
+
+
+  export type SettlementGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SettlementWhereInput
+    orderBy?: SettlementOrderByWithAggregationInput | SettlementOrderByWithAggregationInput[]
+    by: SettlementScalarFieldEnum[] | SettlementScalarFieldEnum
+    having?: SettlementScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SettlementCountAggregateInputType | true
+    _avg?: SettlementAvgAggregateInputType
+    _sum?: SettlementSumAggregateInputType
+    _min?: SettlementMinAggregateInputType
+    _max?: SettlementMaxAggregateInputType
+  }
+
+  export type SettlementGroupByOutputType = {
+    id: string
+    orderId: string
+    verificationCaseId: string | null
+    transactionId: string
+    settlementType: string
+    state: string
+    amountValue: number
+    currency: string
+    periodJson: string | null
+    breakdownJson: string | null
+    initiatedAt: Date
+    completedAt: Date | null
+    rawJson: string
+    createdAt: Date
+    updatedAt: Date
+    _count: SettlementCountAggregateOutputType | null
+    _avg: SettlementAvgAggregateOutputType | null
+    _sum: SettlementSumAggregateOutputType | null
+    _min: SettlementMinAggregateOutputType | null
+    _max: SettlementMaxAggregateOutputType | null
+  }
+
+  type GetSettlementGroupByPayload<T extends SettlementGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SettlementGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SettlementGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SettlementGroupByOutputType[P]>
+            : GetScalarType<T[P], SettlementGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SettlementSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    orderId?: boolean
+    verificationCaseId?: boolean
+    transactionId?: boolean
+    settlementType?: boolean
+    state?: boolean
+    amountValue?: boolean
+    currency?: boolean
+    periodJson?: boolean
+    breakdownJson?: boolean
+    initiatedAt?: boolean
+    completedAt?: boolean
+    rawJson?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    order?: boolean | OrderDefaultArgs<ExtArgs>
+    verificationCase?: boolean | Settlement$verificationCaseArgs<ExtArgs>
+  }, ExtArgs["result"]["settlement"]>
+
+  export type SettlementSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    orderId?: boolean
+    verificationCaseId?: boolean
+    transactionId?: boolean
+    settlementType?: boolean
+    state?: boolean
+    amountValue?: boolean
+    currency?: boolean
+    periodJson?: boolean
+    breakdownJson?: boolean
+    initiatedAt?: boolean
+    completedAt?: boolean
+    rawJson?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    order?: boolean | OrderDefaultArgs<ExtArgs>
+    verificationCase?: boolean | Settlement$verificationCaseArgs<ExtArgs>
+  }, ExtArgs["result"]["settlement"]>
+
+  export type SettlementSelectScalar = {
+    id?: boolean
+    orderId?: boolean
+    verificationCaseId?: boolean
+    transactionId?: boolean
+    settlementType?: boolean
+    state?: boolean
+    amountValue?: boolean
+    currency?: boolean
+    periodJson?: boolean
+    breakdownJson?: boolean
+    initiatedAt?: boolean
+    completedAt?: boolean
+    rawJson?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type SettlementInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    order?: boolean | OrderDefaultArgs<ExtArgs>
+    verificationCase?: boolean | Settlement$verificationCaseArgs<ExtArgs>
+  }
+  export type SettlementIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    order?: boolean | OrderDefaultArgs<ExtArgs>
+    verificationCase?: boolean | Settlement$verificationCaseArgs<ExtArgs>
+  }
+
+  export type $SettlementPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Settlement"
+    objects: {
+      order: Prisma.$OrderPayload<ExtArgs>
+      verificationCase: Prisma.$VerificationCasePayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      orderId: string
+      verificationCaseId: string | null
+      transactionId: string
+      settlementType: string
+      state: string
+      amountValue: number
+      currency: string
+      periodJson: string | null
+      breakdownJson: string | null
+      initiatedAt: Date
+      completedAt: Date | null
+      rawJson: string
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["settlement"]>
+    composites: {}
+  }
+
+  type SettlementGetPayload<S extends boolean | null | undefined | SettlementDefaultArgs> = $Result.GetResult<Prisma.$SettlementPayload, S>
+
+  type SettlementCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<SettlementFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: SettlementCountAggregateInputType | true
+    }
+
+  export interface SettlementDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Settlement'], meta: { name: 'Settlement' } }
+    /**
+     * Find zero or one Settlement that matches the filter.
+     * @param {SettlementFindUniqueArgs} args - Arguments to find a Settlement
+     * @example
+     * // Get one Settlement
+     * const settlement = await prisma.settlement.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SettlementFindUniqueArgs>(args: SelectSubset<T, SettlementFindUniqueArgs<ExtArgs>>): Prisma__SettlementClient<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one Settlement that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {SettlementFindUniqueOrThrowArgs} args - Arguments to find a Settlement
+     * @example
+     * // Get one Settlement
+     * const settlement = await prisma.settlement.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SettlementFindUniqueOrThrowArgs>(args: SelectSubset<T, SettlementFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SettlementClient<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first Settlement that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementFindFirstArgs} args - Arguments to find a Settlement
+     * @example
+     * // Get one Settlement
+     * const settlement = await prisma.settlement.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SettlementFindFirstArgs>(args?: SelectSubset<T, SettlementFindFirstArgs<ExtArgs>>): Prisma__SettlementClient<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first Settlement that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementFindFirstOrThrowArgs} args - Arguments to find a Settlement
+     * @example
+     * // Get one Settlement
+     * const settlement = await prisma.settlement.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SettlementFindFirstOrThrowArgs>(args?: SelectSubset<T, SettlementFindFirstOrThrowArgs<ExtArgs>>): Prisma__SettlementClient<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more Settlements that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Settlements
+     * const settlements = await prisma.settlement.findMany()
+     * 
+     * // Get first 10 Settlements
+     * const settlements = await prisma.settlement.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const settlementWithIdOnly = await prisma.settlement.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SettlementFindManyArgs>(args?: SelectSubset<T, SettlementFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a Settlement.
+     * @param {SettlementCreateArgs} args - Arguments to create a Settlement.
+     * @example
+     * // Create one Settlement
+     * const Settlement = await prisma.settlement.create({
+     *   data: {
+     *     // ... data to create a Settlement
+     *   }
+     * })
+     * 
+     */
+    create<T extends SettlementCreateArgs>(args: SelectSubset<T, SettlementCreateArgs<ExtArgs>>): Prisma__SettlementClient<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many Settlements.
+     * @param {SettlementCreateManyArgs} args - Arguments to create many Settlements.
+     * @example
+     * // Create many Settlements
+     * const settlement = await prisma.settlement.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SettlementCreateManyArgs>(args?: SelectSubset<T, SettlementCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Settlements and returns the data saved in the database.
+     * @param {SettlementCreateManyAndReturnArgs} args - Arguments to create many Settlements.
+     * @example
+     * // Create many Settlements
+     * const settlement = await prisma.settlement.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Settlements and only return the `id`
+     * const settlementWithIdOnly = await prisma.settlement.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SettlementCreateManyAndReturnArgs>(args?: SelectSubset<T, SettlementCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a Settlement.
+     * @param {SettlementDeleteArgs} args - Arguments to delete one Settlement.
+     * @example
+     * // Delete one Settlement
+     * const Settlement = await prisma.settlement.delete({
+     *   where: {
+     *     // ... filter to delete one Settlement
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SettlementDeleteArgs>(args: SelectSubset<T, SettlementDeleteArgs<ExtArgs>>): Prisma__SettlementClient<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one Settlement.
+     * @param {SettlementUpdateArgs} args - Arguments to update one Settlement.
+     * @example
+     * // Update one Settlement
+     * const settlement = await prisma.settlement.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SettlementUpdateArgs>(args: SelectSubset<T, SettlementUpdateArgs<ExtArgs>>): Prisma__SettlementClient<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more Settlements.
+     * @param {SettlementDeleteManyArgs} args - Arguments to filter Settlements to delete.
+     * @example
+     * // Delete a few Settlements
+     * const { count } = await prisma.settlement.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SettlementDeleteManyArgs>(args?: SelectSubset<T, SettlementDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Settlements.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Settlements
+     * const settlement = await prisma.settlement.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SettlementUpdateManyArgs>(args: SelectSubset<T, SettlementUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one Settlement.
+     * @param {SettlementUpsertArgs} args - Arguments to update or create a Settlement.
+     * @example
+     * // Update or create a Settlement
+     * const settlement = await prisma.settlement.upsert({
+     *   create: {
+     *     // ... data to create a Settlement
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Settlement we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SettlementUpsertArgs>(args: SelectSubset<T, SettlementUpsertArgs<ExtArgs>>): Prisma__SettlementClient<$Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of Settlements.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementCountArgs} args - Arguments to filter Settlements to count.
+     * @example
+     * // Count the number of Settlements
+     * const count = await prisma.settlement.count({
+     *   where: {
+     *     // ... the filter for the Settlements we want to count
+     *   }
+     * })
+    **/
+    count<T extends SettlementCountArgs>(
+      args?: Subset<T, SettlementCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SettlementCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Settlement.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SettlementAggregateArgs>(args: Subset<T, SettlementAggregateArgs>): Prisma.PrismaPromise<GetSettlementAggregateType<T>>
+
+    /**
+     * Group by Settlement.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SettlementGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SettlementGroupByArgs['orderBy'] }
+        : { orderBy?: SettlementGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SettlementGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSettlementGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Settlement model
+   */
+  readonly fields: SettlementFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Settlement.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SettlementClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    order<T extends OrderDefaultArgs<ExtArgs> = {}>(args?: Subset<T, OrderDefaultArgs<ExtArgs>>): Prisma__OrderClient<$Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    verificationCase<T extends Settlement$verificationCaseArgs<ExtArgs> = {}>(args?: Subset<T, Settlement$verificationCaseArgs<ExtArgs>>): Prisma__VerificationCaseClient<$Result.GetResult<Prisma.$VerificationCasePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Settlement model
+   */ 
+  interface SettlementFieldRefs {
+    readonly id: FieldRef<"Settlement", 'String'>
+    readonly orderId: FieldRef<"Settlement", 'String'>
+    readonly verificationCaseId: FieldRef<"Settlement", 'String'>
+    readonly transactionId: FieldRef<"Settlement", 'String'>
+    readonly settlementType: FieldRef<"Settlement", 'String'>
+    readonly state: FieldRef<"Settlement", 'String'>
+    readonly amountValue: FieldRef<"Settlement", 'Float'>
+    readonly currency: FieldRef<"Settlement", 'String'>
+    readonly periodJson: FieldRef<"Settlement", 'String'>
+    readonly breakdownJson: FieldRef<"Settlement", 'String'>
+    readonly initiatedAt: FieldRef<"Settlement", 'DateTime'>
+    readonly completedAt: FieldRef<"Settlement", 'DateTime'>
+    readonly rawJson: FieldRef<"Settlement", 'String'>
+    readonly createdAt: FieldRef<"Settlement", 'DateTime'>
+    readonly updatedAt: FieldRef<"Settlement", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Settlement findUnique
+   */
+  export type SettlementFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * Filter, which Settlement to fetch.
+     */
+    where: SettlementWhereUniqueInput
+  }
+
+  /**
+   * Settlement findUniqueOrThrow
+   */
+  export type SettlementFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * Filter, which Settlement to fetch.
+     */
+    where: SettlementWhereUniqueInput
+  }
+
+  /**
+   * Settlement findFirst
+   */
+  export type SettlementFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * Filter, which Settlement to fetch.
+     */
+    where?: SettlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Settlements to fetch.
+     */
+    orderBy?: SettlementOrderByWithRelationInput | SettlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Settlements.
+     */
+    cursor?: SettlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Settlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Settlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Settlements.
+     */
+    distinct?: SettlementScalarFieldEnum | SettlementScalarFieldEnum[]
+  }
+
+  /**
+   * Settlement findFirstOrThrow
+   */
+  export type SettlementFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * Filter, which Settlement to fetch.
+     */
+    where?: SettlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Settlements to fetch.
+     */
+    orderBy?: SettlementOrderByWithRelationInput | SettlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Settlements.
+     */
+    cursor?: SettlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Settlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Settlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Settlements.
+     */
+    distinct?: SettlementScalarFieldEnum | SettlementScalarFieldEnum[]
+  }
+
+  /**
+   * Settlement findMany
+   */
+  export type SettlementFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * Filter, which Settlements to fetch.
+     */
+    where?: SettlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Settlements to fetch.
+     */
+    orderBy?: SettlementOrderByWithRelationInput | SettlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Settlements.
+     */
+    cursor?: SettlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Settlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Settlements.
+     */
+    skip?: number
+    distinct?: SettlementScalarFieldEnum | SettlementScalarFieldEnum[]
+  }
+
+  /**
+   * Settlement create
+   */
+  export type SettlementCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Settlement.
+     */
+    data: XOR<SettlementCreateInput, SettlementUncheckedCreateInput>
+  }
+
+  /**
+   * Settlement createMany
+   */
+  export type SettlementCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Settlements.
+     */
+    data: SettlementCreateManyInput | SettlementCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Settlement createManyAndReturn
+   */
+  export type SettlementCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many Settlements.
+     */
+    data: SettlementCreateManyInput | SettlementCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Settlement update
+   */
+  export type SettlementUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Settlement.
+     */
+    data: XOR<SettlementUpdateInput, SettlementUncheckedUpdateInput>
+    /**
+     * Choose, which Settlement to update.
+     */
+    where: SettlementWhereUniqueInput
+  }
+
+  /**
+   * Settlement updateMany
+   */
+  export type SettlementUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Settlements.
+     */
+    data: XOR<SettlementUpdateManyMutationInput, SettlementUncheckedUpdateManyInput>
+    /**
+     * Filter which Settlements to update
+     */
+    where?: SettlementWhereInput
+  }
+
+  /**
+   * Settlement upsert
+   */
+  export type SettlementUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Settlement to update in case it exists.
+     */
+    where: SettlementWhereUniqueInput
+    /**
+     * In case the Settlement found by the `where` argument doesn't exist, create a new Settlement with this data.
+     */
+    create: XOR<SettlementCreateInput, SettlementUncheckedCreateInput>
+    /**
+     * In case the Settlement was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SettlementUpdateInput, SettlementUncheckedUpdateInput>
+  }
+
+  /**
+   * Settlement delete
+   */
+  export type SettlementDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+    /**
+     * Filter which Settlement to delete.
+     */
+    where: SettlementWhereUniqueInput
+  }
+
+  /**
+   * Settlement deleteMany
+   */
+  export type SettlementDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Settlements to delete
+     */
+    where?: SettlementWhereInput
+  }
+
+  /**
+   * Settlement.verificationCase
+   */
+  export type Settlement$verificationCaseArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCase
+     */
+    select?: VerificationCaseSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VerificationCaseInclude<ExtArgs> | null
+    where?: VerificationCaseWhereInput
+  }
+
+  /**
+   * Settlement without action
+   */
+  export type SettlementDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Settlement
+     */
+    select?: SettlementSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SettlementInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -7994,6 +11678,67 @@ export namespace Prisma {
   };
 
   export type EventScalarFieldEnum = (typeof EventScalarFieldEnum)[keyof typeof EventScalarFieldEnum]
+
+
+  export const VerificationCaseScalarFieldEnum: {
+    id: 'id',
+    orderId: 'orderId',
+    transactionId: 'transactionId',
+    state: 'state',
+    requiredProofsJson: 'requiredProofsJson',
+    toleranceRulesJson: 'toleranceRulesJson',
+    windowJson: 'windowJson',
+    expectedQty: 'expectedQty',
+    deliveredQty: 'deliveredQty',
+    deviationQty: 'deviationQty',
+    deviationPercent: 'deviationPercent',
+    decision: 'decision',
+    decidedAt: 'decidedAt',
+    expiresAt: 'expiresAt',
+    rejectionReason: 'rejectionReason',
+    rawJson: 'rawJson',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type VerificationCaseScalarFieldEnum = (typeof VerificationCaseScalarFieldEnum)[keyof typeof VerificationCaseScalarFieldEnum]
+
+
+  export const ProofScalarFieldEnum: {
+    id: 'id',
+    verificationCaseId: 'verificationCaseId',
+    type: 'type',
+    payloadJson: 'payloadJson',
+    source: 'source',
+    quantityValue: 'quantityValue',
+    timestamp: 'timestamp',
+    receivedAt: 'receivedAt',
+    hash: 'hash',
+    rawJson: 'rawJson'
+  };
+
+  export type ProofScalarFieldEnum = (typeof ProofScalarFieldEnum)[keyof typeof ProofScalarFieldEnum]
+
+
+  export const SettlementScalarFieldEnum: {
+    id: 'id',
+    orderId: 'orderId',
+    verificationCaseId: 'verificationCaseId',
+    transactionId: 'transactionId',
+    settlementType: 'settlementType',
+    state: 'state',
+    amountValue: 'amountValue',
+    currency: 'currency',
+    periodJson: 'periodJson',
+    breakdownJson: 'breakdownJson',
+    initiatedAt: 'initiatedAt',
+    completedAt: 'completedAt',
+    rawJson: 'rawJson',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type SettlementScalarFieldEnum = (typeof SettlementScalarFieldEnum)[keyof typeof SettlementScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -8475,6 +12220,8 @@ export namespace Prisma {
     provider?: XOR<ProviderNullableRelationFilter, ProviderWhereInput> | null
     selectedOffer?: XOR<CatalogOfferNullableRelationFilter, CatalogOfferWhereInput> | null
     blocks?: OfferBlockListRelationFilter
+    verificationCases?: VerificationCaseListRelationFilter
+    settlements?: SettlementListRelationFilter
   }
 
   export type OrderOrderByWithRelationInput = {
@@ -8494,6 +12241,8 @@ export namespace Prisma {
     provider?: ProviderOrderByWithRelationInput
     selectedOffer?: CatalogOfferOrderByWithRelationInput
     blocks?: OfferBlockOrderByRelationAggregateInput
+    verificationCases?: VerificationCaseOrderByRelationAggregateInput
+    settlements?: SettlementOrderByRelationAggregateInput
   }
 
   export type OrderWhereUniqueInput = Prisma.AtLeast<{
@@ -8516,6 +12265,8 @@ export namespace Prisma {
     provider?: XOR<ProviderNullableRelationFilter, ProviderWhereInput> | null
     selectedOffer?: XOR<CatalogOfferNullableRelationFilter, CatalogOfferWhereInput> | null
     blocks?: OfferBlockListRelationFilter
+    verificationCases?: VerificationCaseListRelationFilter
+    settlements?: SettlementListRelationFilter
   }, "id" | "transactionId">
 
   export type OrderOrderByWithAggregationInput = {
@@ -8620,6 +12371,326 @@ export namespace Prisma {
     direction?: StringWithAggregatesFilter<"Event"> | string
     rawJson?: StringWithAggregatesFilter<"Event"> | string
     createdAt?: DateTimeWithAggregatesFilter<"Event"> | Date | string
+  }
+
+  export type VerificationCaseWhereInput = {
+    AND?: VerificationCaseWhereInput | VerificationCaseWhereInput[]
+    OR?: VerificationCaseWhereInput[]
+    NOT?: VerificationCaseWhereInput | VerificationCaseWhereInput[]
+    id?: StringFilter<"VerificationCase"> | string
+    orderId?: StringFilter<"VerificationCase"> | string
+    transactionId?: StringFilter<"VerificationCase"> | string
+    state?: StringFilter<"VerificationCase"> | string
+    requiredProofsJson?: StringFilter<"VerificationCase"> | string
+    toleranceRulesJson?: StringFilter<"VerificationCase"> | string
+    windowJson?: StringFilter<"VerificationCase"> | string
+    expectedQty?: FloatFilter<"VerificationCase"> | number
+    deliveredQty?: FloatNullableFilter<"VerificationCase"> | number | null
+    deviationQty?: FloatNullableFilter<"VerificationCase"> | number | null
+    deviationPercent?: FloatNullableFilter<"VerificationCase"> | number | null
+    decision?: StringNullableFilter<"VerificationCase"> | string | null
+    decidedAt?: DateTimeNullableFilter<"VerificationCase"> | Date | string | null
+    expiresAt?: DateTimeFilter<"VerificationCase"> | Date | string
+    rejectionReason?: StringNullableFilter<"VerificationCase"> | string | null
+    rawJson?: StringFilter<"VerificationCase"> | string
+    createdAt?: DateTimeFilter<"VerificationCase"> | Date | string
+    updatedAt?: DateTimeFilter<"VerificationCase"> | Date | string
+    order?: XOR<OrderRelationFilter, OrderWhereInput>
+    proofs?: ProofListRelationFilter
+    settlements?: SettlementListRelationFilter
+  }
+
+  export type VerificationCaseOrderByWithRelationInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    transactionId?: SortOrder
+    state?: SortOrder
+    requiredProofsJson?: SortOrder
+    toleranceRulesJson?: SortOrder
+    windowJson?: SortOrder
+    expectedQty?: SortOrder
+    deliveredQty?: SortOrderInput | SortOrder
+    deviationQty?: SortOrderInput | SortOrder
+    deviationPercent?: SortOrderInput | SortOrder
+    decision?: SortOrderInput | SortOrder
+    decidedAt?: SortOrderInput | SortOrder
+    expiresAt?: SortOrder
+    rejectionReason?: SortOrderInput | SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    order?: OrderOrderByWithRelationInput
+    proofs?: ProofOrderByRelationAggregateInput
+    settlements?: SettlementOrderByRelationAggregateInput
+  }
+
+  export type VerificationCaseWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: VerificationCaseWhereInput | VerificationCaseWhereInput[]
+    OR?: VerificationCaseWhereInput[]
+    NOT?: VerificationCaseWhereInput | VerificationCaseWhereInput[]
+    orderId?: StringFilter<"VerificationCase"> | string
+    transactionId?: StringFilter<"VerificationCase"> | string
+    state?: StringFilter<"VerificationCase"> | string
+    requiredProofsJson?: StringFilter<"VerificationCase"> | string
+    toleranceRulesJson?: StringFilter<"VerificationCase"> | string
+    windowJson?: StringFilter<"VerificationCase"> | string
+    expectedQty?: FloatFilter<"VerificationCase"> | number
+    deliveredQty?: FloatNullableFilter<"VerificationCase"> | number | null
+    deviationQty?: FloatNullableFilter<"VerificationCase"> | number | null
+    deviationPercent?: FloatNullableFilter<"VerificationCase"> | number | null
+    decision?: StringNullableFilter<"VerificationCase"> | string | null
+    decidedAt?: DateTimeNullableFilter<"VerificationCase"> | Date | string | null
+    expiresAt?: DateTimeFilter<"VerificationCase"> | Date | string
+    rejectionReason?: StringNullableFilter<"VerificationCase"> | string | null
+    rawJson?: StringFilter<"VerificationCase"> | string
+    createdAt?: DateTimeFilter<"VerificationCase"> | Date | string
+    updatedAt?: DateTimeFilter<"VerificationCase"> | Date | string
+    order?: XOR<OrderRelationFilter, OrderWhereInput>
+    proofs?: ProofListRelationFilter
+    settlements?: SettlementListRelationFilter
+  }, "id">
+
+  export type VerificationCaseOrderByWithAggregationInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    transactionId?: SortOrder
+    state?: SortOrder
+    requiredProofsJson?: SortOrder
+    toleranceRulesJson?: SortOrder
+    windowJson?: SortOrder
+    expectedQty?: SortOrder
+    deliveredQty?: SortOrderInput | SortOrder
+    deviationQty?: SortOrderInput | SortOrder
+    deviationPercent?: SortOrderInput | SortOrder
+    decision?: SortOrderInput | SortOrder
+    decidedAt?: SortOrderInput | SortOrder
+    expiresAt?: SortOrder
+    rejectionReason?: SortOrderInput | SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: VerificationCaseCountOrderByAggregateInput
+    _avg?: VerificationCaseAvgOrderByAggregateInput
+    _max?: VerificationCaseMaxOrderByAggregateInput
+    _min?: VerificationCaseMinOrderByAggregateInput
+    _sum?: VerificationCaseSumOrderByAggregateInput
+  }
+
+  export type VerificationCaseScalarWhereWithAggregatesInput = {
+    AND?: VerificationCaseScalarWhereWithAggregatesInput | VerificationCaseScalarWhereWithAggregatesInput[]
+    OR?: VerificationCaseScalarWhereWithAggregatesInput[]
+    NOT?: VerificationCaseScalarWhereWithAggregatesInput | VerificationCaseScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"VerificationCase"> | string
+    orderId?: StringWithAggregatesFilter<"VerificationCase"> | string
+    transactionId?: StringWithAggregatesFilter<"VerificationCase"> | string
+    state?: StringWithAggregatesFilter<"VerificationCase"> | string
+    requiredProofsJson?: StringWithAggregatesFilter<"VerificationCase"> | string
+    toleranceRulesJson?: StringWithAggregatesFilter<"VerificationCase"> | string
+    windowJson?: StringWithAggregatesFilter<"VerificationCase"> | string
+    expectedQty?: FloatWithAggregatesFilter<"VerificationCase"> | number
+    deliveredQty?: FloatNullableWithAggregatesFilter<"VerificationCase"> | number | null
+    deviationQty?: FloatNullableWithAggregatesFilter<"VerificationCase"> | number | null
+    deviationPercent?: FloatNullableWithAggregatesFilter<"VerificationCase"> | number | null
+    decision?: StringNullableWithAggregatesFilter<"VerificationCase"> | string | null
+    decidedAt?: DateTimeNullableWithAggregatesFilter<"VerificationCase"> | Date | string | null
+    expiresAt?: DateTimeWithAggregatesFilter<"VerificationCase"> | Date | string
+    rejectionReason?: StringNullableWithAggregatesFilter<"VerificationCase"> | string | null
+    rawJson?: StringWithAggregatesFilter<"VerificationCase"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"VerificationCase"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"VerificationCase"> | Date | string
+  }
+
+  export type ProofWhereInput = {
+    AND?: ProofWhereInput | ProofWhereInput[]
+    OR?: ProofWhereInput[]
+    NOT?: ProofWhereInput | ProofWhereInput[]
+    id?: StringFilter<"Proof"> | string
+    verificationCaseId?: StringFilter<"Proof"> | string
+    type?: StringFilter<"Proof"> | string
+    payloadJson?: StringFilter<"Proof"> | string
+    source?: StringFilter<"Proof"> | string
+    quantityValue?: FloatNullableFilter<"Proof"> | number | null
+    timestamp?: DateTimeFilter<"Proof"> | Date | string
+    receivedAt?: DateTimeFilter<"Proof"> | Date | string
+    hash?: StringNullableFilter<"Proof"> | string | null
+    rawJson?: StringFilter<"Proof"> | string
+    verificationCase?: XOR<VerificationCaseRelationFilter, VerificationCaseWhereInput>
+  }
+
+  export type ProofOrderByWithRelationInput = {
+    id?: SortOrder
+    verificationCaseId?: SortOrder
+    type?: SortOrder
+    payloadJson?: SortOrder
+    source?: SortOrder
+    quantityValue?: SortOrderInput | SortOrder
+    timestamp?: SortOrder
+    receivedAt?: SortOrder
+    hash?: SortOrderInput | SortOrder
+    rawJson?: SortOrder
+    verificationCase?: VerificationCaseOrderByWithRelationInput
+  }
+
+  export type ProofWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: ProofWhereInput | ProofWhereInput[]
+    OR?: ProofWhereInput[]
+    NOT?: ProofWhereInput | ProofWhereInput[]
+    verificationCaseId?: StringFilter<"Proof"> | string
+    type?: StringFilter<"Proof"> | string
+    payloadJson?: StringFilter<"Proof"> | string
+    source?: StringFilter<"Proof"> | string
+    quantityValue?: FloatNullableFilter<"Proof"> | number | null
+    timestamp?: DateTimeFilter<"Proof"> | Date | string
+    receivedAt?: DateTimeFilter<"Proof"> | Date | string
+    hash?: StringNullableFilter<"Proof"> | string | null
+    rawJson?: StringFilter<"Proof"> | string
+    verificationCase?: XOR<VerificationCaseRelationFilter, VerificationCaseWhereInput>
+  }, "id">
+
+  export type ProofOrderByWithAggregationInput = {
+    id?: SortOrder
+    verificationCaseId?: SortOrder
+    type?: SortOrder
+    payloadJson?: SortOrder
+    source?: SortOrder
+    quantityValue?: SortOrderInput | SortOrder
+    timestamp?: SortOrder
+    receivedAt?: SortOrder
+    hash?: SortOrderInput | SortOrder
+    rawJson?: SortOrder
+    _count?: ProofCountOrderByAggregateInput
+    _avg?: ProofAvgOrderByAggregateInput
+    _max?: ProofMaxOrderByAggregateInput
+    _min?: ProofMinOrderByAggregateInput
+    _sum?: ProofSumOrderByAggregateInput
+  }
+
+  export type ProofScalarWhereWithAggregatesInput = {
+    AND?: ProofScalarWhereWithAggregatesInput | ProofScalarWhereWithAggregatesInput[]
+    OR?: ProofScalarWhereWithAggregatesInput[]
+    NOT?: ProofScalarWhereWithAggregatesInput | ProofScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Proof"> | string
+    verificationCaseId?: StringWithAggregatesFilter<"Proof"> | string
+    type?: StringWithAggregatesFilter<"Proof"> | string
+    payloadJson?: StringWithAggregatesFilter<"Proof"> | string
+    source?: StringWithAggregatesFilter<"Proof"> | string
+    quantityValue?: FloatNullableWithAggregatesFilter<"Proof"> | number | null
+    timestamp?: DateTimeWithAggregatesFilter<"Proof"> | Date | string
+    receivedAt?: DateTimeWithAggregatesFilter<"Proof"> | Date | string
+    hash?: StringNullableWithAggregatesFilter<"Proof"> | string | null
+    rawJson?: StringWithAggregatesFilter<"Proof"> | string
+  }
+
+  export type SettlementWhereInput = {
+    AND?: SettlementWhereInput | SettlementWhereInput[]
+    OR?: SettlementWhereInput[]
+    NOT?: SettlementWhereInput | SettlementWhereInput[]
+    id?: StringFilter<"Settlement"> | string
+    orderId?: StringFilter<"Settlement"> | string
+    verificationCaseId?: StringNullableFilter<"Settlement"> | string | null
+    transactionId?: StringFilter<"Settlement"> | string
+    settlementType?: StringFilter<"Settlement"> | string
+    state?: StringFilter<"Settlement"> | string
+    amountValue?: FloatFilter<"Settlement"> | number
+    currency?: StringFilter<"Settlement"> | string
+    periodJson?: StringNullableFilter<"Settlement"> | string | null
+    breakdownJson?: StringNullableFilter<"Settlement"> | string | null
+    initiatedAt?: DateTimeFilter<"Settlement"> | Date | string
+    completedAt?: DateTimeNullableFilter<"Settlement"> | Date | string | null
+    rawJson?: StringFilter<"Settlement"> | string
+    createdAt?: DateTimeFilter<"Settlement"> | Date | string
+    updatedAt?: DateTimeFilter<"Settlement"> | Date | string
+    order?: XOR<OrderRelationFilter, OrderWhereInput>
+    verificationCase?: XOR<VerificationCaseNullableRelationFilter, VerificationCaseWhereInput> | null
+  }
+
+  export type SettlementOrderByWithRelationInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    verificationCaseId?: SortOrderInput | SortOrder
+    transactionId?: SortOrder
+    settlementType?: SortOrder
+    state?: SortOrder
+    amountValue?: SortOrder
+    currency?: SortOrder
+    periodJson?: SortOrderInput | SortOrder
+    breakdownJson?: SortOrderInput | SortOrder
+    initiatedAt?: SortOrder
+    completedAt?: SortOrderInput | SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    order?: OrderOrderByWithRelationInput
+    verificationCase?: VerificationCaseOrderByWithRelationInput
+  }
+
+  export type SettlementWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: SettlementWhereInput | SettlementWhereInput[]
+    OR?: SettlementWhereInput[]
+    NOT?: SettlementWhereInput | SettlementWhereInput[]
+    orderId?: StringFilter<"Settlement"> | string
+    verificationCaseId?: StringNullableFilter<"Settlement"> | string | null
+    transactionId?: StringFilter<"Settlement"> | string
+    settlementType?: StringFilter<"Settlement"> | string
+    state?: StringFilter<"Settlement"> | string
+    amountValue?: FloatFilter<"Settlement"> | number
+    currency?: StringFilter<"Settlement"> | string
+    periodJson?: StringNullableFilter<"Settlement"> | string | null
+    breakdownJson?: StringNullableFilter<"Settlement"> | string | null
+    initiatedAt?: DateTimeFilter<"Settlement"> | Date | string
+    completedAt?: DateTimeNullableFilter<"Settlement"> | Date | string | null
+    rawJson?: StringFilter<"Settlement"> | string
+    createdAt?: DateTimeFilter<"Settlement"> | Date | string
+    updatedAt?: DateTimeFilter<"Settlement"> | Date | string
+    order?: XOR<OrderRelationFilter, OrderWhereInput>
+    verificationCase?: XOR<VerificationCaseNullableRelationFilter, VerificationCaseWhereInput> | null
+  }, "id">
+
+  export type SettlementOrderByWithAggregationInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    verificationCaseId?: SortOrderInput | SortOrder
+    transactionId?: SortOrder
+    settlementType?: SortOrder
+    state?: SortOrder
+    amountValue?: SortOrder
+    currency?: SortOrder
+    periodJson?: SortOrderInput | SortOrder
+    breakdownJson?: SortOrderInput | SortOrder
+    initiatedAt?: SortOrder
+    completedAt?: SortOrderInput | SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: SettlementCountOrderByAggregateInput
+    _avg?: SettlementAvgOrderByAggregateInput
+    _max?: SettlementMaxOrderByAggregateInput
+    _min?: SettlementMinOrderByAggregateInput
+    _sum?: SettlementSumOrderByAggregateInput
+  }
+
+  export type SettlementScalarWhereWithAggregatesInput = {
+    AND?: SettlementScalarWhereWithAggregatesInput | SettlementScalarWhereWithAggregatesInput[]
+    OR?: SettlementScalarWhereWithAggregatesInput[]
+    NOT?: SettlementScalarWhereWithAggregatesInput | SettlementScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Settlement"> | string
+    orderId?: StringWithAggregatesFilter<"Settlement"> | string
+    verificationCaseId?: StringNullableWithAggregatesFilter<"Settlement"> | string | null
+    transactionId?: StringWithAggregatesFilter<"Settlement"> | string
+    settlementType?: StringWithAggregatesFilter<"Settlement"> | string
+    state?: StringWithAggregatesFilter<"Settlement"> | string
+    amountValue?: FloatWithAggregatesFilter<"Settlement"> | number
+    currency?: StringWithAggregatesFilter<"Settlement"> | string
+    periodJson?: StringNullableWithAggregatesFilter<"Settlement"> | string | null
+    breakdownJson?: StringNullableWithAggregatesFilter<"Settlement"> | string | null
+    initiatedAt?: DateTimeWithAggregatesFilter<"Settlement"> | Date | string
+    completedAt?: DateTimeNullableWithAggregatesFilter<"Settlement"> | Date | string | null
+    rawJson?: StringWithAggregatesFilter<"Settlement"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"Settlement"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"Settlement"> | Date | string
   }
 
   export type ProviderCreateInput = {
@@ -9040,6 +13111,8 @@ export namespace Prisma {
     provider?: ProviderCreateNestedOneWithoutOrdersInput
     selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
     blocks?: OfferBlockCreateNestedManyWithoutOrderInput
+    verificationCases?: VerificationCaseCreateNestedManyWithoutOrderInput
+    settlements?: SettlementCreateNestedManyWithoutOrderInput
   }
 
   export type OrderUncheckedCreateInput = {
@@ -9057,6 +13130,8 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
+    verificationCases?: VerificationCaseUncheckedCreateNestedManyWithoutOrderInput
+    settlements?: SettlementUncheckedCreateNestedManyWithoutOrderInput
   }
 
   export type OrderUpdateInput = {
@@ -9074,6 +13149,8 @@ export namespace Prisma {
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
     selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
     blocks?: OfferBlockUpdateManyWithoutOrderNestedInput
+    verificationCases?: VerificationCaseUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUpdateManyWithoutOrderNestedInput
   }
 
   export type OrderUncheckedUpdateInput = {
@@ -9091,6 +13168,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
+    verificationCases?: VerificationCaseUncheckedUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUncheckedUpdateManyWithoutOrderNestedInput
   }
 
   export type OrderCreateManyInput = {
@@ -9204,6 +13283,374 @@ export namespace Prisma {
     direction?: StringFieldUpdateOperationsInput | string
     rawJson?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VerificationCaseCreateInput = {
+    id: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    order: OrderCreateNestedOneWithoutVerificationCasesInput
+    proofs?: ProofCreateNestedManyWithoutVerificationCaseInput
+    settlements?: SettlementCreateNestedManyWithoutVerificationCaseInput
+  }
+
+  export type VerificationCaseUncheckedCreateInput = {
+    id: string
+    orderId: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    proofs?: ProofUncheckedCreateNestedManyWithoutVerificationCaseInput
+    settlements?: SettlementUncheckedCreateNestedManyWithoutVerificationCaseInput
+  }
+
+  export type VerificationCaseUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    order?: OrderUpdateOneRequiredWithoutVerificationCasesNestedInput
+    proofs?: ProofUpdateManyWithoutVerificationCaseNestedInput
+    settlements?: SettlementUpdateManyWithoutVerificationCaseNestedInput
+  }
+
+  export type VerificationCaseUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    proofs?: ProofUncheckedUpdateManyWithoutVerificationCaseNestedInput
+    settlements?: SettlementUncheckedUpdateManyWithoutVerificationCaseNestedInput
+  }
+
+  export type VerificationCaseCreateManyInput = {
+    id: string
+    orderId: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type VerificationCaseUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VerificationCaseUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofCreateInput = {
+    id: string
+    type: string
+    payloadJson: string
+    source: string
+    quantityValue?: number | null
+    timestamp: Date | string
+    receivedAt?: Date | string
+    hash?: string | null
+    rawJson: string
+    verificationCase: VerificationCaseCreateNestedOneWithoutProofsInput
+  }
+
+  export type ProofUncheckedCreateInput = {
+    id: string
+    verificationCaseId: string
+    type: string
+    payloadJson: string
+    source: string
+    quantityValue?: number | null
+    timestamp: Date | string
+    receivedAt?: Date | string
+    hash?: string | null
+    rawJson: string
+  }
+
+  export type ProofUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    payloadJson?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    quantityValue?: NullableFloatFieldUpdateOperationsInput | number | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    receivedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    hash?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    verificationCase?: VerificationCaseUpdateOneRequiredWithoutProofsNestedInput
+  }
+
+  export type ProofUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    verificationCaseId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    payloadJson?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    quantityValue?: NullableFloatFieldUpdateOperationsInput | number | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    receivedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    hash?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ProofCreateManyInput = {
+    id: string
+    verificationCaseId: string
+    type: string
+    payloadJson: string
+    source: string
+    quantityValue?: number | null
+    timestamp: Date | string
+    receivedAt?: Date | string
+    hash?: string | null
+    rawJson: string
+  }
+
+  export type ProofUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    payloadJson?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    quantityValue?: NullableFloatFieldUpdateOperationsInput | number | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    receivedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    hash?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ProofUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    verificationCaseId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    payloadJson?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    quantityValue?: NullableFloatFieldUpdateOperationsInput | number | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    receivedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    hash?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type SettlementCreateInput = {
+    id: string
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    order: OrderCreateNestedOneWithoutSettlementsInput
+    verificationCase?: VerificationCaseCreateNestedOneWithoutSettlementsInput
+  }
+
+  export type SettlementUncheckedCreateInput = {
+    id: string
+    orderId: string
+    verificationCaseId?: string | null
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SettlementUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    order?: OrderUpdateOneRequiredWithoutSettlementsNestedInput
+    verificationCase?: VerificationCaseUpdateOneWithoutSettlementsNestedInput
+  }
+
+  export type SettlementUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    verificationCaseId?: NullableStringFieldUpdateOperationsInput | string | null
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SettlementCreateManyInput = {
+    id: string
+    orderId: string
+    verificationCaseId?: string | null
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SettlementUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SettlementUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    verificationCaseId?: NullableStringFieldUpdateOperationsInput | string | null
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type StringFilter<$PrismaModel = never> = {
@@ -9664,6 +14111,26 @@ export namespace Prisma {
     isNot?: CatalogOfferWhereInput | null
   }
 
+  export type VerificationCaseListRelationFilter = {
+    every?: VerificationCaseWhereInput
+    some?: VerificationCaseWhereInput
+    none?: VerificationCaseWhereInput
+  }
+
+  export type SettlementListRelationFilter = {
+    every?: SettlementWhereInput
+    some?: SettlementWhereInput
+    none?: SettlementWhereInput
+  }
+
+  export type VerificationCaseOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SettlementOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type OrderCountOrderByAggregateInput = {
     id?: SortOrder
     transactionId?: SortOrder
@@ -9776,6 +14243,217 @@ export namespace Prisma {
 
   export type EventSumOrderByAggregateInput = {
     id?: SortOrder
+  }
+
+  export type OrderRelationFilter = {
+    is?: OrderWhereInput
+    isNot?: OrderWhereInput
+  }
+
+  export type ProofListRelationFilter = {
+    every?: ProofWhereInput
+    some?: ProofWhereInput
+    none?: ProofWhereInput
+  }
+
+  export type ProofOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type VerificationCaseCountOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    transactionId?: SortOrder
+    state?: SortOrder
+    requiredProofsJson?: SortOrder
+    toleranceRulesJson?: SortOrder
+    windowJson?: SortOrder
+    expectedQty?: SortOrder
+    deliveredQty?: SortOrder
+    deviationQty?: SortOrder
+    deviationPercent?: SortOrder
+    decision?: SortOrder
+    decidedAt?: SortOrder
+    expiresAt?: SortOrder
+    rejectionReason?: SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type VerificationCaseAvgOrderByAggregateInput = {
+    expectedQty?: SortOrder
+    deliveredQty?: SortOrder
+    deviationQty?: SortOrder
+    deviationPercent?: SortOrder
+  }
+
+  export type VerificationCaseMaxOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    transactionId?: SortOrder
+    state?: SortOrder
+    requiredProofsJson?: SortOrder
+    toleranceRulesJson?: SortOrder
+    windowJson?: SortOrder
+    expectedQty?: SortOrder
+    deliveredQty?: SortOrder
+    deviationQty?: SortOrder
+    deviationPercent?: SortOrder
+    decision?: SortOrder
+    decidedAt?: SortOrder
+    expiresAt?: SortOrder
+    rejectionReason?: SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type VerificationCaseMinOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    transactionId?: SortOrder
+    state?: SortOrder
+    requiredProofsJson?: SortOrder
+    toleranceRulesJson?: SortOrder
+    windowJson?: SortOrder
+    expectedQty?: SortOrder
+    deliveredQty?: SortOrder
+    deviationQty?: SortOrder
+    deviationPercent?: SortOrder
+    decision?: SortOrder
+    decidedAt?: SortOrder
+    expiresAt?: SortOrder
+    rejectionReason?: SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type VerificationCaseSumOrderByAggregateInput = {
+    expectedQty?: SortOrder
+    deliveredQty?: SortOrder
+    deviationQty?: SortOrder
+    deviationPercent?: SortOrder
+  }
+
+  export type VerificationCaseRelationFilter = {
+    is?: VerificationCaseWhereInput
+    isNot?: VerificationCaseWhereInput
+  }
+
+  export type ProofCountOrderByAggregateInput = {
+    id?: SortOrder
+    verificationCaseId?: SortOrder
+    type?: SortOrder
+    payloadJson?: SortOrder
+    source?: SortOrder
+    quantityValue?: SortOrder
+    timestamp?: SortOrder
+    receivedAt?: SortOrder
+    hash?: SortOrder
+    rawJson?: SortOrder
+  }
+
+  export type ProofAvgOrderByAggregateInput = {
+    quantityValue?: SortOrder
+  }
+
+  export type ProofMaxOrderByAggregateInput = {
+    id?: SortOrder
+    verificationCaseId?: SortOrder
+    type?: SortOrder
+    payloadJson?: SortOrder
+    source?: SortOrder
+    quantityValue?: SortOrder
+    timestamp?: SortOrder
+    receivedAt?: SortOrder
+    hash?: SortOrder
+    rawJson?: SortOrder
+  }
+
+  export type ProofMinOrderByAggregateInput = {
+    id?: SortOrder
+    verificationCaseId?: SortOrder
+    type?: SortOrder
+    payloadJson?: SortOrder
+    source?: SortOrder
+    quantityValue?: SortOrder
+    timestamp?: SortOrder
+    receivedAt?: SortOrder
+    hash?: SortOrder
+    rawJson?: SortOrder
+  }
+
+  export type ProofSumOrderByAggregateInput = {
+    quantityValue?: SortOrder
+  }
+
+  export type VerificationCaseNullableRelationFilter = {
+    is?: VerificationCaseWhereInput | null
+    isNot?: VerificationCaseWhereInput | null
+  }
+
+  export type SettlementCountOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    verificationCaseId?: SortOrder
+    transactionId?: SortOrder
+    settlementType?: SortOrder
+    state?: SortOrder
+    amountValue?: SortOrder
+    currency?: SortOrder
+    periodJson?: SortOrder
+    breakdownJson?: SortOrder
+    initiatedAt?: SortOrder
+    completedAt?: SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SettlementAvgOrderByAggregateInput = {
+    amountValue?: SortOrder
+  }
+
+  export type SettlementMaxOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    verificationCaseId?: SortOrder
+    transactionId?: SortOrder
+    settlementType?: SortOrder
+    state?: SortOrder
+    amountValue?: SortOrder
+    currency?: SortOrder
+    periodJson?: SortOrder
+    breakdownJson?: SortOrder
+    initiatedAt?: SortOrder
+    completedAt?: SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SettlementMinOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    verificationCaseId?: SortOrder
+    transactionId?: SortOrder
+    settlementType?: SortOrder
+    state?: SortOrder
+    amountValue?: SortOrder
+    currency?: SortOrder
+    periodJson?: SortOrder
+    breakdownJson?: SortOrder
+    initiatedAt?: SortOrder
+    completedAt?: SortOrder
+    rawJson?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SettlementSumOrderByAggregateInput = {
+    amountValue?: SortOrder
   }
 
   export type CatalogItemCreateNestedManyWithoutProviderInput = {
@@ -10265,11 +14943,39 @@ export namespace Prisma {
     connect?: OfferBlockWhereUniqueInput | OfferBlockWhereUniqueInput[]
   }
 
+  export type VerificationCaseCreateNestedManyWithoutOrderInput = {
+    create?: XOR<VerificationCaseCreateWithoutOrderInput, VerificationCaseUncheckedCreateWithoutOrderInput> | VerificationCaseCreateWithoutOrderInput[] | VerificationCaseUncheckedCreateWithoutOrderInput[]
+    connectOrCreate?: VerificationCaseCreateOrConnectWithoutOrderInput | VerificationCaseCreateOrConnectWithoutOrderInput[]
+    createMany?: VerificationCaseCreateManyOrderInputEnvelope
+    connect?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+  }
+
+  export type SettlementCreateNestedManyWithoutOrderInput = {
+    create?: XOR<SettlementCreateWithoutOrderInput, SettlementUncheckedCreateWithoutOrderInput> | SettlementCreateWithoutOrderInput[] | SettlementUncheckedCreateWithoutOrderInput[]
+    connectOrCreate?: SettlementCreateOrConnectWithoutOrderInput | SettlementCreateOrConnectWithoutOrderInput[]
+    createMany?: SettlementCreateManyOrderInputEnvelope
+    connect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+  }
+
   export type OfferBlockUncheckedCreateNestedManyWithoutOrderInput = {
     create?: XOR<OfferBlockCreateWithoutOrderInput, OfferBlockUncheckedCreateWithoutOrderInput> | OfferBlockCreateWithoutOrderInput[] | OfferBlockUncheckedCreateWithoutOrderInput[]
     connectOrCreate?: OfferBlockCreateOrConnectWithoutOrderInput | OfferBlockCreateOrConnectWithoutOrderInput[]
     createMany?: OfferBlockCreateManyOrderInputEnvelope
     connect?: OfferBlockWhereUniqueInput | OfferBlockWhereUniqueInput[]
+  }
+
+  export type VerificationCaseUncheckedCreateNestedManyWithoutOrderInput = {
+    create?: XOR<VerificationCaseCreateWithoutOrderInput, VerificationCaseUncheckedCreateWithoutOrderInput> | VerificationCaseCreateWithoutOrderInput[] | VerificationCaseUncheckedCreateWithoutOrderInput[]
+    connectOrCreate?: VerificationCaseCreateOrConnectWithoutOrderInput | VerificationCaseCreateOrConnectWithoutOrderInput[]
+    createMany?: VerificationCaseCreateManyOrderInputEnvelope
+    connect?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+  }
+
+  export type SettlementUncheckedCreateNestedManyWithoutOrderInput = {
+    create?: XOR<SettlementCreateWithoutOrderInput, SettlementUncheckedCreateWithoutOrderInput> | SettlementCreateWithoutOrderInput[] | SettlementUncheckedCreateWithoutOrderInput[]
+    connectOrCreate?: SettlementCreateOrConnectWithoutOrderInput | SettlementCreateOrConnectWithoutOrderInput[]
+    createMany?: SettlementCreateManyOrderInputEnvelope
+    connect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
   }
 
   export type NullableFloatFieldUpdateOperationsInput = {
@@ -10314,6 +15020,34 @@ export namespace Prisma {
     deleteMany?: OfferBlockScalarWhereInput | OfferBlockScalarWhereInput[]
   }
 
+  export type VerificationCaseUpdateManyWithoutOrderNestedInput = {
+    create?: XOR<VerificationCaseCreateWithoutOrderInput, VerificationCaseUncheckedCreateWithoutOrderInput> | VerificationCaseCreateWithoutOrderInput[] | VerificationCaseUncheckedCreateWithoutOrderInput[]
+    connectOrCreate?: VerificationCaseCreateOrConnectWithoutOrderInput | VerificationCaseCreateOrConnectWithoutOrderInput[]
+    upsert?: VerificationCaseUpsertWithWhereUniqueWithoutOrderInput | VerificationCaseUpsertWithWhereUniqueWithoutOrderInput[]
+    createMany?: VerificationCaseCreateManyOrderInputEnvelope
+    set?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+    disconnect?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+    delete?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+    connect?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+    update?: VerificationCaseUpdateWithWhereUniqueWithoutOrderInput | VerificationCaseUpdateWithWhereUniqueWithoutOrderInput[]
+    updateMany?: VerificationCaseUpdateManyWithWhereWithoutOrderInput | VerificationCaseUpdateManyWithWhereWithoutOrderInput[]
+    deleteMany?: VerificationCaseScalarWhereInput | VerificationCaseScalarWhereInput[]
+  }
+
+  export type SettlementUpdateManyWithoutOrderNestedInput = {
+    create?: XOR<SettlementCreateWithoutOrderInput, SettlementUncheckedCreateWithoutOrderInput> | SettlementCreateWithoutOrderInput[] | SettlementUncheckedCreateWithoutOrderInput[]
+    connectOrCreate?: SettlementCreateOrConnectWithoutOrderInput | SettlementCreateOrConnectWithoutOrderInput[]
+    upsert?: SettlementUpsertWithWhereUniqueWithoutOrderInput | SettlementUpsertWithWhereUniqueWithoutOrderInput[]
+    createMany?: SettlementCreateManyOrderInputEnvelope
+    set?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    disconnect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    delete?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    connect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    update?: SettlementUpdateWithWhereUniqueWithoutOrderInput | SettlementUpdateWithWhereUniqueWithoutOrderInput[]
+    updateMany?: SettlementUpdateManyWithWhereWithoutOrderInput | SettlementUpdateManyWithWhereWithoutOrderInput[]
+    deleteMany?: SettlementScalarWhereInput | SettlementScalarWhereInput[]
+  }
+
   export type OfferBlockUncheckedUpdateManyWithoutOrderNestedInput = {
     create?: XOR<OfferBlockCreateWithoutOrderInput, OfferBlockUncheckedCreateWithoutOrderInput> | OfferBlockCreateWithoutOrderInput[] | OfferBlockUncheckedCreateWithoutOrderInput[]
     connectOrCreate?: OfferBlockCreateOrConnectWithoutOrderInput | OfferBlockCreateOrConnectWithoutOrderInput[]
@@ -10326,6 +15060,176 @@ export namespace Prisma {
     update?: OfferBlockUpdateWithWhereUniqueWithoutOrderInput | OfferBlockUpdateWithWhereUniqueWithoutOrderInput[]
     updateMany?: OfferBlockUpdateManyWithWhereWithoutOrderInput | OfferBlockUpdateManyWithWhereWithoutOrderInput[]
     deleteMany?: OfferBlockScalarWhereInput | OfferBlockScalarWhereInput[]
+  }
+
+  export type VerificationCaseUncheckedUpdateManyWithoutOrderNestedInput = {
+    create?: XOR<VerificationCaseCreateWithoutOrderInput, VerificationCaseUncheckedCreateWithoutOrderInput> | VerificationCaseCreateWithoutOrderInput[] | VerificationCaseUncheckedCreateWithoutOrderInput[]
+    connectOrCreate?: VerificationCaseCreateOrConnectWithoutOrderInput | VerificationCaseCreateOrConnectWithoutOrderInput[]
+    upsert?: VerificationCaseUpsertWithWhereUniqueWithoutOrderInput | VerificationCaseUpsertWithWhereUniqueWithoutOrderInput[]
+    createMany?: VerificationCaseCreateManyOrderInputEnvelope
+    set?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+    disconnect?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+    delete?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+    connect?: VerificationCaseWhereUniqueInput | VerificationCaseWhereUniqueInput[]
+    update?: VerificationCaseUpdateWithWhereUniqueWithoutOrderInput | VerificationCaseUpdateWithWhereUniqueWithoutOrderInput[]
+    updateMany?: VerificationCaseUpdateManyWithWhereWithoutOrderInput | VerificationCaseUpdateManyWithWhereWithoutOrderInput[]
+    deleteMany?: VerificationCaseScalarWhereInput | VerificationCaseScalarWhereInput[]
+  }
+
+  export type SettlementUncheckedUpdateManyWithoutOrderNestedInput = {
+    create?: XOR<SettlementCreateWithoutOrderInput, SettlementUncheckedCreateWithoutOrderInput> | SettlementCreateWithoutOrderInput[] | SettlementUncheckedCreateWithoutOrderInput[]
+    connectOrCreate?: SettlementCreateOrConnectWithoutOrderInput | SettlementCreateOrConnectWithoutOrderInput[]
+    upsert?: SettlementUpsertWithWhereUniqueWithoutOrderInput | SettlementUpsertWithWhereUniqueWithoutOrderInput[]
+    createMany?: SettlementCreateManyOrderInputEnvelope
+    set?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    disconnect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    delete?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    connect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    update?: SettlementUpdateWithWhereUniqueWithoutOrderInput | SettlementUpdateWithWhereUniqueWithoutOrderInput[]
+    updateMany?: SettlementUpdateManyWithWhereWithoutOrderInput | SettlementUpdateManyWithWhereWithoutOrderInput[]
+    deleteMany?: SettlementScalarWhereInput | SettlementScalarWhereInput[]
+  }
+
+  export type OrderCreateNestedOneWithoutVerificationCasesInput = {
+    create?: XOR<OrderCreateWithoutVerificationCasesInput, OrderUncheckedCreateWithoutVerificationCasesInput>
+    connectOrCreate?: OrderCreateOrConnectWithoutVerificationCasesInput
+    connect?: OrderWhereUniqueInput
+  }
+
+  export type ProofCreateNestedManyWithoutVerificationCaseInput = {
+    create?: XOR<ProofCreateWithoutVerificationCaseInput, ProofUncheckedCreateWithoutVerificationCaseInput> | ProofCreateWithoutVerificationCaseInput[] | ProofUncheckedCreateWithoutVerificationCaseInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutVerificationCaseInput | ProofCreateOrConnectWithoutVerificationCaseInput[]
+    createMany?: ProofCreateManyVerificationCaseInputEnvelope
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+  }
+
+  export type SettlementCreateNestedManyWithoutVerificationCaseInput = {
+    create?: XOR<SettlementCreateWithoutVerificationCaseInput, SettlementUncheckedCreateWithoutVerificationCaseInput> | SettlementCreateWithoutVerificationCaseInput[] | SettlementUncheckedCreateWithoutVerificationCaseInput[]
+    connectOrCreate?: SettlementCreateOrConnectWithoutVerificationCaseInput | SettlementCreateOrConnectWithoutVerificationCaseInput[]
+    createMany?: SettlementCreateManyVerificationCaseInputEnvelope
+    connect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+  }
+
+  export type ProofUncheckedCreateNestedManyWithoutVerificationCaseInput = {
+    create?: XOR<ProofCreateWithoutVerificationCaseInput, ProofUncheckedCreateWithoutVerificationCaseInput> | ProofCreateWithoutVerificationCaseInput[] | ProofUncheckedCreateWithoutVerificationCaseInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutVerificationCaseInput | ProofCreateOrConnectWithoutVerificationCaseInput[]
+    createMany?: ProofCreateManyVerificationCaseInputEnvelope
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+  }
+
+  export type SettlementUncheckedCreateNestedManyWithoutVerificationCaseInput = {
+    create?: XOR<SettlementCreateWithoutVerificationCaseInput, SettlementUncheckedCreateWithoutVerificationCaseInput> | SettlementCreateWithoutVerificationCaseInput[] | SettlementUncheckedCreateWithoutVerificationCaseInput[]
+    connectOrCreate?: SettlementCreateOrConnectWithoutVerificationCaseInput | SettlementCreateOrConnectWithoutVerificationCaseInput[]
+    createMany?: SettlementCreateManyVerificationCaseInputEnvelope
+    connect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+  }
+
+  export type OrderUpdateOneRequiredWithoutVerificationCasesNestedInput = {
+    create?: XOR<OrderCreateWithoutVerificationCasesInput, OrderUncheckedCreateWithoutVerificationCasesInput>
+    connectOrCreate?: OrderCreateOrConnectWithoutVerificationCasesInput
+    upsert?: OrderUpsertWithoutVerificationCasesInput
+    connect?: OrderWhereUniqueInput
+    update?: XOR<XOR<OrderUpdateToOneWithWhereWithoutVerificationCasesInput, OrderUpdateWithoutVerificationCasesInput>, OrderUncheckedUpdateWithoutVerificationCasesInput>
+  }
+
+  export type ProofUpdateManyWithoutVerificationCaseNestedInput = {
+    create?: XOR<ProofCreateWithoutVerificationCaseInput, ProofUncheckedCreateWithoutVerificationCaseInput> | ProofCreateWithoutVerificationCaseInput[] | ProofUncheckedCreateWithoutVerificationCaseInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutVerificationCaseInput | ProofCreateOrConnectWithoutVerificationCaseInput[]
+    upsert?: ProofUpsertWithWhereUniqueWithoutVerificationCaseInput | ProofUpsertWithWhereUniqueWithoutVerificationCaseInput[]
+    createMany?: ProofCreateManyVerificationCaseInputEnvelope
+    set?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    disconnect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    delete?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    update?: ProofUpdateWithWhereUniqueWithoutVerificationCaseInput | ProofUpdateWithWhereUniqueWithoutVerificationCaseInput[]
+    updateMany?: ProofUpdateManyWithWhereWithoutVerificationCaseInput | ProofUpdateManyWithWhereWithoutVerificationCaseInput[]
+    deleteMany?: ProofScalarWhereInput | ProofScalarWhereInput[]
+  }
+
+  export type SettlementUpdateManyWithoutVerificationCaseNestedInput = {
+    create?: XOR<SettlementCreateWithoutVerificationCaseInput, SettlementUncheckedCreateWithoutVerificationCaseInput> | SettlementCreateWithoutVerificationCaseInput[] | SettlementUncheckedCreateWithoutVerificationCaseInput[]
+    connectOrCreate?: SettlementCreateOrConnectWithoutVerificationCaseInput | SettlementCreateOrConnectWithoutVerificationCaseInput[]
+    upsert?: SettlementUpsertWithWhereUniqueWithoutVerificationCaseInput | SettlementUpsertWithWhereUniqueWithoutVerificationCaseInput[]
+    createMany?: SettlementCreateManyVerificationCaseInputEnvelope
+    set?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    disconnect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    delete?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    connect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    update?: SettlementUpdateWithWhereUniqueWithoutVerificationCaseInput | SettlementUpdateWithWhereUniqueWithoutVerificationCaseInput[]
+    updateMany?: SettlementUpdateManyWithWhereWithoutVerificationCaseInput | SettlementUpdateManyWithWhereWithoutVerificationCaseInput[]
+    deleteMany?: SettlementScalarWhereInput | SettlementScalarWhereInput[]
+  }
+
+  export type ProofUncheckedUpdateManyWithoutVerificationCaseNestedInput = {
+    create?: XOR<ProofCreateWithoutVerificationCaseInput, ProofUncheckedCreateWithoutVerificationCaseInput> | ProofCreateWithoutVerificationCaseInput[] | ProofUncheckedCreateWithoutVerificationCaseInput[]
+    connectOrCreate?: ProofCreateOrConnectWithoutVerificationCaseInput | ProofCreateOrConnectWithoutVerificationCaseInput[]
+    upsert?: ProofUpsertWithWhereUniqueWithoutVerificationCaseInput | ProofUpsertWithWhereUniqueWithoutVerificationCaseInput[]
+    createMany?: ProofCreateManyVerificationCaseInputEnvelope
+    set?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    disconnect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    delete?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    connect?: ProofWhereUniqueInput | ProofWhereUniqueInput[]
+    update?: ProofUpdateWithWhereUniqueWithoutVerificationCaseInput | ProofUpdateWithWhereUniqueWithoutVerificationCaseInput[]
+    updateMany?: ProofUpdateManyWithWhereWithoutVerificationCaseInput | ProofUpdateManyWithWhereWithoutVerificationCaseInput[]
+    deleteMany?: ProofScalarWhereInput | ProofScalarWhereInput[]
+  }
+
+  export type SettlementUncheckedUpdateManyWithoutVerificationCaseNestedInput = {
+    create?: XOR<SettlementCreateWithoutVerificationCaseInput, SettlementUncheckedCreateWithoutVerificationCaseInput> | SettlementCreateWithoutVerificationCaseInput[] | SettlementUncheckedCreateWithoutVerificationCaseInput[]
+    connectOrCreate?: SettlementCreateOrConnectWithoutVerificationCaseInput | SettlementCreateOrConnectWithoutVerificationCaseInput[]
+    upsert?: SettlementUpsertWithWhereUniqueWithoutVerificationCaseInput | SettlementUpsertWithWhereUniqueWithoutVerificationCaseInput[]
+    createMany?: SettlementCreateManyVerificationCaseInputEnvelope
+    set?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    disconnect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    delete?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    connect?: SettlementWhereUniqueInput | SettlementWhereUniqueInput[]
+    update?: SettlementUpdateWithWhereUniqueWithoutVerificationCaseInput | SettlementUpdateWithWhereUniqueWithoutVerificationCaseInput[]
+    updateMany?: SettlementUpdateManyWithWhereWithoutVerificationCaseInput | SettlementUpdateManyWithWhereWithoutVerificationCaseInput[]
+    deleteMany?: SettlementScalarWhereInput | SettlementScalarWhereInput[]
+  }
+
+  export type VerificationCaseCreateNestedOneWithoutProofsInput = {
+    create?: XOR<VerificationCaseCreateWithoutProofsInput, VerificationCaseUncheckedCreateWithoutProofsInput>
+    connectOrCreate?: VerificationCaseCreateOrConnectWithoutProofsInput
+    connect?: VerificationCaseWhereUniqueInput
+  }
+
+  export type VerificationCaseUpdateOneRequiredWithoutProofsNestedInput = {
+    create?: XOR<VerificationCaseCreateWithoutProofsInput, VerificationCaseUncheckedCreateWithoutProofsInput>
+    connectOrCreate?: VerificationCaseCreateOrConnectWithoutProofsInput
+    upsert?: VerificationCaseUpsertWithoutProofsInput
+    connect?: VerificationCaseWhereUniqueInput
+    update?: XOR<XOR<VerificationCaseUpdateToOneWithWhereWithoutProofsInput, VerificationCaseUpdateWithoutProofsInput>, VerificationCaseUncheckedUpdateWithoutProofsInput>
+  }
+
+  export type OrderCreateNestedOneWithoutSettlementsInput = {
+    create?: XOR<OrderCreateWithoutSettlementsInput, OrderUncheckedCreateWithoutSettlementsInput>
+    connectOrCreate?: OrderCreateOrConnectWithoutSettlementsInput
+    connect?: OrderWhereUniqueInput
+  }
+
+  export type VerificationCaseCreateNestedOneWithoutSettlementsInput = {
+    create?: XOR<VerificationCaseCreateWithoutSettlementsInput, VerificationCaseUncheckedCreateWithoutSettlementsInput>
+    connectOrCreate?: VerificationCaseCreateOrConnectWithoutSettlementsInput
+    connect?: VerificationCaseWhereUniqueInput
+  }
+
+  export type OrderUpdateOneRequiredWithoutSettlementsNestedInput = {
+    create?: XOR<OrderCreateWithoutSettlementsInput, OrderUncheckedCreateWithoutSettlementsInput>
+    connectOrCreate?: OrderCreateOrConnectWithoutSettlementsInput
+    upsert?: OrderUpsertWithoutSettlementsInput
+    connect?: OrderWhereUniqueInput
+    update?: XOR<XOR<OrderUpdateToOneWithWhereWithoutSettlementsInput, OrderUpdateWithoutSettlementsInput>, OrderUncheckedUpdateWithoutSettlementsInput>
+  }
+
+  export type VerificationCaseUpdateOneWithoutSettlementsNestedInput = {
+    create?: XOR<VerificationCaseCreateWithoutSettlementsInput, VerificationCaseUncheckedCreateWithoutSettlementsInput>
+    connectOrCreate?: VerificationCaseCreateOrConnectWithoutSettlementsInput
+    upsert?: VerificationCaseUpsertWithoutSettlementsInput
+    disconnect?: VerificationCaseWhereInput | boolean
+    delete?: VerificationCaseWhereInput | boolean
+    connect?: VerificationCaseWhereUniqueInput
+    update?: XOR<XOR<VerificationCaseUpdateToOneWithWhereWithoutSettlementsInput, VerificationCaseUpdateWithoutSettlementsInput>, VerificationCaseUncheckedUpdateWithoutSettlementsInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -10624,6 +15528,8 @@ export namespace Prisma {
     updatedAt?: Date | string
     selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
     blocks?: OfferBlockCreateNestedManyWithoutOrderInput
+    verificationCases?: VerificationCaseCreateNestedManyWithoutOrderInput
+    settlements?: SettlementCreateNestedManyWithoutOrderInput
   }
 
   export type OrderUncheckedCreateWithoutProviderInput = {
@@ -10640,6 +15546,8 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
+    verificationCases?: VerificationCaseUncheckedCreateNestedManyWithoutOrderInput
+    settlements?: SettlementUncheckedCreateNestedManyWithoutOrderInput
   }
 
   export type OrderCreateOrConnectWithoutProviderInput = {
@@ -11132,6 +16040,8 @@ export namespace Prisma {
     updatedAt?: Date | string
     provider?: ProviderCreateNestedOneWithoutOrdersInput
     blocks?: OfferBlockCreateNestedManyWithoutOrderInput
+    verificationCases?: VerificationCaseCreateNestedManyWithoutOrderInput
+    settlements?: SettlementCreateNestedManyWithoutOrderInput
   }
 
   export type OrderUncheckedCreateWithoutSelectedOfferInput = {
@@ -11148,6 +16058,8 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
+    verificationCases?: VerificationCaseUncheckedCreateNestedManyWithoutOrderInput
+    settlements?: SettlementUncheckedCreateNestedManyWithoutOrderInput
   }
 
   export type OrderCreateOrConnectWithoutSelectedOfferInput = {
@@ -11379,6 +16291,8 @@ export namespace Prisma {
     updatedAt?: Date | string
     provider?: ProviderCreateNestedOneWithoutOrdersInput
     selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
+    verificationCases?: VerificationCaseCreateNestedManyWithoutOrderInput
+    settlements?: SettlementCreateNestedManyWithoutOrderInput
   }
 
   export type OrderUncheckedCreateWithoutBlocksInput = {
@@ -11395,6 +16309,8 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    verificationCases?: VerificationCaseUncheckedCreateNestedManyWithoutOrderInput
+    settlements?: SettlementUncheckedCreateNestedManyWithoutOrderInput
   }
 
   export type OrderCreateOrConnectWithoutBlocksInput = {
@@ -11544,6 +16460,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
     selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
+    verificationCases?: VerificationCaseUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUpdateManyWithoutOrderNestedInput
   }
 
   export type OrderUncheckedUpdateWithoutBlocksInput = {
@@ -11560,6 +16478,8 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    verificationCases?: VerificationCaseUncheckedUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUncheckedUpdateManyWithoutOrderNestedInput
   }
 
   export type ProviderCreateWithoutOrdersInput = {
@@ -11672,6 +16592,104 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type VerificationCaseCreateWithoutOrderInput = {
+    id: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    proofs?: ProofCreateNestedManyWithoutVerificationCaseInput
+    settlements?: SettlementCreateNestedManyWithoutVerificationCaseInput
+  }
+
+  export type VerificationCaseUncheckedCreateWithoutOrderInput = {
+    id: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    proofs?: ProofUncheckedCreateNestedManyWithoutVerificationCaseInput
+    settlements?: SettlementUncheckedCreateNestedManyWithoutVerificationCaseInput
+  }
+
+  export type VerificationCaseCreateOrConnectWithoutOrderInput = {
+    where: VerificationCaseWhereUniqueInput
+    create: XOR<VerificationCaseCreateWithoutOrderInput, VerificationCaseUncheckedCreateWithoutOrderInput>
+  }
+
+  export type VerificationCaseCreateManyOrderInputEnvelope = {
+    data: VerificationCaseCreateManyOrderInput | VerificationCaseCreateManyOrderInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SettlementCreateWithoutOrderInput = {
+    id: string
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    verificationCase?: VerificationCaseCreateNestedOneWithoutSettlementsInput
+  }
+
+  export type SettlementUncheckedCreateWithoutOrderInput = {
+    id: string
+    verificationCaseId?: string | null
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SettlementCreateOrConnectWithoutOrderInput = {
+    where: SettlementWhereUniqueInput
+    create: XOR<SettlementCreateWithoutOrderInput, SettlementUncheckedCreateWithoutOrderInput>
+  }
+
+  export type SettlementCreateManyOrderInputEnvelope = {
+    data: SettlementCreateManyOrderInput | SettlementCreateManyOrderInput[]
+    skipDuplicates?: boolean
+  }
+
   export type ProviderUpsertWithoutOrdersInput = {
     update: XOR<ProviderUpdateWithoutOrdersInput, ProviderUncheckedUpdateWithoutOrdersInput>
     create: XOR<ProviderCreateWithoutOrdersInput, ProviderUncheckedCreateWithoutOrdersInput>
@@ -11766,6 +16784,593 @@ export namespace Prisma {
   export type OfferBlockUpdateManyWithWhereWithoutOrderInput = {
     where: OfferBlockScalarWhereInput
     data: XOR<OfferBlockUpdateManyMutationInput, OfferBlockUncheckedUpdateManyWithoutOrderInput>
+  }
+
+  export type VerificationCaseUpsertWithWhereUniqueWithoutOrderInput = {
+    where: VerificationCaseWhereUniqueInput
+    update: XOR<VerificationCaseUpdateWithoutOrderInput, VerificationCaseUncheckedUpdateWithoutOrderInput>
+    create: XOR<VerificationCaseCreateWithoutOrderInput, VerificationCaseUncheckedCreateWithoutOrderInput>
+  }
+
+  export type VerificationCaseUpdateWithWhereUniqueWithoutOrderInput = {
+    where: VerificationCaseWhereUniqueInput
+    data: XOR<VerificationCaseUpdateWithoutOrderInput, VerificationCaseUncheckedUpdateWithoutOrderInput>
+  }
+
+  export type VerificationCaseUpdateManyWithWhereWithoutOrderInput = {
+    where: VerificationCaseScalarWhereInput
+    data: XOR<VerificationCaseUpdateManyMutationInput, VerificationCaseUncheckedUpdateManyWithoutOrderInput>
+  }
+
+  export type VerificationCaseScalarWhereInput = {
+    AND?: VerificationCaseScalarWhereInput | VerificationCaseScalarWhereInput[]
+    OR?: VerificationCaseScalarWhereInput[]
+    NOT?: VerificationCaseScalarWhereInput | VerificationCaseScalarWhereInput[]
+    id?: StringFilter<"VerificationCase"> | string
+    orderId?: StringFilter<"VerificationCase"> | string
+    transactionId?: StringFilter<"VerificationCase"> | string
+    state?: StringFilter<"VerificationCase"> | string
+    requiredProofsJson?: StringFilter<"VerificationCase"> | string
+    toleranceRulesJson?: StringFilter<"VerificationCase"> | string
+    windowJson?: StringFilter<"VerificationCase"> | string
+    expectedQty?: FloatFilter<"VerificationCase"> | number
+    deliveredQty?: FloatNullableFilter<"VerificationCase"> | number | null
+    deviationQty?: FloatNullableFilter<"VerificationCase"> | number | null
+    deviationPercent?: FloatNullableFilter<"VerificationCase"> | number | null
+    decision?: StringNullableFilter<"VerificationCase"> | string | null
+    decidedAt?: DateTimeNullableFilter<"VerificationCase"> | Date | string | null
+    expiresAt?: DateTimeFilter<"VerificationCase"> | Date | string
+    rejectionReason?: StringNullableFilter<"VerificationCase"> | string | null
+    rawJson?: StringFilter<"VerificationCase"> | string
+    createdAt?: DateTimeFilter<"VerificationCase"> | Date | string
+    updatedAt?: DateTimeFilter<"VerificationCase"> | Date | string
+  }
+
+  export type SettlementUpsertWithWhereUniqueWithoutOrderInput = {
+    where: SettlementWhereUniqueInput
+    update: XOR<SettlementUpdateWithoutOrderInput, SettlementUncheckedUpdateWithoutOrderInput>
+    create: XOR<SettlementCreateWithoutOrderInput, SettlementUncheckedCreateWithoutOrderInput>
+  }
+
+  export type SettlementUpdateWithWhereUniqueWithoutOrderInput = {
+    where: SettlementWhereUniqueInput
+    data: XOR<SettlementUpdateWithoutOrderInput, SettlementUncheckedUpdateWithoutOrderInput>
+  }
+
+  export type SettlementUpdateManyWithWhereWithoutOrderInput = {
+    where: SettlementScalarWhereInput
+    data: XOR<SettlementUpdateManyMutationInput, SettlementUncheckedUpdateManyWithoutOrderInput>
+  }
+
+  export type SettlementScalarWhereInput = {
+    AND?: SettlementScalarWhereInput | SettlementScalarWhereInput[]
+    OR?: SettlementScalarWhereInput[]
+    NOT?: SettlementScalarWhereInput | SettlementScalarWhereInput[]
+    id?: StringFilter<"Settlement"> | string
+    orderId?: StringFilter<"Settlement"> | string
+    verificationCaseId?: StringNullableFilter<"Settlement"> | string | null
+    transactionId?: StringFilter<"Settlement"> | string
+    settlementType?: StringFilter<"Settlement"> | string
+    state?: StringFilter<"Settlement"> | string
+    amountValue?: FloatFilter<"Settlement"> | number
+    currency?: StringFilter<"Settlement"> | string
+    periodJson?: StringNullableFilter<"Settlement"> | string | null
+    breakdownJson?: StringNullableFilter<"Settlement"> | string | null
+    initiatedAt?: DateTimeFilter<"Settlement"> | Date | string
+    completedAt?: DateTimeNullableFilter<"Settlement"> | Date | string | null
+    rawJson?: StringFilter<"Settlement"> | string
+    createdAt?: DateTimeFilter<"Settlement"> | Date | string
+    updatedAt?: DateTimeFilter<"Settlement"> | Date | string
+  }
+
+  export type OrderCreateWithoutVerificationCasesInput = {
+    id: string
+    transactionId: string
+    status?: string
+    totalQty?: number | null
+    totalPrice?: number | null
+    currency?: string | null
+    itemsJson: string
+    quoteJson: string
+    version?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    provider?: ProviderCreateNestedOneWithoutOrdersInput
+    selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
+    blocks?: OfferBlockCreateNestedManyWithoutOrderInput
+    settlements?: SettlementCreateNestedManyWithoutOrderInput
+  }
+
+  export type OrderUncheckedCreateWithoutVerificationCasesInput = {
+    id: string
+    transactionId: string
+    providerId?: string | null
+    selectedOfferId?: string | null
+    status?: string
+    totalQty?: number | null
+    totalPrice?: number | null
+    currency?: string | null
+    itemsJson: string
+    quoteJson: string
+    version?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
+    settlements?: SettlementUncheckedCreateNestedManyWithoutOrderInput
+  }
+
+  export type OrderCreateOrConnectWithoutVerificationCasesInput = {
+    where: OrderWhereUniqueInput
+    create: XOR<OrderCreateWithoutVerificationCasesInput, OrderUncheckedCreateWithoutVerificationCasesInput>
+  }
+
+  export type ProofCreateWithoutVerificationCaseInput = {
+    id: string
+    type: string
+    payloadJson: string
+    source: string
+    quantityValue?: number | null
+    timestamp: Date | string
+    receivedAt?: Date | string
+    hash?: string | null
+    rawJson: string
+  }
+
+  export type ProofUncheckedCreateWithoutVerificationCaseInput = {
+    id: string
+    type: string
+    payloadJson: string
+    source: string
+    quantityValue?: number | null
+    timestamp: Date | string
+    receivedAt?: Date | string
+    hash?: string | null
+    rawJson: string
+  }
+
+  export type ProofCreateOrConnectWithoutVerificationCaseInput = {
+    where: ProofWhereUniqueInput
+    create: XOR<ProofCreateWithoutVerificationCaseInput, ProofUncheckedCreateWithoutVerificationCaseInput>
+  }
+
+  export type ProofCreateManyVerificationCaseInputEnvelope = {
+    data: ProofCreateManyVerificationCaseInput | ProofCreateManyVerificationCaseInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SettlementCreateWithoutVerificationCaseInput = {
+    id: string
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    order: OrderCreateNestedOneWithoutSettlementsInput
+  }
+
+  export type SettlementUncheckedCreateWithoutVerificationCaseInput = {
+    id: string
+    orderId: string
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SettlementCreateOrConnectWithoutVerificationCaseInput = {
+    where: SettlementWhereUniqueInput
+    create: XOR<SettlementCreateWithoutVerificationCaseInput, SettlementUncheckedCreateWithoutVerificationCaseInput>
+  }
+
+  export type SettlementCreateManyVerificationCaseInputEnvelope = {
+    data: SettlementCreateManyVerificationCaseInput | SettlementCreateManyVerificationCaseInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type OrderUpsertWithoutVerificationCasesInput = {
+    update: XOR<OrderUpdateWithoutVerificationCasesInput, OrderUncheckedUpdateWithoutVerificationCasesInput>
+    create: XOR<OrderCreateWithoutVerificationCasesInput, OrderUncheckedCreateWithoutVerificationCasesInput>
+    where?: OrderWhereInput
+  }
+
+  export type OrderUpdateToOneWithWhereWithoutVerificationCasesInput = {
+    where?: OrderWhereInput
+    data: XOR<OrderUpdateWithoutVerificationCasesInput, OrderUncheckedUpdateWithoutVerificationCasesInput>
+  }
+
+  export type OrderUpdateWithoutVerificationCasesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    totalQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: NullableStringFieldUpdateOperationsInput | string | null
+    itemsJson?: StringFieldUpdateOperationsInput | string
+    quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    provider?: ProviderUpdateOneWithoutOrdersNestedInput
+    selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
+    blocks?: OfferBlockUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUpdateManyWithoutOrderNestedInput
+  }
+
+  export type OrderUncheckedUpdateWithoutVerificationCasesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    providerId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedOfferId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    totalQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: NullableStringFieldUpdateOperationsInput | string | null
+    itemsJson?: StringFieldUpdateOperationsInput | string
+    quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  }
+
+  export type ProofUpsertWithWhereUniqueWithoutVerificationCaseInput = {
+    where: ProofWhereUniqueInput
+    update: XOR<ProofUpdateWithoutVerificationCaseInput, ProofUncheckedUpdateWithoutVerificationCaseInput>
+    create: XOR<ProofCreateWithoutVerificationCaseInput, ProofUncheckedCreateWithoutVerificationCaseInput>
+  }
+
+  export type ProofUpdateWithWhereUniqueWithoutVerificationCaseInput = {
+    where: ProofWhereUniqueInput
+    data: XOR<ProofUpdateWithoutVerificationCaseInput, ProofUncheckedUpdateWithoutVerificationCaseInput>
+  }
+
+  export type ProofUpdateManyWithWhereWithoutVerificationCaseInput = {
+    where: ProofScalarWhereInput
+    data: XOR<ProofUpdateManyMutationInput, ProofUncheckedUpdateManyWithoutVerificationCaseInput>
+  }
+
+  export type ProofScalarWhereInput = {
+    AND?: ProofScalarWhereInput | ProofScalarWhereInput[]
+    OR?: ProofScalarWhereInput[]
+    NOT?: ProofScalarWhereInput | ProofScalarWhereInput[]
+    id?: StringFilter<"Proof"> | string
+    verificationCaseId?: StringFilter<"Proof"> | string
+    type?: StringFilter<"Proof"> | string
+    payloadJson?: StringFilter<"Proof"> | string
+    source?: StringFilter<"Proof"> | string
+    quantityValue?: FloatNullableFilter<"Proof"> | number | null
+    timestamp?: DateTimeFilter<"Proof"> | Date | string
+    receivedAt?: DateTimeFilter<"Proof"> | Date | string
+    hash?: StringNullableFilter<"Proof"> | string | null
+    rawJson?: StringFilter<"Proof"> | string
+  }
+
+  export type SettlementUpsertWithWhereUniqueWithoutVerificationCaseInput = {
+    where: SettlementWhereUniqueInput
+    update: XOR<SettlementUpdateWithoutVerificationCaseInput, SettlementUncheckedUpdateWithoutVerificationCaseInput>
+    create: XOR<SettlementCreateWithoutVerificationCaseInput, SettlementUncheckedCreateWithoutVerificationCaseInput>
+  }
+
+  export type SettlementUpdateWithWhereUniqueWithoutVerificationCaseInput = {
+    where: SettlementWhereUniqueInput
+    data: XOR<SettlementUpdateWithoutVerificationCaseInput, SettlementUncheckedUpdateWithoutVerificationCaseInput>
+  }
+
+  export type SettlementUpdateManyWithWhereWithoutVerificationCaseInput = {
+    where: SettlementScalarWhereInput
+    data: XOR<SettlementUpdateManyMutationInput, SettlementUncheckedUpdateManyWithoutVerificationCaseInput>
+  }
+
+  export type VerificationCaseCreateWithoutProofsInput = {
+    id: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    order: OrderCreateNestedOneWithoutVerificationCasesInput
+    settlements?: SettlementCreateNestedManyWithoutVerificationCaseInput
+  }
+
+  export type VerificationCaseUncheckedCreateWithoutProofsInput = {
+    id: string
+    orderId: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settlements?: SettlementUncheckedCreateNestedManyWithoutVerificationCaseInput
+  }
+
+  export type VerificationCaseCreateOrConnectWithoutProofsInput = {
+    where: VerificationCaseWhereUniqueInput
+    create: XOR<VerificationCaseCreateWithoutProofsInput, VerificationCaseUncheckedCreateWithoutProofsInput>
+  }
+
+  export type VerificationCaseUpsertWithoutProofsInput = {
+    update: XOR<VerificationCaseUpdateWithoutProofsInput, VerificationCaseUncheckedUpdateWithoutProofsInput>
+    create: XOR<VerificationCaseCreateWithoutProofsInput, VerificationCaseUncheckedCreateWithoutProofsInput>
+    where?: VerificationCaseWhereInput
+  }
+
+  export type VerificationCaseUpdateToOneWithWhereWithoutProofsInput = {
+    where?: VerificationCaseWhereInput
+    data: XOR<VerificationCaseUpdateWithoutProofsInput, VerificationCaseUncheckedUpdateWithoutProofsInput>
+  }
+
+  export type VerificationCaseUpdateWithoutProofsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    order?: OrderUpdateOneRequiredWithoutVerificationCasesNestedInput
+    settlements?: SettlementUpdateManyWithoutVerificationCaseNestedInput
+  }
+
+  export type VerificationCaseUncheckedUpdateWithoutProofsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settlements?: SettlementUncheckedUpdateManyWithoutVerificationCaseNestedInput
+  }
+
+  export type OrderCreateWithoutSettlementsInput = {
+    id: string
+    transactionId: string
+    status?: string
+    totalQty?: number | null
+    totalPrice?: number | null
+    currency?: string | null
+    itemsJson: string
+    quoteJson: string
+    version?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    provider?: ProviderCreateNestedOneWithoutOrdersInput
+    selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
+    blocks?: OfferBlockCreateNestedManyWithoutOrderInput
+    verificationCases?: VerificationCaseCreateNestedManyWithoutOrderInput
+  }
+
+  export type OrderUncheckedCreateWithoutSettlementsInput = {
+    id: string
+    transactionId: string
+    providerId?: string | null
+    selectedOfferId?: string | null
+    status?: string
+    totalQty?: number | null
+    totalPrice?: number | null
+    currency?: string | null
+    itemsJson: string
+    quoteJson: string
+    version?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
+    verificationCases?: VerificationCaseUncheckedCreateNestedManyWithoutOrderInput
+  }
+
+  export type OrderCreateOrConnectWithoutSettlementsInput = {
+    where: OrderWhereUniqueInput
+    create: XOR<OrderCreateWithoutSettlementsInput, OrderUncheckedCreateWithoutSettlementsInput>
+  }
+
+  export type VerificationCaseCreateWithoutSettlementsInput = {
+    id: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    order: OrderCreateNestedOneWithoutVerificationCasesInput
+    proofs?: ProofCreateNestedManyWithoutVerificationCaseInput
+  }
+
+  export type VerificationCaseUncheckedCreateWithoutSettlementsInput = {
+    id: string
+    orderId: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    proofs?: ProofUncheckedCreateNestedManyWithoutVerificationCaseInput
+  }
+
+  export type VerificationCaseCreateOrConnectWithoutSettlementsInput = {
+    where: VerificationCaseWhereUniqueInput
+    create: XOR<VerificationCaseCreateWithoutSettlementsInput, VerificationCaseUncheckedCreateWithoutSettlementsInput>
+  }
+
+  export type OrderUpsertWithoutSettlementsInput = {
+    update: XOR<OrderUpdateWithoutSettlementsInput, OrderUncheckedUpdateWithoutSettlementsInput>
+    create: XOR<OrderCreateWithoutSettlementsInput, OrderUncheckedCreateWithoutSettlementsInput>
+    where?: OrderWhereInput
+  }
+
+  export type OrderUpdateToOneWithWhereWithoutSettlementsInput = {
+    where?: OrderWhereInput
+    data: XOR<OrderUpdateWithoutSettlementsInput, OrderUncheckedUpdateWithoutSettlementsInput>
+  }
+
+  export type OrderUpdateWithoutSettlementsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    totalQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: NullableStringFieldUpdateOperationsInput | string | null
+    itemsJson?: StringFieldUpdateOperationsInput | string
+    quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    provider?: ProviderUpdateOneWithoutOrdersNestedInput
+    selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
+    blocks?: OfferBlockUpdateManyWithoutOrderNestedInput
+    verificationCases?: VerificationCaseUpdateManyWithoutOrderNestedInput
+  }
+
+  export type OrderUncheckedUpdateWithoutSettlementsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    providerId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedOfferId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    totalQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    totalPrice?: NullableFloatFieldUpdateOperationsInput | number | null
+    currency?: NullableStringFieldUpdateOperationsInput | string | null
+    itemsJson?: StringFieldUpdateOperationsInput | string
+    quoteJson?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
+    verificationCases?: VerificationCaseUncheckedUpdateManyWithoutOrderNestedInput
+  }
+
+  export type VerificationCaseUpsertWithoutSettlementsInput = {
+    update: XOR<VerificationCaseUpdateWithoutSettlementsInput, VerificationCaseUncheckedUpdateWithoutSettlementsInput>
+    create: XOR<VerificationCaseCreateWithoutSettlementsInput, VerificationCaseUncheckedCreateWithoutSettlementsInput>
+    where?: VerificationCaseWhereInput
+  }
+
+  export type VerificationCaseUpdateToOneWithWhereWithoutSettlementsInput = {
+    where?: VerificationCaseWhereInput
+    data: XOR<VerificationCaseUpdateWithoutSettlementsInput, VerificationCaseUncheckedUpdateWithoutSettlementsInput>
+  }
+
+  export type VerificationCaseUpdateWithoutSettlementsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    order?: OrderUpdateOneRequiredWithoutVerificationCasesNestedInput
+    proofs?: ProofUpdateManyWithoutVerificationCaseNestedInput
+  }
+
+  export type VerificationCaseUncheckedUpdateWithoutSettlementsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    proofs?: ProofUncheckedUpdateManyWithoutVerificationCaseNestedInput
   }
 
   export type CatalogItemCreateManyProviderInput = {
@@ -11921,6 +17526,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
     blocks?: OfferBlockUpdateManyWithoutOrderNestedInput
+    verificationCases?: VerificationCaseUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUpdateManyWithoutOrderNestedInput
   }
 
   export type OrderUncheckedUpdateWithoutProviderInput = {
@@ -11937,6 +17544,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
+    verificationCases?: VerificationCaseUncheckedUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUncheckedUpdateManyWithoutOrderNestedInput
   }
 
   export type OrderUncheckedUpdateManyWithoutProviderInput = {
@@ -12219,6 +17828,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
     blocks?: OfferBlockUpdateManyWithoutOrderNestedInput
+    verificationCases?: VerificationCaseUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUpdateManyWithoutOrderNestedInput
   }
 
   export type OrderUncheckedUpdateWithoutSelectedOfferInput = {
@@ -12235,6 +17846,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
+    verificationCases?: VerificationCaseUncheckedUpdateManyWithoutOrderNestedInput
+    settlements?: SettlementUncheckedUpdateManyWithoutOrderNestedInput
   }
 
   export type OrderUncheckedUpdateManyWithoutSelectedOfferInput = {
@@ -12266,6 +17879,43 @@ export namespace Prisma {
     updatedAt?: Date | string
     reservedAt?: Date | string | null
     soldAt?: Date | string | null
+  }
+
+  export type VerificationCaseCreateManyOrderInput = {
+    id: string
+    transactionId: string
+    state?: string
+    requiredProofsJson: string
+    toleranceRulesJson: string
+    windowJson: string
+    expectedQty: number
+    deliveredQty?: number | null
+    deviationQty?: number | null
+    deviationPercent?: number | null
+    decision?: string | null
+    decidedAt?: Date | string | null
+    expiresAt: Date | string
+    rejectionReason?: string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SettlementCreateManyOrderInput = {
+    id: string
+    verificationCaseId?: string | null
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type OfferBlockUpdateWithoutOrderInput = {
@@ -12316,6 +17966,237 @@ export namespace Prisma {
     soldAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
+  export type VerificationCaseUpdateWithoutOrderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    proofs?: ProofUpdateManyWithoutVerificationCaseNestedInput
+    settlements?: SettlementUpdateManyWithoutVerificationCaseNestedInput
+  }
+
+  export type VerificationCaseUncheckedUpdateWithoutOrderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    proofs?: ProofUncheckedUpdateManyWithoutVerificationCaseNestedInput
+    settlements?: SettlementUncheckedUpdateManyWithoutVerificationCaseNestedInput
+  }
+
+  export type VerificationCaseUncheckedUpdateManyWithoutOrderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    requiredProofsJson?: StringFieldUpdateOperationsInput | string
+    toleranceRulesJson?: StringFieldUpdateOperationsInput | string
+    windowJson?: StringFieldUpdateOperationsInput | string
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveredQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationQty?: NullableFloatFieldUpdateOperationsInput | number | null
+    deviationPercent?: NullableFloatFieldUpdateOperationsInput | number | null
+    decision?: NullableStringFieldUpdateOperationsInput | string | null
+    decidedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SettlementUpdateWithoutOrderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    verificationCase?: VerificationCaseUpdateOneWithoutSettlementsNestedInput
+  }
+
+  export type SettlementUncheckedUpdateWithoutOrderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    verificationCaseId?: NullableStringFieldUpdateOperationsInput | string | null
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SettlementUncheckedUpdateManyWithoutOrderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    verificationCaseId?: NullableStringFieldUpdateOperationsInput | string | null
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProofCreateManyVerificationCaseInput = {
+    id: string
+    type: string
+    payloadJson: string
+    source: string
+    quantityValue?: number | null
+    timestamp: Date | string
+    receivedAt?: Date | string
+    hash?: string | null
+    rawJson: string
+  }
+
+  export type SettlementCreateManyVerificationCaseInput = {
+    id: string
+    orderId: string
+    transactionId: string
+    settlementType: string
+    state?: string
+    amountValue: number
+    currency: string
+    periodJson?: string | null
+    breakdownJson?: string | null
+    initiatedAt?: Date | string
+    completedAt?: Date | string | null
+    rawJson: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProofUpdateWithoutVerificationCaseInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    payloadJson?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    quantityValue?: NullableFloatFieldUpdateOperationsInput | number | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    receivedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    hash?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ProofUncheckedUpdateWithoutVerificationCaseInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    payloadJson?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    quantityValue?: NullableFloatFieldUpdateOperationsInput | number | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    receivedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    hash?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ProofUncheckedUpdateManyWithoutVerificationCaseInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    payloadJson?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    quantityValue?: NullableFloatFieldUpdateOperationsInput | number | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    receivedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    hash?: NullableStringFieldUpdateOperationsInput | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type SettlementUpdateWithoutVerificationCaseInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    order?: OrderUpdateOneRequiredWithoutSettlementsNestedInput
+  }
+
+  export type SettlementUncheckedUpdateWithoutVerificationCaseInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SettlementUncheckedUpdateManyWithoutVerificationCaseInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    settlementType?: StringFieldUpdateOperationsInput | string
+    state?: StringFieldUpdateOperationsInput | string
+    amountValue?: FloatFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    periodJson?: NullableStringFieldUpdateOperationsInput | string | null
+    breakdownJson?: NullableStringFieldUpdateOperationsInput | string | null
+    initiatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    rawJson?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
 
 
   /**
@@ -12337,6 +18218,10 @@ export namespace Prisma {
      * @deprecated Use OrderCountOutputTypeDefaultArgs instead
      */
     export type OrderCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = OrderCountOutputTypeDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use VerificationCaseCountOutputTypeDefaultArgs instead
+     */
+    export type VerificationCaseCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = VerificationCaseCountOutputTypeDefaultArgs<ExtArgs>
     /**
      * @deprecated Use ProviderDefaultArgs instead
      */
@@ -12361,6 +18246,18 @@ export namespace Prisma {
      * @deprecated Use EventDefaultArgs instead
      */
     export type EventArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = EventDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use VerificationCaseDefaultArgs instead
+     */
+    export type VerificationCaseArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = VerificationCaseDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use ProofDefaultArgs instead
+     */
+    export type ProofArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = ProofDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use SettlementDefaultArgs instead
+     */
+    export type SettlementArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = SettlementDefaultArgs<ExtArgs>
 
   /**
    * Batch Payload for updateMany & deleteMany & createMany
