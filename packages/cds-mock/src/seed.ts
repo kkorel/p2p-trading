@@ -1,9 +1,9 @@
 /**
  * Seed data for CDS Mock
- * Uses shared seed data for consistency with BPP
+ * Uses Prisma ORM for PostgreSQL persistence
  */
 
-import { initDb, getDb, saveDb, closeDb } from './db';
+import { prisma, connectPrisma, disconnectPrisma } from '@p2p/shared';
 import { generateSeedData } from '@p2p/shared';
 
 async function seed() {
@@ -11,56 +11,83 @@ async function seed() {
 
   const SEED_DATA = generateSeedData();
 
-  await initDb();
-  const db = getDb();
+  await connectPrisma();
 
-  // Clear existing data
-  db.run('DELETE FROM offer_blocks');
-  db.run('DELETE FROM catalog_offers');
-  db.run('DELETE FROM catalog_items');
-  db.run('DELETE FROM providers');
-  db.run('DELETE FROM events');
+  // Clear existing data (in correct order for foreign key constraints)
+  console.log('Clearing existing data...');
+  await prisma.offerBlock.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.event.deleteMany();
+  await prisma.catalogOffer.deleteMany();
+  await prisma.catalogItem.deleteMany();
+  await prisma.provider.deleteMany();
 
   // Insert providers
   for (const provider of SEED_DATA.providers) {
-    db.run(
-      `INSERT INTO providers (id, name, trust_score, total_orders, successful_orders) VALUES (?, ?, ?, ?, ?)`,
-      [provider.id, provider.name, provider.trust_score, provider.total_orders, provider.successful_orders]
-    );
+    await prisma.provider.create({
+      data: {
+        id: provider.id,
+        name: provider.name,
+        trustScore: provider.trust_score,
+        totalOrders: provider.total_orders,
+        successfulOrders: provider.successful_orders,
+      },
+    });
     console.log(`✅ Provider: ${provider.name} (trust: ${provider.trust_score})`);
   }
 
   // Insert items
   for (const item of SEED_DATA.items) {
-    db.run(
-      `INSERT INTO catalog_items (id, provider_id, source_type, delivery_mode, available_qty, meter_id, production_windows_json, raw_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [item.id, item.provider_id, item.source_type, item.delivery_mode, item.available_qty, item.meter_id, JSON.stringify(item.production_windows), JSON.stringify(item)]
-    );
+    await prisma.catalogItem.create({
+      data: {
+        id: item.id,
+        providerId: item.provider_id,
+        sourceType: item.source_type,
+        deliveryMode: item.delivery_mode,
+        availableQty: item.available_qty,
+        meterId: item.meter_id,
+        productionWindowsJson: JSON.stringify(item.production_windows),
+      },
+    });
     console.log(`✅ Item: ${item.id} (${item.source_type}, ${item.available_qty} kWh)`);
   }
 
   // Insert offers and create blocks (1 block = 1 unit)
-  const now = new Date().toISOString();
   for (const offer of SEED_DATA.offers) {
-    db.run(
-      `INSERT INTO catalog_offers (id, item_id, provider_id, price_value, currency, max_qty, time_window_json, offer_attributes_json, raw_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [offer.id, offer.item_id, offer.provider_id, offer.price_value, offer.currency, offer.max_qty, JSON.stringify(offer.time_window), JSON.stringify(offer.offer_attributes), JSON.stringify(offer)]
-    );
+    await prisma.catalogOffer.create({
+      data: {
+        id: offer.id,
+        itemId: offer.item_id,
+        providerId: offer.provider_id,
+        priceValue: offer.price_value,
+        currency: offer.currency,
+        maxQty: offer.max_qty,
+        timeWindowStart: new Date(offer.time_window.startTime),
+        timeWindowEnd: new Date(offer.time_window.endTime),
+        pricingModel: offer.offer_attributes.pricingModel,
+        settlementType: offer.offer_attributes.settlementType,
+      },
+    });
 
     // Create blocks for this offer (1 block = 1 unit of energy)
-    for (let i = 0; i < offer.max_qty; i++) {
-      const blockId = `block-${offer.id}-${i}`;
-      db.run(
-        `INSERT INTO offer_blocks (id, offer_id, item_id, provider_id, status, price_value, currency, time_window_json, created_at) VALUES (?, ?, ?, ?, 'AVAILABLE', ?, ?, ?, ?)`,
-        [blockId, offer.id, offer.item_id, offer.provider_id, offer.price_value, offer.currency, JSON.stringify(offer.time_window), now]
-      );
-    }
+    const blockData = Array.from({ length: offer.max_qty }, (_, i) => ({
+      id: `block-${offer.id}-${i}`,
+      offerId: offer.id,
+      itemId: offer.item_id,
+      providerId: offer.provider_id,
+      status: 'AVAILABLE',
+      priceValue: offer.price_value,
+      currency: offer.currency,
+    }));
 
-    console.log(`✅ Offer: ${offer.id} ($${offer.price_value}/kWh, ${offer.max_qty} blocks created)`);
+    await prisma.offerBlock.createMany({
+      data: blockData,
+    });
+
+    console.log(`✅ Offer: ${offer.id} (₹${offer.price_value}/kWh, ${offer.max_qty} blocks created)`);
   }
 
-  saveDb();
-  closeDb();
+  await disconnectPrisma();
 
   const totalBlocks = SEED_DATA.offers.reduce((sum, o) => sum + o.max_qty, 0);
   console.log('\n🎉 CDS Mock seeding complete!');
@@ -70,4 +97,7 @@ async function seed() {
   console.log(`   - ${totalBlocks} total blocks`);
 }
 
-seed().catch(console.error);
+seed().catch(err => {
+  console.error('Seed failed:', err);
+  process.exit(1);
+});

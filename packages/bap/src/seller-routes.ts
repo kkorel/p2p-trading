@@ -1,5 +1,6 @@
 /**
  * Seller (BPP) Routes - Select, Init, Confirm, Status + Seller Management APIs
+ * With concurrency-safe operations using distributed locks
  */
 
 import { Router, Request, Response } from 'express';
@@ -22,6 +23,10 @@ import {
   ErrorCodes,
   OrderItem,
   Quote,
+  withOrderLock,
+  withTransactionLock,
+  InsufficientBlocksError,
+  createIdempotencyMiddleware,
 } from '@p2p/shared';
 import { 
   getOfferById, 
@@ -39,11 +44,14 @@ import {
   updateItemQuantity,
   deleteOffer,
   claimBlocks,
+  claimBlocksStrict,
   markBlocksAsSold,
   releaseBlocks,
+  releaseBlocksByOrderId,
   getBlockStats,
   getAvailableBlockCount,
   getBlocksForOrder,
+  updateBlocksOrderId,
 } from './seller-catalog';
 import { 
   getOrderByTransactionId, 
@@ -55,7 +63,7 @@ import {
   getAllOrders,
 } from './seller-orders';
 import { logEvent, isDuplicateMessage } from './events';
-import { getDb, saveDb } from './db';
+import { authMiddleware } from './middleware/auth';
 
 const router = Router();
 const logger = createLogger('BPP');
@@ -74,7 +82,7 @@ router.post('/select', async (req: Request, res: Response) => {
   });
   
   // Check for duplicate message
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate message detected, returning ACK', {
       transaction_id: context.transaction_id,
       message_id: context.message_id,
@@ -83,18 +91,18 @@ router.post('/select', async (req: Request, res: Response) => {
   }
   
   // Log inbound event
-  logEvent(context.transaction_id, context.message_id, 'select', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'select', 'INBOUND', JSON.stringify(message));
   
   // Validate offers and quantities
   const validationErrors: string[] = [];
   const orderItems: OrderItem[] = [];
   let totalPrice = 0;
   let totalQuantity = 0;
-  let currency = 'USD';
+  let currency = 'INR';
   let providerId = '';
   
   for (const item of content.orderItems) {
-    const offer = getOfferById(item.offer_id);
+    const offer = await getOfferById(item.offer_id);
     
     if (!offer) {
       validationErrors.push(`Offer ${item.offer_id} not found`);
@@ -104,13 +112,13 @@ router.post('/select', async (req: Request, res: Response) => {
     providerId = offer.provider_id;
     
     // Check available blocks instead of max quantity
-    const availableBlocks = getAvailableBlockCount(item.offer_id);
+    const availableBlocks = await getAvailableBlockCount(item.offer_id);
     if (item.quantity > availableBlocks) {
       validationErrors.push(`Requested quantity ${item.quantity} exceeds available blocks ${availableBlocks}`);
     }
     
     // Also check item-level availability as a safety check
-    const availableQty = getItemAvailableQuantity(item.item_id);
+    const availableQty = await getItemAvailableQuantity(item.item_id);
     if (availableQty !== null && item.quantity > availableQty) {
       validationErrors.push(`Requested quantity ${item.quantity} exceeds item available ${availableQty}`);
     }
@@ -145,7 +153,7 @@ router.post('/select', async (req: Request, res: Response) => {
   setTimeout(async () => {
     try {
       const callbackContext = createCallbackContext(context, 'on_select');
-      const provider = getProvider(providerId);
+      const provider = await getProvider(providerId);
       
       const quote: Quote = {
         price: { value: totalPrice, currency },
@@ -167,7 +175,7 @@ router.post('/select', async (req: Request, res: Response) => {
         },
       };
       
-      logEvent(context.transaction_id, callbackContext.message_id, 'on_select', 'OUTBOUND', JSON.stringify(onSelectMessage));
+      await logEvent(context.transaction_id, callbackContext.message_id, 'on_select', 'OUTBOUND', JSON.stringify(onSelectMessage));
       
       const callbackUrl = `${context.bap_uri}/callbacks/on_select`;
       logger.info(`Sending on_select callback to ${callbackUrl}`, {
@@ -196,15 +204,15 @@ router.post('/init', async (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate message detected', { transaction_id: context.transaction_id });
     return res.json(createAck(context));
   }
   
-  logEvent(context.transaction_id, context.message_id, 'init', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'init', 'INBOUND', JSON.stringify(message));
   
   // Check if order already exists for this transaction
-  const existingOrder = getOrderByTransactionId(context.transaction_id);
+  const existingOrder = await getOrderByTransactionId(context.transaction_id);
   if (existingOrder) {
     logger.info('Order already exists for transaction', { transaction_id: context.transaction_id });
     res.json(createAck(context));
@@ -218,7 +226,7 @@ router.post('/init', async (req: Request, res: Response) => {
           message: { order: existingOrder },
         };
         
-        logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
+        await logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
         await axios.post(`${context.bap_uri}/callbacks/on_init`, onInitMessage);
       } catch (error: any) {
         logger.error(`Failed to send on_init callback: ${error.message}`, { transaction_id: context.transaction_id });
@@ -232,49 +240,24 @@ router.post('/init', async (req: Request, res: Response) => {
   
   setTimeout(async () => {
     try {
+      // Get buyer ID from transaction state
+      const { getTransactionState } = await import('@p2p/shared');
+      const txState = await getTransactionState(context.transaction_id);
+      const buyerId = txState?.buyerId || null;
+      
       // Build order items and quote
       const orderItems: OrderItem[] = [];
       let totalPrice = 0;
       let totalQuantity = 0;
-      let currency = 'USD';
+      let currency = 'INR';
       let providerId = content.order.provider.id;
       let selectedOfferId = '';
       
-      // Temporary order ID for block reservation (will be updated after order creation)
-      const tempOrderId = uuidv4();
-      
+      // First pass: calculate prices and validate offers exist
       for (const item of content.order.items) {
-        const offer = getOfferById(item.offer_id);
+        const offer = await getOfferById(item.offer_id);
         if (offer) {
           selectedOfferId = offer.id;
-          
-          // Claim blocks atomically for this purchase
-          const claimedBlocks = claimBlocks(item.offer_id, item.quantity, tempOrderId, context.transaction_id);
-          
-          if (claimedBlocks.length < item.quantity) {
-            // Not enough blocks available - release any claimed blocks and fail
-            releaseBlocks(context.transaction_id);
-            logger.error(`Not enough blocks available: requested ${item.quantity}, got ${claimedBlocks.length}`, {
-              transaction_id: context.transaction_id,
-              offer_id: item.offer_id,
-            });
-            throw new Error(`Not enough blocks available: requested ${item.quantity}, available ${claimedBlocks.length}`);
-          }
-          
-          // Sync reserved blocks to CDS
-          try {
-            await axios.post(`${config.urls.cds}/sync/blocks`, {
-              offer_id: item.offer_id,
-              block_ids: claimedBlocks.map(b => b.id),
-              status: 'RESERVED',
-              order_id: tempOrderId,
-              transaction_id: context.transaction_id,
-            });
-            logger.info(`Synced ${claimedBlocks.length} reserved blocks to CDS for offer ${item.offer_id}`);
-          } catch (syncError: any) {
-            logger.error(`Failed to sync reserved blocks to CDS: ${syncError.message}`);
-          }
-          
           const itemPrice = offer.price.value * item.quantity;
           totalPrice += itemPrice;
           totalQuantity += item.quantity;
@@ -284,7 +267,7 @@ router.post('/init', async (req: Request, res: Response) => {
             item_id: item.item_id,
             offer_id: item.offer_id,
             provider_id: offer.provider_id,
-            quantity: item.quantity, // This is the actual purchased quantity
+            quantity: item.quantity,
             price: { value: itemPrice, currency },
             timeWindow: offer.timeWindow,
           });
@@ -296,24 +279,69 @@ router.post('/init', async (req: Request, res: Response) => {
         totalQuantity,
       };
       
-      // Create order in PENDING state
-      const order = createOrder(context.transaction_id, providerId, selectedOfferId, orderItems, quote, 'PENDING');
+      // Create order first in DRAFT state (so we have a valid order ID for FK constraint)
+      const order = await createOrder(context.transaction_id, providerId, selectedOfferId, orderItems, quote, 'DRAFT', buyerId);
       
-      // Update block order_id references to the actual order ID
-      const db = getDb();
-      db.run(
-        `UPDATE offer_blocks SET order_id = ? WHERE order_id = ? AND transaction_id = ?`,
-        [order.id, tempOrderId, context.transaction_id]
-      );
-      saveDb();
+      // Now claim blocks using the real order ID
+      for (const item of content.order.items) {
+        const claimedBlocks = await claimBlocks(item.offer_id, item.quantity, order.id, context.transaction_id);
+        
+        if (claimedBlocks.length < item.quantity) {
+          // Not enough blocks available - release any claimed blocks and send error callback
+          await releaseBlocks(context.transaction_id);
+          const errorMsg = claimedBlocks.length === 0 
+            ? 'This offer is sold out. Please try a different offer.'
+            : `Only ${claimedBlocks.length} kWh available, but you requested ${item.quantity} kWh.`;
+          
+          logger.error(`Not enough blocks available: requested ${item.quantity}, got ${claimedBlocks.length}`, {
+            transaction_id: context.transaction_id,
+            offer_id: item.offer_id,
+          });
+          
+          // Send error callback
+          const errorCallbackContext = createCallbackContext(context, 'on_init');
+          const errorCallback = {
+            context: errorCallbackContext,
+            error: {
+              code: 'INSUFFICIENT_INVENTORY',
+              message: errorMsg,
+            },
+          };
+          
+          try {
+            await axios.post(`${context.bap_uri}/callbacks/on_init`, errorCallback);
+          } catch (e) {
+            logger.error('Failed to send error callback');
+          }
+          
+          return; // Exit the setTimeout callback
+        }
+        
+        // Sync reserved blocks to CDS
+        try {
+          await axios.post(`${config.urls.cds}/sync/blocks`, {
+            offer_id: item.offer_id,
+            block_ids: claimedBlocks.map(b => b.id),
+            status: 'RESERVED',
+            order_id: order.id,
+            transaction_id: context.transaction_id,
+          });
+          logger.info(`Synced ${claimedBlocks.length} reserved blocks to CDS for offer ${item.offer_id}`);
+        } catch (syncError: any) {
+          logger.error(`Failed to sync reserved blocks to CDS: ${syncError.message}`);
+        }
+      }
+      
+      // Update order status to PENDING now that blocks are claimed
+      const finalOrder = await updateOrderStatus(order.id, 'PENDING') || order;
       
       const callbackContext = createCallbackContext(context, 'on_init');
       const onInitMessage: OnInitMessage = {
         context: callbackContext,
-        message: { order },
+        message: { order: finalOrder },
       };
       
-      logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
+      await logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
       
       const callbackUrl = `${context.bap_uri}/callbacks/on_init`;
       logger.info(`Sending on_init callback to ${callbackUrl}`, {
@@ -331,6 +359,7 @@ router.post('/init', async (req: Request, res: Response) => {
 
 /**
  * POST /confirm - Confirm order (make it active)
+ * CONCURRENCY SAFE: Uses distributed lock on order to prevent double-confirmation
  */
 router.post('/confirm', async (req: Request, res: Response) => {
   const message = req.body as ConfirmMessage;
@@ -342,15 +371,15 @@ router.post('/confirm', async (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate message detected', { transaction_id: context.transaction_id });
     return res.json(createAck(context));
   }
   
-  logEvent(context.transaction_id, context.message_id, 'confirm', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'confirm', 'INBOUND', JSON.stringify(message));
   
   // Get existing order
-  let order = getOrderById(content.order.id) || getOrderByTransactionId(context.transaction_id);
+  let order = await getOrderById(content.order.id) || await getOrderByTransactionId(context.transaction_id);
   
   if (!order) {
     return res.json(createNack(context, {
@@ -363,15 +392,20 @@ router.post('/confirm', async (req: Request, res: Response) => {
   
   setTimeout(async () => {
     try {
-      // Idempotent confirm: only update if not already ACTIVE
-      if (order!.status !== 'ACTIVE') {
-        order = updateOrderStatus(order!.id, 'ACTIVE');
-        logger.info('Order status updated to ACTIVE', { transaction_id: context.transaction_id, order_id: order!.id });
+      // Use distributed lock to prevent concurrent confirmations
+      await withOrderLock(order!.id, async () => {
+        // Re-fetch order inside lock to get current status
+        const currentOrder = await getOrderById(order!.id);
         
-        // Mark reserved blocks as SOLD
-        const soldBlocks = getBlocksForOrder(order!.id);
-        markBlocksAsSold(order!.id);
-        logger.info(`Marked ${soldBlocks.length} blocks as SOLD for order ${order!.id}`, { transaction_id: context.transaction_id });
+        // Idempotent confirm: only update if not already ACTIVE
+        if (currentOrder && currentOrder.status !== 'ACTIVE') {
+          order = await updateOrderStatus(order!.id, 'ACTIVE');
+          logger.info('Order status updated to ACTIVE', { transaction_id: context.transaction_id, order_id: order!.id });
+          
+          // Mark reserved blocks as SOLD (also uses lock internally)
+          const soldCount = await markBlocksAsSold(order!.id);
+          const soldBlocks = await getBlocksForOrder(order!.id);
+          logger.info(`Marked ${soldCount} blocks as SOLD for order ${order!.id}`, { transaction_id: context.transaction_id });
         
         // Sync block status to CDS
         if (soldBlocks.length > 0 && order!.items && order!.items.length > 0) {
@@ -393,12 +427,12 @@ router.post('/confirm', async (req: Request, res: Response) => {
         // Reduce item available quantity when order is confirmed (for item-level tracking)
         if (order!.items && order!.items.length > 0) {
           for (const orderItem of order!.items) {
-            const currentQty = getItemAvailableQuantity(orderItem.item_id);
+            const currentQty = await getItemAvailableQuantity(orderItem.item_id);
             if (currentQty !== null) {
               const soldQty = orderItem.quantity; // This is the actual purchased quantity from blocks
               const newQty = Math.max(0, currentQty - soldQty);
               
-              updateItemQuantity(orderItem.item_id, newQty);
+              await updateItemQuantity(orderItem.item_id, newQty);
               logger.info(`Item ${orderItem.item_id} quantity reduced: ${currentQty} → ${newQty} kWh (sold: ${soldQty} kWh)`, {
                 transaction_id: context.transaction_id,
               });
@@ -407,7 +441,8 @@ router.post('/confirm', async (req: Request, res: Response) => {
               try {
                 // Get provider_id from the order item (not from Order which doesn't have it)
                 const providerId = orderItem.provider_id || '';
-                const item = getProviderItems(providerId).find(i => i.id === orderItem.item_id);
+                const items = await getProviderItems(providerId);
+                const item = items.find(i => i.id === orderItem.item_id);
                 if (item) {
                   await syncItemToCDS({
                     id: item.id,
@@ -426,9 +461,10 @@ router.post('/confirm', async (req: Request, res: Response) => {
             }
           }
         }
-      } else {
-        logger.info('Order already ACTIVE, idempotent confirm', { transaction_id: context.transaction_id });
-      }
+        } else {
+          logger.info('Order already ACTIVE, idempotent confirm', { transaction_id: context.transaction_id });
+        }
+      }); // End withOrderLock
       
       const callbackContext = createCallbackContext(context, 'on_confirm');
       const onConfirmMessage: OnConfirmMessage = {
@@ -436,7 +472,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
         message: { order: order! },
       };
       
-      logEvent(context.transaction_id, callbackContext.message_id, 'on_confirm', 'OUTBOUND', JSON.stringify(onConfirmMessage));
+      await logEvent(context.transaction_id, callbackContext.message_id, 'on_confirm', 'OUTBOUND', JSON.stringify(onConfirmMessage));
       
       const callbackUrl = `${context.bap_uri}/callbacks/on_confirm`;
       logger.info(`Sending on_confirm callback to ${callbackUrl}`, {
@@ -465,14 +501,14 @@ router.post('/status', async (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     return res.json(createAck(context));
   }
   
-  logEvent(context.transaction_id, context.message_id, 'status', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'status', 'INBOUND', JSON.stringify(message));
   
   // Get order
-  const order = getOrderById(content.order_id) || getOrderByTransactionId(context.transaction_id);
+  const order = await getOrderById(content.order_id) || await getOrderByTransactionId(context.transaction_id);
   
   if (!order) {
     return res.json(createNack(context, {
@@ -505,7 +541,7 @@ router.post('/status', async (req: Request, res: Response) => {
         },
       };
       
-      logEvent(context.transaction_id, callbackContext.message_id, 'on_status', 'OUTBOUND', JSON.stringify(onStatusMessage));
+      await logEvent(context.transaction_id, callbackContext.message_id, 'on_status', 'OUTBOUND', JSON.stringify(onStatusMessage));
       
       const callbackUrl = `${context.bap_uri}/callbacks/on_status`;
       logger.info(`Sending on_status callback to ${callbackUrl}`, {
@@ -571,10 +607,127 @@ async function deleteOfferFromCDS(offerId: string) {
   }
 }
 
-// ==================== SELLER APIs ====================
+// ==================== SELLER APIs (Authenticated) ====================
+
+import { prisma } from '@p2p/shared';
 
 /**
- * POST /seller/register - Register as a new provider
+ * GET /seller/my-profile - Get or create the authenticated user's seller profile
+ * Auto-creates provider if user doesn't have one
+ */
+router.get('/seller/my-profile', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    let providerId = req.user!.providerId;
+    let provider;
+    
+    // If user doesn't have a provider, create one
+    if (!providerId) {
+      const providerName = req.user!.name || req.user!.email?.split('@')[0] || 'My Energy';
+      provider = await registerProvider(providerName);
+      providerId = provider.id;
+      
+      // Link provider to user
+      await prisma.user.update({
+        where: { id: req.user!.id },
+        data: { providerId: provider.id },
+      });
+      
+      logger.info(`Auto-created provider ${provider.id} for user ${req.user!.id}`);
+      
+      // Sync to CDS
+      await syncProviderToCDS(provider);
+    } else {
+      provider = await getProvider(providerId);
+    }
+    
+    if (!provider) {
+      return res.status(500).json({ success: false, error: 'Failed to get provider' });
+    }
+    
+    const items = await getProviderItems(providerId);
+    const offers = await getProviderOffers(providerId);
+    
+    // Create a map of item_id to source_type for quick lookup
+    const itemSourceMap = new Map(items.map(item => [item.id, item.source_type]));
+    
+    // Add block stats and source_type to offers
+    const offersWithStats = await Promise.all(offers.map(async (offer) => {
+      const blockStats = await getBlockStats(offer.id);
+      const source_type = itemSourceMap.get(offer.item_id) || 'SOLAR';
+      return { ...offer, blockStats, source_type };
+    }));
+    
+    res.json({ 
+      success: true,
+      provider, 
+      items, 
+      offers: offersWithStats 
+    });
+  } catch (error: any) {
+    logger.error('Failed to get seller profile:', error);
+    res.status(500).json({ success: false, error: 'Failed to load seller profile' });
+  }
+});
+
+/**
+ * GET /seller/my-orders - Get orders for the authenticated user's provider
+ */
+router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const providerId = req.user!.providerId;
+    
+    if (!providerId) {
+      return res.json({ orders: [] });
+    }
+    
+    const orders = await getOrdersByProviderId(providerId);
+    
+    // Enrich orders with block and item information
+    const enrichedOrders = await Promise.all(orders.map(async (order) => {
+      try {
+        if (order.items && order.items.length > 0) {
+          const firstItem = order.items[0];
+          const orderBlocks = await getBlocksForOrder(order.id);
+          const actualSoldQty = orderBlocks.length;
+          const blockStats = await getBlockStats(firstItem.offer_id);
+          
+          // Fetch item and offer details
+          const item = await prisma.catalogItem.findUnique({
+            where: { id: firstItem.item_id },
+          });
+          const offer = await prisma.catalogOffer.findUnique({
+            where: { id: firstItem.offer_id },
+          });
+          
+          return {
+            ...order,
+            itemInfo: {
+              item_id: firstItem.item_id,
+              offer_id: firstItem.offer_id,
+              sold_quantity: actualSoldQty,
+              block_stats: blockStats,
+              source_type: item?.sourceType || 'UNKNOWN',
+              price_per_kwh: offer?.priceValue || 0,
+            },
+          };
+        }
+      } catch (error: any) {
+        logger.error(`Error enriching order ${order.id}: ${error.message}`);
+      }
+      return order;
+    }));
+    
+    res.json({ orders: enrichedOrders });
+  } catch (error: any) {
+    logger.error('Failed to get seller orders:', error);
+    res.status(500).json({ error: 'Failed to load orders' });
+  }
+});
+
+// ==================== Legacy SELLER APIs (for backward compatibility) ====================
+
+/**
+ * POST /seller/register - Register as a new provider (legacy)
  */
 router.post('/seller/register', async (req: Request, res: Response) => {
   const { name } = req.body as { name: string };
@@ -583,7 +736,7 @@ router.post('/seller/register', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Provider name is required' });
   }
   
-  const provider = registerProvider(name);
+  const provider = await registerProvider(name);
   logger.info(`New provider registered: ${provider.id} (${name})`);
   
   // Sync to CDS
@@ -593,35 +746,35 @@ router.post('/seller/register', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /seller/providers - List all providers
+ * GET /seller/providers - List all providers (legacy - now returns empty for privacy)
  */
-router.get('/seller/providers', (req: Request, res: Response) => {
-  const providers = getAllProviders();
-  res.json({ providers });
+router.get('/seller/providers', async (req: Request, res: Response) => {
+  // Don't expose all providers for privacy
+  res.json({ providers: [] });
 });
 
 /**
- * GET /seller/providers/:id - Get provider details
+ * GET /seller/providers/:id - Get provider details (legacy)
  */
-router.get('/seller/providers/:id', (req: Request, res: Response) => {
-  const provider = getProvider(req.params.id);
+router.get('/seller/providers/:id', async (req: Request, res: Response) => {
+  const provider = await getProvider(req.params.id);
   
   if (!provider) {
     return res.status(404).json({ error: 'Provider not found' });
   }
   
-  const items = getProviderItems(req.params.id);
-  const offers = getProviderOffers(req.params.id);
+  const items = await getProviderItems(req.params.id);
+  const offers = await getProviderOffers(req.params.id);
   
   res.json({ provider, items, offers });
 });
 
 /**
  * POST /seller/items - Add a new catalog item (energy listing)
+ * Uses authenticated user's provider
  */
-router.post('/seller/items', async (req: Request, res: Response) => {
+router.post('/seller/items', authMiddleware, async (req: Request, res: Response) => {
   const { 
-    provider_id, 
     source_type, 
     delivery_mode, 
     available_qty, 
@@ -629,16 +782,23 @@ router.post('/seller/items', async (req: Request, res: Response) => {
     meter_id 
   } = req.body;
   
-  if (!provider_id || !source_type || !available_qty) {
-    return res.status(400).json({ error: 'provider_id, source_type, and available_qty are required' });
+  // Use authenticated user's provider
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(400).json({ error: 'No seller profile found. Please set up your seller profile first.' });
   }
   
-  const provider = getProvider(provider_id);
+  if (!source_type || !available_qty) {
+    return res.status(400).json({ error: 'source_type and available_qty are required' });
+  }
+  
+  const provider = await getProvider(provider_id);
   if (!provider) {
     return res.status(404).json({ error: 'Provider not found' });
   }
   
-  const item = addCatalogItem(
+  const item = await addCatalogItem(
     provider_id,
     source_type,
     'SCHEDULED', // Always scheduled for P2P energy trading
@@ -666,12 +826,12 @@ router.post('/seller/items', async (req: Request, res: Response) => {
 /**
  * GET /seller/items - List all items
  */
-router.get('/seller/items', (req: Request, res: Response) => {
+router.get('/seller/items', async (req: Request, res: Response) => {
   const { provider_id } = req.query;
   
   const items = provider_id 
-    ? getProviderItems(provider_id as string)
-    : getAllItems();
+    ? await getProviderItems(provider_id as string)
+    : await getAllItems();
   
   res.json({ items });
 });
@@ -679,14 +839,14 @@ router.get('/seller/items', (req: Request, res: Response) => {
 /**
  * PUT /seller/items/:id/quantity - Update item quantity
  */
-router.put('/seller/items/:id/quantity', (req: Request, res: Response) => {
+router.put('/seller/items/:id/quantity', async (req: Request, res: Response) => {
   const { quantity } = req.body;
   
   if (quantity === undefined || quantity < 0) {
     return res.status(400).json({ error: 'Valid quantity is required' });
   }
   
-  updateItemQuantity(req.params.id, quantity);
+  await updateItemQuantity(req.params.id, quantity);
   logger.info(`Item ${req.params.id} quantity updated to ${quantity}`);
   
   res.json({ status: 'ok', item_id: req.params.id, new_quantity: quantity });
@@ -694,28 +854,42 @@ router.put('/seller/items/:id/quantity', (req: Request, res: Response) => {
 
 /**
  * POST /seller/offers - Add a new offer for an item
+ * Uses authenticated user's provider
  */
-router.post('/seller/offers', async (req: Request, res: Response) => {
+router.post('/seller/offers', authMiddleware, async (req: Request, res: Response) => {
   const { 
     item_id, 
-    provider_id, 
     price_per_kwh, 
     currency, 
     max_qty, 
     time_window 
   } = req.body;
   
-  if (!item_id || !provider_id || !price_per_kwh || !max_qty || !time_window) {
+  // Use authenticated user's provider
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(400).json({ error: 'No seller profile found. Please set up your seller profile first.' });
+  }
+  
+  if (!item_id || !price_per_kwh || !max_qty || !time_window) {
     return res.status(400).json({ 
-      error: 'item_id, provider_id, price_per_kwh, max_qty, and time_window are required' 
+      error: 'item_id, price_per_kwh, max_qty, and time_window are required' 
     });
   }
   
-  const offer = addOffer(
+  // Verify the item belongs to this provider
+  const items = await getProviderItems(provider_id);
+  const itemExists = items.some(i => i.id === item_id);
+  if (!itemExists) {
+    return res.status(403).json({ error: 'Item does not belong to your seller profile' });
+  }
+  
+  const offer = await addOffer(
     item_id,
     provider_id,
     price_per_kwh,
-    currency || 'USD',
+    currency || 'INR',
     max_qty,
     time_window
   );
@@ -738,24 +912,116 @@ router.post('/seller/offers', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /seller/offers/direct - Create an offer directly (auto-creates item)
+ * Simplified flow for prosumers - no need to create a listing first
+ */
+router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: Response) => {
+  const { 
+    source_type,
+    price_per_kwh, 
+    currency, 
+    max_qty, 
+    time_window 
+  } = req.body;
+  
+  // Use authenticated user's provider
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(400).json({ error: 'No seller profile found. Please set up your seller profile first.' });
+  }
+  
+  if (!source_type || !price_per_kwh || !max_qty || !time_window) {
+    return res.status(400).json({ 
+      error: 'source_type, price_per_kwh, max_qty, and time_window are required' 
+    });
+  }
+  
+  // Auto-create an item for this offer
+  const item = await addCatalogItem(
+    provider_id,
+    source_type.toUpperCase() as any,
+    'SCHEDULED',
+    max_qty,
+    [], // No production windows needed
+    '' // No meter ID needed
+  );
+  
+  logger.info(`Auto-created item ${item.id} for direct offer`);
+  
+  // Create the offer
+  const offer = await addOffer(
+    item.id,
+    provider_id,
+    price_per_kwh,
+    currency || 'INR',
+    max_qty,
+    time_window
+  );
+  
+  logger.info(`New direct offer created: ${offer.id}`);
+  
+  // Sync item to CDS
+  await syncItemToCDS(item);
+  
+  // Sync offer to CDS
+  await syncOfferToCDS({
+    id: offer.id,
+    item_id: offer.item_id,
+    provider_id: offer.provider_id,
+    price_value: offer.price.value,
+    currency: offer.price.currency,
+    max_qty: offer.maxQuantity,
+    time_window: offer.timeWindow,
+    offer_attributes: offer.offerAttributes,
+  });
+  
+  // Add source_type to the response
+  res.json({ 
+    status: 'ok', 
+    offer: {
+      ...offer,
+      source_type: source_type.toUpperCase(),
+    }
+  });
+});
+
+/**
  * GET /seller/offers - List all offers
  */
-router.get('/seller/offers', (req: Request, res: Response) => {
+router.get('/seller/offers', async (req: Request, res: Response) => {
   const { provider_id } = req.query;
   
   const offers = provider_id 
-    ? getProviderOffers(provider_id as string)
-    : getAllOffers();
+    ? await getProviderOffers(provider_id as string)
+    : await getAllOffers();
   
   res.json({ offers });
 });
 
 /**
  * DELETE /seller/offers/:id - Delete an offer
+ * Only allows deleting own offers
  */
-router.delete('/seller/offers/:id', async (req: Request, res: Response) => {
-  deleteOffer(req.params.id);
-  logger.info(`Offer ${req.params.id} deleted`);
+router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Response) => {
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(403).json({ error: 'No seller profile found' });
+  }
+  
+  // Verify offer belongs to user's provider
+  const offer = await getOfferById(req.params.id);
+  if (!offer) {
+    return res.status(404).json({ error: 'Offer not found' });
+  }
+  
+  if (offer.provider_id !== provider_id) {
+    return res.status(403).json({ error: 'You can only delete your own offers' });
+  }
+  
+  await deleteOffer(req.params.id);
+  logger.info(`Offer ${req.params.id} deleted by provider ${provider_id}`);
   
   // Sync deletion to CDS
   await deleteOfferFromCDS(req.params.id);
@@ -766,15 +1032,15 @@ router.delete('/seller/offers/:id', async (req: Request, res: Response) => {
 /**
  * GET /seller/orders - Get orders for a provider
  */
-router.get('/seller/orders', (req: Request, res: Response) => {
+router.get('/seller/orders', async (req: Request, res: Response) => {
   const { provider_id } = req.query;
   
   const orders = provider_id 
-    ? getOrdersByProviderId(provider_id as string)
-    : getAllOrders();
+    ? await getOrdersByProviderId(provider_id as string)
+    : await getAllOrders();
   
   // Enrich orders with block information
-  const enrichedOrders = orders.map(order => {
+  const enrichedOrders = await Promise.all(orders.map(async (order) => {
     try {
       if (order.items && order.items.length > 0) {
         const firstItem = order.items[0];
@@ -782,14 +1048,14 @@ router.get('/seller/orders', (req: Request, res: Response) => {
         const offerId = firstItem.offer_id;
         
         // Get actual purchased quantity from blocks (not from offer max)
-        const orderBlocks = getBlocksForOrder(order.id);
+        const orderBlocks = await getBlocksForOrder(order.id);
         const actualSoldQty = orderBlocks.length; // Each block = 1 unit
         
         // Get item-level available quantity
-        const availableQty = getItemAvailableQuantity(itemId);
+        const availableQty = await getItemAvailableQuantity(itemId);
         
         // Get offer block stats
-        const blockStats = getBlockStats(offerId);
+        const blockStats = await getBlockStats(offerId);
         
         return {
           ...order,
@@ -807,7 +1073,7 @@ router.get('/seller/orders', (req: Request, res: Response) => {
       logger.error(`Error enriching order ${order.id}: ${error.message}`);
     }
     return order;
-  });
+  }));
   
   res.json({ orders: enrichedOrders });
 });

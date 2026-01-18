@@ -57,7 +57,7 @@ async function seed() {
       );
     }
 
-    console.log(`✅ Offer: ${offer.id} ($${offer.price_value}/kWh, ${offer.max_qty} blocks created)`);
+    console.log(`✅ Offer: ${offer.id} (₹${offer.price_value}/kWh, ${offer.max_qty} blocks created)`);
   }
 
   saveDb();

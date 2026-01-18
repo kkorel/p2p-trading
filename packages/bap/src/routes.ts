@@ -24,7 +24,8 @@ import {
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
-import { waitForDb, saveDb } from './db';
+import { optionalAuthMiddleware, authMiddleware } from './middleware/auth';
+import { prisma } from '@p2p/shared';
 
 const router = Router();
 const logger = createLogger('BAP');
@@ -344,8 +345,9 @@ function buildPayoutInstruction(record: SettlementRecord, outcome: SettlementOut
 
 /**
  * POST /api/discover - Initiate catalog discovery
+ * Uses optional auth to filter out user's own offers
  */
-router.post('/api/discover', async (req: Request, res: Response) => {
+router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: Response) => {
   const { 
     sourceType, 
     deliveryMode, 
@@ -362,15 +364,22 @@ router.post('/api/discover', async (req: Request, res: Response) => {
   
   const txnId = transaction_id || uuidv4();
   
+  // Get user's provider ID to exclude their own offers
+  const excludeProviderId = req.user?.providerId || null;
+  // Get user's ID for order association
+  const buyerId = req.user?.id || null;
+  
   // Create transaction state with discovery criteria for matching
-  createTransaction(txnId);
-  updateTransaction(txnId, {
+  await createTransaction(txnId);
+  await updateTransaction(txnId, {
     discoveryCriteria: {
       sourceType,
       deliveryMode,
       minQuantity,
       timeWindow,
     },
+    excludeProviderId, // Store for filtering in callback
+    buyerId, // Store buyer ID for order association
   });
   logger.debug('Discovery criteria', {
     sourceType,
@@ -423,7 +432,7 @@ router.post('/api/discover', async (req: Request, res: Response) => {
   });
   
   // Log outbound event
-  logEvent(txnId, context.message_id, 'discover', 'OUTBOUND', JSON.stringify(discoverMessage));
+  await logEvent(txnId, context.message_id, 'discover', 'OUTBOUND', JSON.stringify(discoverMessage));
   
   try {
     const response = await axios.post(`${config.urls.cds}/discover`, discoverMessage);
@@ -460,7 +469,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
     autoMatch?: boolean;
   };
   
-  const txState = getTransaction(transaction_id);
+  const txState = await getTransaction(transaction_id);
   
   if (!txState || !txState.catalog) {
     return res.status(400).json({ error: 'No catalog found for transaction. Run discover first.' });
@@ -565,10 +574,10 @@ router.post('/api/select', async (req: Request, res: Response) => {
     offer_id: selectedOffer.id,
   });
   
-  logEvent(transaction_id, context.message_id, 'select', 'OUTBOUND', JSON.stringify(selectMessage));
+  await logEvent(transaction_id, context.message_id, 'select', 'OUTBOUND', JSON.stringify(selectMessage));
   
   // Update state - store both the offer and the quantity the buyer wants
-  updateTransaction(transaction_id, { selectedOffer, selectedQuantity: quantity });
+  await updateTransaction(transaction_id, { selectedOffer, selectedQuantity: quantity });
   
   try {
     const response = await axios.post(`${config.urls.bpp}/select`, selectMessage);
@@ -602,7 +611,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
 router.post('/api/init', async (req: Request, res: Response) => {
   const { transaction_id } = req.body as { transaction_id: string };
   
-  const txState = getTransaction(transaction_id);
+  const txState = await getTransaction(transaction_id);
   
   if (!txState || !txState.selectedOffer) {
     return res.status(400).json({ error: 'No offer selected. Run select first.' });
@@ -643,7 +652,7 @@ router.post('/api/init', async (req: Request, res: Response) => {
     action: 'init',
   });
   
-  logEvent(transaction_id, context.message_id, 'init', 'OUTBOUND', JSON.stringify(initMessage));
+  await logEvent(transaction_id, context.message_id, 'init', 'OUTBOUND', JSON.stringify(initMessage));
   
   try {
     const response = await axios.post(`${config.urls.bpp}/init`, initMessage);
@@ -666,7 +675,7 @@ router.post('/api/init', async (req: Request, res: Response) => {
 router.post('/api/confirm', async (req: Request, res: Response) => {
   const { transaction_id, order_id } = req.body as { transaction_id: string; order_id?: string };
   
-  const txState = getTransaction(transaction_id);
+  const txState = await getTransaction(transaction_id);
   
   if (!txState) {
     return res.status(400).json({ error: 'Transaction not found' });
@@ -705,7 +714,7 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     order_id: orderId,
   });
   
-  logEvent(transaction_id, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
+  await logEvent(transaction_id, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
   
   try {
     const response = await axios.post(`${config.urls.bpp}/confirm`, confirmMessage);
@@ -779,7 +788,7 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
 router.post('/api/status', async (req: Request, res: Response) => {
   const { transaction_id, order_id } = req.body as { transaction_id: string; order_id?: string };
   
-  const txState = getTransaction(transaction_id);
+  const txState = await getTransaction(transaction_id);
   
   if (!txState) {
     return res.status(400).json({ error: 'Transaction not found' });
@@ -812,7 +821,7 @@ router.post('/api/status', async (req: Request, res: Response) => {
     action: 'status',
   });
   
-  logEvent(transaction_id, context.message_id, 'status', 'OUTBOUND', JSON.stringify(statusMessage));
+  await logEvent(transaction_id, context.message_id, 'status', 'OUTBOUND', JSON.stringify(statusMessage));
   
   try {
     const response = await axios.post(`${config.urls.bpp}/status`, statusMessage);
@@ -832,16 +841,16 @@ router.post('/api/status', async (req: Request, res: Response) => {
 /**
  * GET /api/transactions - List all transactions
  */
-router.get('/api/transactions', (req: Request, res: Response) => {
-  const transactions = getAllTransactions();
+router.get('/api/transactions', async (req: Request, res: Response) => {
+  const transactions = await getAllTransactions();
   res.json({ transactions });
 });
 
 /**
  * GET /api/transactions/:id - Get transaction details
  */
-router.get('/api/transactions/:id', (req: Request, res: Response) => {
-  const txState = getTransaction(req.params.id);
+router.get('/api/transactions/:id', async (req: Request, res: Response) => {
+  const txState = await getTransaction(req.params.id);
   
   if (!txState) {
     return res.status(404).json({ error: 'Transaction not found' });
@@ -1186,10 +1195,11 @@ router.post('/api/settlement/reset', async (req: Request, res: Response) => {
 /**
  * DELETE /api/transactions - Clear all in-memory transactions
  */
-router.delete('/api/transactions', (req: Request, res: Response) => {
-  const count = getAllTransactions().length;
-  clearAllTransactions();
-  logger.info(`Cleared ${count} in-memory transactions`);
+router.delete('/api/transactions', async (req: Request, res: Response) => {
+  const transactions = await getAllTransactions();
+  const count = transactions.length;
+  await clearAllTransactions();
+  logger.info(`Cleared ${count} transactions from Redis`);
   res.json({ status: 'ok', cleared: count });
 });
 
@@ -1236,13 +1246,8 @@ router.post('/api/demo/accounts/reset', (req: Request, res: Response) => {
  * POST /api/demo/reset-all - Reset everything for a fresh demo
  */
 router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
-  // Reset settlement records
-  const db = (await waitForDb()) as any;
-  db.run('DELETE FROM settlement_records');
-  saveDb();
-  
   // Reset in-memory transactions
-  clearAllTransactions();
+  await clearAllTransactions();
   
   // Reset demo accounts
   initializeDemoAccounts();
@@ -1254,6 +1259,70 @@ router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
     message: 'Full demo reset complete',
     accounts: getAllDemoAccounts(),
   });
+});
+
+/**
+ * GET /api/my-orders - Get orders for the authenticated buyer
+ */
+router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    
+    const orders = await prisma.order.findMany({
+      where: { buyerId: userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        provider: true,
+        selectedOffer: {
+          include: {
+            item: true,
+          },
+        },
+      },
+    });
+    
+    // Transform to API format
+    const formattedOrders = orders.map(order => {
+      let items: any[] = [];
+      let quote: any = {};
+      
+      try {
+        items = JSON.parse(order.itemsJson || '[]');
+      } catch { items = []; }
+      
+      try {
+        quote = JSON.parse(order.quoteJson || '{}');
+      } catch { quote = {}; }
+      
+      const selectedOffer = order.selectedOffer as any;
+      
+      return {
+        id: order.id,
+        status: order.status,
+        created_at: order.createdAt.toISOString(),
+        quote: quote.price ? {
+          price: quote.price,
+          totalQuantity: order.totalQty || quote.breakup?.reduce((sum: number, b: any) => sum + (b.quantity?.value || 0), 0) || 0,
+        } : undefined,
+        provider: order.provider ? {
+          id: order.provider.id,
+          name: order.provider.name,
+        } : undefined,
+        itemInfo: {
+          item_id: items[0]?.item_id || selectedOffer?.itemId || null,
+          offer_id: items[0]?.offer_id || order.selectedOfferId || null,
+          source_type: selectedOffer?.item?.sourceType || 'UNKNOWN',
+          price_per_kwh: selectedOffer?.priceValue || 0,
+          quantity: order.totalQty || items[0]?.quantity?.value || 0,
+        },
+      };
+    });
+    
+    res.json({ orders: formattedOrders });
+  } catch (error: any) {
+    logger.error(`Failed to get buyer orders: ${error.message}`);
+    res.status(500).json({ error: 'Failed to load orders' });
+  }
 });
 
 export default router;

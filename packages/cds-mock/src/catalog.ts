@@ -1,8 +1,9 @@
 /**
  * Catalog data access for CDS Mock
+ * Using Prisma ORM for PostgreSQL persistence
  */
 
-import { getDb } from './db';
+import { prisma } from './db';
 import { 
   CatalogItem, 
   CatalogOffer, 
@@ -11,72 +12,96 @@ import {
   ProviderCatalog,
   TimeWindow,
   OfferAttributes,
-  rowToObject
 } from '@p2p/shared';
 
 /**
  * Get all catalog items with their offers
  */
-export function getCatalog(): Catalog {
-  const db = getDb();
-  
+export async function getCatalog(): Promise<Catalog> {
   // Get all providers
-  const providerResult = db.exec('SELECT * FROM providers');
-  const providers = new Map<string, Provider>();
+  const providers = await prisma.provider.findMany();
+  const providerMap = new Map<string, Provider>();
   
-  if (providerResult.length > 0) {
-    const cols = providerResult[0].columns;
-    for (const row of providerResult[0].values) {
-      const p = rowToObject(cols, row);
-      providers.set(p.id, {
-        id: p.id,
-        name: p.name,
-        trust_score: p.trust_score,
-        total_orders: p.total_orders,
-        successful_orders: p.successful_orders,
-      });
-    }
+  for (const p of providers) {
+    providerMap.set(p.id, {
+      id: p.id,
+      name: p.name,
+      trust_score: p.trustScore,
+      total_orders: p.totalOrders,
+      successful_orders: p.successfulOrders,
+    });
   }
   
-  // Get all items
-  const itemResult = db.exec('SELECT * FROM catalog_items');
-  const items: any[] = [];
-  if (itemResult.length > 0) {
-    const cols = itemResult[0].columns;
-    for (const row of itemResult[0].values) {
-      items.push(rowToObject(cols, row));
-    }
-  }
-  
-  // Get all offers
-  const offerResult = db.exec('SELECT * FROM catalog_offers');
-  const offers: any[] = [];
-  if (offerResult.length > 0) {
-    const cols = offerResult[0].columns;
-    for (const row of offerResult[0].values) {
-      offers.push(rowToObject(cols, row));
-    }
-  }
+  // Get all items with their offers
+  const items = await prisma.catalogItem.findMany({
+    include: {
+      offers: true,
+    },
+  });
   
   // Group items by provider
   const providerCatalogs = new Map<string, ProviderCatalog>();
   
-  for (const itemRow of items) {
-    if (!providerCatalogs.has(itemRow.provider_id)) {
-      const provider = providers.get(itemRow.provider_id);
-      providerCatalogs.set(itemRow.provider_id, {
-        id: itemRow.provider_id,
+  for (const item of items) {
+    if (!providerCatalogs.has(item.providerId)) {
+      const provider = providerMap.get(item.providerId);
+      providerCatalogs.set(item.providerId, {
+        id: item.providerId,
         descriptor: provider ? { name: provider.name } : undefined,
         items: [],
       });
     }
     
-    const itemOffers = offers
-      .filter(o => o.item_id === itemRow.id)
-      .map(o => rowToOffer(o));
+    // Convert offers for this item
+    const itemOffers: CatalogOffer[] = [];
+    for (const offer of item.offers) {
+      // Get available blocks count
+      const availableBlocks = await prisma.offerBlock.count({
+        where: {
+          offerId: offer.id,
+          status: 'AVAILABLE',
+        },
+      });
+      
+      // Only include offers that have available blocks
+      if (availableBlocks > 0) {
+        itemOffers.push({
+          id: offer.id,
+          item_id: offer.itemId,
+          provider_id: offer.providerId,
+          offerAttributes: {
+            pricingModel: offer.pricingModel as 'PER_KWH' | 'FLAT_RATE',
+            settlementType: offer.settlementType as 'DAILY' | 'WEEKLY' | 'MONTHLY',
+          },
+          price: {
+            value: offer.priceValue,
+            currency: offer.currency,
+          },
+          maxQuantity: availableBlocks, // Use actual available quantity
+          timeWindow: {
+            startTime: offer.timeWindowStart.toISOString(),
+            endTime: offer.timeWindowEnd.toISOString(),
+          },
+        });
+      }
+    }
     
-    const item = rowToItem(itemRow, itemOffers);
-    providerCatalogs.get(itemRow.provider_id)!.items.push(item);
+    const productionWindows = JSON.parse(item.productionWindowsJson || '[]') as TimeWindow[];
+    
+    const catalogItem: CatalogItem = {
+      id: item.id,
+      provider_id: item.providerId,
+      itemAttributes: {
+        sourceType: item.sourceType as any,
+        deliveryMode: item.deliveryMode as any,
+        meterId: item.meterId || undefined,
+        availableQuantity: item.availableQty,
+        productionWindow: productionWindows,
+      },
+      offers: itemOffers,
+    };
+    
+    providerCatalogs.get(item.providerId)!.items.push(catalogItem);
   }
   
   return {
@@ -84,115 +109,56 @@ export function getCatalog(): Catalog {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToItem(row: any, offers: CatalogOffer[]): CatalogItem {
-  const productionWindows = JSON.parse(row.production_windows_json) as TimeWindow[];
-  
-  return {
-    id: row.id,
-    provider_id: row.provider_id,
-    itemAttributes: {
-      sourceType: row.source_type as any,
-      deliveryMode: row.delivery_mode as any,
-      meterId: row.meter_id,
-      availableQuantity: row.available_qty,
-      productionWindow: productionWindows,
-    },
-    offers,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToOffer(row: any): CatalogOffer {
-  const db = getDb();
-  const timeWindow = JSON.parse(row.time_window_json) as TimeWindow;
-  const offerAttributes = JSON.parse(row.offer_attributes_json) as OfferAttributes;
-  
-  // Get available blocks count (for discovery - shows actual available capacity)
-  const blockResult = db.exec(
-    `SELECT COUNT(*) as count FROM offer_blocks WHERE offer_id = ? AND status = 'AVAILABLE'`,
-    [row.id]
-  );
-  const availableBlocks = blockResult.length > 0 && blockResult[0].values.length > 0 
-    ? blockResult[0].values[0][0] as number 
-    : row.max_qty; // Fallback to max_qty if no blocks found (backward compatibility)
-  
-  return {
-    id: row.id,
-    item_id: row.item_id,
-    provider_id: row.provider_id,
-    offerAttributes,
-    price: {
-      value: row.price_value,
-      currency: row.currency,
-    },
-    maxQuantity: availableBlocks, // Use available blocks for discovery
-    timeWindow,
-  };
-}
-
 /**
  * Get providers map for matching
  */
-export function getProviders(): Map<string, Provider> {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM providers');
-  const providers = new Map<string, Provider>();
+export async function getProviders(): Promise<Map<string, Provider>> {
+  const providers = await prisma.provider.findMany();
+  const providerMap = new Map<string, Provider>();
   
-  if (result.length > 0) {
-    const cols = result[0].columns;
-    for (const row of result[0].values) {
-      const p = rowToObject(cols, row);
-      providers.set(p.id, {
-        id: p.id,
-        name: p.name,
-        trust_score: p.trust_score,
-        total_orders: p.total_orders,
-        successful_orders: p.successful_orders,
-      });
-    }
+  for (const p of providers) {
+    providerMap.set(p.id, {
+      id: p.id,
+      name: p.name,
+      trust_score: p.trustScore,
+      total_orders: p.totalOrders,
+      successful_orders: p.successfulOrders,
+    });
   }
   
-  return providers;
+  return providerMap;
 }
 
 // ==================== SYNC APIs (from BPP) ====================
 
-import { saveDb } from './db';
-
 /**
  * Sync a provider from BPP
  */
-export function syncProvider(provider: {
+export async function syncProvider(provider: {
   id: string;
   name: string;
   trust_score?: number;
-}): void {
-  const db = getDb();
-  
-  // Check if exists
-  const existing = db.exec('SELECT id FROM providers WHERE id = ?', [provider.id]);
-  
-  if (existing.length > 0 && existing[0].values.length > 0) {
-    // Update
-    db.run(
-      'UPDATE providers SET name = ?, trust_score = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [provider.name, provider.trust_score || 0.5, provider.id]
-    );
-  } else {
-    // Insert
-    db.run(
-      'INSERT INTO providers (id, name, trust_score, total_orders, successful_orders) VALUES (?, ?, ?, 0, 0)',
-      [provider.id, provider.name, provider.trust_score || 0.5]
-    );
-  }
-  saveDb();
+}): Promise<void> {
+  await prisma.provider.upsert({
+    where: { id: provider.id },
+    create: {
+      id: provider.id,
+      name: provider.name,
+      trustScore: provider.trust_score ?? 0.5,
+      totalOrders: 0,
+      successfulOrders: 0,
+    },
+    update: {
+      name: provider.name,
+      trustScore: provider.trust_score ?? 0.5,
+    },
+  });
 }
 
 /**
  * Sync a catalog item from BPP
  */
-export function syncItem(item: {
+export async function syncItem(item: {
   id: string;
   provider_id: string;
   source_type: string;
@@ -200,53 +166,32 @@ export function syncItem(item: {
   available_qty: number;
   production_windows?: TimeWindow[];
   meter_id?: string;
-}): void {
-  const db = getDb();
-  
-  // Check if exists
-  const existing = db.exec('SELECT id FROM catalog_items WHERE id = ?', [item.id]);
-  
-  if (existing.length > 0 && existing[0].values.length > 0) {
-    // Update
-    db.run(
-      `UPDATE catalog_items SET 
-        source_type = ?, delivery_mode = ?, available_qty = ?, 
-        meter_id = ?, production_windows_json = ?, raw_json = ?
-       WHERE id = ?`,
-      [
-        item.source_type,
-        item.delivery_mode,
-        item.available_qty,
-        item.meter_id || null,
-        JSON.stringify(item.production_windows || []),
-        JSON.stringify(item),
-        item.id
-      ]
-    );
-  } else {
-    // Insert
-    db.run(
-      `INSERT INTO catalog_items (id, provider_id, source_type, delivery_mode, available_qty, meter_id, production_windows_json, raw_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        item.id,
-        item.provider_id,
-        item.source_type,
-        item.delivery_mode,
-        item.available_qty,
-        item.meter_id || null,
-        JSON.stringify(item.production_windows || []),
-        JSON.stringify(item)
-      ]
-    );
-  }
-  saveDb();
+}): Promise<void> {
+  await prisma.catalogItem.upsert({
+    where: { id: item.id },
+    create: {
+      id: item.id,
+      providerId: item.provider_id,
+      sourceType: item.source_type,
+      deliveryMode: item.delivery_mode,
+      availableQty: item.available_qty,
+      meterId: item.meter_id || null,
+      productionWindowsJson: JSON.stringify(item.production_windows || []),
+    },
+    update: {
+      sourceType: item.source_type,
+      deliveryMode: item.delivery_mode,
+      availableQty: item.available_qty,
+      meterId: item.meter_id || null,
+      productionWindowsJson: JSON.stringify(item.production_windows || []),
+    },
+  });
 }
 
 /**
  * Sync an offer from BPP (creates blocks if new offer)
  */
-export function syncOffer(offer: {
+export async function syncOffer(offer: {
   id: string;
   item_id: string;
   provider_id: string;
@@ -255,117 +200,123 @@ export function syncOffer(offer: {
   max_qty: number;
   time_window: TimeWindow;
   offer_attributes?: OfferAttributes;
-}): void {
-  const db = getDb();
-  
+}): Promise<void> {
   const offerAttributes = offer.offer_attributes || {
     pricingModel: 'PER_KWH',
     settlementType: 'DAILY',
   };
   
   // Check if exists
-  const existing = db.exec('SELECT id FROM catalog_offers WHERE id = ?', [offer.id]);
-  const isNew = existing.length === 0 || existing[0].values.length === 0;
+  const existing = await prisma.catalogOffer.findUnique({
+    where: { id: offer.id },
+  });
   
-  if (!isNew) {
+  if (existing) {
     // Update existing offer
-    db.run(
-      `UPDATE catalog_offers SET 
-        price_value = ?, currency = ?, max_qty = ?, 
-        time_window_json = ?, offer_attributes_json = ?, raw_json = ?
-       WHERE id = ?`,
-      [
-        offer.price_value,
-        offer.currency,
-        offer.max_qty,
-        JSON.stringify(offer.time_window),
-        JSON.stringify(offerAttributes),
-        JSON.stringify(offer),
-        offer.id
-      ]
-    );
+    await prisma.catalogOffer.update({
+      where: { id: offer.id },
+      data: {
+        priceValue: offer.price_value,
+        currency: offer.currency,
+        maxQty: offer.max_qty,
+        timeWindowStart: new Date(offer.time_window.startTime),
+        timeWindowEnd: new Date(offer.time_window.endTime),
+        pricingModel: offerAttributes.pricingModel,
+        settlementType: offerAttributes.settlementType,
+      },
+    });
   } else {
-    // Insert new offer
-    db.run(
-      `INSERT INTO catalog_offers (id, item_id, provider_id, offer_attributes_json, price_value, currency, max_qty, time_window_json, raw_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        offer.id,
-        offer.item_id,
-        offer.provider_id,
-        JSON.stringify(offerAttributes),
-        offer.price_value,
-        offer.currency,
-        offer.max_qty,
-        JSON.stringify(offer.time_window),
-        JSON.stringify(offer)
-      ]
-    );
+    // Create new offer
+    await prisma.catalogOffer.create({
+      data: {
+        id: offer.id,
+        itemId: offer.item_id,
+        providerId: offer.provider_id,
+        priceValue: offer.price_value,
+        currency: offer.currency,
+        maxQty: offer.max_qty,
+        timeWindowStart: new Date(offer.time_window.startTime),
+        timeWindowEnd: new Date(offer.time_window.endTime),
+        pricingModel: offerAttributes.pricingModel,
+        settlementType: offerAttributes.settlementType,
+      },
+    });
     
     // Create blocks for new offer (1 block = 1 unit)
-    const now = new Date().toISOString();
-    for (let i = 0; i < offer.max_qty; i++) {
-      const blockId = `block-${offer.id}-${i}`;
-      db.run(
-        `INSERT INTO offer_blocks (id, offer_id, item_id, provider_id, status, price_value, currency, time_window_json, created_at)
-         VALUES (?, ?, ?, ?, 'AVAILABLE', ?, ?, ?, ?)`,
-        [blockId, offer.id, offer.item_id, offer.provider_id, offer.price_value, offer.currency, JSON.stringify(offer.time_window), now]
-      );
-    }
+    const blockData = Array.from({ length: offer.max_qty }, (_, i) => ({
+      id: `block-${offer.id}-${i}`,
+      offerId: offer.id,
+      itemId: offer.item_id,
+      providerId: offer.provider_id,
+      status: 'AVAILABLE',
+      priceValue: offer.price_value,
+      currency: offer.currency,
+    }));
+    
+    await prisma.offerBlock.createMany({
+      data: blockData,
+    });
   }
-  saveDb();
 }
 
 /**
  * Update block status in CDS (when blocks are sold/reserved in BPP)
  */
-export function updateBlockStatus(
+export async function updateBlockStatus(
   offerId: string,
   blockIds: string[],
   status: 'AVAILABLE' | 'RESERVED' | 'SOLD',
   orderId?: string,
   transactionId?: string
-): void {
-  const db = getDb();
-  const now = new Date().toISOString();
-  
+): Promise<void> {
   if (blockIds.length === 0) return;
   
-  const placeholders = blockIds.map(() => '?').join(',');
-  const updateFields: string[] = ['status = ?'];
-  const updateValues: any[] = [status];
+  const now = new Date();
   
-  if (status === 'RESERVED' || status === 'SOLD') {
-    updateFields.push('order_id = ?', 'transaction_id = ?');
-    updateValues.push(orderId || null, transactionId || null);
-    
-    if (status === 'RESERVED') {
-      updateFields.push('reserved_at = ?');
-      updateValues.push(now);
-    } else if (status === 'SOLD') {
-      updateFields.push('sold_at = ?');
-      updateValues.push(now);
-    }
-  } else {
-    // AVAILABLE - clear order references
-    updateFields.push('order_id = NULL', 'transaction_id = NULL', 'reserved_at = NULL', 'sold_at = NULL');
+  if (status === 'AVAILABLE') {
+    await prisma.offerBlock.updateMany({
+      where: { id: { in: blockIds } },
+      data: {
+        status: 'AVAILABLE',
+        orderId: null,
+        transactionId: null,
+        reservedAt: null,
+        soldAt: null,
+      },
+    });
+  } else if (status === 'RESERVED') {
+    await prisma.offerBlock.updateMany({
+      where: { id: { in: blockIds } },
+      data: {
+        status: 'RESERVED',
+        orderId: orderId || null,
+        transactionId: transactionId || null,
+        reservedAt: now,
+      },
+    });
+  } else if (status === 'SOLD') {
+    await prisma.offerBlock.updateMany({
+      where: { id: { in: blockIds } },
+      data: {
+        status: 'SOLD',
+        orderId: orderId || null,
+        transactionId: transactionId || null,
+        soldAt: now,
+      },
+    });
   }
-  
-  updateValues.push(...blockIds);
-  
-  db.run(
-    `UPDATE offer_blocks SET ${updateFields.join(', ')} WHERE id IN (${placeholders})`,
-    updateValues
-  );
-  saveDb();
 }
 
 /**
  * Delete an offer (also deletes blocks)
  */
-export function deleteOffer(offerId: string): void {
-  const db = getDb();
-  db.run('DELETE FROM offer_blocks WHERE offer_id = ?', [offerId]);
-  db.run('DELETE FROM catalog_offers WHERE id = ?', [offerId]);
-  saveDb();
+export async function deleteOffer(offerId: string): Promise<void> {
+  // Delete blocks first (cascade should handle this, but being explicit)
+  await prisma.offerBlock.deleteMany({
+    where: { offerId },
+  });
+  
+  await prisma.catalogOffer.delete({
+    where: { id: offerId },
+  });
 }

@@ -1,7 +1,7 @@
 {
   "name": "@p2p/bap",
   "version": "1.0.0",
-  "description": "Beckn Application Platform (Consumer) for P2P Energy Trading",
+  "description": "Beckn Application Platform (Consumer + Provider) for P2P Energy Trading",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,6 @@
     "axios": "^1.6.7",
     "express": "^4.18.2",
     "jsonpath-plus": "10.3.0",
-    "sql.js": "^1.10.2",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

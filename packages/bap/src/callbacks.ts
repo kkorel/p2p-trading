@@ -25,7 +25,7 @@ const logger = createLogger('BAP');
 /**
  * POST /callbacks/on_discover - Receive catalog from CDS
  */
-router.post('/on_discover', (req: Request, res: Response) => {
+router.post('/on_discover', async (req: Request, res: Response) => {
   const message = req.body as OnDiscoverMessage;
   const { context, message: content } = message;
   
@@ -36,19 +36,31 @@ router.post('/on_discover', (req: Request, res: Response) => {
   });
   
   // Check for duplicate
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate on_discover callback ignored', { message_id: context.message_id });
     return res.json({ status: 'ok', message: 'duplicate ignored' });
   }
   
   // Log event
-  logEvent(context.transaction_id, context.message_id, 'on_discover', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'on_discover', 'INBOUND', JSON.stringify(message));
   
-  // Extract providers and offers for matching
+  // Update transaction state
+  let txState = await getTransaction(context.transaction_id);
+  if (!txState) {
+    txState = await createTransaction(context.transaction_id);
+  }
+  
+  // Get the provider ID to exclude (user's own provider)
+  const excludeProviderId = txState.excludeProviderId;
+  
+  // Filter out user's own provider from catalog
+  const filteredProviders = content.catalog.providers.filter(p => p.id !== excludeProviderId);
+  
+  // Extract providers and offers for matching (excluding user's own)
   const providers = new Map<string, Provider>();
   const allOffers: CatalogOffer[] = [];
   
-  for (const providerCatalog of content.catalog.providers) {
+  for (const providerCatalog of filteredProviders) {
     // Create basic provider entry (trust scores would come from a real provider registry)
     providers.set(providerCatalog.id, {
       id: providerCatalog.id,
@@ -63,11 +75,11 @@ router.post('/on_discover', (req: Request, res: Response) => {
     }
   }
   
-  // Update transaction state
-  let txState = getTransaction(context.transaction_id);
-  if (!txState) {
-    txState = createTransaction(context.transaction_id);
-  }
+  // Update catalog with filtered providers
+  const filteredCatalog = {
+    ...content.catalog,
+    providers: filteredProviders,
+  };
   
   // Run matching algorithm if we have discovery criteria stored
   let matchingResults = null;
@@ -95,23 +107,29 @@ router.post('/on_discover', (req: Request, res: Response) => {
     }
   }
   
-  updateTransaction(context.transaction_id, {
-    catalog: content.catalog,
+  await updateTransaction(context.transaction_id, {
+    catalog: filteredCatalog,
     providers,
     matchingResults,
     status: 'SELECTING',
   });
   
-  const itemCount = content.catalog.providers.reduce((sum, p) => sum + p.items.length, 0);
+  const itemCount = filteredCatalog.providers.reduce((sum, p) => sum + p.items.length, 0);
   const offerCount = allOffers.length;
   
-  logger.info(`Catalog received: ${content.catalog.providers.length} providers, ${itemCount} items, ${offerCount} offers`, {
+  if (excludeProviderId) {
+    logger.info(`Filtered out user's own provider ${excludeProviderId} from catalog`, {
+      transaction_id: context.transaction_id,
+    });
+  }
+  
+  logger.info(`Catalog received: ${filteredCatalog.providers.length} providers, ${itemCount} items, ${offerCount} offers`, {
     transaction_id: context.transaction_id,
   });
   
   res.json({ 
     status: 'ok', 
-    providers: content.catalog.providers.length, 
+    providers: filteredCatalog.providers.length, 
     items: itemCount, 
     offers: offerCount,
     bestMatch: matchingResults?.selectedOffer ? {
@@ -125,7 +143,7 @@ router.post('/on_discover', (req: Request, res: Response) => {
 /**
  * POST /callbacks/on_select - Receive selection confirmation from BPP
  */
-router.post('/on_select', (req: Request, res: Response) => {
+router.post('/on_select', async (req: Request, res: Response) => {
   const message = req.body as OnSelectMessage;
   const { context, message: content } = message;
   
@@ -135,13 +153,13 @@ router.post('/on_select', (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     return res.json({ status: 'ok', message: 'duplicate ignored' });
   }
   
-  logEvent(context.transaction_id, context.message_id, 'on_select', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'on_select', 'INBOUND', JSON.stringify(message));
   
-  updateTransaction(context.transaction_id, {
+  await updateTransaction(context.transaction_id, {
     status: 'INITIALIZING',
   });
   
@@ -155,25 +173,42 @@ router.post('/on_select', (req: Request, res: Response) => {
 /**
  * POST /callbacks/on_init - Receive order initialization from BPP
  */
-router.post('/on_init', (req: Request, res: Response) => {
-  const message = req.body as OnInitMessage;
-  const { context, message: content } = message;
+router.post('/on_init', async (req: Request, res: Response) => {
+  const message = req.body as any; // Can be OnInitMessage or error
+  const { context, message: content, error } = message;
   
   logger.info('Received on_init callback', {
     transaction_id: context.transaction_id,
     message_id: context.message_id,
     action: context.action,
+    hasError: !!error,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     return res.json({ status: 'ok', message: 'duplicate ignored' });
   }
   
-  logEvent(context.transaction_id, context.message_id, 'on_init', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'on_init', 'INBOUND', JSON.stringify(message));
   
-  updateTransaction(context.transaction_id, {
+  // Handle error response
+  if (error) {
+    logger.error(`Order initialization failed: ${error.message}`, {
+      transaction_id: context.transaction_id,
+      error_code: error.code,
+    });
+    
+    await updateTransaction(context.transaction_id, {
+      status: 'DISCOVERING', // Reset status so user can try again
+      error: error.message,
+    });
+    
+    return res.json({ status: 'error', error: error.message });
+  }
+  
+  await updateTransaction(context.transaction_id, {
     order: content.order,
     status: 'CONFIRMING',
+    error: undefined, // Clear any previous error
   });
   
   logger.info(`Order initialized: ${content.order.id}, status: ${content.order.status}`, {
@@ -196,13 +231,13 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     return res.json({ status: 'ok', message: 'duplicate ignored' });
   }
   
-  logEvent(context.transaction_id, context.message_id, 'on_confirm', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'on_confirm', 'INBOUND', JSON.stringify(message));
   
-  updateTransaction(context.transaction_id, {
+  await updateTransaction(context.transaction_id, {
     order: content.order,
     status: 'ACTIVE',
   });
@@ -217,7 +252,7 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
 /**
  * POST /callbacks/on_status - Receive order status from BPP
  */
-router.post('/on_status', (req: Request, res: Response) => {
+router.post('/on_status', async (req: Request, res: Response) => {
   const message = req.body as OnStatusMessage;
   const { context, message: content } = message;
   
@@ -227,13 +262,13 @@ router.post('/on_status', (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     return res.json({ status: 'ok', message: 'duplicate ignored' });
   }
   
-  logEvent(context.transaction_id, context.message_id, 'on_status', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'on_status', 'INBOUND', JSON.stringify(message));
   
-  updateTransaction(context.transaction_id, {
+  await updateTransaction(context.transaction_id, {
     order: content.order,
   });
   
