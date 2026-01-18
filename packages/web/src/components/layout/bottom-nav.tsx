@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { ShoppingCart, Store, User } from 'lucide-react';
+import { ShoppingCart, Store, ShoppingBag, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -15,6 +15,11 @@ const navItems = [
     href: '/sell',
     label: 'Sell',
     icon: Store,
+  },
+  {
+    href: '/orders',
+    label: 'My Orders',
+    icon: ShoppingBag,
   },
   {
     href: '/profile',

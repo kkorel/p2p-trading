@@ -5,8 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(value: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
+export function formatCurrency(value: number, currency = 'INR'): string {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
@@ -15,28 +15,28 @@ export function formatCurrency(value: number, currency = 'USD'): string {
 }
 
 export function formatNumber(value: number, decimals = 1): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 0,
     maximumFractionDigits: decimals,
   }).format(value);
 }
 
 export function formatTime(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString('en-US', {
+  return new Date(isoString).toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
   });
 }
 
 export function formatDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString('en-US', {
+  return new Date(isoString).toLocaleDateString('en-IN', {
     month: 'short',
     day: 'numeric',
   });
 }
 
 export function formatDateTime(isoString: string): string {
-  return new Date(isoString).toLocaleString('en-US', {
+  return new Date(isoString).toLocaleString('en-IN', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',

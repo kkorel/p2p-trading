@@ -31,7 +31,7 @@ function toOrder(dbOrder: any): Order {
     status: dbOrder.status as OrderStatus,
     items: items,
     quote: quote.price ? quote : {
-      price: { value: dbOrder.totalPrice || 0, currency: dbOrder.currency || 'USD' },
+      price: { value: dbOrder.totalPrice || 0, currency: dbOrder.currency || 'INR' },
       totalQuantity: dbOrder.totalQty || 0,
     },
     created_at: dbOrder.createdAt.toISOString(),
@@ -78,7 +78,8 @@ export async function createOrder(
   offerId: string,
   items: OrderItem[],
   quote: Quote,
-  status: OrderStatus = 'PENDING'
+  status: OrderStatus = 'PENDING',
+  buyerId?: string | null
 ): Promise<Order> {
   const orderId = uuidv4();
   
@@ -89,6 +90,7 @@ export async function createOrder(
       status,
       providerId,
       selectedOfferId: offerId,
+      buyerId: buyerId || undefined,
       totalQty: quote.totalQuantity,
       totalPrice: quote.price.value,
       currency: quote.price.currency,

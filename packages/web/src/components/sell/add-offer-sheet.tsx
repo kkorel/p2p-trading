@@ -37,7 +37,7 @@ export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetP
   } = useForm<OfferFormInput>({
     defaultValues: {
       item_id: '',
-      price_per_kwh: '0.12',
+      price_per_kwh: '2',
       max_qty: '30',
       startTime: getDefaultStartTime(),
       endTime: getDefaultEndTime(),
@@ -93,13 +93,13 @@ export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetP
 
         {/* Price */}
         <Input
-          label="Price per kWh ($)"
+          label="Price per kWh (₹)"
           type="number"
-          step="0.01"
-          min={0.01}
-          max={100}
-          leftIcon={<span className="text-sm">$</span>}
-          {...register('price_per_kwh', { required: 'Required', min: { value: 0.01, message: 'Min $0.01' } })}
+          step="0.50"
+          min={1}
+          max={50}
+          leftIcon={<span className="text-sm">₹</span>}
+          {...register('price_per_kwh', { required: 'Required', min: { value: 1, message: 'Min ₹1' }, max: { value: 50, message: 'Max ₹50' } })}
           error={errors.price_per_kwh?.message}
         />
 

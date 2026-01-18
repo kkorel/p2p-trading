@@ -174,13 +174,14 @@ router.post('/on_select', async (req: Request, res: Response) => {
  * POST /callbacks/on_init - Receive order initialization from BPP
  */
 router.post('/on_init', async (req: Request, res: Response) => {
-  const message = req.body as OnInitMessage;
-  const { context, message: content } = message;
+  const message = req.body as any; // Can be OnInitMessage or error
+  const { context, message: content, error } = message;
   
   logger.info('Received on_init callback', {
     transaction_id: context.transaction_id,
     message_id: context.message_id,
     action: context.action,
+    hasError: !!error,
   });
   
   if (await isDuplicateMessage(context.message_id)) {
@@ -189,9 +190,25 @@ router.post('/on_init', async (req: Request, res: Response) => {
   
   await logEvent(context.transaction_id, context.message_id, 'on_init', 'INBOUND', JSON.stringify(message));
   
+  // Handle error response
+  if (error) {
+    logger.error(`Order initialization failed: ${error.message}`, {
+      transaction_id: context.transaction_id,
+      error_code: error.code,
+    });
+    
+    await updateTransaction(context.transaction_id, {
+      status: 'DISCOVERING', // Reset status so user can try again
+      error: error.message,
+    });
+    
+    return res.json({ status: 'error', error: error.message });
+  }
+  
   await updateTransaction(context.transaction_id, {
     order: content.order,
     status: 'CONFIRMING',
+    error: undefined, // Clear any previous error
   });
   
   logger.info(`Order initialized: ${content.order.id}, status: ${content.order.status}`, {

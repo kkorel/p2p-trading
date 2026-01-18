@@ -169,7 +169,7 @@ export async function createTestOffer(
   }> = {}
 ): Promise<{ id: string; itemId: string; providerId: string; maxQty: number }> {
   const offerId = overrides.id || `test-offer-${Date.now()}`;
-  const priceValue = overrides.priceValue ?? 0.10;
+  const priceValue = overrides.priceValue ?? 6.00;
   
   const offer = await prisma.catalogOffer.create({
     data: {
@@ -177,7 +177,7 @@ export async function createTestOffer(
       itemId,
       providerId,
       priceValue,
-      currency: 'USD',
+      currency: 'INR',
       maxQty,
       timeWindowStart: new Date(),
       timeWindowEnd: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -194,7 +194,7 @@ export async function createTestOffer(
     providerId,
     status: 'AVAILABLE',
     priceValue,
-    currency: 'USD',
+    currency: 'INR',
   }));
   
   await prisma.offerBlock.createMany({ data: blockData });

@@ -1,7 +1,7 @@
 // API base is empty since we use Next.js rewrites to proxy to the backend
 const API_BASE = '';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
     super(message);
@@ -125,6 +125,9 @@ export const buyerApi = {
       method: 'POST',
       body: JSON.stringify({ transaction_id: transactionId, order_id: orderId }),
     }),
+
+  getMyOrders: () =>
+    request<{ orders: BuyerOrder[] }>('/api/my-orders'),
 };
 
 // Seller APIs
@@ -198,6 +201,28 @@ export interface Order {
   status: string;
   quote?: { price: { value: number }; totalQuantity: number };
   created_at: string;
+  itemInfo?: {
+    item_id: string;
+    offer_id: string;
+    sold_quantity: number;
+    source_type?: string;
+    price_per_kwh?: number;
+  };
+}
+
+export interface BuyerOrder {
+  id: string;
+  status: string;
+  created_at: string;
+  quote?: { price: { value: number }; totalQuantity: number };
+  provider?: { id: string; name: string };
+  itemInfo: {
+    item_id: string;
+    offer_id: string;
+    source_type: string;
+    price_per_kwh: number;
+    quantity: number;
+  };
 }
 
 export interface DiscoverParams {
@@ -231,6 +256,7 @@ export interface AddOfferParams {
 export interface TransactionState {
   transaction_id: string;
   status: string;
+  error?: string;
   catalog?: {
     providers: Array<{
       id: string;

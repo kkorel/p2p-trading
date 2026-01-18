@@ -52,6 +52,8 @@ export interface TransactionState {
   discoveryCriteria?: DiscoveryCriteria;
   matchingResults?: MatchingResult | null;
   excludeProviderId?: string | null; // User's own provider to exclude from results
+  buyerId?: string | null; // User ID of the buyer for order association
+  error?: string; // Error message if the transaction failed
   status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED';
   created_at: string;
   updated_at: string;

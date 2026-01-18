@@ -88,7 +88,7 @@ router.post('/select', async (req: Request, res: Response) => {
   const orderItems: OrderItem[] = [];
   let totalPrice = 0;
   let totalQuantity = 0;
-  let currency = 'USD';
+  let currency = 'INR';
   let providerId = '';
   
   for (const item of content.orderItems) {
@@ -234,7 +234,7 @@ router.post('/init', async (req: Request, res: Response) => {
       const orderItems: OrderItem[] = [];
       let totalPrice = 0;
       let totalQuantity = 0;
-      let currency = 'USD';
+      let currency = 'INR';
       let providerId = content.order.provider.id;
       let selectedOfferId = '';
       
@@ -713,7 +713,7 @@ router.post('/seller/offers', async (req: Request, res: Response) => {
     item_id,
     provider_id,
     price_per_kwh,
-    currency || 'USD',
+    currency || 'INR',
     max_qty,
     time_window
   );

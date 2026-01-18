@@ -98,7 +98,7 @@ router.post('/select', async (req: Request, res: Response) => {
   const orderItems: OrderItem[] = [];
   let totalPrice = 0;
   let totalQuantity = 0;
-  let currency = 'USD';
+  let currency = 'INR';
   let providerId = '';
   
   for (const item of content.orderItems) {
@@ -240,11 +240,16 @@ router.post('/init', async (req: Request, res: Response) => {
   
   setTimeout(async () => {
     try {
+      // Get buyer ID from transaction state
+      const { getTransactionState } = await import('@p2p/shared');
+      const txState = await getTransactionState(context.transaction_id);
+      const buyerId = txState?.buyerId || null;
+      
       // Build order items and quote
       const orderItems: OrderItem[] = [];
       let totalPrice = 0;
       let totalQuantity = 0;
-      let currency = 'USD';
+      let currency = 'INR';
       let providerId = content.order.provider.id;
       let selectedOfferId = '';
       
@@ -275,20 +280,41 @@ router.post('/init', async (req: Request, res: Response) => {
       };
       
       // Create order first in DRAFT state (so we have a valid order ID for FK constraint)
-      const order = await createOrder(context.transaction_id, providerId, selectedOfferId, orderItems, quote, 'DRAFT');
+      const order = await createOrder(context.transaction_id, providerId, selectedOfferId, orderItems, quote, 'DRAFT', buyerId);
       
       // Now claim blocks using the real order ID
       for (const item of content.order.items) {
         const claimedBlocks = await claimBlocks(item.offer_id, item.quantity, order.id, context.transaction_id);
         
         if (claimedBlocks.length < item.quantity) {
-          // Not enough blocks available - release any claimed blocks and fail
+          // Not enough blocks available - release any claimed blocks and send error callback
           await releaseBlocks(context.transaction_id);
+          const errorMsg = claimedBlocks.length === 0 
+            ? 'This offer is sold out. Please try a different offer.'
+            : `Only ${claimedBlocks.length} kWh available, but you requested ${item.quantity} kWh.`;
+          
           logger.error(`Not enough blocks available: requested ${item.quantity}, got ${claimedBlocks.length}`, {
             transaction_id: context.transaction_id,
             offer_id: item.offer_id,
           });
-          throw new Error(`Not enough blocks available: requested ${item.quantity}, available ${claimedBlocks.length}`);
+          
+          // Send error callback
+          const errorCallbackContext = createCallbackContext(context, 'on_init');
+          const errorCallback = {
+            context: errorCallbackContext,
+            error: {
+              code: 'INSUFFICIENT_INVENTORY',
+              message: errorMsg,
+            },
+          };
+          
+          try {
+            await axios.post(`${context.bap_uri}/callbacks/on_init`, errorCallback);
+          } catch (e) {
+            logger.error('Failed to send error callback');
+          }
+          
+          return; // Exit the setTimeout callback
         }
         
         // Sync reserved blocks to CDS
@@ -652,7 +678,7 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
     
     const orders = await getOrdersByProviderId(providerId);
     
-    // Enrich orders with block information
+    // Enrich orders with block and item information
     const enrichedOrders = await Promise.all(orders.map(async (order) => {
       try {
         if (order.items && order.items.length > 0) {
@@ -661,6 +687,14 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
           const actualSoldQty = orderBlocks.length;
           const blockStats = await getBlockStats(firstItem.offer_id);
           
+          // Fetch item and offer details
+          const item = await prisma.catalogItem.findUnique({
+            where: { id: firstItem.item_id },
+          });
+          const offer = await prisma.catalogOffer.findUnique({
+            where: { id: firstItem.offer_id },
+          });
+          
           return {
             ...order,
             itemInfo: {
@@ -668,6 +702,8 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
               offer_id: firstItem.offer_id,
               sold_quantity: actualSoldQty,
               block_stats: blockStats,
+              source_type: item?.sourceType || 'UNKNOWN',
+              price_per_kwh: offer?.priceValue || 0,
             },
           };
         }
@@ -849,7 +885,7 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
     item_id,
     provider_id,
     price_per_kwh,
-    currency || 'USD',
+    currency || 'INR',
     max_qty,
     time_window
   );

@@ -126,14 +126,19 @@ export default function BuyPage() {
       let txState = await buyerApi.getTransaction(transaction.transaction_id);
       let attempts = 0;
       
-      while (!txState.order && attempts < 10) {
+      while (!txState.order && !txState.error && attempts < 10) {
         await new Promise(r => setTimeout(r, 500));
         txState = await buyerApi.getTransaction(transaction.transaction_id);
         attempts++;
       }
 
+      // Check for error first
+      if (txState.error) {
+        throw new Error(txState.error);
+      }
+
       if (!txState.order) {
-        throw new Error('Order creation failed');
+        throw new Error('Order creation failed. Please try again.');
       }
 
       // Confirm order

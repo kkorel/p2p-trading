@@ -74,8 +74,8 @@ export default function SellPage() {
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: 'listings', label: 'Listings', count: items.length },
-    { id: 'offers', label: 'Offers', count: offers.length },
-    { id: 'orders', label: 'Orders', count: orders.length },
+    { id: 'offers', label: 'My Offers', count: offers.length },
+    { id: 'orders', label: 'Incoming Orders', count: orders.length },
   ];
 
   if (isLoading) {
@@ -194,38 +194,49 @@ export default function SellPage() {
               />
             ) : (
               <>
-                {offers.map((offer) => (
-                  <Card key={offer.id}>
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="text-base font-semibold text-[var(--color-primary)]">
-                          {formatCurrency(offer.price.value)}/kWh
-                        </p>
-                        <p className="text-xs text-[var(--color-text-muted)]">
-                          {offer.maxQuantity} kWh max
-                        </p>
+                {offers.map((offer) => {
+                  // Find the listing (item) this offer is for
+                  const item = items.find(i => i.id === offer.item_id);
+                  const SourceIcon = item ? sourceIcons[item.source_type] || Package : Package;
+                  
+                  return (
+                    <Card key={offer.id}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-[10px] bg-[var(--color-primary-light)] flex items-center justify-center">
+                            <SourceIcon className="h-5 w-5 text-[var(--color-primary)]" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-[var(--color-text)]">
+                              {item?.source_type || 'Energy'} Offer
+                            </p>
+                            <p className="text-base font-semibold text-[var(--color-primary)]">
+                              {formatCurrency(offer.price.value)}/kWh
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteOffer(offer.id)}
+                          className="p-2 -mr-2 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleDeleteOffer(offer.id)}
-                        className="p-2 -mr-2 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>
-                        {formatTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
-                      </span>
-                    </div>
-                    {offer.blockStats && (
-                      <div className="flex gap-2 mt-2">
-                        <Badge variant="success">{offer.blockStats.available} available</Badge>
-                        <Badge variant="default">{offer.blockStats.total - offer.blockStats.available} sold</Badge>
+                      <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] mb-2">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>
+                          {formatTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
+                        </span>
                       </div>
-                    )}
-                  </Card>
-                ))}
+                      {offer.blockStats && (
+                        <div className="flex gap-2">
+                          <Badge variant="success">{offer.blockStats.available} available</Badge>
+                          <Badge variant="default">{offer.blockStats.total - offer.blockStats.available} sold</Badge>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
                 <Button variant="secondary" fullWidth onClick={() => setShowAddOffer(true)}>
                   <Plus className="h-4 w-4" />
                   Add Offer
@@ -240,42 +251,65 @@ export default function SellPage() {
             {orders.length === 0 ? (
               <EmptyState
                 icon={<ShoppingBag className="h-12 w-12" />}
-                title="No orders yet"
+                title="No incoming orders yet"
                 description="Orders will appear here when buyers purchase your energy"
               />
             ) : (
-              orders.map((order) => (
-                <Card key={order.id}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--color-text)]">
-                        Order #{truncateId(order.id)}
-                      </p>
-                      <p className="text-xs text-[var(--color-text-muted)]">
-                        {formatDateTime(order.created_at)}
-                      </p>
+              orders.map((order) => {
+                const SourceIcon = order.itemInfo?.source_type ? sourceIcons[order.itemInfo.source_type] || Package : Package;
+                return (
+                  <Card key={order.id}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-[10px] bg-[var(--color-primary-light)] flex items-center justify-center">
+                          <SourceIcon className="h-5 w-5 text-[var(--color-primary)]" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-[var(--color-text)]">
+                            {order.itemInfo?.source_type || 'Energy'} Purchase
+                          </p>
+                          <p className="text-xs text-[var(--color-text-muted)]">
+                            {formatDateTime(order.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge
+                        variant={
+                          order.status === 'ACTIVE' ? 'success' :
+                          order.status === 'PENDING' ? 'warning' : 'default'
+                        }
+                      >
+                        {order.status}
+                      </Badge>
                     </div>
-                    <Badge
-                      variant={
-                        order.status === 'ACTIVE' ? 'success' :
-                        order.status === 'PENDING' ? 'warning' : 'default'
-                      }
-                    >
-                      {order.status}
-                    </Badge>
-                  </div>
-                  {order.quote && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[var(--color-text-muted)]">
-                        {order.quote.totalQuantity} kWh
-                      </span>
-                      <span className="font-medium text-[var(--color-success)]">
-                        {formatCurrency(order.quote.price.value)}
-                      </span>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-xs text-[var(--color-text-muted)]">Quantity</p>
+                        <p className="font-medium text-[var(--color-text)]">
+                          {order.itemInfo?.sold_quantity || order.quote?.totalQuantity || 0} kWh
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--color-text-muted)]">Rate</p>
+                        <p className="font-medium text-[var(--color-text)]">
+                          {formatCurrency(order.itemInfo?.price_per_kwh || 0)}/kWh
+                        </p>
+                      </div>
                     </div>
-                  )}
-                </Card>
-              ))
+                    {order.quote && (
+                      <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--color-border)]">
+                        <span className="text-sm text-[var(--color-text-muted)]">Total</span>
+                        <span className="text-base font-semibold text-[var(--color-success)]">
+                          {formatCurrency(order.quote.price.value)}
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-xs text-[var(--color-text-muted)] mt-2">
+                      Order ID: {truncateId(order.id)}
+                    </p>
+                  </Card>
+                );
+              })
             )}
           </div>
         )}

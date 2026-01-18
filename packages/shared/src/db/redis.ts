@@ -97,6 +97,9 @@ export interface TransactionState {
   order?: any;
   discoveryCriteria?: any;
   matchingResults?: any;
+  excludeProviderId?: string | null;
+  buyerId?: string | null;
+  error?: string;
   status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED';
   created_at: string;
   updated_at: string;

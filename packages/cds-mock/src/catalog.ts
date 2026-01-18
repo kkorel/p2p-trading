@@ -63,24 +63,27 @@ export async function getCatalog(): Promise<Catalog> {
         },
       });
       
-      itemOffers.push({
-        id: offer.id,
-        item_id: offer.itemId,
-        provider_id: offer.providerId,
-        offerAttributes: {
-          pricingModel: offer.pricingModel as 'PER_KWH' | 'FLAT_RATE',
-          settlementType: offer.settlementType as 'DAILY' | 'WEEKLY' | 'MONTHLY',
-        },
-        price: {
-          value: offer.priceValue,
-          currency: offer.currency,
-        },
-        maxQuantity: availableBlocks > 0 ? availableBlocks : offer.maxQty,
-        timeWindow: {
-          startTime: offer.timeWindowStart.toISOString(),
-          endTime: offer.timeWindowEnd.toISOString(),
-        },
-      });
+      // Only include offers that have available blocks
+      if (availableBlocks > 0) {
+        itemOffers.push({
+          id: offer.id,
+          item_id: offer.itemId,
+          provider_id: offer.providerId,
+          offerAttributes: {
+            pricingModel: offer.pricingModel as 'PER_KWH' | 'FLAT_RATE',
+            settlementType: offer.settlementType as 'DAILY' | 'WEEKLY' | 'MONTHLY',
+          },
+          price: {
+            value: offer.priceValue,
+            currency: offer.currency,
+          },
+          maxQuantity: availableBlocks, // Use actual available quantity
+          timeWindow: {
+            startTime: offer.timeWindowStart.toISOString(),
+            endTime: offer.timeWindowEnd.toISOString(),
+          },
+        });
+      }
     }
     
     const productionWindows = JSON.parse(item.productionWindowsJson || '[]') as TimeWindow[];
