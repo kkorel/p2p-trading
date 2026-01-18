@@ -155,6 +155,12 @@ export const sellerApi = {
       body: JSON.stringify(data),
     }),
 
+  addOfferDirect: (data: AddOfferDirectParams) =>
+    request<{ status: string; offer: Offer }>('/seller/offers/direct', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   deleteOffer: (id: string) =>
     request<{ status: string }>(`/seller/offers/${id}`, { method: 'DELETE' }),
 };
@@ -190,6 +196,7 @@ export interface Offer {
   id: string;
   item_id: string;
   provider_id: string;
+  source_type?: string;
   price: { value: number; currency: string };
   maxQuantity: number;
   timeWindow: { startTime: string; endTime: string };
@@ -247,6 +254,14 @@ export interface AddItemParams {
 
 export interface AddOfferParams {
   item_id: string;
+  price_per_kwh: number;
+  currency?: string;
+  max_qty: number;
+  time_window: { startTime: string; endTime: string };
+}
+
+export interface AddOfferDirectParams {
+  source_type: string;
   price_per_kwh: number;
   currency?: string;
   max_qty: number;

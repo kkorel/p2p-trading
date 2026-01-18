@@ -647,10 +647,14 @@ router.get('/seller/my-profile', authMiddleware, async (req: Request, res: Respo
     const items = await getProviderItems(providerId);
     const offers = await getProviderOffers(providerId);
     
-    // Add block stats to offers
+    // Create a map of item_id to source_type for quick lookup
+    const itemSourceMap = new Map(items.map(item => [item.id, item.source_type]));
+    
+    // Add block stats and source_type to offers
     const offersWithStats = await Promise.all(offers.map(async (offer) => {
       const blockStats = await getBlockStats(offer.id);
-      return { ...offer, blockStats };
+      const source_type = itemSourceMap.get(offer.item_id) || 'SOLAR';
+      return { ...offer, blockStats, source_type };
     }));
     
     res.json({ 
@@ -905,6 +909,81 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
   });
   
   res.json({ status: 'ok', offer });
+});
+
+/**
+ * POST /seller/offers/direct - Create an offer directly (auto-creates item)
+ * Simplified flow for prosumers - no need to create a listing first
+ */
+router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: Response) => {
+  const { 
+    source_type,
+    price_per_kwh, 
+    currency, 
+    max_qty, 
+    time_window 
+  } = req.body;
+  
+  // Use authenticated user's provider
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(400).json({ error: 'No seller profile found. Please set up your seller profile first.' });
+  }
+  
+  if (!source_type || !price_per_kwh || !max_qty || !time_window) {
+    return res.status(400).json({ 
+      error: 'source_type, price_per_kwh, max_qty, and time_window are required' 
+    });
+  }
+  
+  // Auto-create an item for this offer
+  const item = await addCatalogItem(
+    provider_id,
+    source_type.toUpperCase() as any,
+    'SCHEDULED',
+    max_qty,
+    [], // No production windows needed
+    '' // No meter ID needed
+  );
+  
+  logger.info(`Auto-created item ${item.id} for direct offer`);
+  
+  // Create the offer
+  const offer = await addOffer(
+    item.id,
+    provider_id,
+    price_per_kwh,
+    currency || 'INR',
+    max_qty,
+    time_window
+  );
+  
+  logger.info(`New direct offer created: ${offer.id}`);
+  
+  // Sync item to CDS
+  await syncItemToCDS(item);
+  
+  // Sync offer to CDS
+  await syncOfferToCDS({
+    id: offer.id,
+    item_id: offer.item_id,
+    provider_id: offer.provider_id,
+    price_value: offer.price.value,
+    currency: offer.price.currency,
+    max_qty: offer.maxQuantity,
+    time_window: offer.timeWindow,
+    offer_attributes: offer.offerAttributes,
+  });
+  
+  // Add source_type to the response
+  res.json({ 
+    status: 'ok', 
+    offer: {
+      ...offer,
+      source_type: source_type.toUpperCase(),
+    }
+  });
 });
 
 /**

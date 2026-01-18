@@ -105,7 +105,7 @@ model CatalogOffer {
   itemId          String   @map("item_id")
   providerId      String   @map("provider_id")
   priceValue      Float    @map("price_value")
-  currency        String   @default("USD")
+  currency        String   @default("INR")
   maxQty          Float    @map("max_qty")
   timeWindowStart DateTime @map("time_window_start")
   timeWindowEnd   DateTime @map("time_window_end")
@@ -133,7 +133,7 @@ model OfferBlock {
   orderId       String?   @map("order_id")
   transactionId String?   @map("transaction_id")
   priceValue    Float     @map("price_value")
-  currency      String    @default("USD")
+  currency      String    @default("INR")
   version       Int       @default(0) // Optimistic locking version
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")

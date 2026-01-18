@@ -3,10 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Package, Tag, ShoppingBag, Sun, Wind, Droplets, Trash2, Clock } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
-import { AddListingSheet } from '@/components/sell/add-listing-sheet';
 import { AddOfferSheet } from '@/components/sell/add-offer-sheet';
-import { Card, CardHeader, CardTitle, Button, Badge, EmptyState, SkeletonList } from '@/components/ui';
-import { sellerApi, type CatalogItem, type Offer, type Order, type Provider } from '@/lib/api';
+import { Card, Button, Badge, EmptyState, SkeletonList } from '@/components/ui';
+import { sellerApi, type Offer, type Order, type Provider } from '@/lib/api';
 import { formatCurrency, formatTime, formatDateTime, truncateId, cn } from '@/lib/utils';
 
 const sourceIcons: Record<string, typeof Sun> = {
@@ -15,17 +14,15 @@ const sourceIcons: Record<string, typeof Sun> = {
   HYDRO: Droplets,
 };
 
-type Tab = 'listings' | 'offers' | 'orders';
+type Tab = 'offers' | 'orders';
 
 export default function SellPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('listings');
+  const [activeTab, setActiveTab] = useState<Tab>('offers');
   const [isLoading, setIsLoading] = useState(true);
   const [provider, setProvider] = useState<Provider | null>(null);
-  const [items, setItems] = useState<CatalogItem[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   
-  const [showAddListing, setShowAddListing] = useState(false);
   const [showAddOffer, setShowAddOffer] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -37,7 +34,6 @@ export default function SellPage() {
       ]);
       
       setProvider(profileData.provider);
-      setItems(profileData.items);
       setOffers(profileData.offers);
       setOrders(ordersData.orders);
     } catch (error) {
@@ -51,18 +47,13 @@ export default function SellPage() {
     loadData();
   }, [loadData]);
 
-  const handleAddListing = async (data: { source_type: string; available_qty: number; meter_id?: string }) => {
-    await sellerApi.addItem(data);
-    await loadData();
-  };
-
   const handleAddOffer = async (data: {
-    item_id: string;
+    source_type: string;
     price_per_kwh: number;
     max_qty: number;
     time_window: { startTime: string; endTime: string };
   }) => {
-    await sellerApi.addOffer(data);
+    await sellerApi.addOfferDirect(data);
     await loadData();
   };
 
@@ -73,7 +64,6 @@ export default function SellPage() {
   };
 
   const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: 'listings', label: 'Listings', count: items.length },
     { id: 'offers', label: 'My Offers', count: offers.length },
     { id: 'orders', label: 'Incoming Orders', count: orders.length },
   ];
@@ -91,20 +81,16 @@ export default function SellPage() {
       <div className="flex flex-col gap-4">
         {/* Stats */}
         {provider && (
-          <div className="grid grid-cols-3 gap-3">
-            <Card padding="sm" className="text-center">
-              <p className="text-xl font-semibold text-[var(--color-text)]">{items.length}</p>
-              <p className="text-xs text-[var(--color-text-muted)]">Listings</p>
-            </Card>
+          <div className="grid grid-cols-2 gap-3">
             <Card padding="sm" className="text-center">
               <p className="text-xl font-semibold text-[var(--color-primary)]">{offers.length}</p>
-              <p className="text-xs text-[var(--color-text-muted)]">Offers</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Active Offers</p>
             </Card>
             <Card padding="sm" className="text-center">
               <p className="text-xl font-semibold text-[var(--color-success)]">
                 {Math.round(provider.trust_score * 100)}%
               </p>
-              <p className="text-xs text-[var(--color-text-muted)]">Trust</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Trust Score</p>
             </Card>
           </div>
         )}
@@ -136,68 +122,23 @@ export default function SellPage() {
         </div>
 
         {/* Content */}
-        {activeTab === 'listings' && (
-          <div className="flex flex-col gap-3">
-            {items.length === 0 ? (
-              <EmptyState
-                icon={<Package className="h-12 w-12" />}
-                title="No listings yet"
-                description="Create your first energy listing to start selling"
-                action={{
-                  label: 'Add Listing',
-                  onClick: () => setShowAddListing(true),
-                }}
-              />
-            ) : (
-              <>
-                {items.map((item) => {
-                  const Icon = sourceIcons[item.source_type] || Package;
-                  return (
-                    <Card key={item.id}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-[10px] bg-[var(--color-primary-light)] flex items-center justify-center">
-                          <Icon className="h-5 w-5 text-[var(--color-primary)]" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-[var(--color-text)]">
-                            {item.source_type} Energy
-                          </p>
-                          <p className="text-xs text-[var(--color-text-muted)]">
-                            {item.available_qty} kWh available
-                          </p>
-                        </div>
-                        <Badge variant="default">{truncateId(item.id)}</Badge>
-                      </div>
-                    </Card>
-                  );
-                })}
-                <Button variant="secondary" fullWidth onClick={() => setShowAddListing(true)}>
-                  <Plus className="h-4 w-4" />
-                  Add Listing
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-
         {activeTab === 'offers' && (
           <div className="flex flex-col gap-3">
             {offers.length === 0 ? (
               <EmptyState
                 icon={<Tag className="h-12 w-12" />}
                 title="No offers yet"
-                description={items.length === 0 ? 'Create a listing first, then add offers' : 'Create an offer to sell your energy'}
-                action={items.length > 0 ? {
-                  label: 'Add Offer',
+                description="Create your first offer to start selling energy"
+                action={{
+                  label: 'Create Offer',
                   onClick: () => setShowAddOffer(true),
-                } : undefined}
+                }}
               />
             ) : (
               <>
                 {offers.map((offer) => {
-                  // Find the listing (item) this offer is for
-                  const item = items.find(i => i.id === offer.item_id);
-                  const SourceIcon = item ? sourceIcons[item.source_type] || Package : Package;
+                  const sourceType = offer.source_type || 'SOLAR';
+                  const SourceIcon = sourceIcons[sourceType] || Package;
                   
                   return (
                     <Card key={offer.id}>
@@ -208,7 +149,7 @@ export default function SellPage() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-[var(--color-text)]">
-                              {item?.source_type || 'Energy'} Offer
+                              {sourceType} Energy
                             </p>
                             <p className="text-base font-semibold text-[var(--color-primary)]">
                               {formatCurrency(offer.price.value)}/kWh
@@ -239,7 +180,7 @@ export default function SellPage() {
                 })}
                 <Button variant="secondary" fullWidth onClick={() => setShowAddOffer(true)}>
                   <Plus className="h-4 w-4" />
-                  Add Offer
+                  Create Offer
                 </Button>
               </>
             )}
@@ -314,16 +255,10 @@ export default function SellPage() {
           </div>
         )}
 
-        {/* Sheets */}
-        <AddListingSheet
-          open={showAddListing}
-          onClose={() => setShowAddListing(false)}
-          onSubmit={handleAddListing}
-        />
+        {/* Add Offer Sheet */}
         <AddOfferSheet
           open={showAddOffer}
           onClose={() => setShowAddOffer(false)}
-          items={items}
           onSubmit={handleAddOffer}
         />
       </div>

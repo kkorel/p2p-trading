@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { BottomSheet, Button, Input, Select } from '@/components/ui';
-import type { CatalogItem } from '@/lib/api';
 
 type OfferFormInput = {
-  item_id: string;
+  source_type: string;
   price_per_kwh: string;
   max_qty: string;
   startTime: string;
@@ -16,16 +15,21 @@ type OfferFormInput = {
 interface AddOfferSheetProps {
   open: boolean;
   onClose: () => void;
-  items: CatalogItem[];
   onSubmit: (data: {
-    item_id: string;
+    source_type: string;
     price_per_kwh: number;
     max_qty: number;
     time_window: { startTime: string; endTime: string };
   }) => Promise<void>;
 }
 
-export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetProps) {
+const sourceTypeOptions = [
+  { value: 'SOLAR', label: 'Solar Energy' },
+  { value: 'WIND', label: 'Wind Energy' },
+  { value: 'HYDRO', label: 'Hydro Energy' },
+];
+
+export function AddOfferSheet({ open, onClose, onSubmit }: AddOfferSheetProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,8 +40,8 @@ export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetP
     formState: { errors },
   } = useForm<OfferFormInput>({
     defaultValues: {
-      item_id: '',
-      price_per_kwh: '2',
+      source_type: 'SOLAR',
+      price_per_kwh: '6',
       max_qty: '30',
       startTime: getDefaultStartTime(),
       endTime: getDefaultEndTime(),
@@ -50,7 +54,7 @@ export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetP
     
     try {
       await onSubmit({
-        item_id: data.item_id,
+        source_type: data.source_type,
         price_per_kwh: parseFloat(data.price_per_kwh),
         max_qty: parseInt(data.max_qty, 10),
         time_window: {
@@ -68,11 +72,6 @@ export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetP
     }
   };
 
-  const itemOptions = items.map((item) => ({
-    value: item.id,
-    label: `${item.source_type} - ${item.available_qty} kWh`,
-  }));
-
   return (
     <BottomSheet open={open} onClose={onClose} title="Create Offer">
       <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col gap-4">
@@ -82,13 +81,12 @@ export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetP
           </div>
         )}
 
-        {/* Item Selection */}
+        {/* Energy Type */}
         <Select
-          label="Energy Listing"
-          options={itemOptions}
-          placeholder="Select a listing"
-          {...register('item_id', { required: 'Select a listing' })}
-          error={errors.item_id?.message}
+          label="Energy Type"
+          options={sourceTypeOptions}
+          {...register('source_type', { required: 'Select energy type' })}
+          error={errors.source_type?.message}
         />
 
         {/* Price */}
@@ -105,25 +103,25 @@ export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetP
 
         {/* Quantity */}
         <Input
-          label="Maximum Quantity (kWh)"
+          label="Quantity (kWh)"
           type="number"
           min={1}
           max={10000}
           {...register('max_qty', { required: 'Required', min: { value: 1, message: 'Min 1 kWh' } })}
           error={errors.max_qty?.message}
-          hint="Max energy for this offer"
+          hint="How much energy you want to sell"
         />
 
         {/* Time Window */}
         <div className="flex flex-col gap-3">
           <Input
-            label="Start Time"
+            label="Available From"
             type="datetime-local"
             {...register('startTime', { required: 'Required' })}
             error={errors.startTime?.message}
           />
           <Input
-            label="End Time"
+            label="Available Until"
             type="datetime-local"
             {...register('endTime', { required: 'Required' })}
             error={errors.endTime?.message}
