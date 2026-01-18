@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, Loader2, AlertCircle } from 'lucide-react';
 import { BottomSheet, Button, Input, Badge } from '@/components/ui';
 import { formatCurrency, formatTime, cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ interface OrderSheetProps {
   onClose: () => void;
   offer: Offer | null;
   providerName: string;
+  initialQuantity?: number;
   onConfirm: (quantity: number) => Promise<Order | null>;
 }
 
@@ -21,12 +22,21 @@ export function OrderSheet({
   onClose,
   offer,
   providerName,
+  initialQuantity,
   onConfirm,
 }: OrderSheetProps) {
   const [step, setStep] = useState<OrderStep>('quantity');
-  const [quantity, setQuantity] = useState(offer?.maxQuantity || 10);
+  const [quantity, setQuantity] = useState(initialQuantity || 10);
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Reset quantity when offer changes or sheet opens
+  useEffect(() => {
+    if (open && offer) {
+      const qty = initialQuantity || Math.min(10, offer.maxQuantity);
+      setQuantity(Math.min(qty, offer.maxQuantity));
+    }
+  }, [open, offer, initialQuantity]);
 
   const totalPrice = offer ? offer.price.value * quantity : 0;
 
@@ -76,7 +86,7 @@ export function OrderSheet({
           <div className="flex items-center justify-between py-3 border-b border-[var(--color-border)]">
             <span className="text-sm text-[var(--color-text-muted)]">Delivery Time</span>
             <span className="text-sm font-medium text-[var(--color-text)]">
-              {formatTime(offer.timeWindow.start)} - {formatTime(offer.timeWindow.end)}
+              {formatTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
             </span>
           </div>
 

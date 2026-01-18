@@ -115,7 +115,7 @@ export function AddOfferSheet({ open, onClose, items, onSubmit }: AddOfferSheetP
         />
 
         {/* Time Window */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-3">
           <Input
             label="Start Time"
             type="datetime-local"

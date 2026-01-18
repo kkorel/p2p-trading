@@ -23,6 +23,7 @@ export default function BuyPage() {
   const [offers, setOffers] = useState<DiscoveredOffer[]>([]);
   const [selectedOffer, setSelectedOffer] = useState<DiscoveredOffer | null>(null);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
+  const [requestedQuantity, setRequestedQuantity] = useState(10);
 
   const handleDiscover = useCallback(async (params: {
     sourceType?: string;
@@ -32,6 +33,7 @@ export default function BuyPage() {
     setIsDiscovering(true);
     setOffers([]);
     setSelectedOffer(null);
+    setRequestedQuantity(params.minQuantity);
 
     try {
       // Start discovery
@@ -211,6 +213,7 @@ export default function BuyPage() {
           onClose={() => setOrderSheetOpen(false)}
           offer={selectedOffer?.offer || null}
           providerName={selectedOffer?.providerName || ''}
+          initialQuantity={requestedQuantity}
           onConfirm={handleConfirmOrder}
         />
       </div>

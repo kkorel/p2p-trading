@@ -100,7 +100,7 @@ export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
         />
 
         {/* Time Window */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-3">
           <Input
             label="Start Time"
             type="datetime-local"

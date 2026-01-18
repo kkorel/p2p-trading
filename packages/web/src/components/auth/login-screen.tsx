@@ -101,9 +101,9 @@ export function LoginScreen() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
+    <div className="min-h-screen bg-[var(--color-surface)] flex flex-col items-center">
       {/* Mobile canvas */}
-      <div className="max-w-[480px] mx-auto w-full flex-1 flex flex-col px-4 py-8">
+      <div className="max-w-[480px] mx-auto w-full min-h-screen flex flex-col px-4 py-8 bg-[var(--color-bg)] shadow-[var(--shadow-sm)]">
         {/* Logo & Title */}
         <div className="flex flex-col items-center pt-8 pb-12">
           <div className="w-16 h-16 bg-[var(--color-primary-light)] rounded-[18px] flex items-center justify-center mb-4">

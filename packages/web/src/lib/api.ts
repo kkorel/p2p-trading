@@ -189,7 +189,7 @@ export interface Offer {
   provider_id: string;
   price: { value: number; currency: string };
   maxQuantity: number;
-  timeWindow: { start: string; end: string };
+  timeWindow: { startTime: string; endTime: string };
   blockStats?: { total: number; available: number };
 }
 

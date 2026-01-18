@@ -77,7 +77,7 @@ export function OfferCard({
       <div className="flex items-center gap-1.5 mb-3 text-xs text-[var(--color-text-secondary)]">
         <Clock className="h-3.5 w-3.5" />
         <span>
-          {formatTime(offer.timeWindow.start)} - {formatTime(offer.timeWindow.end)}
+          {formatTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
         </span>
       </div>
 
