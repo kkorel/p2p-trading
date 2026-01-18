@@ -1,0 +1,19 @@
+{
+  "name": "@p2p/shared",
+  "version": "1.0.0",
+  "description": "Shared types and utilities for P2P Energy Trading",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "@types/uuid": "^9.0.8",
+    "typescript": "^5.3.3"
+  }
+}
