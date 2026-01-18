@@ -166,9 +166,9 @@ router.post('/api/select', async (req: Request, res: Response) => {
       providers.set(providerCatalog.id, {
         id: providerCatalog.id,
         name: providerCatalog.descriptor?.name || 'Unknown',
-        trust_score: 0.75, // Would come from database
-        total_orders: 10,
-        successful_orders: 8,
+        trust_score: config.matching.defaultTrustScore,
+        total_orders: 0,
+        successful_orders: 0,
       });
       
       for (const item of providerCatalog.items) {

@@ -1028,25 +1028,12 @@
         await new Promise(r => setTimeout(r, 300));
         
         const finalState = await api.getTransaction(currentTransaction);
-        // #region agent log
-        console.log('[DEBUG] finalState:', JSON.stringify(finalState, null, 2));
-        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1030',message:'finalState after confirm',data:{hasFinalState:!!finalState,hasOrder:!!finalState?.order,orderKeys:finalState?.order?Object.keys(finalState.order):null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         renderTransactionStatus('ACTIVE', finalState.order);
         
         // Show detailed confirmation and update order summary
         const order = finalState.order;
-        // #region agent log
-        console.log('[DEBUG] order:', order);
-        console.log('[DEBUG] order.quote:', order?.quote);
-        console.log('[DEBUG] order.quote.price:', order?.quote?.price);
-        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1034',message:'order object structure',data:{hasOrder:!!order,hasQuote:!!order?.quote,quoteKeys:order?.quote?Object.keys(order.quote):null,hasPrice:!!order?.quote?.price,priceValue:order?.quote?.price?.value,totalQuantity:order?.quote?.totalQuantity},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C'})}).catch(()=>{});
-        // #endregion
-        const quantity = order?.quote?.totalQuantity || 0;
-        const price = order?.quote?.price?.value || 0;
-        // #region agent log
-        console.log('[DEBUG] quantity:', quantity, 'price:', price);
-        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1036',message:'extracted values',data:{quantity:quantity,quantityType:typeof quantity,price:price,priceType:typeof price},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+        const confirmedQuantity = order?.quote?.totalQuantity || 0;
+        const confirmedPrice = order?.quote?.price?.value || 0;
         
         // Update order summary to show confirmed order
         if (order) {
@@ -1067,26 +1054,19 @@
               </div>
               <div class="order-row">
                 <span class="order-row-label">Quantity</span>
-                <span class="order-row-value">${quantity} kWh</span>
+                <span class="order-row-value">${confirmedQuantity} kWh</span>
               </div>
               <div class="order-row">
                 <span class="order-row-label">Total Price</span>
-                <span class="order-row-value" style="color: var(--accent-green); font-weight: 600;">$${price.toFixed(2)}</span>
+                <span class="order-row-value" style="color: var(--accent-green); font-weight: 600;">$${confirmedPrice.toFixed(2)}</span>
               </div>
             </div>
           `;
         }
         
-        showToast(`🎉 Trade Confirmed! ${quantity} kWh for $${price.toFixed(2)} - Order is now ACTIVE`);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1067',message:'confirm success',data:{quantity,price},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'success'})}).catch(()=>{});
-        // #endregion
+        showToast(`🎉 Trade Confirmed! ${confirmedQuantity} kWh for $${confirmedPrice.toFixed(2)} - Order is now ACTIVE`);
         
       } catch (err) {
-        // #region agent log
-        console.error('[DEBUG] Error caught:', err.message, err.stack);
-        fetch('http://127.0.0.1:7242/ingest/833f0587-702e-4d91-af3c-d0d808ba3a84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:catch',message:'error caught',data:{errorMessage:err.message,errorStack:err.stack},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'error'})}).catch(()=>{});
-        // #endregion
         showToast('Order failed: ' + err.message, true);
       } finally {
         btn.disabled = false;

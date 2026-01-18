@@ -4,15 +4,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { getDb, saveDb } from './db';
-import { Order, OrderStatus, OrderItem, Quote } from '@p2p/shared';
-
-function rowToObject(columns: string[], values: any[]): any {
-  const obj: any = {};
-  columns.forEach((col, i) => {
-    obj[col] = values[i];
-  });
-  return obj;
-}
+import { Order, OrderStatus, OrderItem, Quote, rowToObject } from '@p2p/shared';
 
 /**
  * Get order by transaction ID

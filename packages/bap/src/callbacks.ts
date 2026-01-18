@@ -14,6 +14,7 @@ import {
   Provider,
   matchOffers,
   MatchingCriteria,
+  config,
 } from '@p2p/shared';
 import { logEvent, isDuplicateMessage } from './events';
 import { updateTransaction, getTransaction, createTransaction } from './state';
@@ -52,9 +53,9 @@ router.post('/on_discover', (req: Request, res: Response) => {
     providers.set(providerCatalog.id, {
       id: providerCatalog.id,
       name: providerCatalog.descriptor?.name || 'Unknown',
-      trust_score: 0.75, // Default, would be fetched from registry in production
-      total_orders: 10,
-      successful_orders: 8,
+      trust_score: config.matching.defaultTrustScore,
+      total_orders: 0,
+      successful_orders: 0,
     });
     
     for (const item of providerCatalog.items) {

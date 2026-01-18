@@ -10,7 +10,8 @@ import {
   Catalog, 
   ProviderCatalog,
   TimeWindow,
-  OfferAttributes
+  OfferAttributes,
+  rowToObject
 } from '@p2p/shared';
 
 /**
@@ -83,14 +84,7 @@ export function getCatalog(): Catalog {
   };
 }
 
-function rowToObject(columns: string[], values: any[]): any {
-  const obj: any = {};
-  columns.forEach((col, i) => {
-    obj[col] = values[i];
-  });
-  return obj;
-}
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToItem(row: any, offers: CatalogOffer[]): CatalogItem {
   const productionWindows = JSON.parse(row.production_windows_json) as TimeWindow[];
   
@@ -108,6 +102,7 @@ function rowToItem(row: any, offers: CatalogOffer[]): CatalogItem {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToOffer(row: any): CatalogOffer {
   const db = getDb();
   const timeWindow = JSON.parse(row.time_window_json) as TimeWindow;
@@ -216,12 +211,13 @@ export function syncItem(item: {
     db.run(
       `UPDATE catalog_items SET 
         source_type = ?, delivery_mode = ?, available_qty = ?, 
-        production_windows_json = ?, raw_json = ?
+        meter_id = ?, production_windows_json = ?, raw_json = ?
        WHERE id = ?`,
       [
         item.source_type,
         item.delivery_mode,
         item.available_qty,
+        item.meter_id || null,
         JSON.stringify(item.production_windows || []),
         JSON.stringify(item),
         item.id
@@ -230,14 +226,15 @@ export function syncItem(item: {
   } else {
     // Insert
     db.run(
-      `INSERT INTO catalog_items (id, provider_id, source_type, delivery_mode, available_qty, production_windows_json, raw_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO catalog_items (id, provider_id, source_type, delivery_mode, available_qty, meter_id, production_windows_json, raw_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         item.id,
         item.provider_id,
         item.source_type,
         item.delivery_mode,
         item.available_qty,
+        item.meter_id || null,
         JSON.stringify(item.production_windows || []),
         JSON.stringify(item)
       ]

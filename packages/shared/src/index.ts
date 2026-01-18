@@ -14,3 +14,6 @@ export * from './matching';
 
 // Export config
 export * from './config';
+
+// Export seed data
+export * from './seed';

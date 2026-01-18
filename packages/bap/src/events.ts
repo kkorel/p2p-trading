@@ -3,7 +3,7 @@
  */
 
 import { getDb, saveDb } from './db';
-import { EventDirection } from '@p2p/shared';
+import { EventDirection, rowToObject } from '@p2p/shared';
 
 export function logEvent(
   transaction_id: string,
@@ -26,6 +26,7 @@ export function isDuplicateMessage(message_id: string): boolean {
   return result.length > 0 && result[0].values.length > 0;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getEventsByTransactionId(transaction_id: string): any[] {
   const db = getDb();
   const result = db.exec('SELECT * FROM events WHERE transaction_id = ? ORDER BY created_at', [transaction_id]);
@@ -33,11 +34,5 @@ export function getEventsByTransactionId(transaction_id: string): any[] {
   if (result.length === 0) return [];
   
   const cols = result[0].columns;
-  return result[0].values.map(row => {
-    const obj: any = {};
-    cols.forEach((col, i) => {
-      obj[col] = row[i];
-    });
-    return obj;
-  });
+  return result[0].values.map(row => rowToObject(cols, row));
 }

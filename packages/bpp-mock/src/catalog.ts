@@ -4,15 +4,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { getDb, saveDb } from './db';
-import { CatalogOffer, Provider, TimeWindow, OfferAttributes, SourceType, DeliveryMode, ItemAttributes } from '@p2p/shared';
-
-function rowToObject(columns: string[], values: any[]): any {
-  const obj: any = {};
-  columns.forEach((col, i) => {
-    obj[col] = values[i];
-  });
-  return obj;
-}
+import { CatalogOffer, Provider, TimeWindow, OfferAttributes, SourceType, DeliveryMode, ItemAttributes, rowToObject } from '@p2p/shared';
 
 export interface CatalogItem {
   id: string;

@@ -3,3 +3,4 @@ export * from './utils';
 export * from './db';
 export * from './matching';
 export * from './config';
+export * from './seed';
