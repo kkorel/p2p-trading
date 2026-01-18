@@ -1,113 +1,110 @@
 /**
  * Order management for Seller (BPP) functionality
+ * Using Prisma ORM for PostgreSQL persistence
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { getDb, saveDb } from './db';
-import { Order, OrderStatus, OrderItem, Quote, rowToObject } from '@p2p/shared';
+import { prisma } from './db';
+import { Order, OrderStatus, OrderItem, Quote } from '@p2p/shared';
+
+/**
+ * Convert Prisma order to Order type
+ */
+function toOrder(dbOrder: any): Order {
+  const items = JSON.parse(dbOrder.itemsJson || '[]');
+  const quote = JSON.parse(dbOrder.quoteJson || '{}');
+  
+  return {
+    id: dbOrder.id,
+    transaction_id: dbOrder.transactionId,
+    status: dbOrder.status as OrderStatus,
+    items: items,
+    quote: quote.price ? quote : {
+      price: { value: dbOrder.totalPrice || 0, currency: dbOrder.currency || 'USD' },
+      totalQuantity: dbOrder.totalQty || 0,
+    },
+    created_at: dbOrder.createdAt.toISOString(),
+    updated_at: dbOrder.updatedAt.toISOString(),
+  };
+}
 
 /**
  * Get order by transaction ID
  */
-export function getOrderByTransactionId(transactionId: string): Order | null {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM orders WHERE transaction_id = ?', [transactionId]);
+export async function getOrderByTransactionId(transactionId: string): Promise<Order | null> {
+  const order = await prisma.order.findUnique({
+    where: { transactionId },
+  });
   
-  if (result.length === 0 || result[0].values.length === 0) {
+  if (!order) {
     return null;
   }
   
-  const row = rowToObject(result[0].columns, result[0].values[0]);
-  const rawData = JSON.parse(row.raw_json);
-  
-  return {
-    id: row.id,
-    transaction_id: row.transaction_id,
-    status: row.status as OrderStatus,
-    items: rawData.items || [],
-    quote: rawData.quote || {
-      price: { value: row.total_price, currency: row.currency },
-      totalQuantity: row.total_qty,
-    },
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
+  return toOrder(order);
 }
 
 /**
  * Get order by ID
  */
-export function getOrderById(orderId: string): Order | null {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM orders WHERE id = ?', [orderId]);
+export async function getOrderById(orderId: string): Promise<Order | null> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+  });
   
-  if (result.length === 0 || result[0].values.length === 0) {
+  if (!order) {
     return null;
   }
   
-  const row = rowToObject(result[0].columns, result[0].values[0]);
-  const rawData = JSON.parse(row.raw_json);
-  
-  return {
-    id: row.id,
-    transaction_id: row.transaction_id,
-    status: row.status as OrderStatus,
-    items: rawData.items || [],
-    quote: rawData.quote || {
-      price: { value: row.total_price, currency: row.currency },
-      totalQuantity: row.total_qty,
-    },
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
+  return toOrder(order);
 }
 
 /**
  * Create a new order (draft/pending state)
  */
-export function createOrder(
+export async function createOrder(
   transactionId: string,
   providerId: string,
   offerId: string,
   items: OrderItem[],
   quote: Quote,
   status: OrderStatus = 'PENDING'
-): Order {
-  const db = getDb();
+): Promise<Order> {
   const orderId = uuidv4();
-  const now = new Date().toISOString();
   
-  const rawJson = JSON.stringify({ items, quote });
-  
-  db.run(
-    `INSERT INTO orders (id, transaction_id, status, provider_id, selected_offer_id, total_qty, total_price, currency, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [orderId, transactionId, status, providerId, offerId, quote.totalQuantity, quote.price.value, quote.price.currency, rawJson, now, now]
-  );
-  saveDb();
+  const order = await prisma.order.create({
+    data: {
+      id: orderId,
+      transactionId,
+      status,
+      providerId,
+      selectedOfferId: offerId,
+      totalQty: quote.totalQuantity,
+      totalPrice: quote.price.value,
+      currency: quote.price.currency,
+      itemsJson: JSON.stringify(items),
+      quoteJson: JSON.stringify(quote),
+    },
+  });
   
   return {
-    id: orderId,
-    transaction_id: transactionId,
-    status,
+    id: order.id,
+    transaction_id: order.transactionId,
+    status: order.status as OrderStatus,
     items,
     quote,
-    created_at: now,
-    updated_at: now,
+    created_at: order.createdAt.toISOString(),
+    updated_at: order.updatedAt.toISOString(),
   };
 }
 
 /**
  * Update order status
  */
-export function updateOrderStatus(orderId: string, status: OrderStatus): Order | null {
-  const db = getDb();
-  const now = new Date().toISOString();
-  
-  db.run(
-    `UPDATE orders SET status = ?, updated_at = ? WHERE id = ?`,
-    [status, now, orderId]
-  );
-  saveDb();
+export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order | null> {
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status },
+  });
   
   return getOrderById(orderId);
 }
@@ -115,15 +112,11 @@ export function updateOrderStatus(orderId: string, status: OrderStatus): Order |
 /**
  * Update order by transaction ID
  */
-export function updateOrderStatusByTransactionId(transactionId: string, status: OrderStatus): Order | null {
-  const db = getDb();
-  const now = new Date().toISOString();
-  
-  db.run(
-    `UPDATE orders SET status = ?, updated_at = ? WHERE transaction_id = ?`,
-    [status, now, transactionId]
-  );
-  saveDb();
+export async function updateOrderStatusByTransactionId(transactionId: string, status: OrderStatus): Promise<Order | null> {
+  await prisma.order.update({
+    where: { transactionId },
+    data: { status },
+  });
   
   return getOrderByTransactionId(transactionId);
 }
@@ -131,61 +124,22 @@ export function updateOrderStatusByTransactionId(transactionId: string, status: 
 /**
  * Get all orders for a provider
  */
-export function getOrdersByProviderId(providerId: string): Order[] {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM orders WHERE provider_id = ? ORDER BY created_at DESC', [providerId]);
-  
-  if (result.length === 0 || result[0].values.length === 0) {
-    return [];
-  }
-  
-  return result[0].values.map(values => {
-    const row = rowToObject(result[0].columns, values);
-    const rawData = JSON.parse(row.raw_json);
-    
-    return {
-      id: row.id,
-      transaction_id: row.transaction_id,
-      status: row.status as OrderStatus,
-      provider_id: row.provider_id,
-      items: rawData.items || [],
-      quote: rawData.quote || {
-        price: { value: row.total_price, currency: row.currency },
-        totalQuantity: row.total_qty,
-      },
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    };
+export async function getOrdersByProviderId(providerId: string): Promise<Order[]> {
+  const orders = await prisma.order.findMany({
+    where: { providerId },
+    orderBy: { createdAt: 'desc' },
   });
+  
+  return orders.map(toOrder);
 }
 
 /**
  * Get all orders
  */
-export function getAllOrders(): Order[] {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM orders ORDER BY created_at DESC');
-  
-  if (result.length === 0 || result[0].values.length === 0) {
-    return [];
-  }
-  
-  return result[0].values.map(values => {
-    const row = rowToObject(result[0].columns, values);
-    const rawData = JSON.parse(row.raw_json);
-    
-    return {
-      id: row.id,
-      transaction_id: row.transaction_id,
-      status: row.status as OrderStatus,
-      provider_id: row.provider_id,
-      items: rawData.items || [],
-      quote: rawData.quote || {
-        price: { value: row.total_price, currency: row.currency },
-        totalQuantity: row.total_qty,
-      },
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    };
+export async function getAllOrders(): Promise<Order[]> {
+  const orders = await prisma.order.findMany({
+    orderBy: { createdAt: 'desc' },
   });
+  
+  return orders.map(toOrder);
 }

@@ -1,42 +1,80 @@
 /**
  * Event logging for BAP
+ * Uses Redis for fast deduplication and Prisma for persistent storage
  */
 
-import { getDb, saveDb } from './db';
-import { EventDirection, rowToObject } from '@p2p/shared';
+import { prisma } from './db';
+import { EventDirection, isMessageProcessed, markMessageProcessed } from '@p2p/shared';
 
-export function logEvent(
+/**
+ * Log an event to the database
+ */
+export async function logEvent(
   transaction_id: string,
   message_id: string,
   action: string,
   direction: EventDirection,
   raw_json: string
-): void {
-  const db = getDb();
-  db.run(
-    `INSERT INTO events (transaction_id, message_id, action, direction, raw_json) VALUES (?, ?, ?, ?, ?)`,
-    [transaction_id, message_id, action, direction, raw_json]
-  );
-  saveDb();
+): Promise<void> {
+  await prisma.event.create({
+    data: {
+      transactionId: transaction_id,
+      messageId: message_id,
+      action,
+      direction,
+      rawJson: raw_json,
+    },
+  });
+  
+  // Also mark in Redis for fast deduplication
+  await markMessageProcessed(message_id, direction);
 }
 
 /**
- * Check if we've already processed an INBOUND message with this ID
- * Only checks INBOUND direction since we share DB between BAP and BPP
+ * Check if we've already processed a message with this ID
+ * Uses Redis for fast lookups
  */
-export function isDuplicateMessage(message_id: string, direction: EventDirection = 'INBOUND'): boolean {
-  const db = getDb();
-  const result = db.exec('SELECT 1 FROM events WHERE message_id = ? AND direction = ?', [message_id, direction]);
-  return result.length > 0 && result[0].values.length > 0;
+export async function isDuplicateMessage(message_id: string, direction: EventDirection = 'INBOUND'): Promise<boolean> {
+  // First check Redis (fast path)
+  const inRedis = await isMessageProcessed(message_id, direction);
+  if (inRedis) {
+    return true;
+  }
+  
+  // Fallback to database check (for messages processed before Redis was added)
+  const event = await prisma.event.findFirst({
+    where: {
+      messageId: message_id,
+      direction: direction,
+    },
+    select: { id: true },
+  });
+  
+  if (event) {
+    // Cache in Redis for future checks
+    await markMessageProcessed(message_id, direction);
+    return true;
+  }
+  
+  return false;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getEventsByTransactionId(transaction_id: string): any[] {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM events WHERE transaction_id = ? ORDER BY created_at', [transaction_id]);
+/**
+ * Get all events for a transaction
+ */
+export async function getEventsByTransactionId(transaction_id: string): Promise<any[]> {
+  const events = await prisma.event.findMany({
+    where: { transactionId: transaction_id },
+    orderBy: { createdAt: 'asc' },
+  });
   
-  if (result.length === 0) return [];
-  
-  const cols = result[0].columns;
-  return result[0].values.map(row => rowToObject(cols, row));
+  return events.map(e => ({
+    id: e.id,
+    transaction_id: e.transactionId,
+    message_id: e.messageId,
+    action: e.action,
+    direction: e.direction,
+    raw_json: e.rawJson,
+    created_at: e.createdAt.toISOString(),
+  }));
 }

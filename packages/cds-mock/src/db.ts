@@ -1,65 +1,52 @@
 /**
- * CDS Mock Database Connection using sql.js
+ * Database Module for CDS Mock
+ * Re-exports Prisma client and Redis from shared package
  */
 
-import initSqlJs, { Database } from 'sql.js';
-import fs from 'fs';
-import path from 'path';
-import { initializeSchema } from '@p2p/shared';
+import {
+  prisma,
+  connectPrisma,
+  disconnectPrisma,
+  checkPostgresConnection,
+  redis,
+  connectRedis,
+  disconnectRedis,
+  checkRedisConnection,
+} from '@p2p/shared';
 
-const DB_PATH = path.join(__dirname, '..', 'cds.db');
+// Re-export for use in other modules
+export {
+  prisma,
+  redis,
+  checkPostgresConnection,
+  checkRedisConnection,
+};
 
-let db: Database | null = null;
-
-export async function initDb(): Promise<Database> {
-  if (db) return db;
-  
-  const SQL = await initSqlJs();
-  
-  // Try to load existing database
-  try {
-    if (fs.existsSync(DB_PATH)) {
-      const buffer = fs.readFileSync(DB_PATH);
-      db = new SQL.Database(buffer);
-    } else {
-      db = new SQL.Database();
-    }
-  } catch {
-    db = new SQL.Database();
-  }
-  
-  initializeSchema(db);
-  saveDb();
-  
-  return db;
+/**
+ * Initialize database connections (PostgreSQL + Redis)
+ */
+export async function initDb(): Promise<void> {
+  await connectPrisma();
+  await connectRedis();
+  console.log('Database connections initialized');
 }
 
-export function getDb(): Database {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDb() first.');
-  }
-  return db;
+/**
+ * Close database connections gracefully
+ */
+export async function closeDb(): Promise<void> {
+  await disconnectPrisma();
+  await disconnectRedis();
+  console.log('Database connections closed');
 }
 
-export function saveDb(): void {
-  if (db) {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
-  }
-}
-
-export function closeDb(): void {
-  if (db) {
-    saveDb();
-    db.close();
-    db = null;
-  }
-}
-
-export async function waitForDb(): Promise<Database> {
-  if (!db) {
-    return initDb();
-  }
-  return db;
+/**
+ * Check health of all database connections
+ */
+export async function checkDbHealth(): Promise<{ postgres: boolean; redis: boolean }> {
+  const [postgres, redisOk] = await Promise.all([
+    checkPostgresConnection(),
+    checkRedisConnection(),
+  ]);
+  return { postgres, redis: redisOk };
 }

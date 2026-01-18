@@ -1,10 +1,11 @@
 /**
  * Catalog data access for Seller (BPP) functionality
+ * Using Prisma ORM for PostgreSQL persistence
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { getDb, saveDb } from './db';
-import { CatalogOffer, Provider, TimeWindow, OfferAttributes, SourceType, DeliveryMode, ItemAttributes, rowToObject } from '@p2p/shared';
+import { prisma } from './db';
+import { CatalogOffer, Provider, TimeWindow, OfferAttributes, SourceType, DeliveryMode } from '@p2p/shared';
 
 export interface CatalogItem {
   id: string;
@@ -19,106 +20,98 @@ export interface CatalogItem {
 /**
  * Get an offer by ID (with available blocks)
  */
-export function getOfferById(offerId: string): (CatalogOffer & { availableBlocks?: number }) | null {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM catalog_offers WHERE id = ?', [offerId]);
+export async function getOfferById(offerId: string): Promise<(CatalogOffer & { availableBlocks?: number }) | null> {
+  const offer = await prisma.catalogOffer.findUnique({
+    where: { id: offerId },
+  });
   
-  if (result.length === 0 || result[0].values.length === 0) {
+  if (!offer) {
     return null;
   }
   
-  const row = rowToObject(result[0].columns, result[0].values[0]);
-  
-  // Get available blocks count (gracefully handle if blocks don't exist yet)
-  let availableBlocks: number;
-  try {
-    availableBlocks = getAvailableBlockCount(offerId);
-    // If no blocks found, use max_qty as fallback (for backward compatibility with old offers)
-    if (availableBlocks === 0) {
-      // Check if any blocks exist at all for this offer
-      const blockCheck = db.exec('SELECT COUNT(*) as count FROM offer_blocks WHERE offer_id = ?', [offerId]);
-      if (blockCheck.length === 0 || blockCheck[0].values.length === 0 || blockCheck[0].values[0][0] === 0) {
-        availableBlocks = row.max_qty; // No blocks created yet, use original max_qty
-      }
-    }
-  } catch (error) {
-    // If table doesn't exist or error occurs, fallback to max_qty
-    availableBlocks = row.max_qty;
-  }
+  // Get available blocks count
+  const availableBlocks = await getAvailableBlockCount(offerId);
   
   return {
-    id: row.id,
-    item_id: row.item_id,
-    provider_id: row.provider_id,
-    offerAttributes: JSON.parse(row.offer_attributes_json) as OfferAttributes,
-    price: {
-      value: row.price_value,
-      currency: row.currency,
+    id: offer.id,
+    item_id: offer.itemId,
+    provider_id: offer.providerId,
+    offerAttributes: {
+      pricingModel: offer.pricingModel as 'PER_KWH' | 'FLAT_RATE',
+      settlementType: offer.settlementType as 'DAILY' | 'WEEKLY' | 'MONTHLY',
     },
-    maxQuantity: row.max_qty, // Original max quantity
-    timeWindow: JSON.parse(row.time_window_json) as TimeWindow,
-    availableBlocks, // Available blocks (for catalog/discovery)
+    price: {
+      value: offer.priceValue,
+      currency: offer.currency,
+    },
+    maxQuantity: offer.maxQty,
+    timeWindow: {
+      startTime: offer.timeWindowStart.toISOString(),
+      endTime: offer.timeWindowEnd.toISOString(),
+    },
+    availableBlocks: availableBlocks > 0 ? availableBlocks : offer.maxQty,
   };
 }
 
 /**
  * Get item available quantity
  */
-export function getItemAvailableQuantity(itemId: string): number | null {
-  const db = getDb();
-  const result = db.exec('SELECT available_qty FROM catalog_items WHERE id = ?', [itemId]);
+export async function getItemAvailableQuantity(itemId: string): Promise<number | null> {
+  const item = await prisma.catalogItem.findUnique({
+    where: { id: itemId },
+    select: { availableQty: true },
+  });
   
-  if (result.length === 0 || result[0].values.length === 0) {
-    return null;
-  }
-  
-  return result[0].values[0][0] as number;
+  return item?.availableQty ?? null;
 }
 
 /**
  * Get provider by ID
  */
-export function getProvider(providerId: string): Provider | null {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM providers WHERE id = ?', [providerId]);
+export async function getProvider(providerId: string): Promise<Provider | null> {
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+  });
   
-  if (result.length === 0 || result[0].values.length === 0) {
+  if (!provider) {
     return null;
   }
   
-  const row = rowToObject(result[0].columns, result[0].values[0]);
-  
   return {
-    id: row.id,
-    name: row.name,
-    trust_score: row.trust_score,
-    total_orders: row.total_orders,
-    successful_orders: row.successful_orders,
+    id: provider.id,
+    name: provider.name,
+    trust_score: provider.trustScore,
+    total_orders: provider.totalOrders,
+    successful_orders: provider.successfulOrders,
   };
 }
 
 /**
  * Update provider statistics after order completion
  */
-export function updateProviderStats(providerId: string, wasSuccessful: boolean): void {
-  const db = getDb();
-  const provider = getProvider(providerId);
+export async function updateProviderStats(providerId: string, wasSuccessful: boolean): Promise<void> {
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+  });
   
   if (!provider) return;
   
-  const newTotalOrders = provider.total_orders + 1;
-  const newSuccessfulOrders = provider.successful_orders + (wasSuccessful ? 1 : 0);
+  const newTotalOrders = provider.totalOrders + 1;
+  const newSuccessfulOrders = provider.successfulOrders + (wasSuccessful ? 1 : 0);
   
   // Calculate new trust score
   const successRate = newSuccessfulOrders / newTotalOrders;
   const baseRating = 0.5;
   const newTrustScore = successRate * 0.7 + baseRating * 0.3;
   
-  db.run(
-    `UPDATE providers SET total_orders = ?, successful_orders = ?, trust_score = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [newTotalOrders, newSuccessfulOrders, newTrustScore, providerId]
-  );
-  saveDb();
+  await prisma.provider.update({
+    where: { id: providerId },
+    data: {
+      totalOrders: newTotalOrders,
+      successfulOrders: newSuccessfulOrders,
+      trustScore: newTrustScore,
+    },
+  });
 }
 
 // ==================== SELLER APIs ====================
@@ -126,296 +119,257 @@ export function updateProviderStats(providerId: string, wasSuccessful: boolean):
 /**
  * Register a new provider (seller)
  */
-export function registerProvider(name: string): Provider {
-  const db = getDb();
+export async function registerProvider(name: string): Promise<Provider> {
   const id = `provider-${uuidv4().substring(0, 8)}`;
   
-  db.run(
-    `INSERT INTO providers (id, name, trust_score, total_orders, successful_orders) VALUES (?, ?, 0.5, 0, 0)`,
-    [id, name]
-  );
-  saveDb();
+  const provider = await prisma.provider.create({
+    data: {
+      id,
+      name,
+      trustScore: 0.5,
+      totalOrders: 0,
+      successfulOrders: 0,
+    },
+  });
   
   return {
-    id,
-    name,
-    trust_score: 0.5,
-    total_orders: 0,
-    successful_orders: 0,
+    id: provider.id,
+    name: provider.name,
+    trust_score: provider.trustScore,
+    total_orders: provider.totalOrders,
+    successful_orders: provider.successfulOrders,
   };
 }
 
 /**
  * Get all providers
  */
-export function getAllProviders(): Provider[] {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM providers');
+export async function getAllProviders(): Promise<Provider[]> {
+  const providers = await prisma.provider.findMany();
   
-  if (result.length === 0 || result[0].values.length === 0) {
-    return [];
-  }
-  
-  return result[0].values.map(values => {
-    const row = rowToObject(result[0].columns, values);
-    return {
-      id: row.id,
-      name: row.name,
-      trust_score: row.trust_score,
-      total_orders: row.total_orders,
-      successful_orders: row.successful_orders,
-    };
-  });
+  return providers.map(p => ({
+    id: p.id,
+    name: p.name,
+    trust_score: p.trustScore,
+    total_orders: p.totalOrders,
+    successful_orders: p.successfulOrders,
+  }));
 }
 
 /**
  * Add a catalog item (energy listing)
  */
-export function addCatalogItem(
+export async function addCatalogItem(
   providerId: string,
   sourceType: SourceType,
-  deliveryMode: DeliveryMode = 'SCHEDULED', // Always scheduled for P2P energy
+  deliveryMode: DeliveryMode = 'SCHEDULED',
   availableQty: number,
   productionWindows: TimeWindow[],
   meterId: string
-): CatalogItem {
-  const db = getDb();
+): Promise<CatalogItem> {
   const id = `item-${sourceType.toLowerCase()}-${uuidv4().substring(0, 6)}`;
   
-  const itemAttributes: ItemAttributes = {
-    sourceType,
-    deliveryMode,
-    meterId,
-    availableQuantity: availableQty,
-    productionWindow: productionWindows,
-  };
-  
-  db.run(
-    `INSERT INTO catalog_items (id, provider_id, source_type, delivery_mode, available_qty, production_windows_json, raw_json) 
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
+  const item = await prisma.catalogItem.create({
+    data: {
       id,
       providerId,
       sourceType,
       deliveryMode,
       availableQty,
-      JSON.stringify(productionWindows),
-      JSON.stringify(itemAttributes),
-    ]
-  );
-  saveDb();
+      meterId,
+      productionWindowsJson: JSON.stringify(productionWindows),
+    },
+  });
   
   return {
-    id,
-    provider_id: providerId,
-    source_type: sourceType,
-    delivery_mode: deliveryMode,
-    available_qty: availableQty,
+    id: item.id,
+    provider_id: item.providerId,
+    source_type: item.sourceType as SourceType,
+    delivery_mode: item.deliveryMode as DeliveryMode,
+    available_qty: item.availableQty,
     production_windows: productionWindows,
-    meter_id: meterId,
+    meter_id: item.meterId || '',
   };
 }
 
 /**
  * Get all items for a provider
  */
-export function getProviderItems(providerId: string): CatalogItem[] {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM catalog_items WHERE provider_id = ?', [providerId]);
-  
-  if (result.length === 0 || result[0].values.length === 0) {
-    return [];
-  }
-  
-  return result[0].values.map(values => {
-    const row = rowToObject(result[0].columns, values);
-    return {
-      id: row.id,
-      provider_id: row.provider_id,
-      source_type: row.source_type,
-      delivery_mode: row.delivery_mode,
-      available_qty: row.available_qty,
-      production_windows: JSON.parse(row.production_windows_json || '[]'),
-      meter_id: row.meter_id || '',
-    };
+export async function getProviderItems(providerId: string): Promise<CatalogItem[]> {
+  const items = await prisma.catalogItem.findMany({
+    where: { providerId },
   });
+  
+  return items.map(item => ({
+    id: item.id,
+    provider_id: item.providerId,
+    source_type: item.sourceType as SourceType,
+    delivery_mode: item.deliveryMode as DeliveryMode,
+    available_qty: item.availableQty,
+    production_windows: JSON.parse(item.productionWindowsJson || '[]'),
+    meter_id: item.meterId || '',
+  }));
 }
 
 /**
  * Get all items
  */
-export function getAllItems(): CatalogItem[] {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM catalog_items');
+export async function getAllItems(): Promise<CatalogItem[]> {
+  const items = await prisma.catalogItem.findMany();
   
-  if (result.length === 0 || result[0].values.length === 0) {
-    return [];
-  }
-  
-  return result[0].values.map(values => {
-    const row = rowToObject(result[0].columns, values);
-    return {
-      id: row.id,
-      provider_id: row.provider_id,
-      source_type: row.source_type,
-      delivery_mode: row.delivery_mode,
-      available_qty: row.available_qty,
-      production_windows: JSON.parse(row.production_windows_json || '[]'),
-      meter_id: '',
-    };
-  });
+  return items.map(item => ({
+    id: item.id,
+    provider_id: item.providerId,
+    source_type: item.sourceType as SourceType,
+    delivery_mode: item.deliveryMode as DeliveryMode,
+    available_qty: item.availableQty,
+    production_windows: JSON.parse(item.productionWindowsJson || '[]'),
+    meter_id: item.meterId || '',
+  }));
 }
 
 /**
  * Add an offer for an item
  * Creates the offer and generates individual 1-unit blocks
  */
-export function addOffer(
+export async function addOffer(
   itemId: string,
   providerId: string,
   pricePerKwh: number,
   currency: string,
   maxQty: number,
   timeWindow: TimeWindow
-): CatalogOffer {
-  const db = getDb();
+): Promise<CatalogOffer> {
   const id = `offer-${uuidv4().substring(0, 8)}`;
   
-  const offerAttributes: OfferAttributes = {
-    pricingModel: 'PER_KWH',
-    settlementType: 'DAILY',
-  };
-  
-  db.run(
-    `INSERT INTO catalog_offers (id, item_id, provider_id, offer_attributes_json, price_value, currency, max_qty, time_window_json, raw_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
+  const offer = await prisma.catalogOffer.create({
+    data: {
       id,
       itemId,
       providerId,
-      JSON.stringify(offerAttributes),
-      pricePerKwh,
+      priceValue: pricePerKwh,
       currency,
       maxQty,
-      JSON.stringify(timeWindow),
-      JSON.stringify({ offerAttributes, price: { value: pricePerKwh, currency }, maxQty, timeWindow }),
-    ]
-  );
+      timeWindowStart: new Date(timeWindow.startTime),
+      timeWindowEnd: new Date(timeWindow.endTime),
+      pricingModel: 'PER_KWH',
+      settlementType: 'DAILY',
+    },
+  });
   
   // Create individual blocks (1 block = 1 unit)
-  createBlocksForOffer(id, itemId, providerId, pricePerKwh, currency, timeWindow, maxQty);
-  
-  saveDb();
+  await createBlocksForOffer(id, itemId, providerId, pricePerKwh, currency, maxQty);
   
   return {
-    id,
-    item_id: itemId,
-    provider_id: providerId,
-    offerAttributes,
-    price: { value: pricePerKwh, currency },
-    maxQuantity: maxQty,
+    id: offer.id,
+    item_id: offer.itemId,
+    provider_id: offer.providerId,
+    offerAttributes: {
+      pricingModel: 'PER_KWH',
+      settlementType: 'DAILY',
+    },
+    price: { value: offer.priceValue, currency: offer.currency },
+    maxQuantity: offer.maxQty,
     timeWindow,
   };
+}
+
+export interface BlockStats {
+  total: number;
+  available: number;
+  reserved: number;
+  sold: number;
 }
 
 /**
  * Get all offers for a provider (with block stats)
  */
-export function getProviderOffers(providerId: string): (CatalogOffer & { blockStats?: BlockStats })[] {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM catalog_offers WHERE provider_id = ?', [providerId]);
+export async function getProviderOffers(providerId: string): Promise<(CatalogOffer & { blockStats?: BlockStats })[]> {
+  const offers = await prisma.catalogOffer.findMany({
+    where: { providerId },
+  });
   
-  if (result.length === 0 || result[0].values.length === 0) {
-    return [];
+  const result: (CatalogOffer & { blockStats?: BlockStats })[] = [];
+  
+  for (const offer of offers) {
+    const blockStats = await getBlockStats(offer.id);
+    
+    result.push({
+      id: offer.id,
+      item_id: offer.itemId,
+      provider_id: offer.providerId,
+      offerAttributes: {
+        pricingModel: offer.pricingModel as 'PER_KWH' | 'FLAT_RATE',
+        settlementType: offer.settlementType as 'DAILY' | 'WEEKLY' | 'MONTHLY',
+      },
+      price: { value: offer.priceValue, currency: offer.currency },
+      maxQuantity: offer.maxQty,
+      timeWindow: {
+        startTime: offer.timeWindowStart.toISOString(),
+        endTime: offer.timeWindowEnd.toISOString(),
+      },
+      blockStats,
+    });
   }
   
-  return result[0].values.map(values => {
-    const row = rowToObject(result[0].columns, values);
-    const offer: CatalogOffer & { blockStats?: BlockStats } = {
-      id: row.id,
-      item_id: row.item_id,
-      provider_id: row.provider_id,
-      offerAttributes: JSON.parse(row.offer_attributes_json) as OfferAttributes,
-      price: { value: row.price_value, currency: row.currency },
-      maxQuantity: row.max_qty,
-      timeWindow: JSON.parse(row.time_window_json) as TimeWindow,
-    };
-    
-    // Add block statistics (gracefully handle if blocks don't exist)
-    try {
-      offer.blockStats = getBlockStats(row.id);
-    } catch (error) {
-      // If blocks don't exist yet, create default stats
-      offer.blockStats = {
-        total: row.max_qty,
-        available: row.max_qty,
-        reserved: 0,
-        sold: 0,
-      };
-    }
-    
-    return offer;
-  });
+  return result;
 }
 
 /**
  * Get all offers (with block stats)
  */
-export function getAllOffers(): (CatalogOffer & { blockStats?: BlockStats })[] {
-  const db = getDb();
-  const result = db.exec('SELECT * FROM catalog_offers');
+export async function getAllOffers(): Promise<(CatalogOffer & { blockStats?: BlockStats })[]> {
+  const offers = await prisma.catalogOffer.findMany();
   
-  if (result.length === 0 || result[0].values.length === 0) {
-    return [];
+  const result: (CatalogOffer & { blockStats?: BlockStats })[] = [];
+  
+  for (const offer of offers) {
+    const blockStats = await getBlockStats(offer.id);
+    
+    result.push({
+      id: offer.id,
+      item_id: offer.itemId,
+      provider_id: offer.providerId,
+      offerAttributes: {
+        pricingModel: offer.pricingModel as 'PER_KWH' | 'FLAT_RATE',
+        settlementType: offer.settlementType as 'DAILY' | 'WEEKLY' | 'MONTHLY',
+      },
+      price: { value: offer.priceValue, currency: offer.currency },
+      maxQuantity: offer.maxQty,
+      timeWindow: {
+        startTime: offer.timeWindowStart.toISOString(),
+        endTime: offer.timeWindowEnd.toISOString(),
+      },
+      blockStats,
+    });
   }
   
-  return result[0].values.map(values => {
-    const row = rowToObject(result[0].columns, values);
-    const offer: CatalogOffer & { blockStats?: BlockStats } = {
-      id: row.id,
-      item_id: row.item_id,
-      provider_id: row.provider_id,
-      offerAttributes: JSON.parse(row.offer_attributes_json) as OfferAttributes,
-      price: { value: row.price_value, currency: row.currency },
-      maxQuantity: row.max_qty,
-      timeWindow: JSON.parse(row.time_window_json) as TimeWindow,
-    };
-    
-    // Add block statistics (gracefully handle if blocks don't exist)
-    try {
-      offer.blockStats = getBlockStats(row.id);
-    } catch (error) {
-      // If blocks don't exist yet, create default stats
-      offer.blockStats = {
-        total: row.max_qty,
-        available: row.max_qty,
-        reserved: 0,
-        sold: 0,
-      };
-    }
-    
-    return offer;
-  });
+  return result;
 }
 
 /**
  * Update item available quantity
  */
-export function updateItemQuantity(itemId: string, newQuantity: number): void {
-  const db = getDb();
-  db.run('UPDATE catalog_items SET available_qty = ? WHERE id = ?', [newQuantity, itemId]);
-  saveDb();
+export async function updateItemQuantity(itemId: string, newQuantity: number): Promise<void> {
+  await prisma.catalogItem.update({
+    where: { id: itemId },
+    data: { availableQty: newQuantity },
+  });
 }
 
 /**
  * Delete an offer
  */
-export function deleteOffer(offerId: string): boolean {
-  const db = getDb();
-  // Also delete all blocks for this offer
-  db.run('DELETE FROM offer_blocks WHERE offer_id = ?', [offerId]);
-  db.run('DELETE FROM catalog_offers WHERE id = ?', [offerId]);
-  saveDb();
+export async function deleteOffer(offerId: string): Promise<boolean> {
+  // Delete all blocks for this offer first (cascade should handle this, but being explicit)
+  await prisma.offerBlock.deleteMany({
+    where: { offerId },
+  });
+  
+  await prisma.catalogOffer.delete({
+    where: { id: offerId },
+  });
+  
   return true;
 }
 
@@ -431,246 +385,215 @@ export interface OfferBlock {
   transaction_id?: string;
   price_value: number;
   currency: string;
-  time_window: TimeWindow;
   created_at: string;
   reserved_at?: string;
   sold_at?: string;
 }
 
-export interface BlockStats {
-  total: number;
-  available: number;
-  reserved: number;
-  sold: number;
-}
-
 /**
  * Create blocks for an offer (1 block = 1 unit)
  */
-export function createBlocksForOffer(
+export async function createBlocksForOffer(
   offerId: string,
   itemId: string,
   providerId: string,
   priceValue: number,
   currency: string,
-  timeWindow: TimeWindow,
   quantity: number
-): OfferBlock[] {
-  const db = getDb();
+): Promise<OfferBlock[]> {
   const blocks: OfferBlock[] = [];
-  const now = new Date().toISOString();
+  const now = new Date();
   
+  // Batch create blocks for better performance
+  const blockData = Array.from({ length: quantity }, (_, i) => ({
+    id: `block-${offerId}-${i}`,
+    offerId,
+    itemId,
+    providerId,
+    status: 'AVAILABLE',
+    priceValue,
+    currency,
+  }));
+  
+  await prisma.offerBlock.createMany({
+    data: blockData,
+  });
+  
+  // Return the created blocks
   for (let i = 0; i < quantity; i++) {
-    const blockId = `block-${offerId}-${i}`;
-    db.run(
-      `INSERT INTO offer_blocks (id, offer_id, item_id, provider_id, status, price_value, currency, time_window_json, created_at)
-       VALUES (?, ?, ?, ?, 'AVAILABLE', ?, ?, ?, ?)`,
-      [blockId, offerId, itemId, providerId, priceValue, currency, JSON.stringify(timeWindow), now]
-    );
-    
     blocks.push({
-      id: blockId,
+      id: `block-${offerId}-${i}`,
       offer_id: offerId,
       item_id: itemId,
       provider_id: providerId,
       status: 'AVAILABLE',
       price_value: priceValue,
       currency,
-      time_window: timeWindow,
-      created_at: now,
+      created_at: now.toISOString(),
     });
   }
   
-  saveDb();
   return blocks;
 }
 
 /**
  * Atomically claim available blocks for an offer
- * Returns the number of blocks successfully claimed
+ * Returns the blocks successfully claimed
  */
-export function claimBlocks(
+export async function claimBlocks(
   offerId: string,
   quantity: number,
   orderId: string,
   transactionId: string
-): OfferBlock[] {
-  const db = getDb();
-  const now = new Date().toISOString();
+): Promise<OfferBlock[]> {
+  const now = new Date();
   
-  // Atomically claim blocks using a transaction-like approach
-  const result = db.exec(
-    `SELECT id, offer_id, item_id, provider_id, price_value, currency, time_window_json 
-     FROM offer_blocks 
-     WHERE offer_id = ? AND status = 'AVAILABLE' 
-     LIMIT ?`,
-    [offerId, quantity]
-  );
+  // Find available blocks
+  const availableBlocks = await prisma.offerBlock.findMany({
+    where: {
+      offerId,
+      status: 'AVAILABLE',
+    },
+    take: quantity,
+  });
   
-  if (result.length === 0 || result[0].values.length === 0) {
+  if (availableBlocks.length === 0) {
     return [];
   }
   
-  const claimedBlocks: OfferBlock[] = [];
-  const blockIds: string[] = [];
+  const blockIds = availableBlocks.map(b => b.id);
   
-  const cols = result[0].columns;
-  for (const row of result[0].values) {
-    const block = rowToObject(cols, row);
-    blockIds.push(block.id);
-    
-    claimedBlocks.push({
-      id: block.id,
-      offer_id: block.offer_id,
-      item_id: block.item_id,
-      provider_id: block.provider_id,
+  // Update blocks to RESERVED status
+  await prisma.offerBlock.updateMany({
+    where: {
+      id: { in: blockIds },
+    },
+    data: {
       status: 'RESERVED',
-      order_id: orderId,
-      transaction_id: transactionId,
-      price_value: block.price_value,
-      currency: block.currency,
-      time_window: JSON.parse(block.time_window_json),
-      created_at: now,
-      reserved_at: now,
-    });
-  }
+      orderId,
+      transactionId,
+      reservedAt: now,
+    },
+  });
   
-  // Update all claimed blocks to RESERVED status
-  if (blockIds.length > 0) {
-    const placeholders = blockIds.map(() => '?').join(',');
-    db.run(
-      `UPDATE offer_blocks 
-       SET status = 'RESERVED', order_id = ?, transaction_id = ?, reserved_at = ? 
-       WHERE id IN (${placeholders})`,
-      [orderId, transactionId, now, ...blockIds]
-    );
-    saveDb();
-  }
-  
-  return claimedBlocks;
+  return availableBlocks.map(block => ({
+    id: block.id,
+    offer_id: block.offerId,
+    item_id: block.itemId,
+    provider_id: block.providerId,
+    status: 'RESERVED' as const,
+    order_id: orderId,
+    transaction_id: transactionId,
+    price_value: block.priceValue,
+    currency: block.currency,
+    created_at: block.createdAt.toISOString(),
+    reserved_at: now.toISOString(),
+  }));
 }
 
 /**
  * Mark blocks as SOLD (when order is confirmed)
  */
-export function markBlocksAsSold(orderId: string): void {
-  const db = getDb();
-  const now = new Date().toISOString();
-  
-  db.run(
-    `UPDATE offer_blocks 
-     SET status = 'SOLD', sold_at = ? 
-     WHERE order_id = ? AND status = 'RESERVED'`,
-    [now, orderId]
-  );
-  saveDb();
+export async function markBlocksAsSold(orderId: string): Promise<void> {
+  await prisma.offerBlock.updateMany({
+    where: {
+      orderId,
+      status: 'RESERVED',
+    },
+    data: {
+      status: 'SOLD',
+      soldAt: new Date(),
+    },
+  });
 }
 
 /**
  * Release reserved blocks (if order fails or is cancelled)
  */
-export function releaseBlocks(transactionId: string): void {
-  const db = getDb();
-  
-  db.run(
-    `UPDATE offer_blocks 
-     SET status = 'AVAILABLE', order_id = NULL, transaction_id = NULL, reserved_at = NULL 
-     WHERE transaction_id = ? AND status = 'RESERVED'`,
-    [transactionId]
-  );
-  saveDb();
+export async function releaseBlocks(transactionId: string): Promise<void> {
+  await prisma.offerBlock.updateMany({
+    where: {
+      transactionId,
+      status: 'RESERVED',
+    },
+    data: {
+      status: 'AVAILABLE',
+      orderId: null,
+      transactionId: null,
+      reservedAt: null,
+    },
+  });
 }
 
 /**
  * Get block statistics for an offer
  */
-export function getBlockStats(offerId: string): BlockStats {
-  const db = getDb();
+export async function getBlockStats(offerId: string): Promise<BlockStats> {
+  const [available, reserved, sold] = await Promise.all([
+    prisma.offerBlock.count({ where: { offerId, status: 'AVAILABLE' } }),
+    prisma.offerBlock.count({ where: { offerId, status: 'RESERVED' } }),
+    prisma.offerBlock.count({ where: { offerId, status: 'SOLD' } }),
+  ]);
   
-  const result = db.exec(
-    `SELECT status, COUNT(*) as count 
-     FROM offer_blocks 
-     WHERE offer_id = ? 
-     GROUP BY status`,
-    [offerId]
-  );
-  
-  const stats: BlockStats = {
-    total: 0,
-    available: 0,
-    reserved: 0,
-    sold: 0,
+  return {
+    total: available + reserved + sold,
+    available,
+    reserved,
+    sold,
   };
-  
-  if (result.length > 0) {
-    const cols = result[0].columns;
-    for (const row of result[0].values) {
-      const r = rowToObject(cols, row);
-      const count = r.count as number;
-      stats.total += count;
-      
-      if (r.status === 'AVAILABLE') stats.available = count;
-      else if (r.status === 'RESERVED') stats.reserved = count;
-      else if (r.status === 'SOLD') stats.sold = count;
-    }
-  }
-  
-  return stats;
 }
 
 /**
  * Get available block count for an offer (for catalog/discovery)
  */
-export function getAvailableBlockCount(offerId: string): number {
-  const db = getDb();
-  const result = db.exec(
-    `SELECT COUNT(*) as count 
-     FROM offer_blocks 
-     WHERE offer_id = ? AND status = 'AVAILABLE'`,
-    [offerId]
-  );
-  
-  if (result.length > 0 && result[0].values.length > 0) {
-    return result[0].values[0][0] as number;
-  }
-  
-  return 0;
+export async function getAvailableBlockCount(offerId: string): Promise<number> {
+  return prisma.offerBlock.count({
+    where: {
+      offerId,
+      status: 'AVAILABLE',
+    },
+  });
 }
 
 /**
  * Get blocks for an order
  */
-export function getBlocksForOrder(orderId: string): OfferBlock[] {
-  const db = getDb();
-  const result = db.exec(
-    `SELECT id, offer_id, item_id, provider_id, status, order_id, transaction_id, 
-            price_value, currency, time_window_json, created_at, reserved_at, sold_at
-     FROM offer_blocks 
-     WHERE order_id = ?`,
-    [orderId]
-  );
+export async function getBlocksForOrder(orderId: string): Promise<OfferBlock[]> {
+  const blocks = await prisma.offerBlock.findMany({
+    where: { orderId },
+  });
   
-  if (result.length === 0 || result[0].values.length === 0) {
-    return [];
-  }
-  
-  const cols = result[0].columns;
-  return result[0].values.map(values => {
-    const row = rowToObject(cols, values);
-    return {
-      id: row.id,
-      offer_id: row.offer_id,
-      item_id: row.item_id,
-      provider_id: row.provider_id,
-      status: row.status,
-      order_id: row.order_id,
-      transaction_id: row.transaction_id,
-      price_value: row.price_value,
-      currency: row.currency,
-      time_window: JSON.parse(row.time_window_json),
-      created_at: row.created_at,
-      reserved_at: row.reserved_at,
-      sold_at: row.sold_at,
-    };
+  return blocks.map(block => ({
+    id: block.id,
+    offer_id: block.offerId,
+    item_id: block.itemId,
+    provider_id: block.providerId,
+    status: block.status as 'AVAILABLE' | 'RESERVED' | 'SOLD',
+    order_id: block.orderId || undefined,
+    transaction_id: block.transactionId || undefined,
+    price_value: block.priceValue,
+    currency: block.currency,
+    created_at: block.createdAt.toISOString(),
+    reserved_at: block.reservedAt?.toISOString(),
+    sold_at: block.soldAt?.toISOString(),
+  }));
+}
+
+/**
+ * Update blocks order_id (used when order ID changes during init)
+ */
+export async function updateBlocksOrderId(
+  oldOrderId: string,
+  newOrderId: string,
+  transactionId: string
+): Promise<void> {
+  await prisma.offerBlock.updateMany({
+    where: {
+      orderId: oldOrderId,
+      transactionId,
+    },
+    data: {
+      orderId: newOrderId,
+    },
   });
 }

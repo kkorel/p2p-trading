@@ -44,6 +44,7 @@ import {
   getBlockStats,
   getAvailableBlockCount,
   getBlocksForOrder,
+  updateBlocksOrderId,
 } from './seller-catalog';
 import { 
   getOrderByTransactionId, 
@@ -55,7 +56,6 @@ import {
   getAllOrders,
 } from './seller-orders';
 import { logEvent, isDuplicateMessage } from './events';
-import { getDb, saveDb } from './db';
 
 const router = Router();
 const logger = createLogger('BPP');
@@ -74,7 +74,7 @@ router.post('/select', async (req: Request, res: Response) => {
   });
   
   // Check for duplicate message
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate message detected, returning ACK', {
       transaction_id: context.transaction_id,
       message_id: context.message_id,
@@ -83,7 +83,7 @@ router.post('/select', async (req: Request, res: Response) => {
   }
   
   // Log inbound event
-  logEvent(context.transaction_id, context.message_id, 'select', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'select', 'INBOUND', JSON.stringify(message));
   
   // Validate offers and quantities
   const validationErrors: string[] = [];
@@ -94,7 +94,7 @@ router.post('/select', async (req: Request, res: Response) => {
   let providerId = '';
   
   for (const item of content.orderItems) {
-    const offer = getOfferById(item.offer_id);
+    const offer = await getOfferById(item.offer_id);
     
     if (!offer) {
       validationErrors.push(`Offer ${item.offer_id} not found`);
@@ -104,13 +104,13 @@ router.post('/select', async (req: Request, res: Response) => {
     providerId = offer.provider_id;
     
     // Check available blocks instead of max quantity
-    const availableBlocks = getAvailableBlockCount(item.offer_id);
+    const availableBlocks = await getAvailableBlockCount(item.offer_id);
     if (item.quantity > availableBlocks) {
       validationErrors.push(`Requested quantity ${item.quantity} exceeds available blocks ${availableBlocks}`);
     }
     
     // Also check item-level availability as a safety check
-    const availableQty = getItemAvailableQuantity(item.item_id);
+    const availableQty = await getItemAvailableQuantity(item.item_id);
     if (availableQty !== null && item.quantity > availableQty) {
       validationErrors.push(`Requested quantity ${item.quantity} exceeds item available ${availableQty}`);
     }
@@ -145,7 +145,7 @@ router.post('/select', async (req: Request, res: Response) => {
   setTimeout(async () => {
     try {
       const callbackContext = createCallbackContext(context, 'on_select');
-      const provider = getProvider(providerId);
+      const provider = await getProvider(providerId);
       
       const quote: Quote = {
         price: { value: totalPrice, currency },
@@ -167,7 +167,7 @@ router.post('/select', async (req: Request, res: Response) => {
         },
       };
       
-      logEvent(context.transaction_id, callbackContext.message_id, 'on_select', 'OUTBOUND', JSON.stringify(onSelectMessage));
+      await logEvent(context.transaction_id, callbackContext.message_id, 'on_select', 'OUTBOUND', JSON.stringify(onSelectMessage));
       
       const callbackUrl = `${context.bap_uri}/callbacks/on_select`;
       logger.info(`Sending on_select callback to ${callbackUrl}`, {
@@ -196,15 +196,15 @@ router.post('/init', async (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate message detected', { transaction_id: context.transaction_id });
     return res.json(createAck(context));
   }
   
-  logEvent(context.transaction_id, context.message_id, 'init', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'init', 'INBOUND', JSON.stringify(message));
   
   // Check if order already exists for this transaction
-  const existingOrder = getOrderByTransactionId(context.transaction_id);
+  const existingOrder = await getOrderByTransactionId(context.transaction_id);
   if (existingOrder) {
     logger.info('Order already exists for transaction', { transaction_id: context.transaction_id });
     res.json(createAck(context));
@@ -218,7 +218,7 @@ router.post('/init', async (req: Request, res: Response) => {
           message: { order: existingOrder },
         };
         
-        logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
+        await logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
         await axios.post(`${context.bap_uri}/callbacks/on_init`, onInitMessage);
       } catch (error: any) {
         logger.error(`Failed to send on_init callback: ${error.message}`, { transaction_id: context.transaction_id });
@@ -240,41 +240,11 @@ router.post('/init', async (req: Request, res: Response) => {
       let providerId = content.order.provider.id;
       let selectedOfferId = '';
       
-      // Temporary order ID for block reservation (will be updated after order creation)
-      const tempOrderId = uuidv4();
-      
+      // First pass: calculate prices and validate offers exist
       for (const item of content.order.items) {
-        const offer = getOfferById(item.offer_id);
+        const offer = await getOfferById(item.offer_id);
         if (offer) {
           selectedOfferId = offer.id;
-          
-          // Claim blocks atomically for this purchase
-          const claimedBlocks = claimBlocks(item.offer_id, item.quantity, tempOrderId, context.transaction_id);
-          
-          if (claimedBlocks.length < item.quantity) {
-            // Not enough blocks available - release any claimed blocks and fail
-            releaseBlocks(context.transaction_id);
-            logger.error(`Not enough blocks available: requested ${item.quantity}, got ${claimedBlocks.length}`, {
-              transaction_id: context.transaction_id,
-              offer_id: item.offer_id,
-            });
-            throw new Error(`Not enough blocks available: requested ${item.quantity}, available ${claimedBlocks.length}`);
-          }
-          
-          // Sync reserved blocks to CDS
-          try {
-            await axios.post(`${config.urls.cds}/sync/blocks`, {
-              offer_id: item.offer_id,
-              block_ids: claimedBlocks.map(b => b.id),
-              status: 'RESERVED',
-              order_id: tempOrderId,
-              transaction_id: context.transaction_id,
-            });
-            logger.info(`Synced ${claimedBlocks.length} reserved blocks to CDS for offer ${item.offer_id}`);
-          } catch (syncError: any) {
-            logger.error(`Failed to sync reserved blocks to CDS: ${syncError.message}`);
-          }
-          
           const itemPrice = offer.price.value * item.quantity;
           totalPrice += itemPrice;
           totalQuantity += item.quantity;
@@ -284,7 +254,7 @@ router.post('/init', async (req: Request, res: Response) => {
             item_id: item.item_id,
             offer_id: item.offer_id,
             provider_id: offer.provider_id,
-            quantity: item.quantity, // This is the actual purchased quantity
+            quantity: item.quantity,
             price: { value: itemPrice, currency },
             timeWindow: offer.timeWindow,
           });
@@ -296,24 +266,48 @@ router.post('/init', async (req: Request, res: Response) => {
         totalQuantity,
       };
       
-      // Create order in PENDING state
-      const order = createOrder(context.transaction_id, providerId, selectedOfferId, orderItems, quote, 'PENDING');
+      // Create order first in DRAFT state (so we have a valid order ID for FK constraint)
+      const order = await createOrder(context.transaction_id, providerId, selectedOfferId, orderItems, quote, 'DRAFT');
       
-      // Update block order_id references to the actual order ID
-      const db = getDb();
-      db.run(
-        `UPDATE offer_blocks SET order_id = ? WHERE order_id = ? AND transaction_id = ?`,
-        [order.id, tempOrderId, context.transaction_id]
-      );
-      saveDb();
+      // Now claim blocks using the real order ID
+      for (const item of content.order.items) {
+        const claimedBlocks = await claimBlocks(item.offer_id, item.quantity, order.id, context.transaction_id);
+        
+        if (claimedBlocks.length < item.quantity) {
+          // Not enough blocks available - release any claimed blocks and fail
+          await releaseBlocks(context.transaction_id);
+          logger.error(`Not enough blocks available: requested ${item.quantity}, got ${claimedBlocks.length}`, {
+            transaction_id: context.transaction_id,
+            offer_id: item.offer_id,
+          });
+          throw new Error(`Not enough blocks available: requested ${item.quantity}, available ${claimedBlocks.length}`);
+        }
+        
+        // Sync reserved blocks to CDS
+        try {
+          await axios.post(`${config.urls.cds}/sync/blocks`, {
+            offer_id: item.offer_id,
+            block_ids: claimedBlocks.map(b => b.id),
+            status: 'RESERVED',
+            order_id: order.id,
+            transaction_id: context.transaction_id,
+          });
+          logger.info(`Synced ${claimedBlocks.length} reserved blocks to CDS for offer ${item.offer_id}`);
+        } catch (syncError: any) {
+          logger.error(`Failed to sync reserved blocks to CDS: ${syncError.message}`);
+        }
+      }
+      
+      // Update order status to PENDING now that blocks are claimed
+      const finalOrder = await updateOrderStatus(order.id, 'PENDING') || order;
       
       const callbackContext = createCallbackContext(context, 'on_init');
       const onInitMessage: OnInitMessage = {
         context: callbackContext,
-        message: { order },
+        message: { order: finalOrder },
       };
       
-      logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
+      await logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
       
       const callbackUrl = `${context.bap_uri}/callbacks/on_init`;
       logger.info(`Sending on_init callback to ${callbackUrl}`, {
@@ -342,15 +336,15 @@ router.post('/confirm', async (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate message detected', { transaction_id: context.transaction_id });
     return res.json(createAck(context));
   }
   
-  logEvent(context.transaction_id, context.message_id, 'confirm', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'confirm', 'INBOUND', JSON.stringify(message));
   
   // Get existing order
-  let order = getOrderById(content.order.id) || getOrderByTransactionId(context.transaction_id);
+  let order = await getOrderById(content.order.id) || await getOrderByTransactionId(context.transaction_id);
   
   if (!order) {
     return res.json(createNack(context, {
@@ -365,12 +359,12 @@ router.post('/confirm', async (req: Request, res: Response) => {
     try {
       // Idempotent confirm: only update if not already ACTIVE
       if (order!.status !== 'ACTIVE') {
-        order = updateOrderStatus(order!.id, 'ACTIVE');
+        order = await updateOrderStatus(order!.id, 'ACTIVE');
         logger.info('Order status updated to ACTIVE', { transaction_id: context.transaction_id, order_id: order!.id });
         
         // Mark reserved blocks as SOLD
-        const soldBlocks = getBlocksForOrder(order!.id);
-        markBlocksAsSold(order!.id);
+        const soldBlocks = await getBlocksForOrder(order!.id);
+        await markBlocksAsSold(order!.id);
         logger.info(`Marked ${soldBlocks.length} blocks as SOLD for order ${order!.id}`, { transaction_id: context.transaction_id });
         
         // Sync block status to CDS
@@ -393,12 +387,12 @@ router.post('/confirm', async (req: Request, res: Response) => {
         // Reduce item available quantity when order is confirmed (for item-level tracking)
         if (order!.items && order!.items.length > 0) {
           for (const orderItem of order!.items) {
-            const currentQty = getItemAvailableQuantity(orderItem.item_id);
+            const currentQty = await getItemAvailableQuantity(orderItem.item_id);
             if (currentQty !== null) {
               const soldQty = orderItem.quantity; // This is the actual purchased quantity from blocks
               const newQty = Math.max(0, currentQty - soldQty);
               
-              updateItemQuantity(orderItem.item_id, newQty);
+              await updateItemQuantity(orderItem.item_id, newQty);
               logger.info(`Item ${orderItem.item_id} quantity reduced: ${currentQty} → ${newQty} kWh (sold: ${soldQty} kWh)`, {
                 transaction_id: context.transaction_id,
               });
@@ -407,7 +401,8 @@ router.post('/confirm', async (req: Request, res: Response) => {
               try {
                 // Get provider_id from the order item (not from Order which doesn't have it)
                 const providerId = orderItem.provider_id || '';
-                const item = getProviderItems(providerId).find(i => i.id === orderItem.item_id);
+                const items = await getProviderItems(providerId);
+                const item = items.find(i => i.id === orderItem.item_id);
                 if (item) {
                   await syncItemToCDS({
                     id: item.id,
@@ -436,7 +431,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
         message: { order: order! },
       };
       
-      logEvent(context.transaction_id, callbackContext.message_id, 'on_confirm', 'OUTBOUND', JSON.stringify(onConfirmMessage));
+      await logEvent(context.transaction_id, callbackContext.message_id, 'on_confirm', 'OUTBOUND', JSON.stringify(onConfirmMessage));
       
       const callbackUrl = `${context.bap_uri}/callbacks/on_confirm`;
       logger.info(`Sending on_confirm callback to ${callbackUrl}`, {
@@ -465,14 +460,14 @@ router.post('/status', async (req: Request, res: Response) => {
     action: context.action,
   });
   
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     return res.json(createAck(context));
   }
   
-  logEvent(context.transaction_id, context.message_id, 'status', 'INBOUND', JSON.stringify(message));
+  await logEvent(context.transaction_id, context.message_id, 'status', 'INBOUND', JSON.stringify(message));
   
   // Get order
-  const order = getOrderById(content.order_id) || getOrderByTransactionId(context.transaction_id);
+  const order = await getOrderById(content.order_id) || await getOrderByTransactionId(context.transaction_id);
   
   if (!order) {
     return res.json(createNack(context, {
@@ -505,7 +500,7 @@ router.post('/status', async (req: Request, res: Response) => {
         },
       };
       
-      logEvent(context.transaction_id, callbackContext.message_id, 'on_status', 'OUTBOUND', JSON.stringify(onStatusMessage));
+      await logEvent(context.transaction_id, callbackContext.message_id, 'on_status', 'OUTBOUND', JSON.stringify(onStatusMessage));
       
       const callbackUrl = `${context.bap_uri}/callbacks/on_status`;
       logger.info(`Sending on_status callback to ${callbackUrl}`, {
@@ -583,7 +578,7 @@ router.post('/seller/register', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Provider name is required' });
   }
   
-  const provider = registerProvider(name);
+  const provider = await registerProvider(name);
   logger.info(`New provider registered: ${provider.id} (${name})`);
   
   // Sync to CDS
@@ -595,23 +590,23 @@ router.post('/seller/register', async (req: Request, res: Response) => {
 /**
  * GET /seller/providers - List all providers
  */
-router.get('/seller/providers', (req: Request, res: Response) => {
-  const providers = getAllProviders();
+router.get('/seller/providers', async (req: Request, res: Response) => {
+  const providers = await getAllProviders();
   res.json({ providers });
 });
 
 /**
  * GET /seller/providers/:id - Get provider details
  */
-router.get('/seller/providers/:id', (req: Request, res: Response) => {
-  const provider = getProvider(req.params.id);
+router.get('/seller/providers/:id', async (req: Request, res: Response) => {
+  const provider = await getProvider(req.params.id);
   
   if (!provider) {
     return res.status(404).json({ error: 'Provider not found' });
   }
   
-  const items = getProviderItems(req.params.id);
-  const offers = getProviderOffers(req.params.id);
+  const items = await getProviderItems(req.params.id);
+  const offers = await getProviderOffers(req.params.id);
   
   res.json({ provider, items, offers });
 });
@@ -633,12 +628,12 @@ router.post('/seller/items', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'provider_id, source_type, and available_qty are required' });
   }
   
-  const provider = getProvider(provider_id);
+  const provider = await getProvider(provider_id);
   if (!provider) {
     return res.status(404).json({ error: 'Provider not found' });
   }
   
-  const item = addCatalogItem(
+  const item = await addCatalogItem(
     provider_id,
     source_type,
     'SCHEDULED', // Always scheduled for P2P energy trading
@@ -666,12 +661,12 @@ router.post('/seller/items', async (req: Request, res: Response) => {
 /**
  * GET /seller/items - List all items
  */
-router.get('/seller/items', (req: Request, res: Response) => {
+router.get('/seller/items', async (req: Request, res: Response) => {
   const { provider_id } = req.query;
   
   const items = provider_id 
-    ? getProviderItems(provider_id as string)
-    : getAllItems();
+    ? await getProviderItems(provider_id as string)
+    : await getAllItems();
   
   res.json({ items });
 });
@@ -679,14 +674,14 @@ router.get('/seller/items', (req: Request, res: Response) => {
 /**
  * PUT /seller/items/:id/quantity - Update item quantity
  */
-router.put('/seller/items/:id/quantity', (req: Request, res: Response) => {
+router.put('/seller/items/:id/quantity', async (req: Request, res: Response) => {
   const { quantity } = req.body;
   
   if (quantity === undefined || quantity < 0) {
     return res.status(400).json({ error: 'Valid quantity is required' });
   }
   
-  updateItemQuantity(req.params.id, quantity);
+  await updateItemQuantity(req.params.id, quantity);
   logger.info(`Item ${req.params.id} quantity updated to ${quantity}`);
   
   res.json({ status: 'ok', item_id: req.params.id, new_quantity: quantity });
@@ -711,7 +706,7 @@ router.post('/seller/offers', async (req: Request, res: Response) => {
     });
   }
   
-  const offer = addOffer(
+  const offer = await addOffer(
     item_id,
     provider_id,
     price_per_kwh,
@@ -740,12 +735,12 @@ router.post('/seller/offers', async (req: Request, res: Response) => {
 /**
  * GET /seller/offers - List all offers
  */
-router.get('/seller/offers', (req: Request, res: Response) => {
+router.get('/seller/offers', async (req: Request, res: Response) => {
   const { provider_id } = req.query;
   
   const offers = provider_id 
-    ? getProviderOffers(provider_id as string)
-    : getAllOffers();
+    ? await getProviderOffers(provider_id as string)
+    : await getAllOffers();
   
   res.json({ offers });
 });
@@ -754,7 +749,7 @@ router.get('/seller/offers', (req: Request, res: Response) => {
  * DELETE /seller/offers/:id - Delete an offer
  */
 router.delete('/seller/offers/:id', async (req: Request, res: Response) => {
-  deleteOffer(req.params.id);
+  await deleteOffer(req.params.id);
   logger.info(`Offer ${req.params.id} deleted`);
   
   // Sync deletion to CDS
@@ -766,15 +761,15 @@ router.delete('/seller/offers/:id', async (req: Request, res: Response) => {
 /**
  * GET /seller/orders - Get orders for a provider
  */
-router.get('/seller/orders', (req: Request, res: Response) => {
+router.get('/seller/orders', async (req: Request, res: Response) => {
   const { provider_id } = req.query;
   
   const orders = provider_id 
-    ? getOrdersByProviderId(provider_id as string)
-    : getAllOrders();
+    ? await getOrdersByProviderId(provider_id as string)
+    : await getAllOrders();
   
   // Enrich orders with block information
-  const enrichedOrders = orders.map(order => {
+  const enrichedOrders = await Promise.all(orders.map(async (order) => {
     try {
       if (order.items && order.items.length > 0) {
         const firstItem = order.items[0];
@@ -782,14 +777,14 @@ router.get('/seller/orders', (req: Request, res: Response) => {
         const offerId = firstItem.offer_id;
         
         // Get actual purchased quantity from blocks (not from offer max)
-        const orderBlocks = getBlocksForOrder(order.id);
+        const orderBlocks = await getBlocksForOrder(order.id);
         const actualSoldQty = orderBlocks.length; // Each block = 1 unit
         
         // Get item-level available quantity
-        const availableQty = getItemAvailableQuantity(itemId);
+        const availableQty = await getItemAvailableQuantity(itemId);
         
         // Get offer block stats
-        const blockStats = getBlockStats(offerId);
+        const blockStats = await getBlockStats(offerId);
         
         return {
           ...order,
@@ -807,7 +802,7 @@ router.get('/seller/orders', (req: Request, res: Response) => {
       logger.error(`Error enriching order ${order.id}: ${error.message}`);
     }
     return order;
-  });
+  }));
   
   res.json({ orders: enrichedOrders });
 });

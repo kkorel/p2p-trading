@@ -35,7 +35,7 @@ router.post('/discover', async (req: Request, res: Response) => {
   });
   
   // Check for duplicate message
-  if (isDuplicateMessage(context.message_id)) {
+  if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate message detected, returning ACK', {
       transaction_id: context.transaction_id,
       message_id: context.message_id,
@@ -44,7 +44,7 @@ router.post('/discover', async (req: Request, res: Response) => {
   }
   
   // Log inbound event
-  logEvent(
+  await logEvent(
     context.transaction_id,
     context.message_id,
     'discover',
@@ -59,7 +59,7 @@ router.post('/discover', async (req: Request, res: Response) => {
   setTimeout(async () => {
     try {
       // Get full catalog
-      let catalog = getCatalog();
+      let catalog = await getCatalog();
       
       // Apply filters if provided
       if (content.filters?.expression) {
@@ -88,7 +88,7 @@ router.post('/discover', async (req: Request, res: Response) => {
       };
       
       // Log outbound event
-      logEvent(
+      await logEvent(
         context.transaction_id,
         callbackContext.message_id,
         'on_discover',
@@ -124,14 +124,14 @@ router.post('/discover', async (req: Request, res: Response) => {
 /**
  * POST /sync/provider - Sync a provider from BPP
  */
-router.post('/sync/provider', (req: Request, res: Response) => {
+router.post('/sync/provider', async (req: Request, res: Response) => {
   const { id, name, trust_score } = req.body;
   
   if (!id || !name) {
     return res.status(400).json({ error: 'id and name are required' });
   }
   
-  syncProvider({ id, name, trust_score });
+  await syncProvider({ id, name, trust_score });
   logger.info(`Synced provider: ${id} (${name})`);
   
   res.json({ status: 'ok', synced: 'provider', id });
@@ -140,14 +140,14 @@ router.post('/sync/provider', (req: Request, res: Response) => {
 /**
  * POST /sync/item - Sync a catalog item from BPP
  */
-router.post('/sync/item', (req: Request, res: Response) => {
+router.post('/sync/item', async (req: Request, res: Response) => {
   const item = req.body;
   
   if (!item.id || !item.provider_id) {
     return res.status(400).json({ error: 'id and provider_id are required' });
   }
   
-  syncItem(item);
+  await syncItem(item);
   logger.info(`Synced item: ${item.id}`);
   
   res.json({ status: 'ok', synced: 'item', id: item.id });
@@ -156,14 +156,14 @@ router.post('/sync/item', (req: Request, res: Response) => {
 /**
  * POST /sync/offer - Sync an offer from BPP
  */
-router.post('/sync/offer', (req: Request, res: Response) => {
+router.post('/sync/offer', async (req: Request, res: Response) => {
   const offer = req.body;
   
   if (!offer.id || !offer.item_id || !offer.provider_id) {
     return res.status(400).json({ error: 'id, item_id, and provider_id are required' });
   }
   
-  syncOffer(offer);
+  await syncOffer(offer);
   logger.info(`Synced offer: ${offer.id}`);
   
   res.json({ status: 'ok', synced: 'offer', id: offer.id });
@@ -172,8 +172,8 @@ router.post('/sync/offer', (req: Request, res: Response) => {
 /**
  * DELETE /sync/offer/:id - Delete an offer
  */
-router.delete('/sync/offer/:id', (req: Request, res: Response) => {
-  deleteOffer(req.params.id);
+router.delete('/sync/offer/:id', async (req: Request, res: Response) => {
+  await deleteOffer(req.params.id);
   logger.info(`Deleted offer: ${req.params.id}`);
   
   res.json({ status: 'ok', deleted: 'offer', id: req.params.id });
@@ -182,14 +182,14 @@ router.delete('/sync/offer/:id', (req: Request, res: Response) => {
 /**
  * POST /sync/blocks - Update block status (when blocks are sold/reserved)
  */
-router.post('/sync/blocks', (req: Request, res: Response) => {
+router.post('/sync/blocks', async (req: Request, res: Response) => {
   const { offer_id, block_ids, status, order_id, transaction_id } = req.body;
   
   if (!offer_id || !block_ids || !status) {
     return res.status(400).json({ error: 'offer_id, block_ids, and status are required' });
   }
   
-  updateBlockStatus(offer_id, block_ids, status, order_id, transaction_id);
+  await updateBlockStatus(offer_id, block_ids, status, order_id, transaction_id);
   logger.info(`Updated ${block_ids.length} blocks for offer ${offer_id} to status ${status}`);
   
   res.json({ status: 'ok', synced: 'blocks', count: block_ids.length });
@@ -198,8 +198,8 @@ router.post('/sync/blocks', (req: Request, res: Response) => {
 /**
  * GET /catalog - Get current catalog (for debugging)
  */
-router.get('/catalog', (req: Request, res: Response) => {
-  const catalog = getCatalog();
+router.get('/catalog', async (req: Request, res: Response) => {
+  const catalog = await getCatalog();
   res.json({ catalog });
 });
 

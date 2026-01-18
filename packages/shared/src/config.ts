@@ -3,6 +3,16 @@
  */
 
 export const config = {
+  // Database configuration
+  database: {
+    url: process.env.DATABASE_URL || 'postgresql://p2p_user:p2p_password@localhost:5432/p2p_trading',
+  },
+
+  // Redis configuration
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  },
+
   // Service ports
   ports: {
     bap: parseInt(process.env.BAP_PORT || '4000'),

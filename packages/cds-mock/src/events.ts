@@ -1,27 +1,62 @@
 /**
  * Event logging for CDS Mock
+ * Uses Redis for fast deduplication and Prisma for persistent storage
  */
 
-import { getDb, saveDb } from './db';
-import { EventDirection } from '@p2p/shared';
+import { prisma } from './db';
+import { EventDirection, isMessageProcessed, markMessageProcessed } from '@p2p/shared';
 
-export function logEvent(
+/**
+ * Log an event to the database
+ */
+export async function logEvent(
   transaction_id: string,
   message_id: string,
   action: string,
   direction: EventDirection,
   raw_json: string
-): void {
-  const db = getDb();
-  db.run(
-    `INSERT INTO events (transaction_id, message_id, action, direction, raw_json) VALUES (?, ?, ?, ?, ?)`,
-    [transaction_id, message_id, action, direction, raw_json]
-  );
-  saveDb();
+): Promise<void> {
+  await prisma.event.create({
+    data: {
+      transactionId: transaction_id,
+      messageId: message_id,
+      action,
+      direction,
+      rawJson: raw_json,
+    },
+  });
+  
+  // Also mark in Redis for fast deduplication
+  await markMessageProcessed(message_id, direction);
 }
 
-export function isDuplicateMessage(message_id: string): boolean {
-  const db = getDb();
-  const result = db.exec('SELECT 1 FROM events WHERE message_id = ?', [message_id]);
-  return result.length > 0 && result[0].values.length > 0;
+/**
+ * Check if we've already processed a message with this ID
+ * Uses Redis for fast lookups
+ * Checks only INBOUND direction to avoid conflicts with OUTBOUND events from other services
+ */
+export async function isDuplicateMessage(message_id: string): Promise<boolean> {
+  // First check Redis (fast path)
+  const inRedis = await isMessageProcessed(message_id, 'INBOUND');
+  if (inRedis) {
+    return true;
+  }
+  
+  // Fallback to database check (for messages processed before Redis was added)
+  // IMPORTANT: Filter by INBOUND direction to avoid matching OUTBOUND events
+  const event = await prisma.event.findFirst({
+    where: { 
+      messageId: message_id,
+      direction: 'INBOUND',
+    },
+    select: { id: true },
+  });
+  
+  if (event) {
+    // Cache in Redis for future checks
+    await markMessageProcessed(message_id, 'INBOUND');
+    return true;
+  }
+  
+  return false;
 }

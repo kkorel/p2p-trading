@@ -1,9 +1,17 @@
 /**
- * In-memory state for tracking ongoing transactions
- * In production, this would be persisted to the database
+ * Transaction state management using Redis
+ * Provides persistence and automatic expiration of transaction states
  */
 
 import { Catalog, CatalogOffer, Provider, Order, TimeWindow, SourceType, DeliveryMode } from '@p2p/shared';
+import {
+  createTransactionState,
+  getTransactionState,
+  updateTransactionState,
+  getAllTransactionStates,
+  clearAllTransactionStates,
+  TransactionState as RedisTransactionState,
+} from '@p2p/shared';
 
 interface DiscoveryCriteria {
   sourceType?: SourceType;
@@ -34,11 +42,11 @@ interface MatchingResult {
   reason?: string;
 }
 
-interface TransactionState {
+export interface TransactionState {
   transaction_id: string;
   catalog?: Catalog;
   selectedOffer?: CatalogOffer;
-  selectedQuantity?: number; // The quantity the buyer wants to purchase
+  selectedQuantity?: number;
   providers?: Map<string, Provider>;
   order?: Order;
   discoveryCriteria?: DiscoveryCriteria;
@@ -48,42 +56,73 @@ interface TransactionState {
   updated_at: string;
 }
 
-const transactions = new Map<string, TransactionState>();
-
-export function createTransaction(transaction_id: string): TransactionState {
-  const now = new Date().toISOString();
+/**
+ * Convert Redis state to local TransactionState
+ * Handles Map reconstruction for providers
+ */
+function fromRedisState(redisState: RedisTransactionState): TransactionState {
   const state: TransactionState = {
-    transaction_id,
-    status: 'DISCOVERING',
-    created_at: now,
-    updated_at: now,
+    ...redisState,
+    providers: redisState.providers 
+      ? new Map(Object.entries(redisState.providers))
+      : undefined,
   };
-  transactions.set(transaction_id, state);
   return state;
-}
-
-export function getTransaction(transaction_id: string): TransactionState | undefined {
-  return transactions.get(transaction_id);
-}
-
-export function updateTransaction(
-  transaction_id: string, 
-  updates: Partial<Omit<TransactionState, 'transaction_id' | 'created_at'>>
-): TransactionState | undefined {
-  const state = transactions.get(transaction_id);
-  if (!state) return undefined;
-  
-  Object.assign(state, updates, { updated_at: new Date().toISOString() });
-  return state;
-}
-
-export function getAllTransactions(): TransactionState[] {
-  return Array.from(transactions.values());
 }
 
 /**
- * Clear all in-memory transactions
+ * Convert local TransactionState to Redis-compatible format
+ * Handles Map serialization for providers
  */
-export function clearAllTransactions(): void {
-  transactions.clear();
+function toRedisState(state: Partial<TransactionState>): Partial<RedisTransactionState> {
+  const redisState: any = { ...state };
+  if (state.providers instanceof Map) {
+    redisState.providers = Object.fromEntries(state.providers);
+  }
+  return redisState;
+}
+
+/**
+ * Create a new transaction state
+ */
+export async function createTransaction(transaction_id: string): Promise<TransactionState> {
+  const redisState = await createTransactionState(transaction_id);
+  return fromRedisState(redisState);
+}
+
+/**
+ * Get transaction state by ID
+ */
+export async function getTransaction(transaction_id: string): Promise<TransactionState | undefined> {
+  const redisState = await getTransactionState(transaction_id);
+  if (!redisState) return undefined;
+  return fromRedisState(redisState);
+}
+
+/**
+ * Update transaction state
+ */
+export async function updateTransaction(
+  transaction_id: string, 
+  updates: Partial<Omit<TransactionState, 'transaction_id' | 'created_at'>>
+): Promise<TransactionState | undefined> {
+  const redisUpdates = toRedisState(updates);
+  const redisState = await updateTransactionState(transaction_id, redisUpdates as any);
+  if (!redisState) return undefined;
+  return fromRedisState(redisState);
+}
+
+/**
+ * Get all transaction states
+ */
+export async function getAllTransactions(): Promise<TransactionState[]> {
+  const redisStates = await getAllTransactionStates();
+  return redisStates.map(fromRedisState);
+}
+
+/**
+ * Clear all transaction states
+ */
+export async function clearAllTransactions(): Promise<void> {
+  await clearAllTransactionStates();
 }
