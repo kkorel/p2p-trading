@@ -128,14 +128,21 @@ router.post('/select', async (req: Request, res: Response) => {
     totalPrice += itemPrice;
     totalQuantity += item.quantity;
     currency = offer.price.currency;
-    
+
+    // Get source_type from item
+    const catalogItem = await prisma.catalogItem.findUnique({
+      where: {id: item.item_id},
+      select: {sourceType: true},
+    });
+
     orderItems.push({
       item_id: item.item_id,
       offer_id: item.offer_id,
       provider_id: offer.provider_id,
       quantity: item.quantity,
-      price: { value: itemPrice, currency },
+      price: {value: itemPrice, currency},
       timeWindow: offer.timeWindow,
+      source_type: catalogItem?.sourceType || 'UNKNOWN',
     });
   }
   
@@ -262,14 +269,21 @@ router.post('/init', async (req: Request, res: Response) => {
           totalPrice += itemPrice;
           totalQuantity += item.quantity;
           currency = offer.price.currency;
-          
+
+          // Get source_type from catalog item
+          const catalogItem = await prisma.catalogItem.findUnique({
+            where: {id: item.item_id},
+            select: {sourceType: true},
+          });
+
           orderItems.push({
             item_id: item.item_id,
             offer_id: item.offer_id,
             provider_id: offer.provider_id,
             quantity: item.quantity,
-            price: { value: itemPrice, currency },
+            price: {value: itemPrice, currency},
             timeWindow: offer.timeWindow,
+            source_type: catalogItem?.sourceType || 'UNKNOWN',
           });
         }
       }
@@ -421,6 +435,41 @@ router.post('/confirm', async (req: Request, res: Response) => {
             logger.info(`Synced ${soldBlocks.length} sold blocks to CDS for offer ${firstItem.offer_id}`);
           } catch (syncError: any) {
             logger.error(`Failed to sync block status to CDS: ${syncError.message}`);
+          }
+
+          // Auto-delete offers with no remaining available blocks
+          const offerStats = await getBlockStats(firstItem.offer_id);
+          if (offerStats.available === 0) {
+            try {
+              // Delete all blocks for this offer
+              await prisma.offerBlock.deleteMany({
+                where: {offerId: firstItem.offer_id},
+              });
+
+              // Delete the offer
+              await prisma.catalogOffer.deleteMany({
+                where: {id: firstItem.offer_id},
+              });
+
+              logger.info(
+                  `Auto-deleted offer ${
+                      firstItem.offer_id} - no available units remaining`,
+                  {
+                    transaction_id: context.transaction_id,
+                  });
+
+              // Sync deletion to CDS
+              try {
+                await axios.delete(
+                    `${config.urls.cds}/sync/offers/${firstItem.offer_id}`);
+              } catch (syncError: any) {
+                logger.error(`Failed to sync offer deletion to CDS: ${
+                    syncError.message}`);
+              }
+            } catch (deleteError: any) {
+              logger.error(
+                  `Failed to auto-delete empty offer: ${deleteError.message}`);
+            }
           }
         }
         
@@ -698,7 +747,17 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
           const offer = await prisma.catalogOffer.findUnique({
             where: { id: firstItem.offer_id },
           });
-          
+
+          // Get price from blocks if offer is deleted, or from offer if it
+          // exists Blocks store the price at time of purchase, so this works
+          // even if offer is deleted
+          const totalQty = order.quote?.totalQuantity || 0;
+          const pricePerKwh = offer?.priceValue ||
+              (orderBlocks.length > 0 ? orderBlocks[0].price_value : 0) ||
+              (order.quote?.price?.value && totalQty ?
+                   order.quote.price.value / totalQty :
+                   0);
+
           return {
             ...order,
             itemInfo: {
@@ -707,7 +766,7 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
               sold_quantity: actualSoldQty,
               block_stats: blockStats,
               source_type: item?.sourceType || 'UNKNOWN',
-              price_per_kwh: offer?.priceValue || 0,
+              price_per_kwh: pricePerKwh,
             },
           };
         }

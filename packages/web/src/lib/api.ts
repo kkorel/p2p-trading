@@ -87,6 +87,32 @@ export const authApi = {
 
   logout: () =>
     request<{ success: boolean }>('/auth/logout', { method: 'POST' }),
+
+  getBalance: () =>
+    request<{ success: boolean; balance: number }>('/auth/balance'),
+
+  updateBalance: (balance: number) =>
+    request<{ success: boolean; balance: number }>('/auth/balance', {
+      method: 'PUT',
+      body: JSON.stringify({ balance }),
+    }),
+
+  processPayment: (params: { orderId: string; amount: number; sellerId?: string }) =>
+    request<{
+      success: boolean;
+      message: string;
+      payment: {
+        orderId: string;
+        amount: number;
+        platformFee: number;
+        totalDeducted: number;
+        sellerReceived: number;
+      };
+      newBalance: number;
+    }>('/auth/payment', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
 };
 
 // Buyer APIs
@@ -128,6 +154,63 @@ export const buyerApi = {
 
   getMyOrders: () =>
     request<{ orders: BuyerOrder[] }>('/api/my-orders'),
+};
+
+// Settlement/Payment APIs
+export const settlementApi = {
+  getSettlement: (tradeId: string) =>
+    request<SettlementResponse>(`/api/settlement/${tradeId}`),
+
+  initiate: (params: { tradeId?: string; order_id?: string; transaction_id?: string }) =>
+    request<SettlementResponse>('/api/settlement/initiate', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
+  confirmFunded: (tradeId: string, receipt: string) =>
+    request<SettlementResponse>('/api/settlement/confirm-funded', {
+      method: 'POST',
+      body: JSON.stringify({ tradeId, receipt }),
+    }),
+
+  verifyOutcome: (tradeId: string, outcome: 'RELEASE' | 'REFUND') =>
+    request<SettlementResponse>('/api/settlement/verify-outcome', {
+      method: 'POST',
+      body: JSON.stringify({ tradeId, outcome }),
+    }),
+
+  confirmPayout: (tradeId: string, receipt: string) =>
+    request<SettlementResponse>('/api/settlement/confirm-payout', {
+      method: 'POST',
+      body: JSON.stringify({ tradeId, receipt }),
+    }),
+
+  autoRun: (tradeId: string) =>
+    request<SettlementResponse>('/api/settlement/auto-run', {
+      method: 'POST',
+      body: JSON.stringify({ tradeId }),
+    }),
+
+  reset: () =>
+    request<{ status: string }>('/api/settlement/reset', { method: 'POST' }),
+};
+
+// Demo Account APIs
+export const demoApi = {
+  getAccounts: () =>
+    request<{ accounts: DemoAccount[]; transactions: DemoTransaction[] }>('/api/demo/accounts'),
+
+  getAccount: (id: string) =>
+    request<{ account: DemoAccount }>(`/api/demo/accounts/${id}`),
+
+  getTransactions: () =>
+    request<{ transactions: DemoTransaction[] }>('/api/demo/transactions'),
+
+  resetAccounts: () =>
+    request<{ status: string; accounts: DemoAccount[] }>('/api/demo/accounts/reset', { method: 'POST' }),
+
+  resetAll: () =>
+    request<{ status: string; accounts: DemoAccount[] }>('/api/demo/reset-all', { method: 'POST' }),
 };
 
 // Seller APIs
@@ -172,6 +255,7 @@ export interface User {
   name: string | null;
   picture: string | null;
   profileComplete: boolean;
+  balance: number;
   providerId: string | null;
 }
 
@@ -266,6 +350,79 @@ export interface AddOfferDirectParams {
   currency?: string;
   max_qty: number;
   time_window: { startTime: string; endTime: string };
+}
+
+export interface SettlementRecord {
+  tradeId: string;
+  orderId: string | null;
+  transactionId: string | null;
+  buyerId: string | null;
+  sellerId: string | null;
+  principal: number;
+  fee: number;
+  total: number;
+  expiresAt: string | null;
+  status: string;
+  verificationOutcome: string | null;
+  fundedReceipt: string | null;
+  payoutReceipt: string | null;
+  fundedAt: string | null;
+  verifiedAt: string | null;
+  payoutAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PaymentStep {
+  id: number;
+  label: string;
+  status: 'pending' | 'complete' | 'error';
+  time: string | null;
+}
+
+export interface EscrowInstruction {
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  ifsc: string;
+  branch: string;
+  amount: number;
+  currency: string;
+  reference: string;
+  expiresAt: string;
+}
+
+export interface PayoutInstruction {
+  instruction: string;
+  amount: number;
+  currency: string;
+}
+
+export interface SettlementResponse {
+  status: string;
+  record: SettlementRecord;
+  steps: PaymentStep[];
+  escrow?: EscrowInstruction;
+  payout?: PayoutInstruction;
+}
+
+export interface DemoAccount {
+  id: string;
+  name: string;
+  type: 'buyer' | 'seller' | 'escrow' | 'platform';
+  balance: number;
+  currency: string;
+}
+
+export interface DemoTransaction {
+  id: string;
+  fromId: string;
+  fromName: string;
+  toId: string;
+  toName: string;
+  amount: number;
+  description: string;
+  timestamp: string;
 }
 
 export interface TransactionState {

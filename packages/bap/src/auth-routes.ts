@@ -84,6 +84,8 @@ router.post('/google', async (req: Request, res: Response) => {
         name: user!.name,
         picture: user!.picture,
         profileComplete: user!.profileComplete,
+        balance: user!.balance,
+        providerId: user!.providerId,
         provider: user!.provider,
       },
     });
@@ -177,6 +179,8 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
         name: user.name,
         picture: user.picture,
         profileComplete: user.profileComplete,
+        balance: user.balance,
+        providerId: user.providerId,
         provider: user.provider,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
@@ -234,6 +238,8 @@ router.put('/profile', authMiddleware, async (req: Request, res: Response) => {
         name: user.name,
         picture: user.picture,
         profileComplete: user.profileComplete,
+        balance: user.balance,
+        providerId: user.providerId,
         provider: user.provider,
       },
     });
@@ -300,6 +306,169 @@ router.post('/setup-provider', authMiddleware, async (req: Request, res: Respons
     res.status(500).json({
       success: false,
       error: 'Failed to create seller profile',
+    });
+  }
+});
+
+/**
+ * GET /auth/balance
+ * Get current user's balance
+ */
+router.get('/balance', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { balance: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      balance: user.balance,
+    });
+  } catch (error: any) {
+    console.error('Get balance error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get balance',
+    });
+  }
+});
+
+/**
+ * PUT /auth/balance
+ * Set user balance (for demo purposes)
+ */
+router.put('/balance', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { balance } = req.body;
+
+    if (typeof balance !== 'number' || balance < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Balance must be a non-negative number',
+      });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { balance: Math.round(balance * 100) / 100 },
+      select: { balance: true },
+    });
+
+    res.json({
+      success: true,
+      balance: user.balance,
+    });
+  } catch (error: any) {
+    console.error('Update balance error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update balance',
+    });
+  }
+});
+
+/**
+ * POST /auth/payment
+ * Process a payment: deduct from buyer, add to seller (minus platform fee)
+ * Platform fee (2.5%) goes to the platform, not the seller
+ */
+router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { orderId, amount, sellerId } = req.body;
+    const buyerId = req.user!.id;
+
+    if (!orderId || typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid payment parameters',
+      });
+    }
+
+    // Get buyer's current balance
+    const buyer = await prisma.user.findUnique({
+      where: { id: buyerId },
+      select: { balance: true },
+    });
+
+    if (!buyer) {
+      return res.status(404).json({
+        success: false,
+        error: 'Buyer not found',
+      });
+    }
+
+    // Calculate platform fee (2.5%)
+    const platformFee = Math.round(amount * 0.025 * 100) / 100;
+    const totalDeduction = amount + platformFee;
+    const sellerAmount = amount; // Seller gets full amount, fee is separate
+
+    // Check if buyer has sufficient balance
+    if (buyer.balance < totalDeduction) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient balance',
+        required: totalDeduction,
+        available: buyer.balance,
+      });
+    }
+
+    // Find seller's user account via provider
+    let sellerUser = null;
+    if (sellerId) {
+      sellerUser = await prisma.user.findFirst({
+        where: { providerId: sellerId },
+        select: { id: true, balance: true },
+      });
+    }
+
+    // Perform the transaction
+    await prisma.$transaction(async (tx) => {
+      // Deduct from buyer (amount + fee)
+      await tx.user.update({
+        where: { id: buyerId },
+        data: { balance: { decrement: totalDeduction } },
+      });
+
+      // Add to seller (full amount, no fee deduction from seller)
+      if (sellerUser) {
+        await tx.user.update({
+          where: { id: sellerUser.id },
+          data: { balance: { increment: sellerAmount } },
+        });
+      }
+    });
+
+    // Get updated buyer balance
+    const updatedBuyer = await prisma.user.findUnique({
+      where: { id: buyerId },
+      select: { balance: true },
+    });
+
+    res.json({
+      success: true,
+      message: 'Payment processed successfully',
+      payment: {
+        orderId,
+        amount,
+        platformFee,
+        totalDeducted: totalDeduction,
+        sellerReceived: sellerAmount,
+      },
+      newBalance: updatedBuyer?.balance || 0,
+    });
+  } catch (error: any) {
+    console.error('Payment error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Payment processing failed',
     });
   }
 });

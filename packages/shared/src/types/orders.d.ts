@@ -10,6 +10,7 @@ export interface OrderItem {
     quantity: number;
     price: Price;
     timeWindow: TimeWindow;
+    source_type?: string;
 }
 export interface Quote {
     price: Price;

@@ -15,6 +15,7 @@ export interface OrderItem {
   quantity: number; // kWh
   price: Price;
   timeWindow: TimeWindow;
+  source_type?: string; // Energy source type (SOLAR, WIND, etc.) - stored for history even after offer deletion
 }
 
 // Quote breakdown

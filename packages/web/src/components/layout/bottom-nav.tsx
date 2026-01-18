@@ -18,7 +18,7 @@ const navItems = [
   },
   {
     href: '/orders',
-    label: 'My Orders',
+    label: 'Orders',
     icon: ShoppingBag,
   },
   {
@@ -32,8 +32,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--color-bg)] border-t border-[var(--color-border)]">
-      <div className="max-w-[480px] mx-auto">
+    <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-[env(safe-area-inset-bottom)]">
+      <nav className="w-full max-w-[480px] mx-4 mb-4 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-2xl shadow-lg">
         <div className="flex items-center justify-around h-16 px-4">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
@@ -62,9 +62,7 @@ export function BottomNav() {
             );
           })}
         </div>
-      </div>
-      {/* Safe area padding for iOS */}
-      <div className="h-[env(safe-area-inset-bottom)]" />
-    </nav>
+      </nav>
+    </div>
   );
 }

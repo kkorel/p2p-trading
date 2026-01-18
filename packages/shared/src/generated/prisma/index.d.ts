@@ -53,6 +53,11 @@ export type Order = $Result.DefaultSelection<Prisma.$OrderPayload>
  * 
  */
 export type Event = $Result.DefaultSelection<Prisma.$EventPayload>
+/**
+ * Model SettlementRecord
+ * 
+ */
+export type SettlementRecord = $Result.DefaultSelection<Prisma.$SettlementRecordPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -256,6 +261,16 @@ export class PrismaClient<
     * ```
     */
   get event(): Prisma.EventDelegate<ExtArgs>;
+
+  /**
+   * `prisma.settlementRecord`: Exposes CRUD operations for the **SettlementRecord** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SettlementRecords
+    * const settlementRecords = await prisma.settlementRecord.findMany()
+    * ```
+    */
+  get settlementRecord(): Prisma.SettlementRecordDelegate<ExtArgs>;
 }
 
 export namespace Prisma {
@@ -704,7 +719,8 @@ export namespace Prisma {
     CatalogOffer: 'CatalogOffer',
     OfferBlock: 'OfferBlock',
     Order: 'Order',
-    Event: 'Event'
+    Event: 'Event',
+    SettlementRecord: 'SettlementRecord'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -720,7 +736,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, ClientOptions = {}> = {
     meta: {
-      modelProps: "user" | "session" | "provider" | "catalogItem" | "catalogOffer" | "offerBlock" | "order" | "event"
+      modelProps: "user" | "session" | "provider" | "catalogItem" | "catalogOffer" | "offerBlock" | "order" | "event" | "settlementRecord"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1284,6 +1300,76 @@ export namespace Prisma {
           }
         }
       }
+      SettlementRecord: {
+        payload: Prisma.$SettlementRecordPayload<ExtArgs>
+        fields: Prisma.SettlementRecordFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SettlementRecordFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SettlementRecordFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload>
+          }
+          findFirst: {
+            args: Prisma.SettlementRecordFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SettlementRecordFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload>
+          }
+          findMany: {
+            args: Prisma.SettlementRecordFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload>[]
+          }
+          create: {
+            args: Prisma.SettlementRecordCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload>
+          }
+          createMany: {
+            args: Prisma.SettlementRecordCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SettlementRecordCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload>[]
+          }
+          delete: {
+            args: Prisma.SettlementRecordDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload>
+          }
+          update: {
+            args: Prisma.SettlementRecordUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload>
+          }
+          deleteMany: {
+            args: Prisma.SettlementRecordDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SettlementRecordUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.SettlementRecordUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SettlementRecordPayload>
+          }
+          aggregate: {
+            args: Prisma.SettlementRecordAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSettlementRecord>
+          }
+          groupBy: {
+            args: Prisma.SettlementRecordGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SettlementRecordGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SettlementRecordCountArgs<ExtArgs>
+            result: $Utils.Optional<SettlementRecordCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1659,8 +1745,18 @@ export namespace Prisma {
 
   export type AggregateUser = {
     _count: UserCountAggregateOutputType | null
+    _avg: UserAvgAggregateOutputType | null
+    _sum: UserSumAggregateOutputType | null
     _min: UserMinAggregateOutputType | null
     _max: UserMaxAggregateOutputType | null
+  }
+
+  export type UserAvgAggregateOutputType = {
+    balance: number | null
+  }
+
+  export type UserSumAggregateOutputType = {
+    balance: number | null
   }
 
   export type UserMinAggregateOutputType = {
@@ -1670,6 +1766,7 @@ export namespace Prisma {
     picture: string | null
     googleId: string | null
     profileComplete: boolean | null
+    balance: number | null
     createdAt: Date | null
     updatedAt: Date | null
     lastLoginAt: Date | null
@@ -1683,6 +1780,7 @@ export namespace Prisma {
     picture: string | null
     googleId: string | null
     profileComplete: boolean | null
+    balance: number | null
     createdAt: Date | null
     updatedAt: Date | null
     lastLoginAt: Date | null
@@ -1696,6 +1794,7 @@ export namespace Prisma {
     picture: number
     googleId: number
     profileComplete: number
+    balance: number
     createdAt: number
     updatedAt: number
     lastLoginAt: number
@@ -1704,6 +1803,14 @@ export namespace Prisma {
   }
 
 
+  export type UserAvgAggregateInputType = {
+    balance?: true
+  }
+
+  export type UserSumAggregateInputType = {
+    balance?: true
+  }
+
   export type UserMinAggregateInputType = {
     id?: true
     email?: true
@@ -1711,6 +1818,7 @@ export namespace Prisma {
     picture?: true
     googleId?: true
     profileComplete?: true
+    balance?: true
     createdAt?: true
     updatedAt?: true
     lastLoginAt?: true
@@ -1724,6 +1832,7 @@ export namespace Prisma {
     picture?: true
     googleId?: true
     profileComplete?: true
+    balance?: true
     createdAt?: true
     updatedAt?: true
     lastLoginAt?: true
@@ -1737,6 +1846,7 @@ export namespace Prisma {
     picture?: true
     googleId?: true
     profileComplete?: true
+    balance?: true
     createdAt?: true
     updatedAt?: true
     lastLoginAt?: true
@@ -1782,6 +1892,18 @@ export namespace Prisma {
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
+     * Select which fields to average
+    **/
+    _avg?: UserAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: UserSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
      * Select which fields to find the minimum value
     **/
     _min?: UserMinAggregateInputType
@@ -1812,6 +1934,8 @@ export namespace Prisma {
     take?: number
     skip?: number
     _count?: UserCountAggregateInputType | true
+    _avg?: UserAvgAggregateInputType
+    _sum?: UserSumAggregateInputType
     _min?: UserMinAggregateInputType
     _max?: UserMaxAggregateInputType
   }
@@ -1823,11 +1947,14 @@ export namespace Prisma {
     picture: string | null
     googleId: string | null
     profileComplete: boolean
+    balance: number
     createdAt: Date
     updatedAt: Date
     lastLoginAt: Date | null
     providerId: string | null
     _count: UserCountAggregateOutputType | null
+    _avg: UserAvgAggregateOutputType | null
+    _sum: UserSumAggregateOutputType | null
     _min: UserMinAggregateOutputType | null
     _max: UserMaxAggregateOutputType | null
   }
@@ -1853,6 +1980,7 @@ export namespace Prisma {
     picture?: boolean
     googleId?: boolean
     profileComplete?: boolean
+    balance?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     lastLoginAt?: boolean
@@ -1870,6 +1998,7 @@ export namespace Prisma {
     picture?: boolean
     googleId?: boolean
     profileComplete?: boolean
+    balance?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     lastLoginAt?: boolean
@@ -1884,6 +2013,7 @@ export namespace Prisma {
     picture?: boolean
     googleId?: boolean
     profileComplete?: boolean
+    balance?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     lastLoginAt?: boolean
@@ -1914,6 +2044,7 @@ export namespace Prisma {
       picture: string | null
       googleId: string | null
       profileComplete: boolean
+      balance: number
       createdAt: Date
       updatedAt: Date
       lastLoginAt: Date | null
@@ -2320,6 +2451,7 @@ export namespace Prisma {
     readonly picture: FieldRef<"User", 'String'>
     readonly googleId: FieldRef<"User", 'String'>
     readonly profileComplete: FieldRef<"User", 'Boolean'>
+    readonly balance: FieldRef<"User", 'Float'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
     readonly lastLoginAt: FieldRef<"User", 'DateTime'>
@@ -10164,6 +10296,1094 @@ export namespace Prisma {
 
 
   /**
+   * Model SettlementRecord
+   */
+
+  export type AggregateSettlementRecord = {
+    _count: SettlementRecordCountAggregateOutputType | null
+    _avg: SettlementRecordAvgAggregateOutputType | null
+    _sum: SettlementRecordSumAggregateOutputType | null
+    _min: SettlementRecordMinAggregateOutputType | null
+    _max: SettlementRecordMaxAggregateOutputType | null
+  }
+
+  export type SettlementRecordAvgAggregateOutputType = {
+    principal: number | null
+    fee: number | null
+    total: number | null
+  }
+
+  export type SettlementRecordSumAggregateOutputType = {
+    principal: number | null
+    fee: number | null
+    total: number | null
+  }
+
+  export type SettlementRecordMinAggregateOutputType = {
+    id: string | null
+    tradeId: string | null
+    orderId: string | null
+    transactionId: string | null
+    buyerId: string | null
+    sellerId: string | null
+    principal: number | null
+    fee: number | null
+    total: number | null
+    expiresAt: string | null
+    status: string | null
+    verificationOutcome: string | null
+    fundedReceipt: string | null
+    payoutReceipt: string | null
+    fundedAt: string | null
+    verifiedAt: string | null
+    payoutAt: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SettlementRecordMaxAggregateOutputType = {
+    id: string | null
+    tradeId: string | null
+    orderId: string | null
+    transactionId: string | null
+    buyerId: string | null
+    sellerId: string | null
+    principal: number | null
+    fee: number | null
+    total: number | null
+    expiresAt: string | null
+    status: string | null
+    verificationOutcome: string | null
+    fundedReceipt: string | null
+    payoutReceipt: string | null
+    fundedAt: string | null
+    verifiedAt: string | null
+    payoutAt: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SettlementRecordCountAggregateOutputType = {
+    id: number
+    tradeId: number
+    orderId: number
+    transactionId: number
+    buyerId: number
+    sellerId: number
+    principal: number
+    fee: number
+    total: number
+    expiresAt: number
+    status: number
+    verificationOutcome: number
+    fundedReceipt: number
+    payoutReceipt: number
+    fundedAt: number
+    verifiedAt: number
+    payoutAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type SettlementRecordAvgAggregateInputType = {
+    principal?: true
+    fee?: true
+    total?: true
+  }
+
+  export type SettlementRecordSumAggregateInputType = {
+    principal?: true
+    fee?: true
+    total?: true
+  }
+
+  export type SettlementRecordMinAggregateInputType = {
+    id?: true
+    tradeId?: true
+    orderId?: true
+    transactionId?: true
+    buyerId?: true
+    sellerId?: true
+    principal?: true
+    fee?: true
+    total?: true
+    expiresAt?: true
+    status?: true
+    verificationOutcome?: true
+    fundedReceipt?: true
+    payoutReceipt?: true
+    fundedAt?: true
+    verifiedAt?: true
+    payoutAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SettlementRecordMaxAggregateInputType = {
+    id?: true
+    tradeId?: true
+    orderId?: true
+    transactionId?: true
+    buyerId?: true
+    sellerId?: true
+    principal?: true
+    fee?: true
+    total?: true
+    expiresAt?: true
+    status?: true
+    verificationOutcome?: true
+    fundedReceipt?: true
+    payoutReceipt?: true
+    fundedAt?: true
+    verifiedAt?: true
+    payoutAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SettlementRecordCountAggregateInputType = {
+    id?: true
+    tradeId?: true
+    orderId?: true
+    transactionId?: true
+    buyerId?: true
+    sellerId?: true
+    principal?: true
+    fee?: true
+    total?: true
+    expiresAt?: true
+    status?: true
+    verificationOutcome?: true
+    fundedReceipt?: true
+    payoutReceipt?: true
+    fundedAt?: true
+    verifiedAt?: true
+    payoutAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type SettlementRecordAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SettlementRecord to aggregate.
+     */
+    where?: SettlementRecordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SettlementRecords to fetch.
+     */
+    orderBy?: SettlementRecordOrderByWithRelationInput | SettlementRecordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SettlementRecordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SettlementRecords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SettlementRecords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SettlementRecords
+    **/
+    _count?: true | SettlementRecordCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SettlementRecordAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SettlementRecordSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SettlementRecordMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SettlementRecordMaxAggregateInputType
+  }
+
+  export type GetSettlementRecordAggregateType<T extends SettlementRecordAggregateArgs> = {
+        [P in keyof T & keyof AggregateSettlementRecord]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSettlementRecord[P]>
+      : GetScalarType<T[P], AggregateSettlementRecord[P]>
+  }
+
+
+
+
+  export type SettlementRecordGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SettlementRecordWhereInput
+    orderBy?: SettlementRecordOrderByWithAggregationInput | SettlementRecordOrderByWithAggregationInput[]
+    by: SettlementRecordScalarFieldEnum[] | SettlementRecordScalarFieldEnum
+    having?: SettlementRecordScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SettlementRecordCountAggregateInputType | true
+    _avg?: SettlementRecordAvgAggregateInputType
+    _sum?: SettlementRecordSumAggregateInputType
+    _min?: SettlementRecordMinAggregateInputType
+    _max?: SettlementRecordMaxAggregateInputType
+  }
+
+  export type SettlementRecordGroupByOutputType = {
+    id: string
+    tradeId: string
+    orderId: string | null
+    transactionId: string | null
+    buyerId: string | null
+    sellerId: string | null
+    principal: number
+    fee: number
+    total: number
+    expiresAt: string | null
+    status: string
+    verificationOutcome: string | null
+    fundedReceipt: string | null
+    payoutReceipt: string | null
+    fundedAt: string | null
+    verifiedAt: string | null
+    payoutAt: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: SettlementRecordCountAggregateOutputType | null
+    _avg: SettlementRecordAvgAggregateOutputType | null
+    _sum: SettlementRecordSumAggregateOutputType | null
+    _min: SettlementRecordMinAggregateOutputType | null
+    _max: SettlementRecordMaxAggregateOutputType | null
+  }
+
+  type GetSettlementRecordGroupByPayload<T extends SettlementRecordGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SettlementRecordGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SettlementRecordGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SettlementRecordGroupByOutputType[P]>
+            : GetScalarType<T[P], SettlementRecordGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SettlementRecordSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    tradeId?: boolean
+    orderId?: boolean
+    transactionId?: boolean
+    buyerId?: boolean
+    sellerId?: boolean
+    principal?: boolean
+    fee?: boolean
+    total?: boolean
+    expiresAt?: boolean
+    status?: boolean
+    verificationOutcome?: boolean
+    fundedReceipt?: boolean
+    payoutReceipt?: boolean
+    fundedAt?: boolean
+    verifiedAt?: boolean
+    payoutAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["settlementRecord"]>
+
+  export type SettlementRecordSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    tradeId?: boolean
+    orderId?: boolean
+    transactionId?: boolean
+    buyerId?: boolean
+    sellerId?: boolean
+    principal?: boolean
+    fee?: boolean
+    total?: boolean
+    expiresAt?: boolean
+    status?: boolean
+    verificationOutcome?: boolean
+    fundedReceipt?: boolean
+    payoutReceipt?: boolean
+    fundedAt?: boolean
+    verifiedAt?: boolean
+    payoutAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["settlementRecord"]>
+
+  export type SettlementRecordSelectScalar = {
+    id?: boolean
+    tradeId?: boolean
+    orderId?: boolean
+    transactionId?: boolean
+    buyerId?: boolean
+    sellerId?: boolean
+    principal?: boolean
+    fee?: boolean
+    total?: boolean
+    expiresAt?: boolean
+    status?: boolean
+    verificationOutcome?: boolean
+    fundedReceipt?: boolean
+    payoutReceipt?: boolean
+    fundedAt?: boolean
+    verifiedAt?: boolean
+    payoutAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+
+  export type $SettlementRecordPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SettlementRecord"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      tradeId: string
+      orderId: string | null
+      transactionId: string | null
+      buyerId: string | null
+      sellerId: string | null
+      principal: number
+      fee: number
+      total: number
+      expiresAt: string | null
+      status: string
+      verificationOutcome: string | null
+      fundedReceipt: string | null
+      payoutReceipt: string | null
+      fundedAt: string | null
+      verifiedAt: string | null
+      payoutAt: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["settlementRecord"]>
+    composites: {}
+  }
+
+  type SettlementRecordGetPayload<S extends boolean | null | undefined | SettlementRecordDefaultArgs> = $Result.GetResult<Prisma.$SettlementRecordPayload, S>
+
+  type SettlementRecordCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<SettlementRecordFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: SettlementRecordCountAggregateInputType | true
+    }
+
+  export interface SettlementRecordDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SettlementRecord'], meta: { name: 'SettlementRecord' } }
+    /**
+     * Find zero or one SettlementRecord that matches the filter.
+     * @param {SettlementRecordFindUniqueArgs} args - Arguments to find a SettlementRecord
+     * @example
+     * // Get one SettlementRecord
+     * const settlementRecord = await prisma.settlementRecord.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SettlementRecordFindUniqueArgs>(args: SelectSubset<T, SettlementRecordFindUniqueArgs<ExtArgs>>): Prisma__SettlementRecordClient<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one SettlementRecord that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {SettlementRecordFindUniqueOrThrowArgs} args - Arguments to find a SettlementRecord
+     * @example
+     * // Get one SettlementRecord
+     * const settlementRecord = await prisma.settlementRecord.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SettlementRecordFindUniqueOrThrowArgs>(args: SelectSubset<T, SettlementRecordFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SettlementRecordClient<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first SettlementRecord that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementRecordFindFirstArgs} args - Arguments to find a SettlementRecord
+     * @example
+     * // Get one SettlementRecord
+     * const settlementRecord = await prisma.settlementRecord.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SettlementRecordFindFirstArgs>(args?: SelectSubset<T, SettlementRecordFindFirstArgs<ExtArgs>>): Prisma__SettlementRecordClient<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first SettlementRecord that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementRecordFindFirstOrThrowArgs} args - Arguments to find a SettlementRecord
+     * @example
+     * // Get one SettlementRecord
+     * const settlementRecord = await prisma.settlementRecord.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SettlementRecordFindFirstOrThrowArgs>(args?: SelectSubset<T, SettlementRecordFindFirstOrThrowArgs<ExtArgs>>): Prisma__SettlementRecordClient<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more SettlementRecords that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementRecordFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SettlementRecords
+     * const settlementRecords = await prisma.settlementRecord.findMany()
+     * 
+     * // Get first 10 SettlementRecords
+     * const settlementRecords = await prisma.settlementRecord.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const settlementRecordWithIdOnly = await prisma.settlementRecord.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SettlementRecordFindManyArgs>(args?: SelectSubset<T, SettlementRecordFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a SettlementRecord.
+     * @param {SettlementRecordCreateArgs} args - Arguments to create a SettlementRecord.
+     * @example
+     * // Create one SettlementRecord
+     * const SettlementRecord = await prisma.settlementRecord.create({
+     *   data: {
+     *     // ... data to create a SettlementRecord
+     *   }
+     * })
+     * 
+     */
+    create<T extends SettlementRecordCreateArgs>(args: SelectSubset<T, SettlementRecordCreateArgs<ExtArgs>>): Prisma__SettlementRecordClient<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many SettlementRecords.
+     * @param {SettlementRecordCreateManyArgs} args - Arguments to create many SettlementRecords.
+     * @example
+     * // Create many SettlementRecords
+     * const settlementRecord = await prisma.settlementRecord.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SettlementRecordCreateManyArgs>(args?: SelectSubset<T, SettlementRecordCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SettlementRecords and returns the data saved in the database.
+     * @param {SettlementRecordCreateManyAndReturnArgs} args - Arguments to create many SettlementRecords.
+     * @example
+     * // Create many SettlementRecords
+     * const settlementRecord = await prisma.settlementRecord.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SettlementRecords and only return the `id`
+     * const settlementRecordWithIdOnly = await prisma.settlementRecord.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SettlementRecordCreateManyAndReturnArgs>(args?: SelectSubset<T, SettlementRecordCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a SettlementRecord.
+     * @param {SettlementRecordDeleteArgs} args - Arguments to delete one SettlementRecord.
+     * @example
+     * // Delete one SettlementRecord
+     * const SettlementRecord = await prisma.settlementRecord.delete({
+     *   where: {
+     *     // ... filter to delete one SettlementRecord
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SettlementRecordDeleteArgs>(args: SelectSubset<T, SettlementRecordDeleteArgs<ExtArgs>>): Prisma__SettlementRecordClient<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one SettlementRecord.
+     * @param {SettlementRecordUpdateArgs} args - Arguments to update one SettlementRecord.
+     * @example
+     * // Update one SettlementRecord
+     * const settlementRecord = await prisma.settlementRecord.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SettlementRecordUpdateArgs>(args: SelectSubset<T, SettlementRecordUpdateArgs<ExtArgs>>): Prisma__SettlementRecordClient<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more SettlementRecords.
+     * @param {SettlementRecordDeleteManyArgs} args - Arguments to filter SettlementRecords to delete.
+     * @example
+     * // Delete a few SettlementRecords
+     * const { count } = await prisma.settlementRecord.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SettlementRecordDeleteManyArgs>(args?: SelectSubset<T, SettlementRecordDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SettlementRecords.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementRecordUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SettlementRecords
+     * const settlementRecord = await prisma.settlementRecord.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SettlementRecordUpdateManyArgs>(args: SelectSubset<T, SettlementRecordUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one SettlementRecord.
+     * @param {SettlementRecordUpsertArgs} args - Arguments to update or create a SettlementRecord.
+     * @example
+     * // Update or create a SettlementRecord
+     * const settlementRecord = await prisma.settlementRecord.upsert({
+     *   create: {
+     *     // ... data to create a SettlementRecord
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SettlementRecord we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SettlementRecordUpsertArgs>(args: SelectSubset<T, SettlementRecordUpsertArgs<ExtArgs>>): Prisma__SettlementRecordClient<$Result.GetResult<Prisma.$SettlementRecordPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of SettlementRecords.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementRecordCountArgs} args - Arguments to filter SettlementRecords to count.
+     * @example
+     * // Count the number of SettlementRecords
+     * const count = await prisma.settlementRecord.count({
+     *   where: {
+     *     // ... the filter for the SettlementRecords we want to count
+     *   }
+     * })
+    **/
+    count<T extends SettlementRecordCountArgs>(
+      args?: Subset<T, SettlementRecordCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SettlementRecordCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SettlementRecord.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementRecordAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SettlementRecordAggregateArgs>(args: Subset<T, SettlementRecordAggregateArgs>): Prisma.PrismaPromise<GetSettlementRecordAggregateType<T>>
+
+    /**
+     * Group by SettlementRecord.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SettlementRecordGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SettlementRecordGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SettlementRecordGroupByArgs['orderBy'] }
+        : { orderBy?: SettlementRecordGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SettlementRecordGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSettlementRecordGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SettlementRecord model
+   */
+  readonly fields: SettlementRecordFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SettlementRecord.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SettlementRecordClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SettlementRecord model
+   */ 
+  interface SettlementRecordFieldRefs {
+    readonly id: FieldRef<"SettlementRecord", 'String'>
+    readonly tradeId: FieldRef<"SettlementRecord", 'String'>
+    readonly orderId: FieldRef<"SettlementRecord", 'String'>
+    readonly transactionId: FieldRef<"SettlementRecord", 'String'>
+    readonly buyerId: FieldRef<"SettlementRecord", 'String'>
+    readonly sellerId: FieldRef<"SettlementRecord", 'String'>
+    readonly principal: FieldRef<"SettlementRecord", 'Float'>
+    readonly fee: FieldRef<"SettlementRecord", 'Float'>
+    readonly total: FieldRef<"SettlementRecord", 'Float'>
+    readonly expiresAt: FieldRef<"SettlementRecord", 'String'>
+    readonly status: FieldRef<"SettlementRecord", 'String'>
+    readonly verificationOutcome: FieldRef<"SettlementRecord", 'String'>
+    readonly fundedReceipt: FieldRef<"SettlementRecord", 'String'>
+    readonly payoutReceipt: FieldRef<"SettlementRecord", 'String'>
+    readonly fundedAt: FieldRef<"SettlementRecord", 'String'>
+    readonly verifiedAt: FieldRef<"SettlementRecord", 'String'>
+    readonly payoutAt: FieldRef<"SettlementRecord", 'String'>
+    readonly createdAt: FieldRef<"SettlementRecord", 'DateTime'>
+    readonly updatedAt: FieldRef<"SettlementRecord", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SettlementRecord findUnique
+   */
+  export type SettlementRecordFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which SettlementRecord to fetch.
+     */
+    where: SettlementRecordWhereUniqueInput
+  }
+
+  /**
+   * SettlementRecord findUniqueOrThrow
+   */
+  export type SettlementRecordFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which SettlementRecord to fetch.
+     */
+    where: SettlementRecordWhereUniqueInput
+  }
+
+  /**
+   * SettlementRecord findFirst
+   */
+  export type SettlementRecordFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which SettlementRecord to fetch.
+     */
+    where?: SettlementRecordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SettlementRecords to fetch.
+     */
+    orderBy?: SettlementRecordOrderByWithRelationInput | SettlementRecordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SettlementRecords.
+     */
+    cursor?: SettlementRecordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SettlementRecords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SettlementRecords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SettlementRecords.
+     */
+    distinct?: SettlementRecordScalarFieldEnum | SettlementRecordScalarFieldEnum[]
+  }
+
+  /**
+   * SettlementRecord findFirstOrThrow
+   */
+  export type SettlementRecordFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which SettlementRecord to fetch.
+     */
+    where?: SettlementRecordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SettlementRecords to fetch.
+     */
+    orderBy?: SettlementRecordOrderByWithRelationInput | SettlementRecordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SettlementRecords.
+     */
+    cursor?: SettlementRecordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SettlementRecords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SettlementRecords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SettlementRecords.
+     */
+    distinct?: SettlementRecordScalarFieldEnum | SettlementRecordScalarFieldEnum[]
+  }
+
+  /**
+   * SettlementRecord findMany
+   */
+  export type SettlementRecordFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which SettlementRecords to fetch.
+     */
+    where?: SettlementRecordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SettlementRecords to fetch.
+     */
+    orderBy?: SettlementRecordOrderByWithRelationInput | SettlementRecordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SettlementRecords.
+     */
+    cursor?: SettlementRecordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SettlementRecords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SettlementRecords.
+     */
+    skip?: number
+    distinct?: SettlementRecordScalarFieldEnum | SettlementRecordScalarFieldEnum[]
+  }
+
+  /**
+   * SettlementRecord create
+   */
+  export type SettlementRecordCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * The data needed to create a SettlementRecord.
+     */
+    data: XOR<SettlementRecordCreateInput, SettlementRecordUncheckedCreateInput>
+  }
+
+  /**
+   * SettlementRecord createMany
+   */
+  export type SettlementRecordCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SettlementRecords.
+     */
+    data: SettlementRecordCreateManyInput | SettlementRecordCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SettlementRecord createManyAndReturn
+   */
+  export type SettlementRecordCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many SettlementRecords.
+     */
+    data: SettlementRecordCreateManyInput | SettlementRecordCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SettlementRecord update
+   */
+  export type SettlementRecordUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * The data needed to update a SettlementRecord.
+     */
+    data: XOR<SettlementRecordUpdateInput, SettlementRecordUncheckedUpdateInput>
+    /**
+     * Choose, which SettlementRecord to update.
+     */
+    where: SettlementRecordWhereUniqueInput
+  }
+
+  /**
+   * SettlementRecord updateMany
+   */
+  export type SettlementRecordUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SettlementRecords.
+     */
+    data: XOR<SettlementRecordUpdateManyMutationInput, SettlementRecordUncheckedUpdateManyInput>
+    /**
+     * Filter which SettlementRecords to update
+     */
+    where?: SettlementRecordWhereInput
+  }
+
+  /**
+   * SettlementRecord upsert
+   */
+  export type SettlementRecordUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * The filter to search for the SettlementRecord to update in case it exists.
+     */
+    where: SettlementRecordWhereUniqueInput
+    /**
+     * In case the SettlementRecord found by the `where` argument doesn't exist, create a new SettlementRecord with this data.
+     */
+    create: XOR<SettlementRecordCreateInput, SettlementRecordUncheckedCreateInput>
+    /**
+     * In case the SettlementRecord was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SettlementRecordUpdateInput, SettlementRecordUncheckedUpdateInput>
+  }
+
+  /**
+   * SettlementRecord delete
+   */
+  export type SettlementRecordDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+    /**
+     * Filter which SettlementRecord to delete.
+     */
+    where: SettlementRecordWhereUniqueInput
+  }
+
+  /**
+   * SettlementRecord deleteMany
+   */
+  export type SettlementRecordDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SettlementRecords to delete
+     */
+    where?: SettlementRecordWhereInput
+  }
+
+  /**
+   * SettlementRecord without action
+   */
+  export type SettlementRecordDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SettlementRecord
+     */
+    select?: SettlementRecordSelect<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -10184,6 +11404,7 @@ export namespace Prisma {
     picture: 'picture',
     googleId: 'googleId',
     profileComplete: 'profileComplete',
+    balance: 'balance',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     lastLoginAt: 'lastLoginAt',
@@ -10305,6 +11526,31 @@ export namespace Prisma {
   export type EventScalarFieldEnum = (typeof EventScalarFieldEnum)[keyof typeof EventScalarFieldEnum]
 
 
+  export const SettlementRecordScalarFieldEnum: {
+    id: 'id',
+    tradeId: 'tradeId',
+    orderId: 'orderId',
+    transactionId: 'transactionId',
+    buyerId: 'buyerId',
+    sellerId: 'sellerId',
+    principal: 'principal',
+    fee: 'fee',
+    total: 'total',
+    expiresAt: 'expiresAt',
+    status: 'status',
+    verificationOutcome: 'verificationOutcome',
+    fundedReceipt: 'fundedReceipt',
+    payoutReceipt: 'payoutReceipt',
+    fundedAt: 'fundedAt',
+    verifiedAt: 'verifiedAt',
+    payoutAt: 'payoutAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type SettlementRecordScalarFieldEnum = (typeof SettlementRecordScalarFieldEnum)[keyof typeof SettlementRecordScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -10356,20 +11602,6 @@ export namespace Prisma {
 
 
   /**
-   * Reference to a field of type 'DateTime'
-   */
-  export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
-    
-
-
-  /**
-   * Reference to a field of type 'DateTime[]'
-   */
-  export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
-    
-
-
-  /**
    * Reference to a field of type 'Float'
    */
   export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -10380,6 +11612,20 @@ export namespace Prisma {
    * Reference to a field of type 'Float[]'
    */
   export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'DateTime'
+   */
+  export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
+    
+
+
+  /**
+   * Reference to a field of type 'DateTime[]'
+   */
+  export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
     
 
 
@@ -10410,6 +11656,7 @@ export namespace Prisma {
     picture?: StringNullableFilter<"User"> | string | null
     googleId?: StringNullableFilter<"User"> | string | null
     profileComplete?: BoolFilter<"User"> | boolean
+    balance?: FloatFilter<"User"> | number
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     lastLoginAt?: DateTimeNullableFilter<"User"> | Date | string | null
@@ -10426,6 +11673,7 @@ export namespace Prisma {
     picture?: SortOrderInput | SortOrder
     googleId?: SortOrderInput | SortOrder
     profileComplete?: SortOrder
+    balance?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrderInput | SortOrder
@@ -10446,6 +11694,7 @@ export namespace Prisma {
     name?: StringNullableFilter<"User"> | string | null
     picture?: StringNullableFilter<"User"> | string | null
     profileComplete?: BoolFilter<"User"> | boolean
+    balance?: FloatFilter<"User"> | number
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     lastLoginAt?: DateTimeNullableFilter<"User"> | Date | string | null
@@ -10461,13 +11710,16 @@ export namespace Prisma {
     picture?: SortOrderInput | SortOrder
     googleId?: SortOrderInput | SortOrder
     profileComplete?: SortOrder
+    balance?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrderInput | SortOrder
     providerId?: SortOrderInput | SortOrder
     _count?: UserCountOrderByAggregateInput
+    _avg?: UserAvgOrderByAggregateInput
     _max?: UserMaxOrderByAggregateInput
     _min?: UserMinOrderByAggregateInput
+    _sum?: UserSumOrderByAggregateInput
   }
 
   export type UserScalarWhereWithAggregatesInput = {
@@ -10480,6 +11732,7 @@ export namespace Prisma {
     picture?: StringNullableWithAggregatesFilter<"User"> | string | null
     googleId?: StringNullableWithAggregatesFilter<"User"> | string | null
     profileComplete?: BoolWithAggregatesFilter<"User"> | boolean
+    balance?: FloatWithAggregatesFilter<"User"> | number
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     lastLoginAt?: DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
@@ -11100,6 +12353,130 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"Event"> | Date | string
   }
 
+  export type SettlementRecordWhereInput = {
+    AND?: SettlementRecordWhereInput | SettlementRecordWhereInput[]
+    OR?: SettlementRecordWhereInput[]
+    NOT?: SettlementRecordWhereInput | SettlementRecordWhereInput[]
+    id?: StringFilter<"SettlementRecord"> | string
+    tradeId?: StringFilter<"SettlementRecord"> | string
+    orderId?: StringNullableFilter<"SettlementRecord"> | string | null
+    transactionId?: StringNullableFilter<"SettlementRecord"> | string | null
+    buyerId?: StringNullableFilter<"SettlementRecord"> | string | null
+    sellerId?: StringNullableFilter<"SettlementRecord"> | string | null
+    principal?: FloatFilter<"SettlementRecord"> | number
+    fee?: FloatFilter<"SettlementRecord"> | number
+    total?: FloatFilter<"SettlementRecord"> | number
+    expiresAt?: StringNullableFilter<"SettlementRecord"> | string | null
+    status?: StringFilter<"SettlementRecord"> | string
+    verificationOutcome?: StringNullableFilter<"SettlementRecord"> | string | null
+    fundedReceipt?: StringNullableFilter<"SettlementRecord"> | string | null
+    payoutReceipt?: StringNullableFilter<"SettlementRecord"> | string | null
+    fundedAt?: StringNullableFilter<"SettlementRecord"> | string | null
+    verifiedAt?: StringNullableFilter<"SettlementRecord"> | string | null
+    payoutAt?: StringNullableFilter<"SettlementRecord"> | string | null
+    createdAt?: DateTimeFilter<"SettlementRecord"> | Date | string
+    updatedAt?: DateTimeFilter<"SettlementRecord"> | Date | string
+  }
+
+  export type SettlementRecordOrderByWithRelationInput = {
+    id?: SortOrder
+    tradeId?: SortOrder
+    orderId?: SortOrderInput | SortOrder
+    transactionId?: SortOrderInput | SortOrder
+    buyerId?: SortOrderInput | SortOrder
+    sellerId?: SortOrderInput | SortOrder
+    principal?: SortOrder
+    fee?: SortOrder
+    total?: SortOrder
+    expiresAt?: SortOrderInput | SortOrder
+    status?: SortOrder
+    verificationOutcome?: SortOrderInput | SortOrder
+    fundedReceipt?: SortOrderInput | SortOrder
+    payoutReceipt?: SortOrderInput | SortOrder
+    fundedAt?: SortOrderInput | SortOrder
+    verifiedAt?: SortOrderInput | SortOrder
+    payoutAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SettlementRecordWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    tradeId?: string
+    AND?: SettlementRecordWhereInput | SettlementRecordWhereInput[]
+    OR?: SettlementRecordWhereInput[]
+    NOT?: SettlementRecordWhereInput | SettlementRecordWhereInput[]
+    orderId?: StringNullableFilter<"SettlementRecord"> | string | null
+    transactionId?: StringNullableFilter<"SettlementRecord"> | string | null
+    buyerId?: StringNullableFilter<"SettlementRecord"> | string | null
+    sellerId?: StringNullableFilter<"SettlementRecord"> | string | null
+    principal?: FloatFilter<"SettlementRecord"> | number
+    fee?: FloatFilter<"SettlementRecord"> | number
+    total?: FloatFilter<"SettlementRecord"> | number
+    expiresAt?: StringNullableFilter<"SettlementRecord"> | string | null
+    status?: StringFilter<"SettlementRecord"> | string
+    verificationOutcome?: StringNullableFilter<"SettlementRecord"> | string | null
+    fundedReceipt?: StringNullableFilter<"SettlementRecord"> | string | null
+    payoutReceipt?: StringNullableFilter<"SettlementRecord"> | string | null
+    fundedAt?: StringNullableFilter<"SettlementRecord"> | string | null
+    verifiedAt?: StringNullableFilter<"SettlementRecord"> | string | null
+    payoutAt?: StringNullableFilter<"SettlementRecord"> | string | null
+    createdAt?: DateTimeFilter<"SettlementRecord"> | Date | string
+    updatedAt?: DateTimeFilter<"SettlementRecord"> | Date | string
+  }, "id" | "tradeId">
+
+  export type SettlementRecordOrderByWithAggregationInput = {
+    id?: SortOrder
+    tradeId?: SortOrder
+    orderId?: SortOrderInput | SortOrder
+    transactionId?: SortOrderInput | SortOrder
+    buyerId?: SortOrderInput | SortOrder
+    sellerId?: SortOrderInput | SortOrder
+    principal?: SortOrder
+    fee?: SortOrder
+    total?: SortOrder
+    expiresAt?: SortOrderInput | SortOrder
+    status?: SortOrder
+    verificationOutcome?: SortOrderInput | SortOrder
+    fundedReceipt?: SortOrderInput | SortOrder
+    payoutReceipt?: SortOrderInput | SortOrder
+    fundedAt?: SortOrderInput | SortOrder
+    verifiedAt?: SortOrderInput | SortOrder
+    payoutAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: SettlementRecordCountOrderByAggregateInput
+    _avg?: SettlementRecordAvgOrderByAggregateInput
+    _max?: SettlementRecordMaxOrderByAggregateInput
+    _min?: SettlementRecordMinOrderByAggregateInput
+    _sum?: SettlementRecordSumOrderByAggregateInput
+  }
+
+  export type SettlementRecordScalarWhereWithAggregatesInput = {
+    AND?: SettlementRecordScalarWhereWithAggregatesInput | SettlementRecordScalarWhereWithAggregatesInput[]
+    OR?: SettlementRecordScalarWhereWithAggregatesInput[]
+    NOT?: SettlementRecordScalarWhereWithAggregatesInput | SettlementRecordScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"SettlementRecord"> | string
+    tradeId?: StringWithAggregatesFilter<"SettlementRecord"> | string
+    orderId?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    transactionId?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    buyerId?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    sellerId?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    principal?: FloatWithAggregatesFilter<"SettlementRecord"> | number
+    fee?: FloatWithAggregatesFilter<"SettlementRecord"> | number
+    total?: FloatWithAggregatesFilter<"SettlementRecord"> | number
+    expiresAt?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    status?: StringWithAggregatesFilter<"SettlementRecord"> | string
+    verificationOutcome?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    fundedReceipt?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    payoutReceipt?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    fundedAt?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    verifiedAt?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    payoutAt?: StringNullableWithAggregatesFilter<"SettlementRecord"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"SettlementRecord"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"SettlementRecord"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
@@ -11107,6 +12484,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -11122,6 +12500,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -11137,6 +12516,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -11152,6 +12532,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -11167,6 +12548,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -11180,6 +12562,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -11192,6 +12575,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -11861,6 +13245,160 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type SettlementRecordCreateInput = {
+    id?: string
+    tradeId: string
+    orderId?: string | null
+    transactionId?: string | null
+    buyerId?: string | null
+    sellerId?: string | null
+    principal: number
+    fee: number
+    total: number
+    expiresAt?: string | null
+    status?: string
+    verificationOutcome?: string | null
+    fundedReceipt?: string | null
+    payoutReceipt?: string | null
+    fundedAt?: string | null
+    verifiedAt?: string | null
+    payoutAt?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SettlementRecordUncheckedCreateInput = {
+    id?: string
+    tradeId: string
+    orderId?: string | null
+    transactionId?: string | null
+    buyerId?: string | null
+    sellerId?: string | null
+    principal: number
+    fee: number
+    total: number
+    expiresAt?: string | null
+    status?: string
+    verificationOutcome?: string | null
+    fundedReceipt?: string | null
+    payoutReceipt?: string | null
+    fundedAt?: string | null
+    verifiedAt?: string | null
+    payoutAt?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SettlementRecordUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tradeId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    transactionId?: NullableStringFieldUpdateOperationsInput | string | null
+    buyerId?: NullableStringFieldUpdateOperationsInput | string | null
+    sellerId?: NullableStringFieldUpdateOperationsInput | string | null
+    principal?: FloatFieldUpdateOperationsInput | number
+    fee?: FloatFieldUpdateOperationsInput | number
+    total?: FloatFieldUpdateOperationsInput | number
+    expiresAt?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    verificationOutcome?: NullableStringFieldUpdateOperationsInput | string | null
+    fundedReceipt?: NullableStringFieldUpdateOperationsInput | string | null
+    payoutReceipt?: NullableStringFieldUpdateOperationsInput | string | null
+    fundedAt?: NullableStringFieldUpdateOperationsInput | string | null
+    verifiedAt?: NullableStringFieldUpdateOperationsInput | string | null
+    payoutAt?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SettlementRecordUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tradeId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    transactionId?: NullableStringFieldUpdateOperationsInput | string | null
+    buyerId?: NullableStringFieldUpdateOperationsInput | string | null
+    sellerId?: NullableStringFieldUpdateOperationsInput | string | null
+    principal?: FloatFieldUpdateOperationsInput | number
+    fee?: FloatFieldUpdateOperationsInput | number
+    total?: FloatFieldUpdateOperationsInput | number
+    expiresAt?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    verificationOutcome?: NullableStringFieldUpdateOperationsInput | string | null
+    fundedReceipt?: NullableStringFieldUpdateOperationsInput | string | null
+    payoutReceipt?: NullableStringFieldUpdateOperationsInput | string | null
+    fundedAt?: NullableStringFieldUpdateOperationsInput | string | null
+    verifiedAt?: NullableStringFieldUpdateOperationsInput | string | null
+    payoutAt?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SettlementRecordCreateManyInput = {
+    id?: string
+    tradeId: string
+    orderId?: string | null
+    transactionId?: string | null
+    buyerId?: string | null
+    sellerId?: string | null
+    principal: number
+    fee: number
+    total: number
+    expiresAt?: string | null
+    status?: string
+    verificationOutcome?: string | null
+    fundedReceipt?: string | null
+    payoutReceipt?: string | null
+    fundedAt?: string | null
+    verifiedAt?: string | null
+    payoutAt?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SettlementRecordUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tradeId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    transactionId?: NullableStringFieldUpdateOperationsInput | string | null
+    buyerId?: NullableStringFieldUpdateOperationsInput | string | null
+    sellerId?: NullableStringFieldUpdateOperationsInput | string | null
+    principal?: FloatFieldUpdateOperationsInput | number
+    fee?: FloatFieldUpdateOperationsInput | number
+    total?: FloatFieldUpdateOperationsInput | number
+    expiresAt?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    verificationOutcome?: NullableStringFieldUpdateOperationsInput | string | null
+    fundedReceipt?: NullableStringFieldUpdateOperationsInput | string | null
+    payoutReceipt?: NullableStringFieldUpdateOperationsInput | string | null
+    fundedAt?: NullableStringFieldUpdateOperationsInput | string | null
+    verifiedAt?: NullableStringFieldUpdateOperationsInput | string | null
+    payoutAt?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SettlementRecordUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tradeId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    transactionId?: NullableStringFieldUpdateOperationsInput | string | null
+    buyerId?: NullableStringFieldUpdateOperationsInput | string | null
+    sellerId?: NullableStringFieldUpdateOperationsInput | string | null
+    principal?: FloatFieldUpdateOperationsInput | number
+    fee?: FloatFieldUpdateOperationsInput | number
+    total?: FloatFieldUpdateOperationsInput | number
+    expiresAt?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    verificationOutcome?: NullableStringFieldUpdateOperationsInput | string | null
+    fundedReceipt?: NullableStringFieldUpdateOperationsInput | string | null
+    payoutReceipt?: NullableStringFieldUpdateOperationsInput | string | null
+    fundedAt?: NullableStringFieldUpdateOperationsInput | string | null
+    verifiedAt?: NullableStringFieldUpdateOperationsInput | string | null
+    payoutAt?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -11894,6 +13432,17 @@ export namespace Prisma {
   export type BoolFilter<$PrismaModel = never> = {
     equals?: boolean | BooleanFieldRefInput<$PrismaModel>
     not?: NestedBoolFilter<$PrismaModel> | boolean
+  }
+
+  export type FloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
   }
 
   export type DateTimeFilter<$PrismaModel = never> = {
@@ -11955,10 +13504,15 @@ export namespace Prisma {
     picture?: SortOrder
     googleId?: SortOrder
     profileComplete?: SortOrder
+    balance?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrder
     providerId?: SortOrder
+  }
+
+  export type UserAvgOrderByAggregateInput = {
+    balance?: SortOrder
   }
 
   export type UserMaxOrderByAggregateInput = {
@@ -11968,6 +13522,7 @@ export namespace Prisma {
     picture?: SortOrder
     googleId?: SortOrder
     profileComplete?: SortOrder
+    balance?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrder
@@ -11981,10 +13536,15 @@ export namespace Prisma {
     picture?: SortOrder
     googleId?: SortOrder
     profileComplete?: SortOrder
+    balance?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrder
     providerId?: SortOrder
+  }
+
+  export type UserSumOrderByAggregateInput = {
+    balance?: SortOrder
   }
 
   export type StringWithAggregatesFilter<$PrismaModel = never> = {
@@ -12029,6 +13589,22 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedBoolFilter<$PrismaModel>
     _max?: NestedBoolFilter<$PrismaModel>
+  }
+
+  export type FloatWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedFloatFilter<$PrismaModel>
+    _min?: NestedFloatFilter<$PrismaModel>
+    _max?: NestedFloatFilter<$PrismaModel>
   }
 
   export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
@@ -12092,17 +13668,6 @@ export namespace Prisma {
     ipAddress?: SortOrder
     expiresAt?: SortOrder
     createdAt?: SortOrder
-  }
-
-  export type FloatFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel>
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatFilter<$PrismaModel> | number
   }
 
   export type IntFilter<$PrismaModel = never> = {
@@ -12191,22 +13756,6 @@ export namespace Prisma {
     trustScore?: SortOrder
     totalOrders?: SortOrder
     successfulOrders?: SortOrder
-  }
-
-  export type FloatWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel>
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedFloatFilter<$PrismaModel>
-    _min?: NestedFloatFilter<$PrismaModel>
-    _max?: NestedFloatFilter<$PrismaModel>
   }
 
   export type IntWithAggregatesFilter<$PrismaModel = never> = {
@@ -12538,6 +14087,84 @@ export namespace Prisma {
     id?: SortOrder
   }
 
+  export type SettlementRecordCountOrderByAggregateInput = {
+    id?: SortOrder
+    tradeId?: SortOrder
+    orderId?: SortOrder
+    transactionId?: SortOrder
+    buyerId?: SortOrder
+    sellerId?: SortOrder
+    principal?: SortOrder
+    fee?: SortOrder
+    total?: SortOrder
+    expiresAt?: SortOrder
+    status?: SortOrder
+    verificationOutcome?: SortOrder
+    fundedReceipt?: SortOrder
+    payoutReceipt?: SortOrder
+    fundedAt?: SortOrder
+    verifiedAt?: SortOrder
+    payoutAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SettlementRecordAvgOrderByAggregateInput = {
+    principal?: SortOrder
+    fee?: SortOrder
+    total?: SortOrder
+  }
+
+  export type SettlementRecordMaxOrderByAggregateInput = {
+    id?: SortOrder
+    tradeId?: SortOrder
+    orderId?: SortOrder
+    transactionId?: SortOrder
+    buyerId?: SortOrder
+    sellerId?: SortOrder
+    principal?: SortOrder
+    fee?: SortOrder
+    total?: SortOrder
+    expiresAt?: SortOrder
+    status?: SortOrder
+    verificationOutcome?: SortOrder
+    fundedReceipt?: SortOrder
+    payoutReceipt?: SortOrder
+    fundedAt?: SortOrder
+    verifiedAt?: SortOrder
+    payoutAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SettlementRecordMinOrderByAggregateInput = {
+    id?: SortOrder
+    tradeId?: SortOrder
+    orderId?: SortOrder
+    transactionId?: SortOrder
+    buyerId?: SortOrder
+    sellerId?: SortOrder
+    principal?: SortOrder
+    fee?: SortOrder
+    total?: SortOrder
+    expiresAt?: SortOrder
+    status?: SortOrder
+    verificationOutcome?: SortOrder
+    fundedReceipt?: SortOrder
+    payoutReceipt?: SortOrder
+    fundedAt?: SortOrder
+    verifiedAt?: SortOrder
+    payoutAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SettlementRecordSumOrderByAggregateInput = {
+    principal?: SortOrder
+    fee?: SortOrder
+    total?: SortOrder
+  }
+
   export type ProviderCreateNestedOneWithoutUserInput = {
     create?: XOR<ProviderCreateWithoutUserInput, ProviderUncheckedCreateWithoutUserInput>
     connectOrCreate?: ProviderCreateOrConnectWithoutUserInput
@@ -12582,6 +14209,14 @@ export namespace Prisma {
 
   export type BoolFieldUpdateOperationsInput = {
     set?: boolean
+  }
+
+  export type FloatFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
   }
 
   export type DateTimeFieldUpdateOperationsInput = {
@@ -12738,14 +14373,6 @@ export namespace Prisma {
     connectOrCreate?: OfferBlockCreateOrConnectWithoutProviderInput | OfferBlockCreateOrConnectWithoutProviderInput[]
     createMany?: OfferBlockCreateManyProviderInputEnvelope
     connect?: OfferBlockWhereUniqueInput | OfferBlockWhereUniqueInput[]
-  }
-
-  export type FloatFieldUpdateOperationsInput = {
-    set?: number
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
   }
 
   export type IntFieldUpdateOperationsInput = {
@@ -13287,6 +14914,17 @@ export namespace Prisma {
     not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
+  export type NestedFloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
   export type NestedDateTimeFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -13373,6 +15011,22 @@ export namespace Prisma {
     _max?: NestedBoolFilter<$PrismaModel>
   }
 
+  export type NestedFloatWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedFloatFilter<$PrismaModel>
+    _min?: NestedFloatFilter<$PrismaModel>
+    _max?: NestedFloatFilter<$PrismaModel>
+  }
+
   export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -13399,33 +15053,6 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedDateTimeNullableFilter<$PrismaModel>
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
-  }
-
-  export type NestedFloatFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel>
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatFilter<$PrismaModel> | number
-  }
-
-  export type NestedFloatWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel>
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedFloatFilter<$PrismaModel>
-    _min?: NestedFloatFilter<$PrismaModel>
-    _max?: NestedFloatFilter<$PrismaModel>
   }
 
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
@@ -13687,6 +15314,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -13701,6 +15329,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -13731,6 +15360,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -13745,6 +15375,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -13759,6 +15390,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -13773,6 +15405,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -13967,6 +15600,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -13981,6 +15615,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -14932,6 +16567,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -14946,6 +16582,7 @@ export namespace Prisma {
     picture?: string | null
     googleId?: string | null
     profileComplete?: boolean
+    balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
@@ -15100,6 +16737,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -15114,6 +16752,7 @@ export namespace Prisma {
     picture?: NullableStringFieldUpdateOperationsInput | string | null
     googleId?: NullableStringFieldUpdateOperationsInput | string | null
     profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -15852,6 +17491,10 @@ export namespace Prisma {
      * @deprecated Use EventDefaultArgs instead
      */
     export type EventArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = EventDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use SettlementRecordDefaultArgs instead
+     */
+    export type SettlementRecordArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = SettlementRecordDefaultArgs<ExtArgs>
 
   /**
    * Batch Payload for updateMany & deleteMany & createMany

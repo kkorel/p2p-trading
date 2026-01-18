@@ -576,6 +576,40 @@ export async function markBlocksAsSoldWithLock(orderId: string): Promise<number>
 }
 
 /**
+ * Check and delete offers that have no available blocks
+ * Returns the IDs of deleted offers
+ */
+export async function cleanupEmptyOffers(offerIds: string[]): Promise<string[]> {
+  const deletedOfferIds: string[] = [];
+  
+  for (const offerId of offerIds) {
+    const stats = await getBlockStats(offerId);
+    
+    // If no available blocks remain, delete the offer
+    if (stats.available === 0) {
+      try {
+        // Delete all blocks for this offer first
+        await prisma.offerBlock.deleteMany({
+          where: { offerId },
+        });
+        
+        // Delete the offer
+        await prisma.catalogOffer.deleteMany({
+          where: { id: offerId },
+        });
+        
+        deletedOfferIds.push(offerId);
+        console.log(`[CATALOG] Auto-deleted offer ${offerId} - no available units remaining`);
+      } catch (error: any) {
+        console.error(`[CATALOG] Failed to delete empty offer ${offerId}: ${error.message}`);
+      }
+    }
+  }
+  
+  return deletedOfferIds;
+}
+
+/**
  * Release reserved blocks by transaction ID (if order fails or is cancelled)
  * 
  * CONCURRENCY SAFE: Uses transaction to ensure atomicity

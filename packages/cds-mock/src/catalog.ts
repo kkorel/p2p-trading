@@ -316,7 +316,8 @@ export async function deleteOffer(offerId: string): Promise<void> {
     where: { offerId },
   });
   
-  await prisma.catalogOffer.delete({
+  // Use deleteMany to avoid throwing if record doesn't exist
+  await prisma.catalogOffer.deleteMany({
     where: { id: offerId },
   });
 }

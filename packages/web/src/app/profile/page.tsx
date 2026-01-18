@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Mail, Shield, ChevronRight } from 'lucide-react';
+import { LogOut, User, Mail, Shield, Wallet } from 'lucide-react';
 import Image from 'next/image';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
+import { useBalance } from '@/contexts/balance-context';
 import { authApi } from '@/lib/api';
 import { Card, Button, Input, Badge } from '@/components/ui';
-import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -20,8 +21,11 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
   const { user, logout, updateUser } = useAuth();
+  const { balance, setBalance } = useBalance();
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [balanceInput, setBalanceInput] = useState(balance.toString());
 
   const {
     register,
@@ -44,6 +48,18 @@ export default function ProfilePage() {
       console.error('Failed to update profile:', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveBalance = async () => {
+    const parsed = parseFloat(balanceInput);
+    if (!isNaN(parsed) && parsed >= 0) {
+      try {
+        await setBalance(parsed);
+        setIsEditingBalance(false);
+      } catch (error) {
+        console.error('Failed to update balance:', error);
+      }
     }
   };
 
@@ -77,6 +93,63 @@ export default function ProfilePage() {
               <p className="text-sm text-[var(--color-text-muted)]">{user.email}</p>
             </div>
           </div>
+        </Card>
+
+        {/* Balance Card */}
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-[var(--color-primary)]" />
+              Wallet Balance
+            </h3>
+            {!isEditingBalance && (
+              <Button variant="ghost" size="sm" onClick={() => {
+                setBalanceInput(balance.toString());
+                setIsEditingBalance(true);
+              }}>
+                Edit
+              </Button>
+            )}
+          </div>
+
+          {isEditingBalance ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-semibold text-[var(--color-text)]">₹</span>
+                <Input
+                  type="number"
+                  value={balanceInput}
+                  onChange={(e) => setBalanceInput(e.target.value)}
+                  placeholder="Enter balance"
+                  min={0}
+                  step={100}
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => setIsEditingBalance(false)}
+                >
+                  Cancel
+                </Button>
+                <Button fullWidth onClick={handleSaveBalance}>
+                  Save
+                </Button>
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                This is a demo balance for testing payment flows
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-[var(--color-text-muted)]">Available Balance</span>
+              <span className="text-2xl font-bold text-[var(--color-primary)]">
+                {formatCurrency(balance)}
+              </span>
+            </div>
+          )}
         </Card>
 
         {/* Edit Profile */}

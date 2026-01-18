@@ -11,6 +11,7 @@ import { buyerApi, type Offer, type TransactionState } from '@/lib/api';
 
 interface DiscoveredOffer {
   offer: Offer;
+  providerId: string;
   providerName: string;
   sourceType: string;
   availableQty: number;
@@ -65,6 +66,7 @@ export default function BuyPage() {
                   
                   discoveredOffers.push({
                     offer,
+                    providerId: provider.id,
                     providerName: provider.descriptor?.name || 'Provider',
                     sourceType: item.itemAttributes?.sourceType || 'MIXED',
                     availableQty: item.itemAttributes?.availableQuantity || offer.maxQuantity,
@@ -217,6 +219,7 @@ export default function BuyPage() {
           open={orderSheetOpen}
           onClose={() => setOrderSheetOpen(false)}
           offer={selectedOffer?.offer || null}
+          providerId={selectedOffer?.providerId}
           providerName={selectedOffer?.providerName || ''}
           initialQuantity={requestedQuantity}
           onConfirm={handleConfirmOrder}

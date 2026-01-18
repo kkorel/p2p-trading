@@ -22,6 +22,7 @@ model User {
   picture         String? // Google profile picture URL
   googleId        String?   @unique @map("google_id")
   profileComplete Boolean   @default(false) @map("profile_complete")
+  balance         Float     @default(10000) // Account balance in INR
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   lastLoginAt     DateTime? @map("last_login_at")
@@ -191,4 +192,35 @@ model Event {
   @@index([transactionId])
   @@index([messageId, direction])
   @@map("events")
+}
+
+// ============================================
+// Settlement Records (Phase 4 - Payment Flow)
+// ============================================
+
+model SettlementRecord {
+  id                  String   @id @default(uuid())
+  tradeId             String   @unique @map("trade_id")
+  orderId             String?  @map("order_id")
+  transactionId       String?  @map("transaction_id")
+  buyerId             String?  @map("buyer_id")
+  sellerId            String?  @map("seller_id")
+  principal           Float
+  fee                 Float
+  total               Float
+  expiresAt           String?  @map("expires_at")
+  status              String   @default("INITIATED")
+  verificationOutcome String?  @map("verification_outcome")
+  fundedReceipt       String?  @map("funded_receipt")
+  payoutReceipt       String?  @map("payout_receipt")
+  fundedAt            String?  @map("funded_at")
+  verifiedAt          String?  @map("verified_at")
+  payoutAt            String?  @map("payout_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([transactionId])
+  @@index([status])
+  @@map("settlement_records")
 }

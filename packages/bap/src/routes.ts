@@ -195,107 +195,89 @@ function nowIso(): string {
 
 function toRecord(row: any): SettlementRecord {
   return {
-    tradeId: row.trade_id,
-    orderId: row.order_id ?? null,
-    transactionId: row.transaction_id ?? null,
-    buyerId: row.buyer_id ?? null,
-    sellerId: row.seller_id ?? null,
+    tradeId: row.tradeId,
+    orderId: row.orderId ?? null,
+    transactionId: row.transactionId ?? null,
+    buyerId: row.buyerId ?? null,
+    sellerId: row.sellerId ?? null,
     principal: Number(row.principal ?? 0),
     fee: Number(row.fee ?? 0),
     total: Number(row.total ?? 0),
-    expiresAt: row.expires_at,
+    expiresAt: row.expiresAt,
     status: row.status,
-    verificationOutcome: row.verification_outcome ?? null,
-    fundedReceipt: row.funded_receipt ?? null,
-    payoutReceipt: row.payout_receipt ?? null,
-    fundedAt: row.funded_at ?? null,
-    verifiedAt: row.verified_at ?? null,
-    payoutAt: row.payout_at ?? null,
-    createdAt: row.created_at ?? null,
-    updatedAt: row.updated_at ?? null,
+    verificationOutcome: row.verificationOutcome ?? null,
+    fundedReceipt: row.fundedReceipt ?? null,
+    payoutReceipt: row.payoutReceipt ?? null,
+    fundedAt: row.fundedAt ?? null,
+    verifiedAt: row.verifiedAt ?? null,
+    payoutAt: row.payoutAt ?? null,
+    createdAt: row.createdAt?.toISOString?.() ?? row.createdAt ?? null,
+    updatedAt: row.updatedAt?.toISOString?.() ?? row.updatedAt ?? null,
   };
 }
 
 async function getSettlementRecord(tradeId: string): Promise<SettlementRecord | null> {
-  const db = (await waitForDb()) as any;
-  const stmt = db.prepare('SELECT * FROM settlement_records WHERE trade_id = ?');
-  stmt.bind([tradeId]);
-  let record: SettlementRecord | null = null;
-  if (stmt.step()) {
-    record = toRecord(stmt.getAsObject());
-  }
-  stmt.free();
-  return record;
+  const record = await prisma.settlementRecord.findUnique({
+    where: {tradeId},
+  });
+  return record ? toRecord(record) : null;
 }
 
 async function insertSettlementRecord(record: SettlementRecord): Promise<void> {
-  const db = (await waitForDb()) as any;
-  db.run(
-    `INSERT INTO settlement_records (
-      trade_id, order_id, transaction_id, buyer_id, seller_id,
-      principal, fee, total, expires_at, status,
-      verification_outcome, funded_receipt, payout_receipt,
-      funded_at, verified_at, payout_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      record.tradeId,
-      record.orderId,
-      record.transactionId,
-      record.buyerId,
-      record.sellerId,
-      record.principal,
-      record.fee,
-      record.total,
-      record.expiresAt,
-      record.status,
-      record.verificationOutcome,
-      record.fundedReceipt,
-      record.payoutReceipt,
-      record.fundedAt,
-      record.verifiedAt,
-      record.payoutAt,
-      record.createdAt,
-      record.updatedAt,
-    ]
-  );
-  saveDb();
+  await prisma.settlementRecord.create({
+    data: {
+      tradeId: record.tradeId,
+      orderId: record.orderId,
+      transactionId: record.transactionId,
+      buyerId: record.buyerId,
+      sellerId: record.sellerId,
+      principal: record.principal,
+      fee: record.fee,
+      total: record.total,
+      expiresAt: record.expiresAt,
+      status: record.status,
+      verificationOutcome: record.verificationOutcome,
+      fundedReceipt: record.fundedReceipt,
+      payoutReceipt: record.payoutReceipt,
+      fundedAt: record.fundedAt,
+      verifiedAt: record.verifiedAt,
+      payoutAt: record.payoutAt,
+    },
+  });
 }
 
 async function updateSettlementRecord(tradeId: string, fields: Partial<SettlementRecord>): Promise<void> {
-  const db = (await waitForDb()) as any;
-  const updatedAt = nowIso();
-  const updates: string[] = [];
-  const values: any[] = [];
-  const mapField = (column: string, value: any) => {
-    updates.push(`${column} = ?`);
-    values.push(value);
-  };
+  const updateData: any = {};
 
-  if (fields.status) mapField('status', fields.status);
-  if (fields.verificationOutcome !== undefined) mapField('verification_outcome', fields.verificationOutcome);
-  if (fields.fundedReceipt !== undefined) mapField('funded_receipt', fields.fundedReceipt);
-  if (fields.payoutReceipt !== undefined) mapField('payout_receipt', fields.payoutReceipt);
-  if (fields.fundedAt !== undefined) mapField('funded_at', fields.fundedAt);
-  if (fields.verifiedAt !== undefined) mapField('verified_at', fields.verifiedAt);
-  if (fields.payoutAt !== undefined) mapField('payout_at', fields.payoutAt);
-  if (fields.orderId !== undefined) mapField('order_id', fields.orderId);
-  if (fields.transactionId !== undefined) mapField('transaction_id', fields.transactionId);
-  if (fields.buyerId !== undefined) mapField('buyer_id', fields.buyerId);
-  if (fields.sellerId !== undefined) mapField('seller_id', fields.sellerId);
-  if (fields.principal !== undefined) mapField('principal', fields.principal);
-  if (fields.fee !== undefined) mapField('fee', fields.fee);
-  if (fields.total !== undefined) mapField('total', fields.total);
-  if (fields.expiresAt !== undefined) mapField('expires_at', fields.expiresAt);
+  if (fields.status !== undefined) updateData.status = fields.status;
+  if (fields.verificationOutcome !== undefined)
+    updateData.verificationOutcome = fields.verificationOutcome;
+  if (fields.fundedReceipt !== undefined)
+    updateData.fundedReceipt = fields.fundedReceipt;
+  if (fields.payoutReceipt !== undefined)
+    updateData.payoutReceipt = fields.payoutReceipt;
+  if (fields.fundedAt !== undefined) updateData.fundedAt = fields.fundedAt;
+  if (fields.verifiedAt !== undefined)
+    updateData.verifiedAt = fields.verifiedAt;
+  if (fields.payoutAt !== undefined) updateData.payoutAt = fields.payoutAt;
+  if (fields.orderId !== undefined) updateData.orderId = fields.orderId;
+  if (fields.transactionId !== undefined)
+    updateData.transactionId = fields.transactionId;
+  if (fields.buyerId !== undefined) updateData.buyerId = fields.buyerId;
+  if (fields.sellerId !== undefined) updateData.sellerId = fields.sellerId;
+  if (fields.principal !== undefined) updateData.principal = fields.principal;
+  if (fields.fee !== undefined) updateData.fee = fields.fee;
+  if (fields.total !== undefined) updateData.total = fields.total;
+  if (fields.expiresAt !== undefined) updateData.expiresAt = fields.expiresAt;
 
-  mapField('updated_at', updatedAt);
-
-  if (!updates.length) {
+  if (Object.keys(updateData).length === 0) {
     return;
   }
 
-  values.push(tradeId);
-  db.run(`UPDATE settlement_records SET ${updates.join(', ')} WHERE trade_id = ?`, values);
-  saveDb();
+  await prisma.settlementRecord.update({
+    where: {tradeId},
+    data: updateData,
+  });
 }
 
 function buildPaymentSteps(record: SettlementRecord | null) {
@@ -721,7 +703,7 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
 
     // Best-effort settlement initiation (idempotent)
     try {
-      const txState = getTransaction(transaction_id);
+      const txState = await getTransaction(transaction_id);
       const order = txState?.order;
       const tradeId = order?.id || orderId;
       const orderPrice = Number(order?.quote?.price?.value ?? 0);
@@ -895,7 +877,7 @@ router.post('/api/settlement/initiate', async (req: Request, res: Response) => {
     durationSec?: number;
   };
 
-  const txState = transaction_id ? getTransaction(transaction_id) : null;
+  const txState = transaction_id ? await getTransaction(transaction_id) : null;
   const order = txState?.order;
   const resolvedTradeId = tradeId || order?.id || order_id;
 
@@ -1185,9 +1167,7 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
  * POST /api/settlement/reset - Clear settlement records (demo reset)
  */
 router.post('/api/settlement/reset', async (req: Request, res: Response) => {
-  const db = (await waitForDb()) as any;
-  db.run('DELETE FROM settlement_records');
-  saveDb();
+  await prisma.settlementRecord.deleteMany({});
   logger.info('Cleared settlement_records for demo reset');
   res.json({ status: 'ok' });
 });
@@ -1267,10 +1247,10 @@ router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
 router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    
-    const orders = await prisma.order.findMany({
-      where: { buyerId: userId },
-      orderBy: { createdAt: 'desc' },
+
+    const orders = await (prisma.order as any).findMany({
+      where: {buyerId: userId},
+      orderBy: {createdAt: 'desc'},
       include: {
         provider: true,
         selectedOffer: {
@@ -1280,44 +1260,74 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
         },
       },
     });
-    
-    // Transform to API format
-    const formattedOrders = orders.map(order => {
+
+    // Transform to API format - need to use Promise.all since we may need async
+    // lookups
+    const formattedOrders = await Promise.all(orders.map(async (order: any) => {
       let items: any[] = [];
       let quote: any = {};
       
       try {
         items = JSON.parse(order.itemsJson || '[]');
-      } catch { items = []; }
-      
+      } catch {
+        items = [];
+      }
+
       try {
         quote = JSON.parse(order.quoteJson || '{}');
-      } catch { quote = {}; }
-      
-      const selectedOffer = order.selectedOffer as any;
-      
+      } catch {
+        quote = {};
+      }
+
+      const selectedOffer = order.selectedOffer;
+      const totalQty = order.totalQty || items[0]?.quantity?.value || 0;
+
+      // Calculate price_per_kwh: prefer offer value, fallback to calculating
+      // from quote
+      let pricePerKwh = selectedOffer?.priceValue || 0;
+      if (pricePerKwh === 0 && quote.price?.value && totalQty > 0) {
+        pricePerKwh = quote.price.value / totalQty;
+      }
+
+      // Get source_type: prefer offer, then stored items, then lookup from
+      // catalog
+      let sourceType = selectedOffer?.item?.sourceType || items[0]?.source_type;
+      if (!sourceType || sourceType === 'UNKNOWN') {
+        // Fallback: lookup from catalog item directly
+        const itemId = items[0]?.item_id || selectedOffer?.itemId;
+        if (itemId) {
+          const catalogItem = await prisma.catalogItem.findUnique({
+            where: {id: itemId},
+            select: {sourceType: true},
+          });
+          sourceType = catalogItem?.sourceType || 'UNKNOWN';
+        }
+      }
+
       return {
         id: order.id,
         status: order.status,
         created_at: order.createdAt.toISOString(),
         quote: quote.price ? {
           price: quote.price,
-          totalQuantity: order.totalQty || quote.breakup?.reduce((sum: number, b: any) => sum + (b.quantity?.value || 0), 0) || 0,
-        } : undefined,
+          totalQuantity: totalQty,
+        } :
+                             undefined,
         provider: order.provider ? {
           id: order.provider.id,
           name: order.provider.name,
-        } : undefined,
+        } :
+                                   undefined,
         itemInfo: {
           item_id: items[0]?.item_id || selectedOffer?.itemId || null,
           offer_id: items[0]?.offer_id || order.selectedOfferId || null,
-          source_type: selectedOffer?.item?.sourceType || 'UNKNOWN',
-          price_per_kwh: selectedOffer?.priceValue || 0,
-          quantity: order.totalQty || items[0]?.quantity?.value || 0,
+          source_type: sourceType || 'UNKNOWN',
+          price_per_kwh: pricePerKwh,
+          quantity: totalQty,
         },
       };
-    });
-    
+    }));
+
     res.json({ orders: formattedOrders });
   } catch (error: any) {
     logger.error(`Failed to get buyer orders: ${error.message}`);

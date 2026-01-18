@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/contexts/auth-context';
+import { BalanceProvider } from '@/contexts/balance-context';
 import './globals.css';
 
 const inter = Inter({
@@ -39,7 +40,9 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
       <body className="font-sans antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <BalanceProvider>{children}</BalanceProvider>
+        </AuthProvider>
       </body>
     </html>
   );

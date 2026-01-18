@@ -129,6 +129,7 @@ exports.Prisma.UserScalarFieldEnum = {
   picture: 'picture',
   googleId: 'googleId',
   profileComplete: 'profileComplete',
+  balance: 'balance',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   lastLoginAt: 'lastLoginAt',
@@ -226,6 +227,28 @@ exports.Prisma.EventScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.SettlementRecordScalarFieldEnum = {
+  id: 'id',
+  tradeId: 'tradeId',
+  orderId: 'orderId',
+  transactionId: 'transactionId',
+  buyerId: 'buyerId',
+  sellerId: 'sellerId',
+  principal: 'principal',
+  fee: 'fee',
+  total: 'total',
+  expiresAt: 'expiresAt',
+  status: 'status',
+  verificationOutcome: 'verificationOutcome',
+  fundedReceipt: 'fundedReceipt',
+  payoutReceipt: 'payoutReceipt',
+  fundedAt: 'fundedAt',
+  verifiedAt: 'verifiedAt',
+  payoutAt: 'payoutAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -250,7 +273,8 @@ exports.Prisma.ModelName = {
   CatalogOffer: 'CatalogOffer',
   OfferBlock: 'OfferBlock',
   Order: 'Order',
-  Event: 'Event'
+  Event: 'Event',
+  SettlementRecord: 'SettlementRecord'
 };
 
 /**
