@@ -1,6 +1,7 @@
 /**
  * Combined Prosumer Application - BAP (Consumer) + BPP (Provider)
  * Single Express server hosting both buyer and seller functionality
+ * Now with AI Trading Agents!
  */
 
 import express from 'express';
@@ -9,7 +10,9 @@ import { config, createLogger } from '@p2p/shared';
 import routes from './routes';
 import callbacks from './callbacks';
 import sellerRoutes from './seller-routes';
+import agentRoutes from './agent-routes';
 import { initDb, closeDb } from './db';
+import { startScheduler, stopScheduler, isOpenAIConfigured } from './ai';
 
 const app = express();
 const logger = createLogger('PROSUMER');
@@ -36,9 +39,20 @@ app.use('/callbacks', callbacks);
 // Seller/Provider routes (BPP) - includes Beckn protocol routes and seller management APIs
 app.use('/', sellerRoutes);
 
+// AI Trading Agent routes
+app.use('/', agentRoutes);
+
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'prosumer', roles: ['bap', 'bpp'] });
+  res.json({ 
+    status: 'ok', 
+    service: 'prosumer', 
+    roles: ['bap', 'bpp'],
+    ai_agents: {
+      enabled: true,
+      openai_configured: isOpenAIConfigured(),
+    }
+  });
 });
 
 // Serve frontend for all non-API routes (SPA fallback)
@@ -62,11 +76,21 @@ async function start() {
     logger.info(`CDS URL: ${config.urls.cds}`);
     logger.info(`Roles: Consumer (BAP) + Provider (BPP)`);
     logger.info(`Matching weights: price=${config.matching.weights.price}, trust=${config.matching.weights.trust}, time=${config.matching.weights.timeWindowFit}`);
+    
+    // Start AI Agent scheduler
+    if (isOpenAIConfigured()) {
+      startScheduler();
+      logger.info(`AI Agent scheduler started (interval: ${config.agents.cycleIntervalMs}ms)`);
+    } else {
+      logger.warn('OPENAI_API_KEY not configured - AI agents will not run automatically');
+      logger.info('Set OPENAI_API_KEY environment variable to enable AI trading agents');
+    }
   });
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
     logger.info('SIGTERM received, shutting down...');
+    stopScheduler();
     server.close(() => {
       closeDb();
       process.exit(0);
@@ -75,6 +99,7 @@ async function start() {
 
   process.on('SIGINT', () => {
     logger.info('SIGINT received, shutting down...');
+    stopScheduler();
     server.close(() => {
       closeDb();
       process.exit(0);

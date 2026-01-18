@@ -144,6 +144,14 @@
       color: var(--accent-orange);
     }
 
+    .main-tab.active.agents-tab { 
+      background: var(--accent-purple-dim); 
+      border-color: var(--accent-purple); 
+      color: var(--accent-purple);
+    }
+
+    .agents-tab .main-tab-icon { background: var(--accent-purple-dim); }
+
     .main-tab-icon {
       width: 32px;
       height: 32px;
@@ -761,6 +769,10 @@
         <div class="main-tab-icon">🏪</div>
         Sell Energy
       </button>
+      <button class="main-tab agents-tab" onclick="switchMainTab('agents')">
+        <div class="main-tab-icon">🤖</div>
+        AI Agents
+      </button>
     </div>
 
     <!-- BUY ENERGY TAB -->
@@ -1043,6 +1055,149 @@
         </div>
       </div>
     </div>
+
+    <!-- AI AGENTS TAB -->
+    <div id="agents-content" class="tab-content agents-view">
+      <!-- Scheduler Status Banner -->
+      <div class="card" id="schedulerStatus" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div class="card-title-icon" style="background: var(--accent-purple-dim);">🤖</div>
+            <div>
+              <div style="font-weight: 600;">AI Agent Scheduler</div>
+              <div id="schedulerStatusText" style="font-size: 0.8rem; color: var(--text-muted);">Loading...</div>
+            </div>
+          </div>
+          <div id="openaiStatus" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; background: var(--bg-secondary);">
+            <span id="openaiIndicator">⏳</span>
+            <span id="openaiStatusText">Checking...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="main-grid" style="grid-template-columns: 1fr 380px;">
+        <!-- Left: Agent List & Management -->
+        <div class="main-content">
+          <!-- Create Agent Form -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon" style="background: var(--accent-purple-dim);">➕</div>
+                Create Trading Agent
+              </div>
+            </div>
+            <form id="createAgentForm" class="form-grid">
+              <div class="form-group">
+                <label>Agent Name</label>
+                <input type="text" id="agentName" placeholder="e.g., Solar Buyer Bot" required>
+              </div>
+              <div class="form-group">
+                <label>Agent Type</label>
+                <select id="agentType" required>
+                  <option value="buyer">🛒 Buyer Agent</option>
+                  <option value="seller">🏪 Seller Agent</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Execution Mode</label>
+                <select id="agentExecutionMode">
+                  <option value="approval">📝 Approval Mode (requires your approval)</option>
+                  <option value="auto">⚡ Auto-Execute (trades automatically)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Max Price ($/kWh) - for buyers</label>
+                <input type="number" id="agentMaxPrice" step="0.01" min="0" placeholder="e.g., 0.12">
+              </div>
+              <div class="form-group">
+                <label>Min Trust Score (%)</label>
+                <input type="number" id="agentMinTrust" min="0" max="100" value="60" placeholder="e.g., 60">
+              </div>
+              <div class="form-group">
+                <label>Max Quantity (kWh)</label>
+                <input type="number" id="agentMaxQty" min="1" placeholder="e.g., 50">
+              </div>
+              <div class="form-group full-width">
+                <label>Custom Instructions (optional)</label>
+                <input type="text" id="agentInstructions" placeholder="e.g., Prefer solar energy, avoid trading before 9am">
+              </div>
+              <div class="form-group full-width">
+                <button type="submit" class="btn" style="background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%); color: white;">
+                  🤖 Create Agent
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Agent List -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon" style="background: var(--accent-purple-dim);">📋</div>
+                Your Agents
+              </div>
+              <button class="btn btn-secondary btn-small" onclick="loadAgents()">🔄 Refresh</button>
+            </div>
+            <div id="agentsList">
+              <div class="empty-state">
+                <div class="empty-state-icon">🤖</div>
+                <p>No agents yet. Create one above!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Pending Approvals & Activity -->
+        <div class="order-panel">
+          <!-- Pending Approvals -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon" style="background: var(--accent-yellow-dim);">⏳</div>
+                Pending Approvals
+              </div>
+              <span id="pendingCount" style="color: var(--text-muted); font-size: 0.875rem;"></span>
+            </div>
+            <div id="pendingProposals">
+              <div class="empty-state" style="padding: 1.5rem;">
+                <p style="font-size: 0.85rem; color: var(--text-muted);">No pending proposals</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Agent Orders / Trade History -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon" style="background: var(--accent-purple-dim);">💸</div>
+                Trade History
+              </div>
+              <span id="ordersCount" style="color: var(--text-muted); font-size: 0.875rem;"></span>
+            </div>
+            <div id="agentOrders" style="max-height: 350px; overflow-y: auto;">
+              <div class="empty-state" style="padding: 1.5rem;">
+                <p style="font-size: 0.85rem; color: var(--text-muted);">No executed trades yet</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon" style="background: var(--accent-blue-dim);">📊</div>
+                Recent Activity
+              </div>
+            </div>
+            <div id="agentActivity" style="max-height: 300px; overflow-y: auto;">
+              <div class="empty-state" style="padding: 1.5rem;">
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Select an agent to view activity</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="toast" id="toast">
@@ -1073,6 +1228,12 @@
       
       if (tab === 'sell') {
         loadProviders();
+      }
+      if (tab === 'agents') {
+        loadAgents();
+        loadPendingProposals();
+        loadAgentOrders();
+        loadSchedulerStatus();
       }
     }
 
@@ -1214,6 +1375,76 @@
       },
       async deleteOffer(id) {
         await fetch(`/seller/offers/${id}`, { method: 'DELETE' });
+      },
+      
+      // Agent APIs
+      async getAgents() {
+        const res = await fetch('/api/agents');
+        return res.json();
+      },
+      async getAgent(id) {
+        const res = await fetch(`/api/agents/${id}`);
+        return res.json();
+      },
+      async createAgent(data) {
+        const res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return res.json();
+      },
+      async updateAgent(id, data) {
+        const res = await fetch(`/api/agents/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return res.json();
+      },
+      async deleteAgent(id) {
+        const res = await fetch(`/api/agents/${id}`, { method: 'DELETE' });
+        return res.json();
+      },
+      async startAgent(id) {
+        const res = await fetch(`/api/agents/${id}/start`, { method: 'POST' });
+        return res.json();
+      },
+      async stopAgent(id) {
+        const res = await fetch(`/api/agents/${id}/stop`, { method: 'POST' });
+        return res.json();
+      },
+      async triggerAgent(id) {
+        const res = await fetch(`/api/agents/${id}/trigger`, { method: 'POST' });
+        return res.json();
+      },
+      async getAgentLogs(id, limit = 20) {
+        const res = await fetch(`/api/agents/${id}/logs?limit=${limit}`);
+        return res.json();
+      },
+      async getProposals(pending = false) {
+        const res = await fetch(`/api/proposals?pending=${pending}`);
+        return res.json();
+      },
+      async getExecutedProposals(limit = 20) {
+        const res = await fetch(`/api/proposals?limit=${limit}`);
+        return res.json();
+      },
+      async getSettlementStatus(tradeId) {
+        const res = await fetch(`/api/settlement/${tradeId}`);
+        return res.json();
+      },
+      async approveProposal(id) {
+        const res = await fetch(`/api/proposals/${id}/approve`, { method: 'POST' });
+        return res.json();
+      },
+      async rejectProposal(id) {
+        const res = await fetch(`/api/proposals/${id}/reject`, { method: 'POST' });
+        return res.json();
+      },
+      async getSchedulerStatus() {
+        const res = await fetch('/api/agents/scheduler/status');
+        return res.json();
       }
     };
 
@@ -2023,6 +2254,561 @@
       }
     });
 
+    // ==================== AI AGENTS ====================
+    let selectedAgentId = null;
+    let agentsPollTimer = null;
+
+    async function loadSchedulerStatus() {
+      try {
+        const data = await api.getSchedulerStatus();
+        const statusEl = document.getElementById('schedulerStatusText');
+        const openaiIndicator = document.getElementById('openaiIndicator');
+        const openaiText = document.getElementById('openaiStatusText');
+        
+        if (data.scheduler) {
+          const { running, cycleCount, intervalMs, pendingApprovals, maxPendingApprovals, throttled } = data.scheduler;
+          
+          if (throttled) {
+            statusEl.innerHTML = `<span style="color: var(--accent-yellow);">⏸️ Paused</span> - ${pendingApprovals}/${maxPendingApprovals} pending approvals`;
+          } else if (running) {
+            statusEl.textContent = `Running (cycle #${cycleCount}, every ${intervalMs/1000}s)`;
+          } else {
+            statusEl.textContent = 'Stopped';
+          }
+        }
+        
+        if (data.openai_configured) {
+          openaiIndicator.textContent = '✅';
+          openaiText.textContent = 'OpenAI Connected';
+          openaiText.style.color = 'var(--accent-green)';
+        } else {
+          openaiIndicator.textContent = '⚠️';
+          openaiText.textContent = 'OpenAI Not Configured';
+          openaiText.style.color = 'var(--accent-yellow)';
+        }
+      } catch (err) {
+        console.error('Failed to load scheduler status:', err);
+      }
+    }
+
+    async function loadAgents() {
+      try {
+        const { agents } = await api.getAgents();
+        renderAgentsList(agents || []);
+      } catch (err) {
+        console.error('Failed to load agents:', err);
+        showToast('Failed to load agents', true);
+      }
+    }
+
+    async function loadPendingProposals() {
+      try {
+        const { proposals } = await api.getProposals(true);
+        renderPendingProposals(proposals || []);
+      } catch (err) {
+        console.error('Failed to load proposals:', err);
+      }
+    }
+
+    async function loadAgentOrders() {
+      try {
+        const { proposals } = await api.getExecutedProposals(20);
+        // Filter only executed/approved proposals (not pending or rejected)
+        const executedOrders = (proposals || []).filter(p => 
+          p.status === 'executed' || p.status === 'approved'
+        );
+        await renderAgentOrders(executedOrders);
+      } catch (err) {
+        console.error('Failed to load agent orders:', err);
+      }
+    }
+
+    async function renderAgentOrders(orders) {
+      const container = document.getElementById('agentOrders');
+      const countEl = document.getElementById('ordersCount');
+      
+      countEl.textContent = orders.length > 0 ? `${orders.length} trades` : '';
+      
+      if (!orders || orders.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding: 1.5rem;">
+            <p style="font-size: 0.85rem; color: var(--text-muted);">No executed trades yet</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // Fetch settlement status for each order
+      const ordersWithStatus = await Promise.all(orders.map(async (order) => {
+        if (order.order_id) {
+          try {
+            const res = await fetch(`/api/settlement/${order.order_id}`);
+            if (res.ok) {
+              const data = await res.json();
+              return { ...order, settlement: data.record || null };
+            }
+            // If no settlement record exists, check if proposal was executed
+            // If executed without settlement, mark as completed (legacy trades)
+            if (order.status === 'executed') {
+              return { ...order, settlement: { status: 'RELEASED' } };
+            }
+            return { ...order, settlement: null };
+          } catch {
+            // On error, if trade was executed, assume completed
+            if (order.status === 'executed') {
+              return { ...order, settlement: { status: 'RELEASED' } };
+            }
+            return { ...order, settlement: null };
+          }
+        }
+        return { ...order, settlement: null };
+      }));
+      
+      container.innerHTML = ordersWithStatus.map(o => {
+        const offer = o.offer || {};
+        const settlement = o.settlement;
+        
+        // Determine payment status
+        let statusIcon, statusText, statusColor, statusBg;
+        if (!settlement) {
+          statusIcon = '⏳';
+          statusText = 'Pending';
+          statusColor = 'var(--accent-yellow)';
+          statusBg = 'var(--accent-yellow-dim)';
+        } else if (settlement.status === 'INITIATED') {
+          statusIcon = '🔄';
+          statusText = 'Initiating';
+          statusColor = 'var(--accent-yellow)';
+          statusBg = 'var(--accent-yellow-dim)';
+        } else if (settlement.status === 'FUNDED') {
+          statusIcon = '🏦';
+          statusText = 'In Escrow';
+          statusColor = 'var(--accent-purple)';
+          statusBg = 'var(--accent-purple-dim)';
+        } else if (settlement.status === 'VERIFIED') {
+          statusIcon = '✓';
+          statusText = 'Verified';
+          statusColor = 'var(--accent-blue)';
+          statusBg = 'var(--accent-blue-dim)';
+        } else if (settlement.status === 'RELEASED') {
+          statusIcon = '✅';
+          statusText = 'Complete';
+          statusColor = 'var(--accent-green)';
+          statusBg = 'var(--accent-green-dim)';
+        } else if (settlement.status === 'REFUNDED') {
+          statusIcon = '↩️';
+          statusText = 'Refunded';
+          statusColor = 'var(--accent-orange)';
+          statusBg = 'var(--accent-orange-dim)';
+        } else {
+          statusIcon = '❓';
+          statusText = settlement.status || 'Unknown';
+          statusColor = 'var(--text-muted)';
+          statusBg = 'var(--bg-secondary)';
+        }
+        
+        const sourceIcon = {
+          'SOLAR': '☀️',
+          'WIND': '💨',
+          'HYDRO': '💧',
+          'GRID': '🔌'
+        }[offer.source_type] || '⚡';
+        
+        return `
+        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 0.5rem; border-left: 3px solid ${statusColor};">
+          <!-- Header: Action + Status Badge -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="font-size: 0.9rem;">${o.action === 'buy' ? '🛒' : '📤'}</span>
+              <span style="font-weight: 600; font-size: 0.85rem;">${o.quantity} kWh</span>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">@ $${o.price_per_unit?.toFixed(4)}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${statusBg}; font-size: 0.7rem; font-weight: 600; color: ${statusColor};">
+              ${statusIcon} ${statusText}
+            </div>
+          </div>
+          
+          <!-- Details Row -->
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+            <div style="color: var(--text-muted);">
+              ${sourceIcon} ${offer.provider_name || 'Unknown'} • ${offer.source_type || '?'}
+            </div>
+            <div style="font-weight: 600; color: var(--accent-green); font-family: 'JetBrains Mono', monospace;">
+              $${o.total_price?.toFixed(2) || '—'}
+            </div>
+          </div>
+          
+          <!-- Agent & Time -->
+          <div style="display: flex; justify-content: space-between; margin-top: 0.4rem; font-size: 0.65rem; color: var(--text-muted);">
+            <span>🤖 ${o.agent_name || 'Agent'}</span>
+            <span>${getTimeAgo(o.executed_at || o.created_at)}</span>
+          </div>
+        </div>
+      `}).join('');
+    }
+
+    function renderAgentsList(agents) {
+      const container = document.getElementById('agentsList');
+      
+      if (!agents || agents.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🤖</div>
+            <p>No agents yet. Create one above!</p>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = agents.map(agent => {
+        const statusColors = {
+          active: 'var(--accent-green)',
+          paused: 'var(--accent-yellow)',
+          stopped: 'var(--text-muted)'
+        };
+        const statusBgs = {
+          active: 'var(--accent-green-dim)',
+          paused: 'var(--accent-yellow-dim)',
+          stopped: 'var(--bg-secondary)'
+        };
+        const statusIcons = {
+          active: '🟢',
+          paused: '🟡',
+          stopped: '⚫'
+        };
+        const typeIcons = {
+          buyer: '🛒',
+          seller: '🏪'
+        };
+        const modeLabels = {
+          auto: '⚡ Auto',
+          approval: '📝 Approval'
+        };
+        
+        const isSelected = selectedAgentId === agent.id;
+        
+        return `
+          <div class="offer-card ${isSelected ? 'selected' : ''}" 
+               style="cursor: pointer; margin-bottom: 0.75rem; ${isSelected ? 'border-color: var(--accent-purple);' : ''}"
+               onclick="selectAgent('${agent.id}')">
+            <div class="offer-header">
+              <div>
+                <div class="offer-provider" style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span>${typeIcons[agent.type] || '🤖'}</span>
+                  ${agent.name}
+                  ${agent.owner_id === 'platform' ? '<span style="font-size: 0.7rem; background: var(--accent-purple-dim); color: var(--accent-purple); padding: 0.1rem 0.4rem; border-radius: 4px;">PLATFORM</span>' : ''}
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                  <span style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${statusBgs[agent.status]}; color: ${statusColors[agent.status]};">
+                    ${statusIcons[agent.status]} ${agent.status.toUpperCase()}
+                  </span>
+                  <span style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: var(--bg-secondary); color: var(--text-muted);">
+                    ${modeLabels[agent.execution_mode]}
+                  </span>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                ${agent.status === 'active' 
+                  ? `<button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); stopAgentAction('${agent.id}')">⏹ Stop</button>`
+                  : `<button class="btn btn-small" style="background: var(--accent-green); color: white;" onclick="event.stopPropagation(); startAgentAction('${agent.id}')">▶ Start</button>`
+                }
+              </div>
+            </div>
+            <div class="offer-details" style="margin-top: 0.75rem;">
+              <div class="offer-detail">
+                <span class="offer-detail-label">Type</span>
+                <span class="offer-detail-value">${agent.type}</span>
+              </div>
+              <div class="offer-detail">
+                <span class="offer-detail-label">Max Price</span>
+                <span class="offer-detail-value">${agent.config?.maxPricePerKwh ? '$' + agent.config.maxPricePerKwh + '/kWh' : '—'}</span>
+              </div>
+              <div class="offer-detail">
+                <span class="offer-detail-label">Min Trust</span>
+                <span class="offer-detail-value">${agent.config?.minTrustScore ? (agent.config.minTrustScore * 100).toFixed(0) + '%' : '—'}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderPendingProposals(proposals) {
+      const container = document.getElementById('pendingProposals');
+      const countEl = document.getElementById('pendingCount');
+      const MAX_PENDING = 5;
+      
+      if (proposals.length >= MAX_PENDING) {
+        countEl.innerHTML = `<span style="color: var(--accent-yellow);">⚠️ ${proposals.length}/${MAX_PENDING} (agents paused)</span>`;
+      } else if (proposals.length > 0) {
+        countEl.textContent = `${proposals.length}/${MAX_PENDING}`;
+      } else {
+        countEl.textContent = '';
+      }
+      
+      if (!proposals || proposals.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding: 1.5rem;">
+            <p style="font-size: 0.85rem; color: var(--text-muted);">No pending proposals</p>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = proposals.map(p => {
+        const offer = p.offer || {};
+        const trustPercent = Math.round((offer.provider_trust_score || 0) * 100);
+        const trustColor = trustPercent >= 70 ? 'var(--accent-green)' : trustPercent >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+        const sourceIcon = {
+          'SOLAR': '☀️',
+          'WIND': '💨',
+          'HYDRO': '💧',
+          'GRID': '🔌'
+        }[offer.source_type] || '⚡';
+        
+        return `
+        <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 10px; margin-bottom: 0.75rem; border-left: 4px solid var(--accent-yellow);">
+          <!-- Header: Action + Time -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.25rem;">${p.action === 'buy' ? '🛒' : '📤'}</span>
+              <span style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">
+                ${p.action.toUpperCase()} ${p.quantity} kWh
+              </span>
+            </div>
+            <span style="font-size: 0.7rem; color: var(--text-muted); background: var(--bg-card); padding: 0.25rem 0.5rem; border-radius: 4px;">
+              ${getTimeAgo(p.created_at)}
+            </span>
+          </div>
+          
+          <!-- Provider & Energy Info -->
+          <div style="background: var(--bg-card); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Provider</div>
+                <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">${offer.provider_name || 'Unknown'}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Energy Source</div>
+                <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">${sourceIcon} ${offer.source_type || 'Unknown'}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Trust Score</div>
+                <div style="font-weight: 600; font-size: 0.85rem; color: ${trustColor};">${trustPercent}%</div>
+              </div>
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Price/kWh</div>
+                <div style="font-weight: 600; font-size: 0.85rem; color: var(--accent-green); font-family: 'JetBrains Mono', monospace;">$${p.price_per_unit?.toFixed(4) || '—'}</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Total Price -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: linear-gradient(135deg, var(--accent-green-dim), transparent); border-radius: 6px; margin-bottom: 0.75rem;">
+            <span style="font-size: 0.8rem; color: var(--text-secondary);">Total Cost</span>
+            <span style="font-weight: 700; font-size: 1.1rem; color: var(--accent-green); font-family: 'JetBrains Mono', monospace;">$${p.total_price?.toFixed(2) || '—'}</span>
+          </div>
+          
+          <!-- AI Reasoning (Collapsible) -->
+          <details style="margin-bottom: 0.75rem;">
+            <summary style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer; padding: 0.25rem 0;">
+              🤖 AI Reasoning
+            </summary>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem; padding: 0.5rem; background: var(--bg-card); border-radius: 4px; line-height: 1.4;">
+              ${p.reasoning || 'No reasoning provided'}
+            </div>
+          </details>
+          
+          <!-- Action Buttons -->
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-small" style="flex: 1; background: var(--accent-green); color: white; font-weight: 600; padding: 0.6rem;" onclick="approveProposalAction('${p.id}')">
+              ✓ Approve & Execute
+            </button>
+            <button class="btn btn-small btn-secondary" style="flex: 1; padding: 0.6rem;" onclick="rejectProposalAction('${p.id}')">
+              ✕ Reject
+            </button>
+          </div>
+        </div>
+      `}).join('');
+    }
+
+    async function selectAgent(agentId) {
+      selectedAgentId = agentId;
+      loadAgents(); // Re-render to show selection
+      loadAgentActivity(agentId);
+    }
+
+    async function loadAgentActivity(agentId) {
+      const container = document.getElementById('agentActivity');
+      
+      try {
+        const { logs } = await api.getAgentLogs(agentId, 20);
+        
+        if (!logs || logs.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state" style="padding: 1.5rem;">
+              <p style="font-size: 0.85rem; color: var(--text-muted);">No activity yet</p>
+            </div>
+          `;
+          return;
+        }
+        
+        const eventIcons = {
+          analysis: '🔍',
+          proposal: '📝',
+          execution: '⚡',
+          approval: '✅',
+          rejection: '❌',
+          error: '⚠️',
+          start: '▶️',
+          stop: '⏹️'
+        };
+        
+        container.innerHTML = logs.map(log => `
+          <div style="padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.8rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 500;">
+                ${eventIcons[log.event_type] || '📋'} ${log.event_type.toUpperCase()}
+              </span>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">
+                ${getTimeAgo(log.created_at)}
+              </span>
+            </div>
+            <div style="color: var(--text-secondary); margin-top: 0.25rem;">
+              ${log.details?.message || log.details?.reasoning?.substring(0, 100) || JSON.stringify(log.details).substring(0, 80)}
+            </div>
+          </div>
+        `).join('');
+        
+      } catch (err) {
+        container.innerHTML = `<div style="color: var(--text-muted); padding: 1rem;">Failed to load activity</div>`;
+      }
+    }
+
+    async function startAgentAction(agentId) {
+      try {
+        const result = await api.startAgent(agentId);
+        if (result.status === 'ok') {
+          showToast('Agent started!');
+          loadAgents();
+        } else {
+          showToast(result.error || 'Failed to start agent', true);
+        }
+      } catch (err) {
+        showToast('Failed to start agent: ' + err.message, true);
+      }
+    }
+
+    async function stopAgentAction(agentId) {
+      try {
+        const result = await api.stopAgent(agentId);
+        if (result.status === 'ok') {
+          showToast('Agent stopped');
+          loadAgents();
+        } else {
+          showToast(result.error || 'Failed to stop agent', true);
+        }
+      } catch (err) {
+        showToast('Failed to stop agent: ' + err.message, true);
+      }
+    }
+
+    async function approveProposalAction(proposalId) {
+      try {
+        showToast('Executing trade & processing payment...');
+        const result = await api.approveProposal(proposalId);
+        if (result.status === 'ok') {
+          const proposal = result.proposal;
+          if (proposal?.status === 'executed') {
+            showToast(`Trade complete! Payment processed.`);
+          } else {
+            showToast('Trade approved and queued for execution');
+          }
+          loadPendingProposals();
+          loadAgentOrders(); // Refresh trade history
+          if (selectedAgentId) loadAgentActivity(selectedAgentId);
+          // Also refresh orders list if on buy tab
+          if (typeof loadOrders === 'function') loadOrders();
+        } else {
+          showToast(result.error || 'Failed to execute trade', true);
+        }
+      } catch (err) {
+        showToast('Failed to execute: ' + err.message, true);
+      }
+    }
+
+    async function rejectProposalAction(proposalId) {
+      try {
+        const result = await api.rejectProposal(proposalId);
+        if (result.status === 'ok') {
+          showToast('Proposal rejected');
+          loadPendingProposals();
+          if (selectedAgentId) loadAgentActivity(selectedAgentId);
+        } else {
+          showToast(result.error || 'Failed to reject', true);
+        }
+      } catch (err) {
+        showToast('Failed to reject: ' + err.message, true);
+      }
+    }
+
+    // Create Agent Form Handler
+    document.getElementById('createAgentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('agentName').value.trim();
+      const type = document.getElementById('agentType').value;
+      const executionMode = document.getElementById('agentExecutionMode').value;
+      const maxPrice = parseFloat(document.getElementById('agentMaxPrice').value) || null;
+      const minTrust = parseInt(document.getElementById('agentMinTrust').value) || null;
+      const maxQty = parseInt(document.getElementById('agentMaxQty').value) || null;
+      const instructions = document.getElementById('agentInstructions').value.trim() || null;
+      
+      if (!name) {
+        showToast('Please enter an agent name', true);
+        return;
+      }
+      
+      const config = {};
+      if (maxPrice) config.maxPricePerKwh = maxPrice;
+      if (minTrust) config.minTrustScore = minTrust / 100;
+      if (maxQty) config.maxQuantity = maxQty;
+      if (instructions) config.customInstructions = instructions;
+      
+      try {
+        const result = await api.createAgent({
+          name,
+          type,
+          execution_mode: executionMode,
+          config
+        });
+        
+        if (result.status === 'ok') {
+          showToast(`Agent "${name}" created!`);
+          document.getElementById('createAgentForm').reset();
+          document.getElementById('agentMinTrust').value = '60'; // Reset default
+          loadAgents();
+        } else {
+          showToast(result.error || 'Failed to create agent', true);
+        }
+      } catch (err) {
+        showToast('Failed to create agent: ' + err.message, true);
+      }
+    });
+
+    // Poll for updates when on agents tab
+    function startAgentsPoll() {
+      if (agentsPollTimer) return;
+      agentsPollTimer = setInterval(() => {
+        const agentsTab = document.getElementById('agents-content');
+        if (agentsTab && agentsTab.classList.contains('active')) {
+          loadPendingProposals();
+          loadAgentOrders();
+          loadSchedulerStatus();
+        }
+      }, 5000);
+    }
+
     // ==================== INITIALIZATION ====================
     function setDefaultDates() {
       const now = new Date();
@@ -2042,6 +2828,7 @@
     setDefaultDates();
     startAccountsPoll(); // Start demo accounts polling
     initDraggablePanel(); // Make demo accounts panel draggable
+    startAgentsPoll(); // Start agents polling
   </script>
 </body>
 </html>

@@ -150,6 +150,75 @@ export const SCHEMA = {
   settlement_trade_index: `
     CREATE INDEX IF NOT EXISTS idx_settlement_trade_id ON settlement_records(trade_id)
   `,
+
+  // AI Trading Agents - user-owned autonomous trading bots
+  agents: `
+    CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      owner_id TEXT NOT NULL DEFAULT 'platform',
+      type TEXT NOT NULL CHECK(type IN ('buyer', 'seller')),
+      status TEXT NOT NULL DEFAULT 'stopped' CHECK(status IN ('active', 'paused', 'stopped')),
+      execution_mode TEXT NOT NULL DEFAULT 'approval' CHECK(execution_mode IN ('auto', 'approval')),
+      config_json TEXT NOT NULL DEFAULT '{}',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `,
+
+  // Trade proposals from agents (for approval mode)
+  trade_proposals: `
+    CREATE TABLE IF NOT EXISTS trade_proposals (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      action TEXT NOT NULL CHECK(action IN ('buy', 'sell')),
+      offer_id TEXT,
+      quantity REAL NOT NULL,
+      price_per_unit REAL,
+      total_price REAL,
+      reasoning TEXT,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected', 'executed', 'expired')),
+      transaction_id TEXT,
+      order_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      decided_at DATETIME,
+      executed_at DATETIME,
+      FOREIGN KEY (agent_id) REFERENCES agents(id)
+    )
+  `,
+
+  // Agent activity logs
+  agent_logs: `
+    CREATE TABLE IF NOT EXISTS agent_logs (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      event_type TEXT NOT NULL CHECK(event_type IN ('analysis', 'proposal', 'execution', 'approval', 'rejection', 'error', 'start', 'stop')),
+      details_json TEXT NOT NULL DEFAULT '{}',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (agent_id) REFERENCES agents(id)
+    )
+  `,
+
+  // Indexes for agents
+  agents_owner_index: `
+    CREATE INDEX IF NOT EXISTS idx_agents_owner_id ON agents(owner_id)
+  `,
+
+  agents_status_index: `
+    CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)
+  `,
+
+  proposals_agent_index: `
+    CREATE INDEX IF NOT EXISTS idx_proposals_agent_id ON trade_proposals(agent_id)
+  `,
+
+  proposals_status_index: `
+    CREATE INDEX IF NOT EXISTS idx_proposals_status ON trade_proposals(status)
+  `,
+
+  agent_logs_agent_index: `
+    CREATE INDEX IF NOT EXISTS idx_agent_logs_agent_id ON agent_logs(agent_id)
+  `,
 };
 
 /**
@@ -168,4 +237,13 @@ export function initializeSchema(db: any): void {
   db.run(SCHEMA.blocks_offer_index);
   db.run(SCHEMA.blocks_status_index);
   db.run(SCHEMA.settlement_trade_index);
+  // AI Agent tables
+  db.run(SCHEMA.agents);
+  db.run(SCHEMA.trade_proposals);
+  db.run(SCHEMA.agent_logs);
+  db.run(SCHEMA.agents_owner_index);
+  db.run(SCHEMA.agents_status_index);
+  db.run(SCHEMA.proposals_agent_index);
+  db.run(SCHEMA.proposals_status_index);
+  db.run(SCHEMA.agent_logs_agent_index);
 }

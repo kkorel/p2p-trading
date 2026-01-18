@@ -48,4 +48,18 @@ export const config = {
     minTrustThreshold: parseFloat(process.env.MIN_TRUST_THRESHOLD || '0.2'),
     defaultTrustScore: parseFloat(process.env.DEFAULT_TRUST_SCORE || '0.5'),
   },
+
+  // AI Agent configuration
+  ai: {
+    openaiApiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-4o',
+    maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS || '1024'),
+  },
+
+  // Agent scheduler configuration
+  agents: {
+    cycleIntervalMs: parseInt(process.env.AGENT_CYCLE_INTERVAL_MS || '10000'),
+    maxConcurrent: parseInt(process.env.AGENT_MAX_CONCURRENT || '5'),
+    proposalExpiryMs: parseInt(process.env.AGENT_PROPOSAL_EXPIRY_MS || '300000'), // 5 minutes
+  },
 };

@@ -1,10 +1,12 @@
 /**
  * Seed data for Prosumer App (Combined BAP + BPP)
  * Uses shared seed data for consistency with CDS
+ * Includes AI Trading Agent seeding
  */
 
 import { initDb, getDb, saveDb, closeDb } from './db';
 import { generateSeedData } from '@p2p/shared';
+import { v4 as uuidv4 } from 'uuid';
 
 async function seed() {
   console.log('🌱 Seeding Prosumer database...\n');
@@ -15,6 +17,9 @@ async function seed() {
   const db = getDb();
 
   // Clear existing data
+  db.run('DELETE FROM agent_logs');
+  db.run('DELETE FROM trade_proposals');
+  db.run('DELETE FROM agents');
   db.run('DELETE FROM offer_blocks');
   db.run('DELETE FROM catalog_offers');
   db.run('DELETE FROM catalog_items');
@@ -60,6 +65,59 @@ async function seed() {
     console.log(`✅ Offer: ${offer.id} ($${offer.price_value}/kWh, ${offer.max_qty} blocks created)`);
   }
 
+  // ==================== AI AGENTS ====================
+  console.log('\n🤖 Seeding AI Trading Agents...\n');
+  
+  const agentNow = new Date().toISOString();
+  
+  // Platform Agent - Smart Buyer
+  const platformBuyerAgentId = uuidv4();
+  const platformBuyerConfig = {
+    maxPricePerKwh: 0.12,
+    minTrustScore: 0.5,
+    maxQuantity: 50,
+    riskTolerance: 'medium',
+    preferredSources: ['SOLAR', 'WIND'],
+    customInstructions: 'Focus on finding the best price-to-trust ratio. Prefer renewable sources. Always explain your reasoning clearly.'
+  };
+  
+  db.run(
+    `INSERT INTO agents (id, name, owner_id, type, status, execution_mode, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [platformBuyerAgentId, 'Platform Smart Buyer', 'platform', 'buyer', 'stopped', 'approval', JSON.stringify(platformBuyerConfig), agentNow, agentNow]
+  );
+  console.log(`✅ Platform Agent: Smart Buyer (id: ${platformBuyerAgentId.substring(0, 8)}...)`);
+  
+  // Platform Agent - Market Analyzer
+  const platformAnalyzerAgentId = uuidv4();
+  const platformAnalyzerConfig = {
+    riskTolerance: 'low',
+    minTrustScore: 0.6,
+    customInstructions: 'Analyze the market carefully and only propose trades when there are exceptional opportunities. Prioritize trust scores over price.'
+  };
+  
+  db.run(
+    `INSERT INTO agents (id, name, owner_id, type, status, execution_mode, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [platformAnalyzerAgentId, 'Conservative Analyzer', 'platform', 'buyer', 'stopped', 'approval', JSON.stringify(platformAnalyzerConfig), agentNow, agentNow]
+  );
+  console.log(`✅ Platform Agent: Conservative Analyzer (id: ${platformAnalyzerAgentId.substring(0, 8)}...)`);
+  
+  // Demo User Agent
+  const demoAgentId = uuidv4();
+  const demoAgentConfig = {
+    maxPricePerKwh: 0.10,
+    minTrustScore: 0.7,
+    maxQuantity: 30,
+    dailyLimit: 100,
+    riskTolerance: 'low',
+    customInstructions: 'Only buy solar energy. Never trade if trust score is below 70%.'
+  };
+  
+  db.run(
+    `INSERT INTO agents (id, name, owner_id, type, status, execution_mode, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [demoAgentId, 'My Solar Buyer', 'user', 'buyer', 'stopped', 'approval', JSON.stringify(demoAgentConfig), agentNow, agentNow]
+  );
+  console.log(`✅ Demo Agent: My Solar Buyer (id: ${demoAgentId.substring(0, 8)}...)`);
+
   saveDb();
   closeDb();
 
@@ -69,6 +127,7 @@ async function seed() {
   console.log(`   - ${SEED_DATA.items.length} items`);
   console.log(`   - ${SEED_DATA.offers.length} offers`);
   console.log(`   - ${totalBlocks} total blocks`);
+  console.log(`   - 3 AI agents (2 platform, 1 demo)`);
 }
 
 seed().catch(console.error);
