@@ -255,7 +255,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/emirhurturk/Dev/Projects/p2p-trading/packages/shared/src/generated/prisma",
+      "value": "C:\\Users\\kuzey\\OneDrive\\Desktop\\Clasp\\p2p-trading\\packages\\shared\\src\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -264,12 +264,12 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "darwin-arm64",
+        "value": "windows",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/emirhurturk/Dev/Projects/p2p-trading/packages/shared/prisma/schema.prisma",
+    "sourceFilePath": "C:\\Users\\kuzey\\OneDrive\\Desktop\\Clasp\\p2p-trading\\packages\\shared\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
