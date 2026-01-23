@@ -1,0 +1,8 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "packages/bap/Dockerfile"
+
+[deploy]
+startCommand = "node packages/bap/dist/index.js"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10

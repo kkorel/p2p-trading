@@ -1,0 +1,25 @@
+{
+    "buildCommand": "cd packages/web && npm install && npm run build",
+    "outputDirectory": "packages/web/.next",
+    "devCommand": "cd packages/web && npm run dev",
+    "installCommand": "npm install",
+    "framework": "nextjs",
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "https://your-railway-backend-url.railway.app/api/:path*"
+        },
+        {
+            "source": "/auth/:path*",
+            "destination": "https://your-railway-backend-url.railway.app/auth/:path*"
+        },
+        {
+            "source": "/seller/:path*",
+            "destination": "https://your-railway-backend-url.railway.app/seller/:path*"
+        },
+        {
+            "source": "/callbacks/:path*",
+            "destination": "https://your-railway-backend-url.railway.app/callbacks/:path*"
+        }
+    ]
+}
