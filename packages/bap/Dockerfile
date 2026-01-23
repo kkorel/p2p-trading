@@ -25,6 +25,9 @@ RUN npx prisma generate --schema=./packages/shared/prisma/schema.prisma
 RUN npm run build --workspace=@p2p/shared
 RUN npm run build --workspace=@p2p/bap
 
+# Verify build output exists
+RUN ls -la packages/bap/dist/ && echo "Build successful: dist folder exists"
+
 # Expose port
 EXPOSE 4000
 
