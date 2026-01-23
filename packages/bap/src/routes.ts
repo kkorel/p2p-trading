@@ -113,20 +113,20 @@ function updateDemoBalance(id: string, delta: number): void {
 function transferMoney(fromId: string, toId: string, amount: number, description: string): boolean {
   const from = demoAccounts.get(fromId);
   const to = demoAccounts.get(toId);
-  
+
   if (!from || !to) {
     logger.error(`Transfer failed: account not found (from=${fromId}, to=${toId})`);
     return false;
   }
-  
+
   if (from.balance < amount) {
     logger.error(`Transfer failed: insufficient balance (${from.name} has ₹${from.balance}, needs ₹${amount})`);
     return false;
   }
-  
+
   from.balance = roundMoney(from.balance - amount);
   to.balance = roundMoney(to.balance + amount);
-  
+
   // Record the transaction
   const tx: DemoTransaction = {
     id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -139,12 +139,12 @@ function transferMoney(fromId: string, toId: string, amount: number, description
     timestamp: new Date().toISOString(),
   };
   demoTransactions.unshift(tx); // Add to beginning (newest first)
-  
+
   // Keep only last 20 transactions
   if (demoTransactions.length > 20) {
     demoTransactions = demoTransactions.slice(0, 20);
   }
-  
+
   logger.info(`[TRANSFER] ${description}: ₹${amount.toFixed(2)} | ${from.name} (₹${from.balance.toFixed(2)}) → ${to.name} (₹${to.balance.toFixed(2)})`);
   return true;
 }
@@ -218,7 +218,7 @@ function toRecord(row: any): SettlementRecord {
 
 async function getSettlementRecord(tradeId: string): Promise<SettlementRecord | null> {
   const record = await prisma.settlementRecord.findUnique({
-    where: {tradeId},
+    where: { tradeId },
   });
   return record ? toRecord(record) : null;
 }
@@ -275,7 +275,7 @@ async function updateSettlementRecord(tradeId: string, fields: Partial<Settlemen
   }
 
   await prisma.settlementRecord.update({
-    where: {tradeId},
+    where: { tradeId },
     data: updateData,
   });
 }
@@ -330,12 +330,12 @@ function buildPayoutInstruction(record: SettlementRecord, outcome: SettlementOut
  * Uses optional auth to filter out user's own offers
  */
 router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: Response) => {
-  const { 
-    sourceType, 
-    deliveryMode, 
-    minQuantity, 
+  const {
+    sourceType,
+    deliveryMode,
+    minQuantity,
     timeWindow,
-    transaction_id 
+    transaction_id
   } = req.body as {
     sourceType?: SourceType;
     deliveryMode?: DeliveryMode;
@@ -343,14 +343,14 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     timeWindow?: TimeWindow;
     transaction_id?: string;
   };
-  
+
   const txnId = transaction_id || uuidv4();
-  
+
   // Get user's provider ID to exclude their own offers
   const excludeProviderId = req.user?.providerId || null;
   // Get user's ID for order association
   const buyerId = req.user?.id || null;
-  
+
   // Create transaction state with discovery criteria for matching
   await createTransaction(txnId);
   await updateTransaction(txnId, {
@@ -374,9 +374,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   const filterParts: string[] = [];
   if (sourceType) filterParts.push(`sourceType='${sourceType}'`);
   if (minQuantity) filterParts.push(`availableQuantity>=${minQuantity}`);
-  
+
   const expression = filterParts.length > 0 ? filterParts.join(' && ') : '*';
-  
+
   // Create context
   const context = createContext({
     action: 'discover',
@@ -384,7 +384,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     bap_id: config.bap.id,
     bap_uri: config.bap.uri,
   });
-  
+
   // Build discover message
   const discoverMessage: DiscoverMessage = {
     context,
@@ -406,19 +406,19 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       },
     },
   };
-  
+
   logger.info('Sending discover request', {
     transaction_id: txnId,
     message_id: context.message_id,
     action: 'discover',
   });
-  
+
   // Log outbound event
   await logEvent(txnId, context.message_id, 'discover', 'OUTBOUND', JSON.stringify(discoverMessage));
-  
+
   try {
     const response = await axios.post(`${config.urls.cds}/discover`, discoverMessage);
-    
+
     res.json({
       status: 'ok',
       transaction_id: txnId,
@@ -435,7 +435,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
  * POST /api/select - Select an offer (with matching algorithm)
  */
 router.post('/api/select', async (req: Request, res: Response) => {
-  const { 
+  const {
     transaction_id,
     offer_id,
     item_id,
@@ -450,22 +450,22 @@ router.post('/api/select', async (req: Request, res: Response) => {
     requestedTimeWindow?: TimeWindow;
     autoMatch?: boolean;
   };
-  
+
   const txState = await getTransaction(transaction_id);
-  
+
   if (!txState) {
     return res.status(400).json({ error: 'Transaction not found.' });
   }
-  
+
   let selectedOffer: CatalogOffer | undefined;
   let selectedItemId: string | undefined;
   let matchingResult: any;
-  
+
   if (autoMatch && txState.catalog && requestedTimeWindow) {
     // Use matching algorithm to select best offer
     const allOffers: CatalogOffer[] = [];
     const providers = new Map<string, Provider>();
-    
+
     for (const providerCatalog of txState.catalog.providers) {
       // Add provider with default trust score (in production, fetch from registry)
       providers.set(providerCatalog.id, {
@@ -475,31 +475,31 @@ router.post('/api/select', async (req: Request, res: Response) => {
         total_orders: 0,
         successful_orders: 0,
       });
-      
+
       for (const item of providerCatalog.items) {
         for (const offer of item.offers) {
           allOffers.push(offer);
         }
       }
     }
-    
+
     const criteria: MatchingCriteria = {
       requestedQuantity: quantity,
       requestedTimeWindow,
     };
-    
+
     matchingResult = matchOffers(allOffers, providers, criteria);
-    
+
     if (matchingResult.selectedOffer) {
       selectedOffer = matchingResult.selectedOffer.offer;
       selectedItemId = selectedOffer.item_id;
-      
+
       logger.info(`Matching algorithm selected offer: ${selectedOffer.id} with score ${matchingResult.selectedOffer.score.toFixed(3)}`, {
         transaction_id,
         breakdown: matchingResult.selectedOffer.breakdown,
       });
     } else {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: matchingResult.reason || 'No matching offers found',
         allOffers: matchingResult.allOffers.length,
       });
@@ -521,17 +521,17 @@ router.post('/api/select', async (req: Request, res: Response) => {
         if (selectedOffer) break;
       }
     }
-    
+
     // If not found in catalog, look up directly from database (for multi-purchase flow)
     if (!selectedOffer) {
       const dbOffer = await prisma.catalogOffer.findUnique({
         where: { id: offer_id },
-        include: { 
+        include: {
           item: true,
           provider: true,
         },
       });
-      
+
       if (dbOffer) {
         // Create a CatalogOffer-compatible object for the selection flow
         selectedOffer = {
@@ -550,18 +550,18 @@ router.post('/api/select', async (req: Request, res: Response) => {
           },
         };
         selectedItemId = dbOffer.itemId;
-        
+
         logger.info(`Offer ${offer_id} found in database for multi-purchase flow`, { transaction_id });
       }
     }
-    
+
     if (!selectedOffer) {
       return res.status(400).json({ error: `Offer ${offer_id} not found` });
     }
   } else {
     return res.status(400).json({ error: 'Either offer_id or autoMatch with requestedTimeWindow is required' });
   }
-  
+
   // Create context
   const context = createContext({
     action: 'select',
@@ -571,7 +571,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
     bpp_id: selectedOffer.provider_id,
     bpp_uri: config.bpp.uri,
   });
-  
+
   // Build select message
   const selectMessage: SelectMessage = {
     context,
@@ -583,22 +583,22 @@ router.post('/api/select', async (req: Request, res: Response) => {
       }],
     },
   };
-  
+
   logger.info('Sending select request', {
     transaction_id,
     message_id: context.message_id,
     action: 'select',
     offer_id: selectedOffer.id,
   });
-  
+
   await logEvent(transaction_id, context.message_id, 'select', 'OUTBOUND', JSON.stringify(selectMessage));
-  
+
   // Update state - store both the offer and the quantity the buyer wants
   await updateTransaction(transaction_id, { selectedOffer, selectedQuantity: quantity });
-  
+
   try {
     const response = await axios.post(`${config.urls.bpp}/select`, selectMessage);
-    
+
     res.json({
       status: 'ok',
       transaction_id,
@@ -627,15 +627,15 @@ router.post('/api/select', async (req: Request, res: Response) => {
  */
 router.post('/api/init', async (req: Request, res: Response) => {
   const { transaction_id } = req.body as { transaction_id: string };
-  
+
   const txState = await getTransaction(transaction_id);
-  
+
   if (!txState || !txState.selectedOffer) {
     return res.status(400).json({ error: 'No offer selected. Run select first.' });
   }
-  
+
   const offer = txState.selectedOffer;
-  
+
   // Create context
   const context = createContext({
     action: 'init',
@@ -645,10 +645,10 @@ router.post('/api/init', async (req: Request, res: Response) => {
     bpp_id: offer.provider_id,
     bpp_uri: config.bpp.uri,
   });
-  
+
   // Build init message - use the quantity from selected offer (set during select)
   const selectedQuantity = txState.selectedQuantity || offer.maxQuantity;
-  
+
   const initMessage: InitMessage = {
     context,
     message: {
@@ -662,18 +662,18 @@ router.post('/api/init', async (req: Request, res: Response) => {
       },
     },
   };
-  
+
   logger.info('Sending init request', {
     transaction_id,
     message_id: context.message_id,
     action: 'init',
   });
-  
+
   await logEvent(transaction_id, context.message_id, 'init', 'OUTBOUND', JSON.stringify(initMessage));
-  
+
   try {
     const response = await axios.post(`${config.urls.bpp}/init`, initMessage);
-    
+
     res.json({
       status: 'ok',
       transaction_id,
@@ -691,21 +691,21 @@ router.post('/api/init', async (req: Request, res: Response) => {
  */
 router.post('/api/confirm', async (req: Request, res: Response) => {
   const { transaction_id, order_id } = req.body as { transaction_id: string; order_id?: string };
-  
+
   const txState = await getTransaction(transaction_id);
-  
+
   if (!txState) {
     return res.status(400).json({ error: 'Transaction not found' });
   }
-  
+
   const orderId = order_id || txState.order?.id;
-  
+
   if (!orderId) {
     return res.status(400).json({ error: 'No order ID available. Run init first or provide order_id.' });
   }
-  
+
   const providerId = txState.selectedOffer?.provider_id || config.bpp.id;
-  
+
   // Create context
   const context = createContext({
     action: 'confirm',
@@ -715,7 +715,7 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     bpp_id: providerId,
     bpp_uri: config.bpp.uri,
   });
-  
+
   // Build confirm message
   const confirmMessage: ConfirmMessage = {
     context,
@@ -723,16 +723,16 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
       order: { id: orderId },
     },
   };
-  
+
   logger.info('Sending confirm request', {
     transaction_id,
     message_id: context.message_id,
     action: 'confirm',
     order_id: orderId,
   });
-  
+
   await logEvent(transaction_id, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
-  
+
   try {
     const response = await axios.post(`${config.urls.bpp}/confirm`, confirmMessage);
 
@@ -785,7 +785,7 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     } catch (error: any) {
       logger.warn(`Settlement initiation skipped: ${error.message}`, { transaction_id });
     }
-    
+
     res.json({
       status: 'ok',
       transaction_id,
@@ -804,16 +804,16 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
  */
 router.post('/api/status', async (req: Request, res: Response) => {
   const { transaction_id, order_id } = req.body as { transaction_id: string; order_id?: string };
-  
+
   const txState = await getTransaction(transaction_id);
-  
+
   if (!txState) {
     return res.status(400).json({ error: 'Transaction not found' });
   }
-  
+
   const orderId = order_id || txState.order?.id || '';
   const providerId = txState.selectedOffer?.provider_id || config.bpp.id;
-  
+
   // Create context
   const context = createContext({
     action: 'status',
@@ -823,7 +823,7 @@ router.post('/api/status', async (req: Request, res: Response) => {
     bpp_id: providerId,
     bpp_uri: config.bpp.uri,
   });
-  
+
   // Build status message
   const statusMessage: StatusMessage = {
     context,
@@ -831,18 +831,18 @@ router.post('/api/status', async (req: Request, res: Response) => {
       order_id: orderId,
     },
   };
-  
+
   logger.info('Sending status request', {
     transaction_id,
     message_id: context.message_id,
     action: 'status',
   });
-  
+
   await logEvent(transaction_id, context.message_id, 'status', 'OUTBOUND', JSON.stringify(statusMessage));
-  
+
   try {
     const response = await axios.post(`${config.urls.bpp}/status`, statusMessage);
-    
+
     res.json({
       status: 'ok',
       transaction_id,
@@ -869,10 +869,10 @@ router.get('/api/transactions', async (req: Request, res: Response) => {
 router.post('/api/transactions', optionalAuthMiddleware, async (req: Request, res: Response) => {
   const txnId = uuidv4();
   const buyerId = req.user?.id || null;
-  
+
   await createTransaction(txnId);
   await updateTransaction(txnId, { buyerId });
-  
+
   res.json({ transaction_id: txnId });
 });
 
@@ -881,11 +881,11 @@ router.post('/api/transactions', optionalAuthMiddleware, async (req: Request, re
  */
 router.get('/api/transactions/:id', async (req: Request, res: Response) => {
   const txState = await getTransaction(req.params.id);
-  
+
   if (!txState) {
     return res.status(404).json({ error: 'Transaction not found' });
   }
-  
+
   res.json(txState);
 });
 
@@ -1127,44 +1127,44 @@ router.post('/api/settlement/confirm-payout', async (req: Request, res: Response
  */
 router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
   const { tradeId, scenario } = req.body as { tradeId?: string; scenario?: 'SUCCESS' | 'FAIL' };
-  
+
   if (!tradeId) {
     return res.status(400).json({ error: 'tradeId is required' });
   }
-  
+
   const finalOutcome: SettlementOutcome = scenario === 'FAIL' ? 'FAIL' : 'SUCCESS';
-  
+
   const record = await getSettlementRecord(tradeId);
   if (!record) {
     return res.status(404).json({ error: 'Settlement record not found. Initiate settlement first.' });
   }
-  
+
   // If already in progress or completed, just return current state
   if (record.status === 'RELEASED' || record.status === 'REFUNDED') {
     return res.json({ status: 'ok', message: 'Settlement already completed', record });
   }
-  
+
   logger.info('=== [AUTO-RUN] Starting automated settlement simulation', { tradeId, scenario: finalOutcome });
-  
+
   // Respond immediately - processing happens async
   res.json({ status: 'ok', message: 'Auto-run started', tradeId, scenario: finalOutcome });
-  
+
   // Run the simulation in background
   (async () => {
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
     const genUtr = () => `UTR${Date.now()}${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
     const genPayout = () => `PAYOUT${Date.now()}${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
-    
+
     try {
       // Step 1-4: Escrow funding (3 seconds)
       // Transfer: Buyer -> Escrow (total = principal + fee)
       if (record.status === 'INITIATED') {
         logger.info('=== [AUTO-RUN STEP 2-4] Simulating buyer -> escrow transfer...', { tradeId, amount: record.total });
         await delay(3000);
-        
+
         // BALANCE TRANSFER: Buyer pays total (principal + fee) to Escrow
         transferMoney('buyer', 'escrow', record.total, 'Buyer → Escrow (funding)');
-        
+
         const fundedReceipt = genUtr();
         await updateSettlementRecord(tradeId, {
           status: 'FUNDED',
@@ -1173,7 +1173,7 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
         });
         logger.info('=== [AUTO-RUN STEP 2-4] Escrow funded', { tradeId, receipt: fundedReceipt, amount: record.total });
       }
-      
+
       // Step 5-6: Verification - wait longer so escrow balance is visible (5 seconds)
       logger.info('=== [AUTO-RUN STEP 5] Simulating trade verification (escrow holding funds)...', { tradeId, outcome: finalOutcome });
       await delay(5000);
@@ -1182,11 +1182,11 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
         verifiedAt: nowIso(),
       });
       logger.info('=== [AUTO-RUN STEP 5-6] Verification complete', { tradeId, outcome: finalOutcome });
-      
+
       // Step 7-9: Payout (3 seconds)
       logger.info('=== [AUTO-RUN STEP 7-9] Simulating escrow -> ' + (finalOutcome === 'SUCCESS' ? 'seller' : 'buyer refund') + '...', { tradeId });
       await delay(3000);
-      
+
       if (finalOutcome === 'SUCCESS') {
         // BALANCE TRANSFER: Escrow pays principal to Seller, fee stays as platform revenue
         transferMoney('escrow', 'seller', record.principal, 'Escrow → Seller (principal)');
@@ -1195,7 +1195,7 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
         // BALANCE TRANSFER: Escrow refunds total (principal + fee) to Buyer
         transferMoney('escrow', 'buyer', record.total, 'Escrow → Buyer (refund)');
       }
-      
+
       const payoutReceipt = genPayout();
       const newStatus: SettlementStatus = finalOutcome === 'SUCCESS' ? 'RELEASED' : 'REFUNDED';
       await updateSettlementRecord(tradeId, {
@@ -1204,7 +1204,7 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
         payoutAt: nowIso(),
       });
       logger.info('=== [AUTO-RUN COMPLETE] Settlement finished', { tradeId, status: newStatus, receipt: payoutReceipt });
-      
+
     } catch (error: any) {
       logger.error('=== [AUTO-RUN ERROR] Settlement simulation failed', { tradeId, error: error.message });
     }
@@ -1276,12 +1276,12 @@ router.post('/api/demo/accounts/reset', (req: Request, res: Response) => {
 router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
   // Reset in-memory transactions
   await clearAllTransactions();
-  
+
   // Reset demo accounts
   initializeDemoAccounts();
-  
+
   logger.info('=== DEMO RESET === All data cleared, accounts reset');
-  
+
   res.json({
     status: 'ok',
     message: 'Full demo reset complete',
@@ -1297,8 +1297,8 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
     const userId = req.user!.id;
 
     const orders = await (prisma.order as any).findMany({
-      where: {buyerId: userId},
-      orderBy: {createdAt: 'desc'},
+      where: { buyerId: userId },
+      orderBy: { createdAt: 'desc' },
       include: {
         provider: true,
         selectedOffer: {
@@ -1314,7 +1314,7 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
     const formattedOrders = await Promise.all(orders.map(async (order: any) => {
       let items: any[] = [];
       let quote: any = {};
-      
+
       try {
         items = JSON.parse(order.itemsJson || '[]');
       } catch {
@@ -1345,8 +1345,8 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
         const itemId = items[0]?.item_id || selectedOffer?.itemId;
         if (itemId) {
           const catalogItem = await prisma.catalogItem.findUnique({
-            where: {id: itemId},
-            select: {sourceType: true},
+            where: { id: itemId },
+            select: { sourceType: true },
           });
           sourceType = catalogItem?.sourceType || 'UNKNOWN';
         }
@@ -1355,7 +1355,7 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
       // Get delivery time window
       let deliveryStart = selectedOffer?.timeWindowStart;
       let deliveryEnd = selectedOffer?.timeWindowEnd;
-      
+
       // Fallback: try to get from itemsJson
       if (!deliveryStart && items.length > 0 && items[0].timeWindow) {
         deliveryStart = items[0].timeWindow.startTime ? new Date(items[0].timeWindow.startTime) : null;
@@ -1368,6 +1368,18 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
         orderBy: { createdAt: 'desc' },
       });
 
+      // Get DISCOM feedback for completed orders (shows delivery status)
+      const discomFeedback = await prisma.discomFeedback.findFirst({
+        where: { orderId: order.id },
+      });
+
+      // Get payment record for completed orders (shows payment breakdown)
+      const paymentRecord = order.status === 'COMPLETED'
+        ? await prisma.paymentRecord.findFirst({
+          where: { orderId: order.id, type: 'RELEASE' },
+        })
+        : null;
+
       return {
         id: order.id,
         transaction_id: order.transactionId,
@@ -1378,12 +1390,12 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
           price: quote.price,
           totalQuantity: totalQty,
         } :
-                             undefined,
+          undefined,
         provider: order.provider ? {
           id: order.provider.id,
           name: order.provider.name,
         } :
-                                   undefined,
+          undefined,
         itemInfo: {
           item_id: items[0]?.item_id || selectedOffer?.itemId || null,
           offer_id: items[0]?.offer_id || order.selectedOfferId || null,
@@ -1402,6 +1414,19 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
           penalty: order.cancelPenalty,
           refund: order.cancelRefund,
         } : undefined,
+        // DISCOM verification results (delivery status)
+        fulfillment: discomFeedback ? {
+          verified: true,
+          deliveredQty: discomFeedback.deliveredQty,
+          expectedQty: discomFeedback.expectedQty,
+          deliveryRatio: discomFeedback.deliveryRatio,
+          status: discomFeedback.status, // 'FULL' | 'PARTIAL' | 'FAILED'
+          trustImpact: discomFeedback.trustImpact,
+          verifiedAt: discomFeedback.verifiedAt.toISOString(),
+          // Payment breakdown for partial/failed deliveries
+          sellerPayment: paymentRecord?.sellerAmount ?? null,
+          discomPenalty: paymentRecord?.platformFee ?? null, // Goes to DISCOM for differential
+        } : null,
         // Trust impact from this order
         trustImpact: trustHistory ? {
           previousScore: trustHistory.previousScore,
@@ -1481,7 +1506,7 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
 
     // Get delivery start time from order items or selected offer
     let deliveryStartTime: Date | null = null;
-    
+
     if (order.selectedOffer?.timeWindowStart) {
       deliveryStartTime = order.selectedOffer.timeWindowStart;
     } else {
@@ -1518,11 +1543,11 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
     const energyCost = order.totalPrice || 0;
     const originalPlatformFee = Math.round(energyCost * 0.025 * 100) / 100; // 2.5% platform fee
     const totalPaid = energyCost + originalPlatformFee; // What buyer actually paid
-    
+
     const penaltyRate = 0.10; // 10% total penalty
     const sellerShare = 0.05; // 5% to seller
     const platformShare = 0.05; // 5% to platform
-    
+
     const totalPenalty = Math.round(totalPaid * penaltyRate * 100) / 100;
     const sellerCompensation = Math.round(totalPaid * sellerShare * 100) / 100;
     const platformPenaltyShare = Math.round(totalPaid * platformShare * 100) / 100;
@@ -1531,12 +1556,24 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
     // Get buyer and seller for balance updates
     const buyer = await prisma.user.findUnique({ where: { id: userId } });
     // Get seller via provider relation
-    const seller = order.providerId 
+    const seller = order.providerId
       ? await prisma.user.findFirst({ where: { providerId: order.providerId } })
       : null;
 
     if (!buyer) {
       return res.status(400).json({ error: 'Buyer not found' });
+    }
+
+    // Get block IDs BEFORE the transaction updates them (since orderId will be null after)
+    const blocksToRelease = await prisma.offerBlock.findMany({
+      where: { orderId: order_id },
+      select: { id: true, offerId: true },
+    });
+    const blockIdsByOffer = new Map<string, string[]>();
+    for (const block of blocksToRelease) {
+      const ids = blockIdsByOffer.get(block.offerId) || [];
+      ids.push(block.id);
+      blockIdsByOffer.set(block.offerId, ids);
     }
 
     // Use transaction for atomic updates
@@ -1617,14 +1654,65 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
     // Sync released blocks to CDS so they appear in discovery again
     try {
       const sharedConfig = (await import('@p2p/shared')).config;
-      const items = JSON.parse(order.itemsJson || '[]');
-      if (items.length > 0 && items[0].offer_id) {
-        await axios.post(`${sharedConfig.urls.cds}/sync/blocks`, {
-          offer_id: items[0].offer_id,
-          status: 'AVAILABLE',
-          count: items[0].quantity || order.totalQty || 0,
+      // Sync each offer's blocks back to AVAILABLE
+      for (const [offerId, blockIds] of blockIdsByOffer) {
+        logger.info(`===DEBUG=== Syncing ${blockIds.length} blocks to CDS`, {
+          offer_id: offerId,
+          block_ids: blockIds.slice(0, 5), // Log first 5 for brevity
+          total_blocks: blockIds.length,
         });
-        logger.info(`Synced released blocks to CDS for offer ${items[0].offer_id}`);
+        
+        await axios.post(`${sharedConfig.urls.cds}/sync/blocks`, {
+          offer_id: offerId,
+          block_ids: blockIds,
+          status: 'AVAILABLE',
+          order_id: null,
+          transaction_id: null,
+        });
+        logger.info(`===DEBUG=== Successfully synced ${blockIds.length} released blocks to CDS for offer ${offerId}`);
+        
+        // Verify blocks were updated
+        const verifyBlocks = await prisma.offerBlock.count({
+          where: { offerId, status: 'AVAILABLE' },
+        });
+        logger.info(`===DEBUG=== Offer ${offerId} now has ${verifyBlocks} AVAILABLE blocks in database`);
+
+        // IMPORTANT: Also restore the CatalogItem's availableQty
+        // When the order was confirmed, the item qty was reduced. Now we need to add it back.
+        const offer = await prisma.catalogOffer.findUnique({
+          where: { id: offerId },
+          select: { itemId: true, providerId: true },
+        });
+        
+        if (offer) {
+          const item = await prisma.catalogItem.findUnique({
+            where: { id: offer.itemId },
+          });
+          
+          if (item) {
+            const restoredQty = blockIds.length;
+            const newQty = item.availableQty + restoredQty;
+            
+            await prisma.catalogItem.update({
+              where: { id: offer.itemId },
+              data: { availableQty: newQty },
+            });
+            
+            logger.info(`===DEBUG=== Restored item ${offer.itemId} quantity: ${item.availableQty} → ${newQty} kWh`);
+            
+            // Sync the updated item to CDS
+            await axios.post(`${sharedConfig.urls.cds}/sync/item`, {
+              id: item.id,
+              provider_id: item.providerId,
+              source_type: item.sourceType,
+              delivery_mode: item.deliveryMode,
+              available_qty: newQty,
+              production_windows: JSON.parse(item.productionWindowsJson || '[]'),
+              meter_id: item.meterId,
+            });
+            logger.info(`===DEBUG=== Synced restored item quantity to CDS for item ${offer.itemId}`);
+          }
+        }
       }
     } catch (syncError: any) {
       logger.error(`Failed to sync released blocks to CDS: ${syncError.message}`);

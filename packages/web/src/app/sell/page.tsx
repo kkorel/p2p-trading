@@ -352,14 +352,34 @@ export default function SellPage() {
                         </p>
                       </div>
                     </div>
-                    {order.quote && (
-                      <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--color-border)]">
-                        <span className="text-sm text-[var(--color-text-muted)]">Total</span>
-                        <span className="text-base font-semibold text-[var(--color-success)]">
-                          {formatCurrency(order.quote.price.value)}
-                        </span>
-                      </div>
-                    )}
+                    {/* Payment Info - Differs by status */}
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--color-border)]">
+                      {order.status === 'CANCELLED' && (order as any).cancellation ? (
+                        // Cancelled - show compensation
+                        <>
+                          <span className="text-sm text-[var(--color-text-muted)]">Compensation (5%)</span>
+                          <span className="text-base font-semibold text-[var(--color-success)]">
+                            +{formatCurrency((order as any).cancellation.compensation || 0)}
+                          </span>
+                        </>
+                      ) : (order as any).paymentStatus === 'RELEASED' ? (
+                        // Payment released after delivery
+                        <>
+                          <span className="text-sm text-[var(--color-text-muted)]">Received</span>
+                          <span className="text-base font-semibold text-[var(--color-success)]">
+                            +{formatCurrency(order.quote?.price?.value || 0)}
+                          </span>
+                        </>
+                      ) : order.quote ? (
+                        // Payment in escrow
+                        <>
+                          <span className="text-sm text-[var(--color-text-muted)]">In Escrow</span>
+                          <span className="text-base font-semibold text-[var(--color-warning)]">
+                            {formatCurrency(order.quote.price.value)}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
                     
                     {/* Fulfillment Status (DISCOM Verification) */}
                     {order.fulfillment && (

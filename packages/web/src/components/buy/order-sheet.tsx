@@ -291,18 +291,22 @@ export function OrderSheet({
           <div className="w-16 h-16 bg-[var(--color-danger-light)] rounded-full flex items-center justify-center mb-4">
             <AlertCircle className="h-8 w-8 text-[var(--color-danger)]" />
           </div>
-          <p className="text-lg font-semibold text-[var(--color-text)] mb-1">Payment Failed</p>
+          <p className="text-lg font-semibold text-[var(--color-text)] mb-1">
+            {error?.toLowerCase().includes('trust score') ? 'Trust Score Too Low' : 'Order Failed'}
+          </p>
           <p className="text-sm text-[var(--color-text-muted)] text-center mb-6 max-w-[280px]">
             {error || 'Something went wrong. Please try again.'}
           </p>
 
           <div className="flex gap-3 w-full">
             <Button fullWidth variant="secondary" onClick={handleClose}>
-              Cancel
+              Close
             </Button>
-            <Button fullWidth onClick={() => setStep('quantity')}>
-              Try Again
-            </Button>
+            {!error?.toLowerCase().includes('trust score') && (
+              <Button fullWidth onClick={() => setStep('quantity')}>
+                Try Again
+              </Button>
+            )}
           </div>
         </div>
       )}

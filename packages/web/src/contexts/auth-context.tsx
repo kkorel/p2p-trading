@@ -18,6 +18,7 @@ interface AuthContextType {
   login: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -83,6 +84,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updatedUser);
   };
 
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    try {
+      const { user } = await authApi.getMe();
+      setUser(user);
+    } catch (error) {
+      // Ignore refresh errors
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -92,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         updateUser,
+        refreshUser,
       }}
     >
       {children}

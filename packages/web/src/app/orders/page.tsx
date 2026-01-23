@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ShoppingBag, Sun, Wind, Droplets, Package, ArrowDownLeft, ArrowUpRight, X, Clock } from 'lucide-react';
+import { ShoppingBag, Sun, Wind, Droplets, Package, ArrowDownLeft, ArrowUpRight, X, Clock, Zap, AlertTriangle } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { Card, Badge, EmptyState, SkeletonList, Button, useToast, useConfirm } from '@/components/ui';
 import { buyerApi, sellerApi, ApiError } from '@/lib/api';
@@ -47,10 +47,22 @@ interface UnifiedOrder {
     change: number;
     reason: string;
   };
+  // DISCOM verification / delivery status
+  fulfillment?: {
+    verified: boolean;
+    deliveredQty: number;
+    expectedQty: number;
+    deliveryRatio: number;
+    status: 'FULL' | 'PARTIAL' | 'FAILED';
+    trustImpact: number;
+    verifiedAt: string;
+    sellerPayment?: number;
+    discomPenalty?: number;
+  };
 }
 
 export default function OrdersPage() {
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user, refreshUser } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +103,7 @@ export default function OrdersPage() {
             } : undefined,
             cancellation: o.cancellation,
             trustImpact: o.trustImpact,
+            fulfillment: o.fulfillment,
           });
         }
       } catch (err) {
@@ -131,6 +144,7 @@ export default function OrdersPage() {
                   change: o.fulfillment.trustImpact || 0,
                   reason: 'DELIVERY',
                 } : undefined,
+                fulfillment: o.fulfillment,
               });
             }
           }
@@ -183,7 +197,7 @@ export default function OrdersPage() {
       cancelText: 'Keep Order',
       variant: 'danger',
     });
-    
+
     if (!confirmed) return;
 
     setCancellingOrderId(order.id);
@@ -193,7 +207,7 @@ export default function OrdersPage() {
         order_id: order.id,
         reason: 'User requested cancellation',
       });
-      
+
       // Show success toast with financial details
       const financials = (result as any).financials;
       if (financials) {
@@ -210,9 +224,9 @@ export default function OrdersPage() {
           message: 'Your order has been cancelled successfully.',
         });
       }
-      
-      // Reload orders
-      await loadOrders();
+
+      // Reload orders and refresh user balance
+      await Promise.all([loadOrders(), refreshUser()]);
     } catch (err: any) {
       showToast({
         type: 'error',
@@ -439,25 +453,69 @@ export default function OrdersPage() {
                     )}
                   </div>
 
+                  {/* Delivery Status for completed orders */}
+                  {order.fulfillment && (
+                    <div className={`mt-2 p-3 rounded-lg ${order.fulfillment.status === 'FULL'
+                        ? 'bg-[var(--color-success-light)]'
+                        : order.fulfillment.status === 'PARTIAL'
+                          ? 'bg-[var(--color-warning-light)]'
+                          : 'bg-[var(--color-danger-light)]'
+                      }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {order.fulfillment.status === 'FULL' ? (
+                          <Zap className="w-4 h-4 text-[var(--color-success)]" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-[var(--color-warning)]" />
+                        )}
+                        <span className={`text-sm font-medium ${order.fulfillment.status === 'FULL'
+                            ? 'text-[var(--color-success)]'
+                            : order.fulfillment.status === 'PARTIAL'
+                              ? 'text-[var(--color-warning)]'
+                              : 'text-[var(--color-danger)]'
+                          }`}>
+                          {order.fulfillment.status === 'FULL'
+                            ? 'Full Delivery'
+                            : order.fulfillment.status === 'PARTIAL'
+                              ? `Partial Delivery (${Math.round(order.fulfillment.deliveryRatio * 100)}%)`
+                              : 'Delivery Failed'}
+                        </span>
+                      </div>
+                      <div className="text-xs space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-[var(--color-text-muted)]">Delivered</span>
+                          <span className="text-[var(--color-text)]">
+                            {order.fulfillment.deliveredQty}/{order.fulfillment.expectedQty} kWh
+                          </span>
+                        </div>
+                        {order.fulfillment.status !== 'FULL' && order.fulfillment.discomPenalty && order.fulfillment.discomPenalty > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-[var(--color-text-muted)]">DISCOM covered shortfall</span>
+                            <span className="text-[var(--color-danger)]">
+                              {formatCurrency(order.fulfillment.discomPenalty)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Trust Impact */}
                   {order.trustImpact && order.trustImpact.change !== 0 && (
-                    <div className={`mt-2 p-2 rounded-lg ${
-                      order.trustImpact.change > 0 
-                        ? 'bg-[var(--color-success-light)]' 
-                        : 'bg-[var(--color-danger-light)]'
-                    }`}>
+                    <div className={`mt-2 p-2 rounded-lg ${order.trustImpact.change > 0
+                      ? 'bg-[var(--color-success-light)]'
+                      : 'bg-[var(--color-danger-light)]'
+                      }`}>
                       <div className="flex justify-between items-center text-xs">
-                        <span className={order.trustImpact.change > 0 
-                          ? 'text-[var(--color-success)]' 
+                        <span className={order.trustImpact.change > 0
+                          ? 'text-[var(--color-success)]'
                           : 'text-[var(--color-danger)]'
                         }>
                           Trust Score Impact
                         </span>
-                        <span className={`font-semibold ${
-                          order.trustImpact.change > 0 
-                            ? 'text-[var(--color-success)]' 
-                            : 'text-[var(--color-danger)]'
-                        }`}>
+                        <span className={`font-semibold ${order.trustImpact.change > 0
+                          ? 'text-[var(--color-success)]'
+                          : 'text-[var(--color-danger)]'
+                          }`}>
                           {order.trustImpact.change > 0 ? '+' : ''}{(order.trustImpact.change * 100).toFixed(1)}%
                         </span>
                       </div>
@@ -469,16 +527,16 @@ export default function OrdersPage() {
                     if (!isBought || (order.status !== 'ACTIVE' && order.status !== 'PENDING')) {
                       return null;
                     }
-                    
+
                     // Check if we're at least 30 min before delivery start
                     const deliveryStart = order.deliveryTime?.start ? new Date(order.deliveryTime.start) : null;
                     const now = new Date();
                     const minCancelBuffer = 30 * 60 * 1000; // 30 minutes
                     const canCancel = !deliveryStart || (deliveryStart.getTime() - now.getTime() >= minCancelBuffer);
-                    const minutesRemaining = deliveryStart 
+                    const minutesRemaining = deliveryStart
                       ? Math.max(0, Math.floor((deliveryStart.getTime() - now.getTime()) / 60000))
                       : null;
-                    
+
                     if (!canCancel) {
                       return (
                         <div className="mt-3 p-2 bg-[var(--color-warning-light)] rounded-lg">
@@ -488,7 +546,7 @@ export default function OrdersPage() {
                         </div>
                       );
                     }
-                    
+
                     return (
                       <div className="mt-3">
                         <Button
