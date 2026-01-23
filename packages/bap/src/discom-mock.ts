@@ -56,9 +56,50 @@ function getTimeWindowEnd(order: any): Date | null {
 }
 
 /**
+ * Recover stuck DRAFT orders that have payment escrowed
+ * These are orders where the confirm callback didn't complete properly
+ */
+async function recoverStuckDraftOrders() {
+    // Find ALL DRAFT orders (they shouldn't exist - orders should be PENDING/ACTIVE)
+    const allDraftOrders = await prisma.order.findMany({
+        where: { status: 'DRAFT' },
+        select: { id: true, paymentStatus: true, escrowedAt: true, totalPrice: true },
+    });
+
+    if (allDraftOrders.length > 0) {
+        logger.info(`Found ${allDraftOrders.length} DRAFT orders - checking for recovery`, {
+            orders: allDraftOrders.map(o => ({ 
+                id: o.id.substring(0, 8), 
+                paymentStatus: o.paymentStatus,
+                hasEscrow: !!o.escrowedAt,
+                total: o.totalPrice,
+            })),
+        });
+        
+        for (const order of allDraftOrders) {
+            // Recover if payment was taken OR if order has a price (was quoted)
+            if (order.escrowedAt || order.paymentStatus === 'ESCROWED' || (order.totalPrice && order.totalPrice > 0)) {
+                try {
+                    await prisma.order.update({
+                        where: { id: order.id },
+                        data: { status: 'ACTIVE' },
+                    });
+                    logger.info(`Recovered order ${order.id.substring(0, 8)} from DRAFT to ACTIVE`);
+                } catch (e: any) {
+                    logger.error(`Failed to recover order ${order.id.substring(0, 8)}: ${e.message}`);
+                }
+            }
+        }
+    }
+}
+
+/**
  * Find orders that have completed their time window and haven't been verified
  */
 async function findOrdersPastTimeWindow() {
+    // First recover any stuck DRAFT orders
+    await recoverStuckDraftOrders();
+    
     const now = new Date();
 
     // Get ACTIVE orders that haven't been DISCOM verified yet

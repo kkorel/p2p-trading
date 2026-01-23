@@ -983,11 +983,32 @@ router.get('/seller/my-profile', authMiddleware, async (req: Request, res: Respo
       return { ...offer, blockStats, source_type };
     }));
 
+    // Calculate quota stats for the seller
+    // Total SOLD = orders that are PENDING, ACTIVE, or COMPLETED (excludes CANCELLED)
+    const soldOrders = await prisma.order.findMany({
+      where: {
+        providerId: providerId,
+        status: { in: ['PENDING', 'ACTIVE', 'COMPLETED'] },
+      },
+      select: { totalQty: true },
+    });
+    const totalSoldQty = soldOrders.reduce((sum, order) => sum + (order.totalQty || 0), 0);
+
+    // Total unsold in active offers
+    const totalUnsoldInOffers = offersWithStats.reduce((sum, offer) => {
+      return sum + (offer.blockStats?.available ?? 0);
+    }, 0);
+
     res.json({
       success: true,
       provider,
       items,
-      offers: offersWithStats
+      offers: offersWithStats,
+      quotaStats: {
+        totalSold: totalSoldQty,
+        totalUnsoldInOffers: totalUnsoldInOffers,
+        totalCommitted: totalSoldQty + totalUnsoldInOffers,
+      },
     });
   } catch (error: any) {
     logger.error('Failed to get seller profile:', error);
@@ -1330,28 +1351,40 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
   // Calculate trade limit
   const tradeLimit = (user.productionCapacity * (user.allowedTradeLimit ?? 10)) / 100;
 
-  // Get total offered quantity across all offers
-  // Trade limit = how much you can OFFER in total (not what's available or delivered)
-  // If you created offers for 100 + 30 = 130 kWh, you've offered 130 kWh
-  const existingOffers = await prisma.catalogOffer.findMany({
+  // Get total SOLD quantity from orders (not offers)
+  // Once energy is sold, it counts towards quota permanently - even if offer is deleted
+  // This includes: PENDING (escrowed), ACTIVE (awaiting delivery), COMPLETED orders
+  // Excludes: CANCELLED orders (those were refunded)
+  const soldOrders = await prisma.order.findMany({
+    where: {
+      providerId: provider_id,
+      status: { in: ['PENDING', 'ACTIVE', 'COMPLETED'] },
+    },
+    select: { totalQty: true },
+  });
+
+  const totalSoldQty = soldOrders.reduce((sum, order) => sum + (order.totalQty || 0), 0);
+
+  // Also count currently active offers (unsold blocks that are reserved)
+  const activeOffers = await prisma.catalogOffer.findMany({
     where: { providerId: provider_id },
     include: {
-      _count: {
-        select: { blocks: true }, // Count all blocks (total offer amount)
+      blocks: {
+        where: { status: 'AVAILABLE' }, // Only unsold blocks
       },
     },
   });
 
-  const totalOfferedQty = existingOffers.reduce((sum, offer) => {
-    return sum + offer._count.blocks;
-  }, 0);
+  const totalUnsoldInOffers = activeOffers.reduce((sum, offer) => sum + offer.blocks.length, 0);
 
-  const remainingCapacity = tradeLimit - totalOfferedQty;
+  // Total committed = sold + unsold in active offers
+  const totalCommitted = totalSoldQty + totalUnsoldInOffers;
+  const remainingCapacity = tradeLimit - totalCommitted;
 
   // Check if new offer quantity exceeds remaining capacity
   if (max_qty > remainingCapacity) {
     return res.status(400).json({
-      error: `Offer quantity (${max_qty} kWh) exceeds your remaining capacity (${remainingCapacity.toFixed(1)} kWh). You have ${totalOfferedQty.toFixed(1)} kWh already offered out of ${tradeLimit.toFixed(1)} kWh limit.`
+      error: `Offer quantity (${max_qty} kWh) exceeds your remaining capacity (${remainingCapacity.toFixed(1)} kWh). You have ${totalSoldQty.toFixed(1)} kWh sold + ${totalUnsoldInOffers.toFixed(1)} kWh in active offers = ${totalCommitted.toFixed(1)} kWh committed out of ${tradeLimit.toFixed(1)} kWh limit.`
     });
   }
 

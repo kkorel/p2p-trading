@@ -368,7 +368,7 @@ export default function OrdersPage() {
                       <div>
                         <p className="text-xs text-[var(--color-text-muted)]">Delivery Time</p>
                         <p className="text-sm font-medium text-[var(--color-text)]">
-                          {formatTime(order.deliveryTime.start)}
+                          {formatDateTime(order.deliveryTime.start)}
                           {order.deliveryTime.end && ` - ${formatTime(order.deliveryTime.end)}`}
                         </p>
                       </div>

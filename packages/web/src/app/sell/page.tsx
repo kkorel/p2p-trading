@@ -5,7 +5,7 @@ import { Plus, Package, Tag, ShoppingBag, Sun, Wind, Droplets, Trash2, Clock, Al
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/app-shell';
 import { AddOfferSheet } from '@/components/sell/add-offer-sheet';
-import { Card, Button, Badge, EmptyState, SkeletonList, useToast } from '@/components/ui';
+import { Card, Button, Badge, EmptyState, SkeletonList, useToast, useConfirm } from '@/components/ui';
 import { sellerApi, type Offer, type Order, type Provider } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatTime, formatDateTime, truncateId, cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ type Tab = 'offers' | 'orders';
 export default function SellPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<Tab>('offers');
   const [isLoading, setIsLoading] = useState(true);
   const [provider, setProvider] = useState<Provider | null>(null);
@@ -28,6 +29,11 @@ export default function SellPage() {
   const [orders, setOrders] = useState<Order[]>([]);
 
   const [showAddOffer, setShowAddOffer] = useState(false);
+  const [quotaStats, setQuotaStats] = useState<{
+    totalSold: number;
+    totalUnsoldInOffers: number;
+    totalCommitted: number;
+  } | null>(null);
 
   // Check if user has set production capacity
   const hasProductionCapacity = user?.productionCapacity && user.productionCapacity > 0;
@@ -37,17 +43,14 @@ export default function SellPage() {
     ? (user.productionCapacity! * (user.allowedTradeLimit ?? 10)) / 100 
     : 0;
 
-  // Calculate total offered quantity across all offers
-  // Trade limit = how much you can OFFER in total (not what's available or delivered)
-  // If you created offers for 100 + 30 = 130 kWh, you've offered 130 kWh
-  const totalOfferedQty = offers.reduce((sum, offer) => {
-    // Use total blocks (the full offer amount)
-    const offeredQty = offer.blockStats?.total ?? offer.maxQuantity;
-    return sum + offeredQty;
-  }, 0);
+  // Use quota stats from backend (tracks sold orders permanently)
+  // totalCommitted = sold (from orders) + unsold (in active offers)
+  const totalCommitted = quotaStats?.totalCommitted ?? 0;
+  const totalSold = quotaStats?.totalSold ?? 0;
+  const totalUnsoldInOffers = quotaStats?.totalUnsoldInOffers ?? 0;
 
   // Remaining capacity
-  const remainingCapacity = Math.max(0, tradeLimit - totalOfferedQty);
+  const remainingCapacity = Math.max(0, tradeLimit - totalCommitted);
 
   const handleCreateOffer = () => {
     if (!hasProductionCapacity) {
@@ -80,6 +83,9 @@ export default function SellPage() {
       setProvider(profileData.provider);
       setOffers(profileData.offers);
       setOrders(ordersData.orders);
+      if (profileData.quotaStats) {
+        setQuotaStats(profileData.quotaStats);
+      }
     } catch (error) {
       console.error('Failed to load seller data:', error);
     } finally {
@@ -110,9 +116,23 @@ export default function SellPage() {
   };
 
   const handleDeleteOffer = async (offerId: string) => {
-    if (!confirm('Delete this offer?')) return;
-    await sellerApi.deleteOffer(offerId);
-    await loadData();
+    const confirmed = await confirm({
+      title: 'Delete Offer?',
+      message: 'Are you sure you want to delete this offer? This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Keep',
+      variant: 'danger',
+    });
+    
+    if (!confirmed) return;
+    
+    try {
+      await sellerApi.deleteOffer(offerId);
+      await loadData();
+      showToast({ type: 'success', title: 'Offer deleted successfully' });
+    } catch (error: any) {
+      showToast({ type: 'error', title: error.message || 'Failed to delete offer' });
+    }
   };
 
   const tabs: { id: Tab; label: string; count: number }[] = [
@@ -211,14 +231,24 @@ export default function SellPage() {
               <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[var(--color-primary)] rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (totalOfferedQty / tradeLimit) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (totalCommitted / tradeLimit) * 100)}%` }}
                 />
               </div>
               
               {/* Breakdown */}
-              <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
-                <span>Total offered: {totalOfferedQty.toFixed(1)} kWh</span>
-                <span>Limit: {tradeLimit.toFixed(1)} kWh</span>
+              <div className="flex flex-col gap-1 text-xs text-[var(--color-text-muted)]">
+                <div className="flex justify-between">
+                  <span>Sold (from orders):</span>
+                  <span>{totalSold.toFixed(1)} kWh</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Unsold in offers:</span>
+                  <span>{totalUnsoldInOffers.toFixed(1)} kWh</span>
+                </div>
+                <div className="flex justify-between font-medium text-[var(--color-text)]">
+                  <span>Total committed:</span>
+                  <span>{totalCommitted.toFixed(1)} / {tradeLimit.toFixed(1)} kWh</span>
+                </div>
               </div>
               
               <p className="text-xs text-[var(--color-text-muted)] pt-1 border-t border-[var(--color-border)]">
@@ -276,7 +306,7 @@ export default function SellPage() {
                       <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] mb-2">
                         <Clock className="h-3.5 w-3.5" />
                         <span>
-                          {formatTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
+                          {formatDateTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
                         </span>
                       </div>
                       {offer.blockStats && (
@@ -352,6 +382,17 @@ export default function SellPage() {
                         </p>
                       </div>
                     </div>
+                    
+                    {/* Delivery Time */}
+                    {(order as any).deliveryTime && (
+                      <div className="flex items-center gap-2 mt-2 p-2 bg-[var(--color-surface)] rounded-lg">
+                        <Clock className="h-4 w-4 text-[var(--color-text-muted)]" />
+                        <span className="text-xs text-[var(--color-text-muted)]">
+                          Delivery: {formatDateTime((order as any).deliveryTime.start)}
+                          {(order as any).deliveryTime.end && ` - ${formatTime((order as any).deliveryTime.end)}`}
+                        </span>
+                      </div>
+                    )}
                     {/* Payment Info - Differs by status */}
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--color-border)]">
                       {order.status === 'CANCELLED' && (order as any).cancellation ? (
