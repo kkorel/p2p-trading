@@ -127,6 +127,11 @@ export const buyerApi = {
       body: JSON.stringify(params),
     }),
 
+  createTransaction: () =>
+    request<{ transaction_id: string }>('/api/transactions', {
+      method: 'POST',
+    }),
+
   getTransaction: (transactionId: string) =>
     request<TransactionState>(`/api/transactions/${transactionId}`),
 
@@ -297,7 +302,13 @@ export interface Offer {
   price: { value: number; currency: string };
   maxQuantity: number;
   timeWindow: { startTime: string; endTime: string };
-  blockStats?: { total: number; available: number };
+  blockStats?: { 
+    total: number; 
+    available: number; 
+    sold?: number;
+    delivered?: number;
+    activeCommitment?: number; // What counts against trade limit
+  };
 }
 
 export interface Order {
@@ -312,6 +323,16 @@ export interface Order {
     source_type?: string;
     price_per_kwh?: number;
   };
+  // DISCOM fulfillment verification
+  fulfillment?: {
+    verified: boolean;
+    deliveredQty: number;
+    expectedQty: number;
+    deliveryRatio: number;
+    status: 'FULL' | 'PARTIAL' | 'FAILED';
+    trustImpact: number;
+    verifiedAt: string;
+  } | null;
 }
 
 export interface BuyerOrder {

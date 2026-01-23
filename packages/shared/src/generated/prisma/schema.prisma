@@ -49,6 +49,9 @@ model User {
   // Trust history
   trustHistory   TrustScoreHistory[]
   discomFeedback DiscomFeedback[]
+  // Payment records
+  buyerPayments  PaymentRecord[]     @relation("BuyerPayments")
+  sellerPayments PaymentRecord[]     @relation("SellerPayments")
 
   @@index([email])
   @@index([googleId])
@@ -184,21 +187,30 @@ model Order {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   // Cancellation tracking
-  cancelledAt  DateTime? @map("cancelled_at")
-  cancelledBy  String?   @map("cancelled_by") // 'BUYER' | 'SELLER' | 'SYSTEM'
-  cancelReason String?   @map("cancel_reason")
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledBy   String?   @map("cancelled_by") // 'BUYER' | 'SELLER' | 'SYSTEM'
+  cancelReason  String?   @map("cancel_reason")
+  cancelPenalty Float?    @map("cancel_penalty") // Total penalty amount
+  cancelRefund  Float?    @map("cancel_refund") // Amount refunded to buyer
+
+  // Payment tracking (escrow)
+  paymentStatus String    @default("PENDING") @map("payment_status") // PENDING | ESCROWED | RELEASED | REFUNDED
+  escrowedAt    DateTime? @map("escrowed_at")
+  releasedAt    DateTime? @map("released_at")
 
   // DISCOM verification
   discomVerified Boolean @default(false) @map("discom_verified")
 
-  provider      Provider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  selectedOffer CatalogOffer? @relation(fields: [selectedOfferId], references: [id], onDelete: SetNull)
-  buyer         User?         @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  provider      Provider?       @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  selectedOffer CatalogOffer?   @relation(fields: [selectedOfferId], references: [id], onDelete: SetNull)
+  buyer         User?           @relation(fields: [buyerId], references: [id], onDelete: SetNull)
   blocks        OfferBlock[]
+  payments      PaymentRecord[]
 
   @@index([providerId])
   @@index([buyerId])
   @@index([status])
+  @@index([paymentStatus])
   @@map("orders")
 }
 
@@ -288,4 +300,35 @@ model DiscomFeedback {
   @@index([sellerId])
   @@index([orderId])
   @@map("discom_feedback")
+}
+
+// Payment records for tracking money flow
+model PaymentRecord {
+  id       String  @id @default(uuid())
+  type     String // 'ESCROW' | 'RELEASE' | 'CANCEL_PENALTY' | 'REFUND'
+  orderId  String  @map("order_id")
+  buyerId  String? @map("buyer_id")
+  sellerId String? @map("seller_id")
+
+  // Amounts
+  totalAmount  Float  @map("total_amount") // Original order amount
+  buyerRefund  Float? @map("buyer_refund") // Amount returned to buyer
+  sellerAmount Float? @map("seller_amount") // Amount paid to seller
+  platformFee  Float? @map("platform_fee") // Platform's share
+
+  // Status
+  status      String    @default("PENDING") // PENDING | COMPLETED | FAILED
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyer  User? @relation("BuyerPayments", fields: [buyerId], references: [id], onDelete: SetNull)
+  seller User? @relation("SellerPayments", fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([type])
+  @@map("payment_records")
 }

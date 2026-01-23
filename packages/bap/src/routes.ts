@@ -453,8 +453,8 @@ router.post('/api/select', async (req: Request, res: Response) => {
   
   const txState = await getTransaction(transaction_id);
   
-  if (!txState || !txState.catalog) {
-    return res.status(400).json({ error: 'No catalog found for transaction. Run discover first.' });
+  if (!txState) {
+    return res.status(400).json({ error: 'Transaction not found.' });
   }
   
   let selectedOffer: CatalogOffer | undefined;
@@ -505,23 +505,58 @@ router.post('/api/select', async (req: Request, res: Response) => {
       });
     }
   } else if (offer_id) {
-    // Manual offer selection
-    for (const providerCatalog of txState.catalog.providers) {
-      for (const item of providerCatalog.items) {
-        for (const offer of item.offers) {
-          if (offer.id === offer_id) {
-            selectedOffer = offer;
-            selectedItemId = item.id;
-            break;
+    // Manual offer selection - first try catalog, then fallback to database
+    if (txState.catalog) {
+      for (const providerCatalog of txState.catalog.providers) {
+        for (const item of providerCatalog.items) {
+          for (const offer of item.offers) {
+            if (offer.id === offer_id) {
+              selectedOffer = offer;
+              selectedItemId = item.id;
+              break;
+            }
           }
+          if (selectedOffer) break;
         }
         if (selectedOffer) break;
       }
-      if (selectedOffer) break;
+    }
+    
+    // If not found in catalog, look up directly from database (for multi-purchase flow)
+    if (!selectedOffer) {
+      const dbOffer = await prisma.catalogOffer.findUnique({
+        where: { id: offer_id },
+        include: { 
+          item: true,
+          provider: true,
+        },
+      });
+      
+      if (dbOffer) {
+        // Create a CatalogOffer-compatible object for the selection flow
+        selectedOffer = {
+          id: dbOffer.id,
+          item_id: dbOffer.itemId,
+          provider_id: dbOffer.providerId,
+          price: { value: dbOffer.priceValue, currency: dbOffer.currency },
+          maxQuantity: dbOffer.maxQty,
+          timeWindow: {
+            startTime: dbOffer.timeWindowStart.toISOString(),
+            endTime: dbOffer.timeWindowEnd.toISOString(),
+          },
+          offerAttributes: {
+            pricingModel: dbOffer.pricingModel as any,
+            settlementType: dbOffer.settlementType as any,
+          },
+        };
+        selectedItemId = dbOffer.itemId;
+        
+        logger.info(`Offer ${offer_id} found in database for multi-purchase flow`, { transaction_id });
+      }
     }
     
     if (!selectedOffer) {
-      return res.status(400).json({ error: `Offer ${offer_id} not found in catalog` });
+      return res.status(400).json({ error: `Offer ${offer_id} not found` });
     }
   } else {
     return res.status(400).json({ error: 'Either offer_id or autoMatch with requestedTimeWindow is required' });
@@ -826,6 +861,19 @@ router.post('/api/status', async (req: Request, res: Response) => {
 router.get('/api/transactions', async (req: Request, res: Response) => {
   const transactions = await getAllTransactions();
   res.json({ transactions });
+});
+
+/**
+ * POST /api/transactions - Create a new transaction (for multi-purchase flow)
+ */
+router.post('/api/transactions', optionalAuthMiddleware, async (req: Request, res: Response) => {
+  const txnId = uuidv4();
+  const buyerId = req.user?.id || null;
+  
+  await createTransaction(txnId);
+  await updateTransaction(txnId, { buyerId });
+  
+  res.json({ transaction_id: txnId });
 });
 
 /**
@@ -1304,9 +1352,27 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
         }
       }
 
+      // Get delivery time window
+      let deliveryStart = selectedOffer?.timeWindowStart;
+      let deliveryEnd = selectedOffer?.timeWindowEnd;
+      
+      // Fallback: try to get from itemsJson
+      if (!deliveryStart && items.length > 0 && items[0].timeWindow) {
+        deliveryStart = items[0].timeWindow.startTime ? new Date(items[0].timeWindow.startTime) : null;
+        deliveryEnd = items[0].timeWindow.endTime ? new Date(items[0].timeWindow.endTime) : null;
+      }
+
+      // Get trust history for this order (to show trust impact)
+      const trustHistory = await prisma.trustScoreHistory.findFirst({
+        where: { orderId: order.id, userId },
+        orderBy: { createdAt: 'desc' },
+      });
+
       return {
         id: order.id,
+        transaction_id: order.transactionId,
         status: order.status,
+        paymentStatus: order.paymentStatus || 'PENDING',
         created_at: order.createdAt.toISOString(),
         quote: quote.price ? {
           price: quote.price,
@@ -1325,6 +1391,24 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
           price_per_kwh: pricePerKwh,
           quantity: totalQty,
         },
+        deliveryTime: deliveryStart ? {
+          start: deliveryStart instanceof Date ? deliveryStart.toISOString() : deliveryStart,
+          end: deliveryEnd instanceof Date ? deliveryEnd.toISOString() : deliveryEnd,
+        } : undefined,
+        // Cancellation info
+        cancellation: order.status === 'CANCELLED' ? {
+          cancelledAt: order.cancelledAt?.toISOString(),
+          reason: order.cancelReason,
+          penalty: order.cancelPenalty,
+          refund: order.cancelRefund,
+        } : undefined,
+        // Trust impact from this order
+        trustImpact: trustHistory ? {
+          previousScore: trustHistory.previousScore,
+          newScore: trustHistory.newScore,
+          change: trustHistory.newScore - trustHistory.previousScore,
+          reason: trustHistory.reason,
+        } : undefined,
       };
     }));
 
@@ -1332,6 +1416,293 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
   } catch (error: any) {
     logger.error(`Failed to get buyer orders: ${error.message}`);
     res.status(500).json({ error: 'Failed to load orders' });
+  }
+});
+
+/**
+ * POST /api/cancel - Cancel an order (buyer initiated via frontend)
+ * 
+ * Cancellation rules:
+ * - Must be at least 30 minutes before delivery start time
+ * - Cannot cancel after delivery has started or completed
+ * 
+ * Cancellation penalty (10% total):
+ * - 5% goes to seller (compensation)
+ * - 5% goes to platform (fee)
+ * - 90% refunded to buyer
+ */
+router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { transaction_id, order_id, reason } = req.body as {
+      transaction_id: string;
+      order_id: string;
+      reason?: string;
+    };
+    const userId = req.user!.id;
+
+    logger.info('Received cancel request from frontend', {
+      transaction_id,
+      order_id,
+      user_id: userId,
+    });
+
+    // Get order and verify ownership
+    const order = await prisma.order.findUnique({
+      where: { id: order_id },
+      include: {
+        blocks: true,
+        selectedOffer: true,
+        provider: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Verify the order belongs to this user
+    if (order.buyerId !== userId) {
+      return res.status(403).json({ error: 'You are not authorized to cancel this order' });
+    }
+
+    // Check if order is already delivered/completed
+    if (order.status === 'COMPLETED' || order.discomVerified) {
+      return res.status(400).json({
+        error: 'Cannot cancel an order that has already been delivered',
+      });
+    }
+
+    // Check if order is in a cancellable state
+    if (order.status !== 'ACTIVE' && order.status !== 'PENDING') {
+      return res.status(400).json({
+        error: `Order in status ${order.status} cannot be cancelled`,
+      });
+    }
+
+    // Get delivery start time from order items or selected offer
+    let deliveryStartTime: Date | null = null;
+    
+    if (order.selectedOffer?.timeWindowStart) {
+      deliveryStartTime = order.selectedOffer.timeWindowStart;
+    } else {
+      // Fallback: try to get from itemsJson
+      try {
+        const items = JSON.parse(order.itemsJson || '[]');
+        if (items.length > 0 && items[0].timeWindow?.startTime) {
+          deliveryStartTime = new Date(items[0].timeWindow.startTime);
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
+    if (!deliveryStartTime) {
+      return res.status(400).json({
+        error: 'Could not determine delivery start time for this order',
+      });
+    }
+
+    // Check if we're at least 30 minutes before delivery start
+    const now = new Date();
+    const minCancelBufferMs = 30 * 60 * 1000; // 30 minutes
+    const timeUntilDelivery = deliveryStartTime.getTime() - now.getTime();
+
+    if (timeUntilDelivery < minCancelBufferMs) {
+      const minutesRemaining = Math.max(0, Math.floor(timeUntilDelivery / 60000));
+      return res.status(400).json({
+        error: `Cancellation not allowed within 30 minutes of delivery start. Only ${minutesRemaining} minutes remaining.`,
+      });
+    }
+
+    // Calculate cancellation penalty (10% of total paid including platform fee)
+    const energyCost = order.totalPrice || 0;
+    const originalPlatformFee = Math.round(energyCost * 0.025 * 100) / 100; // 2.5% platform fee
+    const totalPaid = energyCost + originalPlatformFee; // What buyer actually paid
+    
+    const penaltyRate = 0.10; // 10% total penalty
+    const sellerShare = 0.05; // 5% to seller
+    const platformShare = 0.05; // 5% to platform
+    
+    const totalPenalty = Math.round(totalPaid * penaltyRate * 100) / 100;
+    const sellerCompensation = Math.round(totalPaid * sellerShare * 100) / 100;
+    const platformPenaltyShare = Math.round(totalPaid * platformShare * 100) / 100;
+    const buyerRefund = Math.round((totalPaid - totalPenalty) * 100) / 100; // 90% back to buyer
+
+    // Get buyer and seller for balance updates
+    const buyer = await prisma.user.findUnique({ where: { id: userId } });
+    // Get seller via provider relation
+    const seller = order.providerId 
+      ? await prisma.user.findFirst({ where: { providerId: order.providerId } })
+      : null;
+
+    if (!buyer) {
+      return res.status(400).json({ error: 'Buyer not found' });
+    }
+
+    // Use transaction for atomic updates
+    await prisma.$transaction(async (tx) => {
+      // 1. Update order status
+      await tx.order.update({
+        where: { id: order_id },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelledBy: 'BUYER',
+          cancelReason: reason || 'User requested cancellation',
+          // Store financial details in metadata
+          cancelPenalty: totalPenalty,
+          cancelRefund: buyerRefund,
+        },
+      });
+
+      // 2. Release reserved blocks back to AVAILABLE
+      await tx.offerBlock.updateMany({
+        where: {
+          orderId: order_id,
+          status: { in: ['RESERVED', 'SOLD'] },
+        },
+        data: {
+          status: 'AVAILABLE',
+          orderId: null,
+          transactionId: null,
+          reservedAt: null,
+          soldAt: null,
+        },
+      });
+
+      // 3. Refund 90% to buyer (they had escrowed the full amount)
+      await tx.user.update({
+        where: { id: userId },
+        data: { balance: { increment: buyerRefund } },
+      });
+
+      // 4. Pay 5% to seller as compensation
+      if (seller) {
+        await tx.user.update({
+          where: { id: seller.id },
+          data: { balance: { increment: sellerCompensation } },
+        });
+      }
+
+      // 5. Platform gets 5% penalty + original 2.5% fee (tracked in payment record)
+      // In production, this would go to a platform account
+
+      // 6. Record the payment
+      await tx.paymentRecord.create({
+        data: {
+          type: 'CANCEL_PENALTY',
+          orderId: order_id,
+          buyerId: userId,
+          sellerId: seller?.id,
+          totalAmount: totalPaid,
+          buyerRefund,
+          sellerAmount: sellerCompensation,
+          platformFee: platformPenaltyShare + originalPlatformFee, // Penalty share + original fee
+          status: 'COMPLETED',
+          completedAt: new Date(),
+        },
+      });
+    });
+
+    logger.info(`Order ${order_id} cancelled with penalty`, {
+      energyCost,
+      originalPlatformFee,
+      totalPaid,
+      totalPenalty,
+      buyerRefund,
+      sellerCompensation,
+      platformTotal: platformPenaltyShare + originalPlatformFee,
+    });
+
+    // Sync released blocks to CDS so they appear in discovery again
+    try {
+      const sharedConfig = (await import('@p2p/shared')).config;
+      const items = JSON.parse(order.itemsJson || '[]');
+      if (items.length > 0 && items[0].offer_id) {
+        await axios.post(`${sharedConfig.urls.cds}/sync/blocks`, {
+          offer_id: items[0].offer_id,
+          status: 'AVAILABLE',
+          count: items[0].quantity || order.totalQty || 0,
+        });
+        logger.info(`Synced released blocks to CDS for offer ${items[0].offer_id}`);
+      }
+    } catch (syncError: any) {
+      logger.error(`Failed to sync released blocks to CDS: ${syncError.message}`);
+    }
+
+    // Update buyer trust score (penalty for cancellation)
+    try {
+      const { updateTrustAfterCancel } = await import('@p2p/shared');
+
+      let cancelledQty = 0;
+      try {
+        const quote = JSON.parse(order.quoteJson || '{}');
+        cancelledQty = quote.totalQuantity || order.totalQty || 0;
+      } catch {
+        cancelledQty = order.totalQty || 0;
+      }
+
+      const { newScore, newLimit, trustImpact } = updateTrustAfterCancel(
+        buyer.trustScore,
+        cancelledQty,
+        cancelledQty,
+        true // within window
+      );
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          trustScore: newScore,
+          allowedTradeLimit: newLimit,
+        },
+      });
+
+      await prisma.trustScoreHistory.create({
+        data: {
+          userId: userId,
+          previousScore: buyer.trustScore,
+          newScore: newScore,
+          previousLimit: buyer.allowedTradeLimit,
+          newLimit: newLimit,
+          reason: 'BUYER_CANCEL',
+          orderId: order_id,
+          metadata: JSON.stringify({
+            cancelledQty,
+            trustImpact,
+            cancelReason: reason,
+            financials: { buyerRefund, sellerCompensation, platformFee: platformPenaltyShare + originalPlatformFee },
+          }),
+        },
+      });
+
+      logger.info(`Buyer trust updated after cancellation`, {
+        userId,
+        previousScore: buyer.trustScore,
+        newScore,
+        trustImpact,
+      });
+    } catch (trustError: any) {
+      // Don't fail the cancel if trust update fails
+      logger.error(`Failed to update trust after cancel: ${trustError.message}`);
+    }
+
+    res.json({
+      status: 'ok',
+      message: 'Order cancelled successfully',
+      order_id,
+      financials: {
+        originalAmount: totalPaid, // What buyer originally paid (energy + 2.5% fee)
+        refundAmount: buyerRefund, // 90% of total paid
+        penaltyAmount: totalPenalty, // 10% of total paid
+        penaltyBreakdown: {
+          sellerCompensation, // 5% to seller
+          platformFee: platformPenaltyShare + originalPlatformFee, // 5% penalty + original 2.5%
+        },
+      },
+    });
+  } catch (error: any) {
+    logger.error(`Failed to cancel order: ${error.message}`);
+    res.status(500).json({ error: 'Failed to cancel order' });
   }
 });
 

@@ -225,6 +225,11 @@ exports.Prisma.OrderScalarFieldEnum = {
   cancelledAt: 'cancelledAt',
   cancelledBy: 'cancelledBy',
   cancelReason: 'cancelReason',
+  cancelPenalty: 'cancelPenalty',
+  cancelRefund: 'cancelRefund',
+  paymentStatus: 'paymentStatus',
+  escrowedAt: 'escrowedAt',
+  releasedAt: 'releasedAt',
   discomVerified: 'discomVerified'
 };
 
@@ -287,6 +292,21 @@ exports.Prisma.DiscomFeedbackScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.PaymentRecordScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  orderId: 'orderId',
+  buyerId: 'buyerId',
+  sellerId: 'sellerId',
+  totalAmount: 'totalAmount',
+  buyerRefund: 'buyerRefund',
+  sellerAmount: 'sellerAmount',
+  platformFee: 'platformFee',
+  status: 'status',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -314,7 +334,8 @@ exports.Prisma.ModelName = {
   Event: 'Event',
   SettlementRecord: 'SettlementRecord',
   TrustScoreHistory: 'TrustScoreHistory',
-  DiscomFeedback: 'DiscomFeedback'
+  DiscomFeedback: 'DiscomFeedback',
+  PaymentRecord: 'PaymentRecord'
 };
 
 /**

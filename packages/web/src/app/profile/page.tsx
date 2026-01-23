@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Mail, Shield, Wallet } from 'lucide-react';
+import { LogOut, User, Mail, Shield, Wallet, Check, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
@@ -74,6 +74,19 @@ export default function ProfilePage() {
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [balanceInput, setBalanceInput] = useState(balance.toString());
+  
+  // Production capacity state
+  const [capacityInput, setCapacityInput] = useState('');
+  const [isSavingCapacity, setIsSavingCapacity] = useState(false);
+  const [capacityError, setCapacityError] = useState<string | null>(null);
+  const [capacitySuccess, setCapacitySuccess] = useState(false);
+  
+  // Initialize capacity input when user loads
+  useEffect(() => {
+    if (user?.productionCapacity) {
+      setCapacityInput(user.productionCapacity.toString());
+    }
+  }, [user?.productionCapacity]);
 
   const {
     register,
@@ -242,22 +255,82 @@ export default function ProfilePage() {
                   placeholder="e.g., 500"
                   min={0}
                   step={10}
-                  defaultValue={user.productionCapacity ?? ''}
-                  onBlur={async (e) => {
-                    const value = parseFloat(e.target.value);
-                    if (!isNaN(value) && value >= 0 && value !== user.productionCapacity) {
-                      try {
-                        const result = await authApi.updateProfile({ productionCapacity: value });
-                        updateUser(result.user);
-                      } catch (error) {
-                        console.error('Failed to update production capacity:', error);
-                      }
-                    }
+                  value={capacityInput}
+                  onChange={(e) => {
+                    setCapacityInput(e.target.value);
+                    setCapacityError(null);
+                    setCapacitySuccess(false);
                   }}
+                  error={capacityError || undefined}
                 />
                 <span className="text-sm font-medium text-[var(--color-text-muted)]">kWh/month</span>
               </div>
             </div>
+
+            {/* Error Message */}
+            {capacityError && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--color-danger-light)]">
+                <AlertCircle className="w-4 h-4 text-[var(--color-danger)]" />
+                <span className="text-sm text-[var(--color-danger)]">{capacityError}</span>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {capacitySuccess && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--color-success-light)]">
+                <Check className="w-4 h-4 text-[var(--color-success)]" />
+                <span className="text-sm text-[var(--color-success)]">Production capacity updated!</span>
+              </div>
+            )}
+
+            {/* Apply Button */}
+            <Button
+              fullWidth
+              loading={isSavingCapacity}
+              onClick={async () => {
+                const value = parseFloat(capacityInput);
+                
+                // Validate
+                if (isNaN(value) || capacityInput.trim() === '') {
+                  setCapacityError('Please enter a valid number');
+                  return;
+                }
+                
+                if (value < 0) {
+                  setCapacityError('Capacity cannot be negative');
+                  return;
+                }
+                
+                if (value > 100000) {
+                  setCapacityError('Value seems too high. Please enter a realistic capacity.');
+                  return;
+                }
+                
+                // Check if value changed
+                if (value === user.productionCapacity) {
+                  setCapacitySuccess(true);
+                  setTimeout(() => setCapacitySuccess(false), 2000);
+                  return;
+                }
+                
+                setIsSavingCapacity(true);
+                setCapacityError(null);
+                setCapacitySuccess(false);
+                
+                try {
+                  const result = await authApi.updateProfile({ productionCapacity: value });
+                  updateUser(result.user);
+                  setCapacitySuccess(true);
+                  setTimeout(() => setCapacitySuccess(false), 3000);
+                } catch (error: any) {
+                  setCapacityError(error.message || 'Failed to update production capacity');
+                } finally {
+                  setIsSavingCapacity(false);
+                }
+              }}
+            >
+              Apply
+            </Button>
 
             {user.productionCapacity ? (
               <div className="p-3 bg-[var(--color-primary-light)] rounded-lg">
@@ -278,9 +351,9 @@ export default function ProfilePage() {
             )}
 
             {user.meterVerifiedCapacity && (
-              <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
-                  <span>✓</span>
+              <div className="p-2 rounded-lg bg-[var(--color-success-light)] border border-[var(--color-success)]">
+                <div className="flex items-center gap-2 text-sm text-[var(--color-success)]">
+                  <Check className="w-4 h-4" />
                   <span>Meter verified: {user.meterVerifiedCapacity} kWh/month</span>
                 </div>
               </div>

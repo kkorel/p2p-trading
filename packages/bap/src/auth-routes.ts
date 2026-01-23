@@ -87,6 +87,13 @@ router.post('/google', async (req: Request, res: Response) => {
         balance: user!.balance,
         providerId: user!.providerId,
         provider: user!.provider,
+        // Trust score fields
+        trustScore: user!.trustScore,
+        allowedTradeLimit: user!.allowedTradeLimit,
+        meterDataAnalyzed: user!.meterDataAnalyzed,
+        // Production capacity fields
+        productionCapacity: user!.productionCapacity,
+        meterVerifiedCapacity: user!.meterVerifiedCapacity,
       },
     });
   } catch (error: any) {
@@ -184,6 +191,13 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
         provider: user.provider,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
+        // Trust score fields
+        trustScore: user.trustScore,
+        allowedTradeLimit: user.allowedTradeLimit,
+        meterDataAnalyzed: user.meterDataAnalyzed,
+        // Production capacity fields
+        productionCapacity: user.productionCapacity,
+        meterVerifiedCapacity: user.meterVerifiedCapacity,
       },
     });
   } catch (error: any) {
@@ -391,8 +405,9 @@ router.put('/balance', authMiddleware, async (req: Request, res: Response) => {
 
 /**
  * POST /auth/payment
- * Process a payment: deduct from buyer, add to seller (minus platform fee)
- * Platform fee (2.5%) goes to the platform, not the seller
+ * Verify payment was escrowed for an order
+ * NOTE: Actual payment deduction happens in /confirm (escrow)
+ *       Seller payment happens after DISCOM verification
  */
 router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -403,6 +418,24 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         error: 'Invalid payment parameters',
+      });
+    }
+
+    // Check if order exists and payment was escrowed
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { 
+        id: true, 
+        paymentStatus: true, 
+        buyerId: true,
+        totalPrice: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found',
       });
     }
 
@@ -419,70 +452,28 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
       });
     }
 
-    // Calculate platform fee (2.5%)
-    const platformFee = Math.round(amount * 0.025 * 100) / 100;
-    const totalDeduction = amount + platformFee;
-    const sellerAmount = amount; // Seller gets full amount, fee is separate
-
-    // Check if buyer has sufficient balance
-    if (buyer.balance < totalDeduction) {
-      return res.status(400).json({
-        success: false,
-        error: 'Insufficient balance',
-        required: totalDeduction,
-        available: buyer.balance,
-      });
-    }
-
-    // Find seller's user account via provider
-    let sellerUser = null;
-    if (sellerId) {
-      sellerUser = await prisma.user.findFirst({
-        where: { providerId: sellerId },
-        select: { id: true, balance: true },
-      });
-    }
-
-    // Perform the transaction
-    await prisma.$transaction(async (tx) => {
-      // Deduct from buyer (amount + fee)
-      await tx.user.update({
-        where: { id: buyerId },
-        data: { balance: { decrement: totalDeduction } },
-      });
-
-      // Add to seller (full amount, no fee deduction from seller)
-      if (sellerUser) {
-        await tx.user.update({
-          where: { id: sellerUser.id },
-          data: { balance: { increment: sellerAmount } },
-        });
-      }
-    });
-
-    // Get updated buyer balance
-    const updatedBuyer = await prisma.user.findUnique({
-      where: { id: buyerId },
-      select: { balance: true },
-    });
+    // Payment is handled via escrow in /confirm
+    // Seller will be paid after DISCOM verification
+    // This endpoint just confirms the escrow status
 
     res.json({
       success: true,
-      message: 'Payment processed successfully',
+      message: 'Payment escrowed successfully. Seller will be paid after delivery verification.',
       payment: {
         orderId,
         amount,
-        platformFee,
-        totalDeducted: totalDeduction,
-        sellerReceived: sellerAmount,
+        status: order.paymentStatus || 'ESCROWED',
+        // Seller is NOT paid yet - paid after DISCOM verification
+        sellerReceived: 0,
+        note: 'Seller payment pending delivery verification',
       },
-      newBalance: updatedBuyer?.balance || 0,
+      newBalance: buyer.balance,
     });
   } catch (error: any) {
-    console.error('Payment error:', error);
+    console.error('Payment verification error:', error);
     res.status(500).json({
       success: false,
-      error: 'Payment processing failed',
+      error: 'Payment verification failed',
     });
   }
 });

@@ -64,9 +64,39 @@ import {
 } from './seller-orders';
 import { logEvent, isDuplicateMessage } from './events';
 import { authMiddleware } from './middleware/auth';
+import { prisma } from './db';
+import { getTransaction } from './state';
 
 const router = Router();
 const logger = createLogger('BPP');
+
+/**
+ * Helper: Get buyer ID from transaction state
+ */
+async function getBuyerIdFromTransaction(transactionId: string): Promise<string | null> {
+  try {
+    const txState = await getTransaction(transactionId);
+    return txState?.buyerId || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Helper: Get seller user ID from provider ID
+ */
+async function getSellerIdFromProvider(providerId: string): Promise<string | null> {
+  if (!providerId) return null;
+  try {
+    const user = await prisma.user.findFirst({
+      where: { providerId },
+      select: { id: true },
+    });
+    return user?.id || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /select - Handle offer selection
@@ -251,6 +281,38 @@ router.post('/init', async (req: Request, res: Response) => {
       const { getTransactionState } = await import('@p2p/shared');
       const txState = await getTransactionState(context.transaction_id);
       const buyerId = txState?.buyerId || null;
+
+      // Check buyer trust score - block if below 20%
+      if (buyerId) {
+        const buyer = await prisma.user.findUnique({
+          where: { id: buyerId },
+          select: { trustScore: true },
+        });
+        
+        if (buyer && buyer.trustScore < 0.2) {
+          logger.error(`Buyer trust score too low: ${(buyer.trustScore * 100).toFixed(1)}%`, {
+            transaction_id: context.transaction_id,
+            buyerId,
+          });
+
+          const errorCallbackContext = createCallbackContext(context, 'on_init');
+          const errorCallback = {
+            context: errorCallbackContext,
+            error: {
+              code: 'TRUST_SCORE_TOO_LOW',
+              message: `Your trust score (${(buyer.trustScore * 100).toFixed(0)}%) is below the minimum required (20%). Please maintain a good order history to increase your score.`,
+            },
+          };
+
+          try {
+            await axios.post(`${context.bap_uri}/callbacks/on_init`, errorCallback);
+          } catch (e) {
+            logger.error('Failed to send trust error callback');
+          }
+
+          return; // Exit the setTimeout callback
+        }
+      }
 
       // Build order items and quote
       const orderItems: OrderItem[] = [];
@@ -437,37 +499,15 @@ router.post('/confirm', async (req: Request, res: Response) => {
               logger.error(`Failed to sync block status to CDS: ${syncError.message}`);
             }
 
-            // Auto-delete offers with no remaining available blocks
+            // NOTE: We no longer auto-delete offers when fully sold
+            // This ensures "total offered" tracking remains accurate for trade limit calculations
+            // Sold-out offers are hidden from discovery (CDS filters by available > 0)
             const offerStats = await getBlockStats(firstItem.offer_id);
             if (offerStats.available === 0) {
-              try {
-                // Delete all blocks for this offer
-                await prisma.offerBlock.deleteMany({
-                  where: { offerId: firstItem.offer_id },
-                });
-
-                // Delete the offer
-                await prisma.catalogOffer.deleteMany({
-                  where: { id: firstItem.offer_id },
-                });
-
-                logger.info(
-                  `Auto-deleted offer ${firstItem.offer_id} - no available units remaining`,
-                  {
-                    transaction_id: context.transaction_id,
-                  });
-
-                // Sync deletion to CDS
-                try {
-                  await axios.delete(
-                    `${config.urls.cds}/sync/offers/${firstItem.offer_id}`);
-                } catch (syncError: any) {
-                  logger.error(`Failed to sync offer deletion to CDS: ${syncError.message}`);
-                }
-              } catch (deleteError: any) {
-                logger.error(
-                  `Failed to auto-delete empty offer: ${deleteError.message}`);
-              }
+              logger.info(
+                `Offer ${firstItem.offer_id} is now sold out (${offerStats.sold} blocks sold)`,
+                { transaction_id: context.transaction_id }
+              );
             }
           }
 
@@ -507,6 +547,60 @@ router.post('/confirm', async (req: Request, res: Response) => {
                 }
               }
             }
+          }
+          // ESCROW: Deduct payment from buyer (funds held until delivery verification)
+          try {
+            const orderTotal = order!.quote?.price?.value || 0;
+            const platformFeeRate = 0.025; // 2.5% platform fee
+            const platformFee = Math.round(orderTotal * platformFeeRate * 100) / 100;
+            const totalDeduction = orderTotal + platformFee; // Total to deduct from buyer
+            const buyerId = await getBuyerIdFromTransaction(context.transaction_id);
+            
+            if (buyerId && orderTotal > 0) {
+              await prisma.$transaction(async (tx) => {
+                // 1. Deduct from buyer's balance (energy cost + platform fee)
+                await tx.user.update({
+                  where: { id: buyerId },
+                  data: { balance: { decrement: totalDeduction } },
+                });
+                
+                // 2. Update order payment status to ESCROWED
+                await tx.order.update({
+                  where: { id: order!.id },
+                  data: {
+                    paymentStatus: 'ESCROWED',
+                    escrowedAt: new Date(),
+                    totalPrice: orderTotal, // Store energy cost
+                  },
+                });
+                
+                // 3. Create payment record
+                const sellerId = await getSellerIdFromProvider(order!.items?.[0]?.provider_id || '');
+                await tx.paymentRecord.create({
+                  data: {
+                    type: 'ESCROW',
+                    orderId: order!.id,
+                    buyerId,
+                    sellerId,
+                    totalAmount: totalDeduction,
+                    platformFee: platformFee,
+                    status: 'COMPLETED',
+                    completedAt: new Date(),
+                  },
+                });
+              });
+              
+              logger.info(`Payment escrowed for order ${order!.id}`, {
+                energyCost: orderTotal,
+                platformFee: platformFee,
+                totalDeducted: totalDeduction,
+                buyerId,
+                transaction_id: context.transaction_id,
+              });
+            }
+          } catch (escrowError: any) {
+            logger.error(`Failed to escrow payment: ${escrowError.message}`, { transaction_id: context.transaction_id });
+            // Don't fail the order confirmation if escrow fails - can be handled manually
           }
         } else {
           logger.info('Order already ACTIVE, idempotent confirm', { transaction_id: context.transaction_id });
@@ -843,8 +937,6 @@ async function deleteOfferFromCDS(offerId: string) {
 
 // ==================== SELLER APIs (Authenticated) ====================
 
-import { prisma } from '@p2p/shared';
-
 /**
  * GET /seller/my-profile - Get or create the authenticated user's seller profile
  * Auto-creates provider if user doesn't have one
@@ -919,6 +1011,11 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
     // Enrich orders with block and item information
     const enrichedOrders = await Promise.all(orders.map(async (order) => {
       try {
+        // Get DISCOM feedback for this order
+        const discomFeedback = await prisma.discomFeedback.findUnique({
+          where: { orderId: order.id },
+        });
+
         if (order.items && order.items.length > 0) {
           const firstItem = order.items[0];
           const orderBlocks = await getBlocksForOrder(order.id);
@@ -943,8 +1040,20 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
               order.quote.price.value / totalQty :
               0);
 
+          // Get delivery time from offer
+          const deliveryTime = offer?.timeWindowStart ? {
+            start: offer.timeWindowStart.toISOString(),
+            end: offer.timeWindowEnd?.toISOString(),
+          } : undefined;
+
+          // Get cancellation compensation for seller (5% of total)
+          const cancellationCompensation = order.status === 'CANCELLED' && order.cancelPenalty
+            ? order.cancelPenalty * 0.5 // 5% of 10% penalty goes to seller
+            : null;
+
           return {
             ...order,
+            paymentStatus: order.paymentStatus || 'PENDING',
             itemInfo: {
               item_id: firstItem.item_id,
               offer_id: firstItem.offer_id,
@@ -953,8 +1062,39 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
               source_type: item?.sourceType || 'UNKNOWN',
               price_per_kwh: pricePerKwh,
             },
+            deliveryTime,
+            // Cancellation info for seller
+            cancellation: order.status === 'CANCELLED' ? {
+              cancelledAt: order.cancelledAt,
+              compensation: cancellationCompensation,
+            } : undefined,
+            // DISCOM verification results
+            fulfillment: discomFeedback ? {
+              verified: true,
+              deliveredQty: discomFeedback.deliveredQty,
+              expectedQty: discomFeedback.expectedQty,
+              deliveryRatio: discomFeedback.deliveryRatio,
+              status: discomFeedback.status, // 'FULL' | 'PARTIAL' | 'FAILED'
+              trustImpact: discomFeedback.trustImpact,
+              verifiedAt: discomFeedback.verifiedAt.toISOString(),
+            } : null,
           };
         }
+
+        // Return order with just DISCOM feedback if no items
+        return {
+          ...order,
+          paymentStatus: order.paymentStatus || 'PENDING',
+          fulfillment: discomFeedback ? {
+            verified: true,
+            deliveredQty: discomFeedback.deliveredQty,
+            expectedQty: discomFeedback.expectedQty,
+            deliveryRatio: discomFeedback.deliveryRatio,
+            status: discomFeedback.status,
+            trustImpact: discomFeedback.trustImpact,
+            verifiedAt: discomFeedback.verifiedAt.toISOString(),
+          } : null,
+        };
       } catch (error: any) {
         logger.error(`Error enriching order ${order.id}: ${error.message}`);
       }
@@ -1173,6 +1313,46 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
 
   if (!provider_id) {
     return res.status(400).json({ error: 'No seller profile found. Please set up your seller profile first.' });
+  }
+
+  // Check if user has set production capacity
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { productionCapacity: true, allowedTradeLimit: true },
+  });
+
+  if (!user?.productionCapacity || user.productionCapacity <= 0) {
+    return res.status(400).json({ 
+      error: 'Please set your production capacity in Profile before creating offers.' 
+    });
+  }
+
+  // Calculate trade limit
+  const tradeLimit = (user.productionCapacity * (user.allowedTradeLimit ?? 10)) / 100;
+
+  // Get total offered quantity across all offers
+  // Trade limit = how much you can OFFER in total (not what's available or delivered)
+  // If you created offers for 100 + 30 = 130 kWh, you've offered 130 kWh
+  const existingOffers = await prisma.catalogOffer.findMany({
+    where: { providerId: provider_id },
+    include: {
+      _count: {
+        select: { blocks: true }, // Count all blocks (total offer amount)
+      },
+    },
+  });
+
+  const totalOfferedQty = existingOffers.reduce((sum, offer) => {
+    return sum + offer._count.blocks;
+  }, 0);
+
+  const remainingCapacity = tradeLimit - totalOfferedQty;
+
+  // Check if new offer quantity exceeds remaining capacity
+  if (max_qty > remainingCapacity) {
+    return res.status(400).json({
+      error: `Offer quantity (${max_qty} kWh) exceeds your remaining capacity (${remainingCapacity.toFixed(1)} kWh). You have ${totalOfferedQty.toFixed(1)} kWh already offered out of ${tradeLimit.toFixed(1)} kWh limit.`
+    });
   }
 
   if (!source_type || !price_per_kwh || !max_qty || !time_window) {

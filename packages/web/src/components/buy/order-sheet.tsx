@@ -33,6 +33,7 @@ export function OrderSheet({
   const [quantity, setQuantity] = useState(initialQuantity || 10);
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Reset quantity when offer changes or sheet opens
   useEffect(() => {
@@ -52,7 +53,7 @@ export function OrderSheet({
   };
 
   const handleConfirmPayment = async () => {
-    if (!offer) return;
+    if (!offer || isProcessing) return;
     
     if (!hasEnoughBalance) {
       setError('Insufficient balance. Please add funds in your profile.');
@@ -60,6 +61,7 @@ export function OrderSheet({
       return;
     }
 
+    setIsProcessing(true);
     setStep('processing');
     setError(null);
 
@@ -72,7 +74,7 @@ export function OrderSheet({
       
       setOrder(result);
 
-      // Process the payment (deduct from buyer, add to seller)
+      // Process the payment verification (escrow already done in /confirm)
       await processPayment(result.id, totalPrice, providerId);
       
       // Refresh balance to get latest
@@ -82,6 +84,8 @@ export function OrderSheet({
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
       setStep('error');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -92,6 +96,7 @@ export function OrderSheet({
       setStep('quantity');
       setError(null);
       setOrder(null);
+      setIsProcessing(false);
     }, 200);
   };
 
@@ -218,14 +223,15 @@ export function OrderSheet({
 
           {/* Action buttons */}
           <div className="flex gap-3">
-            <Button fullWidth variant="secondary" onClick={() => setStep('quantity')}>
+            <Button fullWidth variant="secondary" onClick={() => setStep('quantity')} disabled={isProcessing}>
               Back
             </Button>
             <Button 
               fullWidth 
               size="lg" 
               onClick={handleConfirmPayment}
-              disabled={!hasEnoughBalance}
+              disabled={!hasEnoughBalance || isProcessing}
+              loading={isProcessing}
             >
               Confirm & Pay
             </Button>
