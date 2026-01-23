@@ -201,7 +201,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
  */
 router.put('/profile', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name } = req.body;
+    const { name, productionCapacity } = req.body;
 
     // Validate input
     if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2)) {
@@ -211,9 +211,17 @@ router.put('/profile', authMiddleware, async (req: Request, res: Response) => {
       });
     }
 
+    if (productionCapacity !== undefined && (typeof productionCapacity !== 'number' || productionCapacity < 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Production capacity must be a non-negative number (kWh per month)',
+      });
+    }
+
     // Update user
     const updateData: any = {};
     if (name !== undefined) updateData.name = name.trim();
+    if (productionCapacity !== undefined) updateData.productionCapacity = productionCapacity;
 
     const user = await prisma.user.update({
       where: { id: req.user!.id },
@@ -241,6 +249,12 @@ router.put('/profile', authMiddleware, async (req: Request, res: Response) => {
         balance: user.balance,
         providerId: user.providerId,
         provider: user.provider,
+        // Trust and capacity fields
+        trustScore: user.trustScore,
+        allowedTradeLimit: user.allowedTradeLimit,
+        productionCapacity: user.productionCapacity,
+        meterVerifiedCapacity: user.meterVerifiedCapacity,
+        meterDataAnalyzed: user.meterDataAnalyzed,
       },
     });
   } catch (error: any) {
@@ -277,7 +291,7 @@ router.post('/setup-provider', authMiddleware, async (req: Request, res: Respons
 
     // Create provider and link to user
     const providerId = `provider-${req.user!.id}`;
-    
+
     const provider = await prisma.provider.create({
       data: {
         id: providerId,

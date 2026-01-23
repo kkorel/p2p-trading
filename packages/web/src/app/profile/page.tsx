@@ -19,6 +19,54 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
+// Trust score helper functions
+function getTrustTierName(score?: number): string {
+  const s = score ?? 0.3;
+  if (s >= 0.95) return 'Platinum';
+  if (s >= 0.85) return 'Gold';
+  if (s >= 0.7) return 'Silver';
+  if (s >= 0.5) return 'Bronze';
+  if (s >= 0.3) return 'Starter';
+  return 'New';
+}
+
+function getTrustBadgeVariant(score?: number): 'success' | 'warning' | 'default' {
+  const s = score ?? 0.3;
+  if (s >= 0.7) return 'success';
+  if (s >= 0.5) return 'warning';
+  return 'default';
+}
+
+function getTrustTierDescription(score?: number): string {
+  const s = score ?? 0.3;
+  if (s >= 0.95) return 'Platinum tier: Full trading privileges. Trade up to 100% of your surplus energy.';
+  if (s >= 0.85) return 'Gold tier: Excellent reputation! Trade up to 80% of your surplus energy.';
+  if (s >= 0.7) return 'Silver tier: Good track record. Trade up to 60% of your surplus energy.';
+  if (s >= 0.5) return 'Bronze tier: Building trust. Trade up to 40% of your surplus energy.';
+  if (s >= 0.3) return 'Starter tier: Welcome! Complete more trades to increase your limit.';
+  return 'New user: Complete your first successful trade to start building trust.';
+}
+
+function getTrustRingColor(score?: number): string {
+  const s = score ?? 0.3;
+  if (s >= 0.95) return '#7c3aed'; // Purple for Platinum
+  if (s >= 0.85) return '#f59e0b'; // Amber for Gold
+  if (s >= 0.7) return '#6b7280';  // Gray for Silver
+  if (s >= 0.5) return '#d97706';  // Orange for Bronze
+  if (s >= 0.3) return '#3b82f6';  // Blue for Starter
+  return '#9ca3af'; // Light gray for New
+}
+
+function getTrustTierIcon(score?: number): string {
+  const s = score ?? 0.3;
+  if (s >= 0.95) return '💎';
+  if (s >= 0.85) return '🏆';
+  if (s >= 0.7) return '⭐';
+  if (s >= 0.5) return '🥉';
+  if (s >= 0.3) return '🌱';
+  return '🆕';
+}
+
 export default function ProfilePage() {
   const { user, logout, updateUser } = useAuth();
   const { balance, setBalance } = useBalance();
@@ -71,27 +119,172 @@ export default function ProfilePage() {
         {/* Profile Header */}
         <Card>
           <div className="flex items-center gap-4">
-            {user.picture ? (
-              <Image
-                src={user.picture}
-                alt={user.name || 'Avatar'}
-                width={64}
-                height={64}
-                className="rounded-full"
-              />
-            ) : (
-              <div className="w-16 h-16 bg-[var(--color-primary-light)] rounded-full flex items-center justify-center">
-                <span className="text-2xl font-semibold text-[var(--color-primary)]">
-                  {user.name?.[0] || user.email[0].toUpperCase()}
-                </span>
+            {/* Avatar with Trust Ring */}
+            <div className="relative">
+              {user.picture ? (
+                <Image
+                  src={user.picture}
+                  alt={user.name || 'Avatar'}
+                  width={64}
+                  height={64}
+                  className="rounded-full ring-2 ring-offset-2"
+                  style={{
+                    '--tw-ring-color': getTrustRingColor(user.trustScore),
+                  } as React.CSSProperties}
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 bg-[var(--color-primary-light)] rounded-full flex items-center justify-center ring-2 ring-offset-2"
+                  style={{
+                    '--tw-ring-color': getTrustRingColor(user.trustScore),
+                  } as React.CSSProperties}
+                >
+                  <span className="text-2xl font-semibold text-[var(--color-primary)]">
+                    {user.name?.[0] || user.email[0].toUpperCase()}
+                  </span>
+                </div>
+              )}
+              {/* Trust Score Mini Badge */}
+              <div
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-md"
+                style={{ backgroundColor: getTrustRingColor(user.trustScore) }}
+                title={`Trust: ${((user.trustScore ?? 0.3) * 100).toFixed(0)}%`}
+              >
+                {getTrustTierIcon(user.trustScore)}
               </div>
-            )}
+            </div>
+
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-[var(--color-text)]">
-                {user.name || 'No name set'}
-              </h2>
+              <div className="flex items-center gap-2 mb-0.5">
+                <h2 className="text-lg font-semibold text-[var(--color-text)]">
+                  {user.name || 'No name set'}
+                </h2>
+                <Badge
+                  variant={getTrustBadgeVariant(user.trustScore)}
+                  size="sm"
+                  className="font-semibold"
+                >
+                  {getTrustTierName(user.trustScore)}
+                </Badge>
+              </div>
               <p className="text-sm text-[var(--color-text-muted)]">{user.email}</p>
             </div>
+          </div>
+        </Card>
+
+        {/* Trust Score Card */}
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+              <Shield className="w-4 h-4 text-[var(--color-primary)]" />
+              Trust Score
+            </h3>
+            <Badge variant={getTrustBadgeVariant(user.trustScore)}>
+              {getTrustTierName(user.trustScore)}
+            </Badge>
+          </div>
+
+          {/* Trust Score Progress */}
+          <div className="mb-4">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-[var(--color-text-muted)]">Trust Level</span>
+              <span className="font-semibold text-[var(--color-primary)]">
+                {((user.trustScore ?? 0.3) * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-success)] rounded-full transition-all duration-500"
+                style={{ width: `${(user.trustScore ?? 0.3) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Trade Limit */}
+          <div className="flex items-center justify-between py-2 border-t border-[var(--color-border)]">
+            <span className="text-sm text-[var(--color-text-muted)]">Trade Limit</span>
+            <div className="text-right">
+              <span className="text-lg font-bold text-[var(--color-primary)]">
+                {user.allowedTradeLimit ?? 10}%
+              </span>
+              {user.productionCapacity && (
+                <span className="text-xs text-[var(--color-text-muted)] block">
+                  = {((user.productionCapacity * (user.allowedTradeLimit ?? 10)) / 100).toFixed(1)} kWh/month
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Trust Tier Info */}
+          <div className="mt-3 p-3 bg-[var(--color-bg-subtle)] rounded-lg">
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {getTrustTierDescription(user.trustScore)}
+            </p>
+          </div>
+        </Card>
+
+        {/* Production Capacity Card */}
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+              ⚡ Production Capacity
+            </h3>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm text-[var(--color-text-muted)] mb-1">
+                How much electricity do you produce monthly?
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  placeholder="e.g., 500"
+                  min={0}
+                  step={10}
+                  defaultValue={user.productionCapacity ?? ''}
+                  onBlur={async (e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value) && value >= 0 && value !== user.productionCapacity) {
+                      try {
+                        const result = await authApi.updateProfile({ productionCapacity: value });
+                        updateUser(result.user);
+                      } catch (error) {
+                        console.error('Failed to update production capacity:', error);
+                      }
+                    }
+                  }}
+                />
+                <span className="text-sm font-medium text-[var(--color-text-muted)]">kWh/month</span>
+              </div>
+            </div>
+
+            {user.productionCapacity ? (
+              <div className="p-3 bg-[var(--color-primary-light)] rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-[var(--color-text)]">Your trade limit:</span>
+                  <span className="text-lg font-bold text-[var(--color-primary)]">
+                    {((user.productionCapacity * (user.allowedTradeLimit ?? 10)) / 100).toFixed(1)} kWh
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                  {user.allowedTradeLimit ?? 10}% of {user.productionCapacity} kWh = you can trade up to this much per month
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Set your production capacity to see your trade limit
+              </p>
+            )}
+
+            {user.meterVerifiedCapacity && (
+              <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+                  <span>✓</span>
+                  <span>Meter verified: {user.meterVerifiedCapacity} kWh/month</span>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 

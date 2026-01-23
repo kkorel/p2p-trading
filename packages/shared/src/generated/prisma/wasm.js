@@ -133,6 +133,13 @@ exports.Prisma.UserScalarFieldEnum = {
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   lastLoginAt: 'lastLoginAt',
+  trustScore: 'trustScore',
+  allowedTradeLimit: 'allowedTradeLimit',
+  baselineTrustScore: 'baselineTrustScore',
+  meterDataAnalyzed: 'meterDataAnalyzed',
+  productionCapacity: 'productionCapacity',
+  meterVerifiedCapacity: 'meterVerifiedCapacity',
+  meterPdfUrl: 'meterPdfUrl',
   providerId: 'providerId'
 };
 
@@ -214,7 +221,11 @@ exports.Prisma.OrderScalarFieldEnum = {
   quoteJson: 'quoteJson',
   version: 'version',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  cancelledAt: 'cancelledAt',
+  cancelledBy: 'cancelledBy',
+  cancelReason: 'cancelReason',
+  discomVerified: 'discomVerified'
 };
 
 exports.Prisma.EventScalarFieldEnum = {
@@ -249,6 +260,33 @@ exports.Prisma.SettlementRecordScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.TrustScoreHistoryScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  previousScore: 'previousScore',
+  newScore: 'newScore',
+  previousLimit: 'previousLimit',
+  newLimit: 'newLimit',
+  reason: 'reason',
+  orderId: 'orderId',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.DiscomFeedbackScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  sellerId: 'sellerId',
+  transactionId: 'transactionId',
+  deliveredQty: 'deliveredQty',
+  expectedQty: 'expectedQty',
+  deliveryRatio: 'deliveryRatio',
+  status: 'status',
+  trustImpact: 'trustImpact',
+  verifiedAt: 'verifiedAt',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -274,7 +312,9 @@ exports.Prisma.ModelName = {
   OfferBlock: 'OfferBlock',
   Order: 'Order',
   Event: 'Event',
-  SettlementRecord: 'SettlementRecord'
+  SettlementRecord: 'SettlementRecord',
+  TrustScoreHistory: 'TrustScoreHistory',
+  DiscomFeedback: 'DiscomFeedback'
 };
 
 /**

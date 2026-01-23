@@ -122,3 +122,25 @@ export interface OnStatusMessageContent {
 }
 
 export type OnStatusMessage = BecknMessage<OnStatusMessageContent>;
+
+// ============ CANCEL ============
+
+export interface CancelMessageContent {
+  order_id: string;
+  reason?: string;
+}
+
+export type CancelMessage = BecknMessage<CancelMessageContent>;
+
+// ============ ON_CANCEL ============
+
+export interface OnCancelMessageContent {
+  order: Order;
+  cancellation: {
+    cancelled_by: 'BUYER' | 'SELLER' | 'SYSTEM';
+    reason?: string;
+    refund_status?: 'INITIATED' | 'COMPLETED' | 'NONE';
+  };
+}
+
+export type OnCancelMessage = BecknMessage<OnCancelMessageContent>;

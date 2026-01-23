@@ -58,6 +58,16 @@ export type Event = $Result.DefaultSelection<Prisma.$EventPayload>
  * 
  */
 export type SettlementRecord = $Result.DefaultSelection<Prisma.$SettlementRecordPayload>
+/**
+ * Model TrustScoreHistory
+ * 
+ */
+export type TrustScoreHistory = $Result.DefaultSelection<Prisma.$TrustScoreHistoryPayload>
+/**
+ * Model DiscomFeedback
+ * 
+ */
+export type DiscomFeedback = $Result.DefaultSelection<Prisma.$DiscomFeedbackPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -271,6 +281,26 @@ export class PrismaClient<
     * ```
     */
   get settlementRecord(): Prisma.SettlementRecordDelegate<ExtArgs>;
+
+  /**
+   * `prisma.trustScoreHistory`: Exposes CRUD operations for the **TrustScoreHistory** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more TrustScoreHistories
+    * const trustScoreHistories = await prisma.trustScoreHistory.findMany()
+    * ```
+    */
+  get trustScoreHistory(): Prisma.TrustScoreHistoryDelegate<ExtArgs>;
+
+  /**
+   * `prisma.discomFeedback`: Exposes CRUD operations for the **DiscomFeedback** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more DiscomFeedbacks
+    * const discomFeedbacks = await prisma.discomFeedback.findMany()
+    * ```
+    */
+  get discomFeedback(): Prisma.DiscomFeedbackDelegate<ExtArgs>;
 }
 
 export namespace Prisma {
@@ -720,7 +750,9 @@ export namespace Prisma {
     OfferBlock: 'OfferBlock',
     Order: 'Order',
     Event: 'Event',
-    SettlementRecord: 'SettlementRecord'
+    SettlementRecord: 'SettlementRecord',
+    TrustScoreHistory: 'TrustScoreHistory',
+    DiscomFeedback: 'DiscomFeedback'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -736,7 +768,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, ClientOptions = {}> = {
     meta: {
-      modelProps: "user" | "session" | "provider" | "catalogItem" | "catalogOffer" | "offerBlock" | "order" | "event" | "settlementRecord"
+      modelProps: "user" | "session" | "provider" | "catalogItem" | "catalogOffer" | "offerBlock" | "order" | "event" | "settlementRecord" | "trustScoreHistory" | "discomFeedback"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1370,6 +1402,146 @@ export namespace Prisma {
           }
         }
       }
+      TrustScoreHistory: {
+        payload: Prisma.$TrustScoreHistoryPayload<ExtArgs>
+        fields: Prisma.TrustScoreHistoryFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.TrustScoreHistoryFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.TrustScoreHistoryFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload>
+          }
+          findFirst: {
+            args: Prisma.TrustScoreHistoryFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.TrustScoreHistoryFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload>
+          }
+          findMany: {
+            args: Prisma.TrustScoreHistoryFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload>[]
+          }
+          create: {
+            args: Prisma.TrustScoreHistoryCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload>
+          }
+          createMany: {
+            args: Prisma.TrustScoreHistoryCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.TrustScoreHistoryCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload>[]
+          }
+          delete: {
+            args: Prisma.TrustScoreHistoryDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload>
+          }
+          update: {
+            args: Prisma.TrustScoreHistoryUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload>
+          }
+          deleteMany: {
+            args: Prisma.TrustScoreHistoryDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.TrustScoreHistoryUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.TrustScoreHistoryUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$TrustScoreHistoryPayload>
+          }
+          aggregate: {
+            args: Prisma.TrustScoreHistoryAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateTrustScoreHistory>
+          }
+          groupBy: {
+            args: Prisma.TrustScoreHistoryGroupByArgs<ExtArgs>
+            result: $Utils.Optional<TrustScoreHistoryGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.TrustScoreHistoryCountArgs<ExtArgs>
+            result: $Utils.Optional<TrustScoreHistoryCountAggregateOutputType> | number
+          }
+        }
+      }
+      DiscomFeedback: {
+        payload: Prisma.$DiscomFeedbackPayload<ExtArgs>
+        fields: Prisma.DiscomFeedbackFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.DiscomFeedbackFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.DiscomFeedbackFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload>
+          }
+          findFirst: {
+            args: Prisma.DiscomFeedbackFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.DiscomFeedbackFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload>
+          }
+          findMany: {
+            args: Prisma.DiscomFeedbackFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload>[]
+          }
+          create: {
+            args: Prisma.DiscomFeedbackCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload>
+          }
+          createMany: {
+            args: Prisma.DiscomFeedbackCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.DiscomFeedbackCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload>[]
+          }
+          delete: {
+            args: Prisma.DiscomFeedbackDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload>
+          }
+          update: {
+            args: Prisma.DiscomFeedbackUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload>
+          }
+          deleteMany: {
+            args: Prisma.DiscomFeedbackDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.DiscomFeedbackUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.DiscomFeedbackUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DiscomFeedbackPayload>
+          }
+          aggregate: {
+            args: Prisma.DiscomFeedbackAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateDiscomFeedback>
+          }
+          groupBy: {
+            args: Prisma.DiscomFeedbackGroupByArgs<ExtArgs>
+            result: $Utils.Optional<DiscomFeedbackGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.DiscomFeedbackCountArgs<ExtArgs>
+            result: $Utils.Optional<DiscomFeedbackCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1533,11 +1705,15 @@ export namespace Prisma {
   export type UserCountOutputType = {
     orders: number
     sessions: number
+    trustHistory: number
+    discomFeedback: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     orders?: boolean | UserCountOutputTypeCountOrdersArgs
     sessions?: boolean | UserCountOutputTypeCountSessionsArgs
+    trustHistory?: boolean | UserCountOutputTypeCountTrustHistoryArgs
+    discomFeedback?: boolean | UserCountOutputTypeCountDiscomFeedbackArgs
   }
 
   // Custom InputTypes
@@ -1563,6 +1739,20 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: SessionWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountTrustHistoryArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: TrustScoreHistoryWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountDiscomFeedbackArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: DiscomFeedbackWhereInput
   }
 
 
@@ -1753,10 +1943,20 @@ export namespace Prisma {
 
   export type UserAvgAggregateOutputType = {
     balance: number | null
+    trustScore: number | null
+    allowedTradeLimit: number | null
+    baselineTrustScore: number | null
+    productionCapacity: number | null
+    meterVerifiedCapacity: number | null
   }
 
   export type UserSumAggregateOutputType = {
     balance: number | null
+    trustScore: number | null
+    allowedTradeLimit: number | null
+    baselineTrustScore: number | null
+    productionCapacity: number | null
+    meterVerifiedCapacity: number | null
   }
 
   export type UserMinAggregateOutputType = {
@@ -1770,6 +1970,13 @@ export namespace Prisma {
     createdAt: Date | null
     updatedAt: Date | null
     lastLoginAt: Date | null
+    trustScore: number | null
+    allowedTradeLimit: number | null
+    baselineTrustScore: number | null
+    meterDataAnalyzed: boolean | null
+    productionCapacity: number | null
+    meterVerifiedCapacity: number | null
+    meterPdfUrl: string | null
     providerId: string | null
   }
 
@@ -1784,6 +1991,13 @@ export namespace Prisma {
     createdAt: Date | null
     updatedAt: Date | null
     lastLoginAt: Date | null
+    trustScore: number | null
+    allowedTradeLimit: number | null
+    baselineTrustScore: number | null
+    meterDataAnalyzed: boolean | null
+    productionCapacity: number | null
+    meterVerifiedCapacity: number | null
+    meterPdfUrl: string | null
     providerId: string | null
   }
 
@@ -1798,6 +2012,13 @@ export namespace Prisma {
     createdAt: number
     updatedAt: number
     lastLoginAt: number
+    trustScore: number
+    allowedTradeLimit: number
+    baselineTrustScore: number
+    meterDataAnalyzed: number
+    productionCapacity: number
+    meterVerifiedCapacity: number
+    meterPdfUrl: number
     providerId: number
     _all: number
   }
@@ -1805,10 +2026,20 @@ export namespace Prisma {
 
   export type UserAvgAggregateInputType = {
     balance?: true
+    trustScore?: true
+    allowedTradeLimit?: true
+    baselineTrustScore?: true
+    productionCapacity?: true
+    meterVerifiedCapacity?: true
   }
 
   export type UserSumAggregateInputType = {
     balance?: true
+    trustScore?: true
+    allowedTradeLimit?: true
+    baselineTrustScore?: true
+    productionCapacity?: true
+    meterVerifiedCapacity?: true
   }
 
   export type UserMinAggregateInputType = {
@@ -1822,6 +2053,13 @@ export namespace Prisma {
     createdAt?: true
     updatedAt?: true
     lastLoginAt?: true
+    trustScore?: true
+    allowedTradeLimit?: true
+    baselineTrustScore?: true
+    meterDataAnalyzed?: true
+    productionCapacity?: true
+    meterVerifiedCapacity?: true
+    meterPdfUrl?: true
     providerId?: true
   }
 
@@ -1836,6 +2074,13 @@ export namespace Prisma {
     createdAt?: true
     updatedAt?: true
     lastLoginAt?: true
+    trustScore?: true
+    allowedTradeLimit?: true
+    baselineTrustScore?: true
+    meterDataAnalyzed?: true
+    productionCapacity?: true
+    meterVerifiedCapacity?: true
+    meterPdfUrl?: true
     providerId?: true
   }
 
@@ -1850,6 +2095,13 @@ export namespace Prisma {
     createdAt?: true
     updatedAt?: true
     lastLoginAt?: true
+    trustScore?: true
+    allowedTradeLimit?: true
+    baselineTrustScore?: true
+    meterDataAnalyzed?: true
+    productionCapacity?: true
+    meterVerifiedCapacity?: true
+    meterPdfUrl?: true
     providerId?: true
     _all?: true
   }
@@ -1951,6 +2203,13 @@ export namespace Prisma {
     createdAt: Date
     updatedAt: Date
     lastLoginAt: Date | null
+    trustScore: number
+    allowedTradeLimit: number
+    baselineTrustScore: number
+    meterDataAnalyzed: boolean
+    productionCapacity: number | null
+    meterVerifiedCapacity: number | null
+    meterPdfUrl: string | null
     providerId: string | null
     _count: UserCountAggregateOutputType | null
     _avg: UserAvgAggregateOutputType | null
@@ -1984,10 +2243,19 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     lastLoginAt?: boolean
+    trustScore?: boolean
+    allowedTradeLimit?: boolean
+    baselineTrustScore?: boolean
+    meterDataAnalyzed?: boolean
+    productionCapacity?: boolean
+    meterVerifiedCapacity?: boolean
+    meterPdfUrl?: boolean
     providerId?: boolean
     provider?: boolean | User$providerArgs<ExtArgs>
     orders?: boolean | User$ordersArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
+    trustHistory?: boolean | User$trustHistoryArgs<ExtArgs>
+    discomFeedback?: boolean | User$discomFeedbackArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -2002,6 +2270,13 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     lastLoginAt?: boolean
+    trustScore?: boolean
+    allowedTradeLimit?: boolean
+    baselineTrustScore?: boolean
+    meterDataAnalyzed?: boolean
+    productionCapacity?: boolean
+    meterVerifiedCapacity?: boolean
+    meterPdfUrl?: boolean
     providerId?: boolean
     provider?: boolean | User$providerArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
@@ -2017,6 +2292,13 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     lastLoginAt?: boolean
+    trustScore?: boolean
+    allowedTradeLimit?: boolean
+    baselineTrustScore?: boolean
+    meterDataAnalyzed?: boolean
+    productionCapacity?: boolean
+    meterVerifiedCapacity?: boolean
+    meterPdfUrl?: boolean
     providerId?: boolean
   }
 
@@ -2024,6 +2306,8 @@ export namespace Prisma {
     provider?: boolean | User$providerArgs<ExtArgs>
     orders?: boolean | User$ordersArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
+    trustHistory?: boolean | User$trustHistoryArgs<ExtArgs>
+    discomFeedback?: boolean | User$discomFeedbackArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -2036,6 +2320,8 @@ export namespace Prisma {
       provider: Prisma.$ProviderPayload<ExtArgs> | null
       orders: Prisma.$OrderPayload<ExtArgs>[]
       sessions: Prisma.$SessionPayload<ExtArgs>[]
+      trustHistory: Prisma.$TrustScoreHistoryPayload<ExtArgs>[]
+      discomFeedback: Prisma.$DiscomFeedbackPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -2048,6 +2334,13 @@ export namespace Prisma {
       createdAt: Date
       updatedAt: Date
       lastLoginAt: Date | null
+      trustScore: number
+      allowedTradeLimit: number
+      baselineTrustScore: number
+      meterDataAnalyzed: boolean
+      productionCapacity: number | null
+      meterVerifiedCapacity: number | null
+      meterPdfUrl: string | null
       providerId: string | null
     }, ExtArgs["result"]["user"]>
     composites: {}
@@ -2416,6 +2709,8 @@ export namespace Prisma {
     provider<T extends User$providerArgs<ExtArgs> = {}>(args?: Subset<T, User$providerArgs<ExtArgs>>): Prisma__ProviderClient<$Result.GetResult<Prisma.$ProviderPayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     orders<T extends User$ordersArgs<ExtArgs> = {}>(args?: Subset<T, User$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany"> | Null>
     sessions<T extends User$sessionsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany"> | Null>
+    trustHistory<T extends User$trustHistoryArgs<ExtArgs> = {}>(args?: Subset<T, User$trustHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "findMany"> | Null>
+    discomFeedback<T extends User$discomFeedbackArgs<ExtArgs> = {}>(args?: Subset<T, User$discomFeedbackArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2455,6 +2750,13 @@ export namespace Prisma {
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
     readonly lastLoginAt: FieldRef<"User", 'DateTime'>
+    readonly trustScore: FieldRef<"User", 'Float'>
+    readonly allowedTradeLimit: FieldRef<"User", 'Float'>
+    readonly baselineTrustScore: FieldRef<"User", 'Float'>
+    readonly meterDataAnalyzed: FieldRef<"User", 'Boolean'>
+    readonly productionCapacity: FieldRef<"User", 'Float'>
+    readonly meterVerifiedCapacity: FieldRef<"User", 'Float'>
+    readonly meterPdfUrl: FieldRef<"User", 'String'>
     readonly providerId: FieldRef<"User", 'String'>
   }
     
@@ -2826,6 +3128,46 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: SessionScalarFieldEnum | SessionScalarFieldEnum[]
+  }
+
+  /**
+   * User.trustHistory
+   */
+  export type User$trustHistoryArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    where?: TrustScoreHistoryWhereInput
+    orderBy?: TrustScoreHistoryOrderByWithRelationInput | TrustScoreHistoryOrderByWithRelationInput[]
+    cursor?: TrustScoreHistoryWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: TrustScoreHistoryScalarFieldEnum | TrustScoreHistoryScalarFieldEnum[]
+  }
+
+  /**
+   * User.discomFeedback
+   */
+  export type User$discomFeedbackArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    where?: DiscomFeedbackWhereInput
+    orderBy?: DiscomFeedbackOrderByWithRelationInput | DiscomFeedbackOrderByWithRelationInput[]
+    cursor?: DiscomFeedbackWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: DiscomFeedbackScalarFieldEnum | DiscomFeedbackScalarFieldEnum[]
   }
 
   /**
@@ -8232,6 +8574,10 @@ export namespace Prisma {
     version: number | null
     createdAt: Date | null
     updatedAt: Date | null
+    cancelledAt: Date | null
+    cancelledBy: string | null
+    cancelReason: string | null
+    discomVerified: boolean | null
   }
 
   export type OrderMaxAggregateOutputType = {
@@ -8249,6 +8595,10 @@ export namespace Prisma {
     version: number | null
     createdAt: Date | null
     updatedAt: Date | null
+    cancelledAt: Date | null
+    cancelledBy: string | null
+    cancelReason: string | null
+    discomVerified: boolean | null
   }
 
   export type OrderCountAggregateOutputType = {
@@ -8266,6 +8616,10 @@ export namespace Prisma {
     version: number
     createdAt: number
     updatedAt: number
+    cancelledAt: number
+    cancelledBy: number
+    cancelReason: number
+    discomVerified: number
     _all: number
   }
 
@@ -8297,6 +8651,10 @@ export namespace Prisma {
     version?: true
     createdAt?: true
     updatedAt?: true
+    cancelledAt?: true
+    cancelledBy?: true
+    cancelReason?: true
+    discomVerified?: true
   }
 
   export type OrderMaxAggregateInputType = {
@@ -8314,6 +8672,10 @@ export namespace Prisma {
     version?: true
     createdAt?: true
     updatedAt?: true
+    cancelledAt?: true
+    cancelledBy?: true
+    cancelReason?: true
+    discomVerified?: true
   }
 
   export type OrderCountAggregateInputType = {
@@ -8331,6 +8693,10 @@ export namespace Prisma {
     version?: true
     createdAt?: true
     updatedAt?: true
+    cancelledAt?: true
+    cancelledBy?: true
+    cancelReason?: true
+    discomVerified?: true
     _all?: true
   }
 
@@ -8435,6 +8801,10 @@ export namespace Prisma {
     version: number
     createdAt: Date
     updatedAt: Date
+    cancelledAt: Date | null
+    cancelledBy: string | null
+    cancelReason: string | null
+    discomVerified: boolean
     _count: OrderCountAggregateOutputType | null
     _avg: OrderAvgAggregateOutputType | null
     _sum: OrderSumAggregateOutputType | null
@@ -8471,6 +8841,10 @@ export namespace Prisma {
     version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    cancelledAt?: boolean
+    cancelledBy?: boolean
+    cancelReason?: boolean
+    discomVerified?: boolean
     provider?: boolean | Order$providerArgs<ExtArgs>
     selectedOffer?: boolean | Order$selectedOfferArgs<ExtArgs>
     buyer?: boolean | Order$buyerArgs<ExtArgs>
@@ -8493,6 +8867,10 @@ export namespace Prisma {
     version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    cancelledAt?: boolean
+    cancelledBy?: boolean
+    cancelReason?: boolean
+    discomVerified?: boolean
     provider?: boolean | Order$providerArgs<ExtArgs>
     selectedOffer?: boolean | Order$selectedOfferArgs<ExtArgs>
     buyer?: boolean | Order$buyerArgs<ExtArgs>
@@ -8513,6 +8891,10 @@ export namespace Prisma {
     version?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    cancelledAt?: boolean
+    cancelledBy?: boolean
+    cancelReason?: boolean
+    discomVerified?: boolean
   }
 
   export type OrderInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -8551,6 +8933,10 @@ export namespace Prisma {
       version: number
       createdAt: Date
       updatedAt: Date
+      cancelledAt: Date | null
+      cancelledBy: string | null
+      cancelReason: string | null
+      discomVerified: boolean
     }, ExtArgs["result"]["order"]>
     composites: {}
   }
@@ -8962,6 +9348,10 @@ export namespace Prisma {
     readonly version: FieldRef<"Order", 'Int'>
     readonly createdAt: FieldRef<"Order", 'DateTime'>
     readonly updatedAt: FieldRef<"Order", 'DateTime'>
+    readonly cancelledAt: FieldRef<"Order", 'DateTime'>
+    readonly cancelledBy: FieldRef<"Order", 'String'>
+    readonly cancelReason: FieldRef<"Order", 'String'>
+    readonly discomVerified: FieldRef<"Order", 'Boolean'>
   }
     
 
@@ -11384,6 +11774,2096 @@ export namespace Prisma {
 
 
   /**
+   * Model TrustScoreHistory
+   */
+
+  export type AggregateTrustScoreHistory = {
+    _count: TrustScoreHistoryCountAggregateOutputType | null
+    _avg: TrustScoreHistoryAvgAggregateOutputType | null
+    _sum: TrustScoreHistorySumAggregateOutputType | null
+    _min: TrustScoreHistoryMinAggregateOutputType | null
+    _max: TrustScoreHistoryMaxAggregateOutputType | null
+  }
+
+  export type TrustScoreHistoryAvgAggregateOutputType = {
+    previousScore: number | null
+    newScore: number | null
+    previousLimit: number | null
+    newLimit: number | null
+  }
+
+  export type TrustScoreHistorySumAggregateOutputType = {
+    previousScore: number | null
+    newScore: number | null
+    previousLimit: number | null
+    newLimit: number | null
+  }
+
+  export type TrustScoreHistoryMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    previousScore: number | null
+    newScore: number | null
+    previousLimit: number | null
+    newLimit: number | null
+    reason: string | null
+    orderId: string | null
+    metadata: string | null
+    createdAt: Date | null
+  }
+
+  export type TrustScoreHistoryMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    previousScore: number | null
+    newScore: number | null
+    previousLimit: number | null
+    newLimit: number | null
+    reason: string | null
+    orderId: string | null
+    metadata: string | null
+    createdAt: Date | null
+  }
+
+  export type TrustScoreHistoryCountAggregateOutputType = {
+    id: number
+    userId: number
+    previousScore: number
+    newScore: number
+    previousLimit: number
+    newLimit: number
+    reason: number
+    orderId: number
+    metadata: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type TrustScoreHistoryAvgAggregateInputType = {
+    previousScore?: true
+    newScore?: true
+    previousLimit?: true
+    newLimit?: true
+  }
+
+  export type TrustScoreHistorySumAggregateInputType = {
+    previousScore?: true
+    newScore?: true
+    previousLimit?: true
+    newLimit?: true
+  }
+
+  export type TrustScoreHistoryMinAggregateInputType = {
+    id?: true
+    userId?: true
+    previousScore?: true
+    newScore?: true
+    previousLimit?: true
+    newLimit?: true
+    reason?: true
+    orderId?: true
+    metadata?: true
+    createdAt?: true
+  }
+
+  export type TrustScoreHistoryMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    previousScore?: true
+    newScore?: true
+    previousLimit?: true
+    newLimit?: true
+    reason?: true
+    orderId?: true
+    metadata?: true
+    createdAt?: true
+  }
+
+  export type TrustScoreHistoryCountAggregateInputType = {
+    id?: true
+    userId?: true
+    previousScore?: true
+    newScore?: true
+    previousLimit?: true
+    newLimit?: true
+    reason?: true
+    orderId?: true
+    metadata?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type TrustScoreHistoryAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which TrustScoreHistory to aggregate.
+     */
+    where?: TrustScoreHistoryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TrustScoreHistories to fetch.
+     */
+    orderBy?: TrustScoreHistoryOrderByWithRelationInput | TrustScoreHistoryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: TrustScoreHistoryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TrustScoreHistories from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TrustScoreHistories.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned TrustScoreHistories
+    **/
+    _count?: true | TrustScoreHistoryCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: TrustScoreHistoryAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: TrustScoreHistorySumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: TrustScoreHistoryMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: TrustScoreHistoryMaxAggregateInputType
+  }
+
+  export type GetTrustScoreHistoryAggregateType<T extends TrustScoreHistoryAggregateArgs> = {
+        [P in keyof T & keyof AggregateTrustScoreHistory]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateTrustScoreHistory[P]>
+      : GetScalarType<T[P], AggregateTrustScoreHistory[P]>
+  }
+
+
+
+
+  export type TrustScoreHistoryGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: TrustScoreHistoryWhereInput
+    orderBy?: TrustScoreHistoryOrderByWithAggregationInput | TrustScoreHistoryOrderByWithAggregationInput[]
+    by: TrustScoreHistoryScalarFieldEnum[] | TrustScoreHistoryScalarFieldEnum
+    having?: TrustScoreHistoryScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: TrustScoreHistoryCountAggregateInputType | true
+    _avg?: TrustScoreHistoryAvgAggregateInputType
+    _sum?: TrustScoreHistorySumAggregateInputType
+    _min?: TrustScoreHistoryMinAggregateInputType
+    _max?: TrustScoreHistoryMaxAggregateInputType
+  }
+
+  export type TrustScoreHistoryGroupByOutputType = {
+    id: string
+    userId: string
+    previousScore: number
+    newScore: number
+    previousLimit: number
+    newLimit: number
+    reason: string
+    orderId: string | null
+    metadata: string | null
+    createdAt: Date
+    _count: TrustScoreHistoryCountAggregateOutputType | null
+    _avg: TrustScoreHistoryAvgAggregateOutputType | null
+    _sum: TrustScoreHistorySumAggregateOutputType | null
+    _min: TrustScoreHistoryMinAggregateOutputType | null
+    _max: TrustScoreHistoryMaxAggregateOutputType | null
+  }
+
+  type GetTrustScoreHistoryGroupByPayload<T extends TrustScoreHistoryGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<TrustScoreHistoryGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof TrustScoreHistoryGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], TrustScoreHistoryGroupByOutputType[P]>
+            : GetScalarType<T[P], TrustScoreHistoryGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type TrustScoreHistorySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    previousScore?: boolean
+    newScore?: boolean
+    previousLimit?: boolean
+    newLimit?: boolean
+    reason?: boolean
+    orderId?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["trustScoreHistory"]>
+
+  export type TrustScoreHistorySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    previousScore?: boolean
+    newScore?: boolean
+    previousLimit?: boolean
+    newLimit?: boolean
+    reason?: boolean
+    orderId?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["trustScoreHistory"]>
+
+  export type TrustScoreHistorySelectScalar = {
+    id?: boolean
+    userId?: boolean
+    previousScore?: boolean
+    newScore?: boolean
+    previousLimit?: boolean
+    newLimit?: boolean
+    reason?: boolean
+    orderId?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+  }
+
+  export type TrustScoreHistoryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type TrustScoreHistoryIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $TrustScoreHistoryPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "TrustScoreHistory"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      previousScore: number
+      newScore: number
+      previousLimit: number
+      newLimit: number
+      reason: string
+      orderId: string | null
+      metadata: string | null
+      createdAt: Date
+    }, ExtArgs["result"]["trustScoreHistory"]>
+    composites: {}
+  }
+
+  type TrustScoreHistoryGetPayload<S extends boolean | null | undefined | TrustScoreHistoryDefaultArgs> = $Result.GetResult<Prisma.$TrustScoreHistoryPayload, S>
+
+  type TrustScoreHistoryCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<TrustScoreHistoryFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: TrustScoreHistoryCountAggregateInputType | true
+    }
+
+  export interface TrustScoreHistoryDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['TrustScoreHistory'], meta: { name: 'TrustScoreHistory' } }
+    /**
+     * Find zero or one TrustScoreHistory that matches the filter.
+     * @param {TrustScoreHistoryFindUniqueArgs} args - Arguments to find a TrustScoreHistory
+     * @example
+     * // Get one TrustScoreHistory
+     * const trustScoreHistory = await prisma.trustScoreHistory.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends TrustScoreHistoryFindUniqueArgs>(args: SelectSubset<T, TrustScoreHistoryFindUniqueArgs<ExtArgs>>): Prisma__TrustScoreHistoryClient<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one TrustScoreHistory that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {TrustScoreHistoryFindUniqueOrThrowArgs} args - Arguments to find a TrustScoreHistory
+     * @example
+     * // Get one TrustScoreHistory
+     * const trustScoreHistory = await prisma.trustScoreHistory.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends TrustScoreHistoryFindUniqueOrThrowArgs>(args: SelectSubset<T, TrustScoreHistoryFindUniqueOrThrowArgs<ExtArgs>>): Prisma__TrustScoreHistoryClient<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first TrustScoreHistory that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TrustScoreHistoryFindFirstArgs} args - Arguments to find a TrustScoreHistory
+     * @example
+     * // Get one TrustScoreHistory
+     * const trustScoreHistory = await prisma.trustScoreHistory.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends TrustScoreHistoryFindFirstArgs>(args?: SelectSubset<T, TrustScoreHistoryFindFirstArgs<ExtArgs>>): Prisma__TrustScoreHistoryClient<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first TrustScoreHistory that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TrustScoreHistoryFindFirstOrThrowArgs} args - Arguments to find a TrustScoreHistory
+     * @example
+     * // Get one TrustScoreHistory
+     * const trustScoreHistory = await prisma.trustScoreHistory.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends TrustScoreHistoryFindFirstOrThrowArgs>(args?: SelectSubset<T, TrustScoreHistoryFindFirstOrThrowArgs<ExtArgs>>): Prisma__TrustScoreHistoryClient<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more TrustScoreHistories that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TrustScoreHistoryFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all TrustScoreHistories
+     * const trustScoreHistories = await prisma.trustScoreHistory.findMany()
+     * 
+     * // Get first 10 TrustScoreHistories
+     * const trustScoreHistories = await prisma.trustScoreHistory.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const trustScoreHistoryWithIdOnly = await prisma.trustScoreHistory.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends TrustScoreHistoryFindManyArgs>(args?: SelectSubset<T, TrustScoreHistoryFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a TrustScoreHistory.
+     * @param {TrustScoreHistoryCreateArgs} args - Arguments to create a TrustScoreHistory.
+     * @example
+     * // Create one TrustScoreHistory
+     * const TrustScoreHistory = await prisma.trustScoreHistory.create({
+     *   data: {
+     *     // ... data to create a TrustScoreHistory
+     *   }
+     * })
+     * 
+     */
+    create<T extends TrustScoreHistoryCreateArgs>(args: SelectSubset<T, TrustScoreHistoryCreateArgs<ExtArgs>>): Prisma__TrustScoreHistoryClient<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many TrustScoreHistories.
+     * @param {TrustScoreHistoryCreateManyArgs} args - Arguments to create many TrustScoreHistories.
+     * @example
+     * // Create many TrustScoreHistories
+     * const trustScoreHistory = await prisma.trustScoreHistory.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends TrustScoreHistoryCreateManyArgs>(args?: SelectSubset<T, TrustScoreHistoryCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many TrustScoreHistories and returns the data saved in the database.
+     * @param {TrustScoreHistoryCreateManyAndReturnArgs} args - Arguments to create many TrustScoreHistories.
+     * @example
+     * // Create many TrustScoreHistories
+     * const trustScoreHistory = await prisma.trustScoreHistory.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many TrustScoreHistories and only return the `id`
+     * const trustScoreHistoryWithIdOnly = await prisma.trustScoreHistory.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends TrustScoreHistoryCreateManyAndReturnArgs>(args?: SelectSubset<T, TrustScoreHistoryCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a TrustScoreHistory.
+     * @param {TrustScoreHistoryDeleteArgs} args - Arguments to delete one TrustScoreHistory.
+     * @example
+     * // Delete one TrustScoreHistory
+     * const TrustScoreHistory = await prisma.trustScoreHistory.delete({
+     *   where: {
+     *     // ... filter to delete one TrustScoreHistory
+     *   }
+     * })
+     * 
+     */
+    delete<T extends TrustScoreHistoryDeleteArgs>(args: SelectSubset<T, TrustScoreHistoryDeleteArgs<ExtArgs>>): Prisma__TrustScoreHistoryClient<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one TrustScoreHistory.
+     * @param {TrustScoreHistoryUpdateArgs} args - Arguments to update one TrustScoreHistory.
+     * @example
+     * // Update one TrustScoreHistory
+     * const trustScoreHistory = await prisma.trustScoreHistory.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends TrustScoreHistoryUpdateArgs>(args: SelectSubset<T, TrustScoreHistoryUpdateArgs<ExtArgs>>): Prisma__TrustScoreHistoryClient<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more TrustScoreHistories.
+     * @param {TrustScoreHistoryDeleteManyArgs} args - Arguments to filter TrustScoreHistories to delete.
+     * @example
+     * // Delete a few TrustScoreHistories
+     * const { count } = await prisma.trustScoreHistory.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends TrustScoreHistoryDeleteManyArgs>(args?: SelectSubset<T, TrustScoreHistoryDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more TrustScoreHistories.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TrustScoreHistoryUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many TrustScoreHistories
+     * const trustScoreHistory = await prisma.trustScoreHistory.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends TrustScoreHistoryUpdateManyArgs>(args: SelectSubset<T, TrustScoreHistoryUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one TrustScoreHistory.
+     * @param {TrustScoreHistoryUpsertArgs} args - Arguments to update or create a TrustScoreHistory.
+     * @example
+     * // Update or create a TrustScoreHistory
+     * const trustScoreHistory = await prisma.trustScoreHistory.upsert({
+     *   create: {
+     *     // ... data to create a TrustScoreHistory
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the TrustScoreHistory we want to update
+     *   }
+     * })
+     */
+    upsert<T extends TrustScoreHistoryUpsertArgs>(args: SelectSubset<T, TrustScoreHistoryUpsertArgs<ExtArgs>>): Prisma__TrustScoreHistoryClient<$Result.GetResult<Prisma.$TrustScoreHistoryPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of TrustScoreHistories.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TrustScoreHistoryCountArgs} args - Arguments to filter TrustScoreHistories to count.
+     * @example
+     * // Count the number of TrustScoreHistories
+     * const count = await prisma.trustScoreHistory.count({
+     *   where: {
+     *     // ... the filter for the TrustScoreHistories we want to count
+     *   }
+     * })
+    **/
+    count<T extends TrustScoreHistoryCountArgs>(
+      args?: Subset<T, TrustScoreHistoryCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], TrustScoreHistoryCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a TrustScoreHistory.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TrustScoreHistoryAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends TrustScoreHistoryAggregateArgs>(args: Subset<T, TrustScoreHistoryAggregateArgs>): Prisma.PrismaPromise<GetTrustScoreHistoryAggregateType<T>>
+
+    /**
+     * Group by TrustScoreHistory.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {TrustScoreHistoryGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends TrustScoreHistoryGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: TrustScoreHistoryGroupByArgs['orderBy'] }
+        : { orderBy?: TrustScoreHistoryGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, TrustScoreHistoryGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetTrustScoreHistoryGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the TrustScoreHistory model
+   */
+  readonly fields: TrustScoreHistoryFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for TrustScoreHistory.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__TrustScoreHistoryClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the TrustScoreHistory model
+   */ 
+  interface TrustScoreHistoryFieldRefs {
+    readonly id: FieldRef<"TrustScoreHistory", 'String'>
+    readonly userId: FieldRef<"TrustScoreHistory", 'String'>
+    readonly previousScore: FieldRef<"TrustScoreHistory", 'Float'>
+    readonly newScore: FieldRef<"TrustScoreHistory", 'Float'>
+    readonly previousLimit: FieldRef<"TrustScoreHistory", 'Float'>
+    readonly newLimit: FieldRef<"TrustScoreHistory", 'Float'>
+    readonly reason: FieldRef<"TrustScoreHistory", 'String'>
+    readonly orderId: FieldRef<"TrustScoreHistory", 'String'>
+    readonly metadata: FieldRef<"TrustScoreHistory", 'String'>
+    readonly createdAt: FieldRef<"TrustScoreHistory", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * TrustScoreHistory findUnique
+   */
+  export type TrustScoreHistoryFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * Filter, which TrustScoreHistory to fetch.
+     */
+    where: TrustScoreHistoryWhereUniqueInput
+  }
+
+  /**
+   * TrustScoreHistory findUniqueOrThrow
+   */
+  export type TrustScoreHistoryFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * Filter, which TrustScoreHistory to fetch.
+     */
+    where: TrustScoreHistoryWhereUniqueInput
+  }
+
+  /**
+   * TrustScoreHistory findFirst
+   */
+  export type TrustScoreHistoryFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * Filter, which TrustScoreHistory to fetch.
+     */
+    where?: TrustScoreHistoryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TrustScoreHistories to fetch.
+     */
+    orderBy?: TrustScoreHistoryOrderByWithRelationInput | TrustScoreHistoryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for TrustScoreHistories.
+     */
+    cursor?: TrustScoreHistoryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TrustScoreHistories from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TrustScoreHistories.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TrustScoreHistories.
+     */
+    distinct?: TrustScoreHistoryScalarFieldEnum | TrustScoreHistoryScalarFieldEnum[]
+  }
+
+  /**
+   * TrustScoreHistory findFirstOrThrow
+   */
+  export type TrustScoreHistoryFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * Filter, which TrustScoreHistory to fetch.
+     */
+    where?: TrustScoreHistoryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TrustScoreHistories to fetch.
+     */
+    orderBy?: TrustScoreHistoryOrderByWithRelationInput | TrustScoreHistoryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for TrustScoreHistories.
+     */
+    cursor?: TrustScoreHistoryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TrustScoreHistories from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TrustScoreHistories.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TrustScoreHistories.
+     */
+    distinct?: TrustScoreHistoryScalarFieldEnum | TrustScoreHistoryScalarFieldEnum[]
+  }
+
+  /**
+   * TrustScoreHistory findMany
+   */
+  export type TrustScoreHistoryFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * Filter, which TrustScoreHistories to fetch.
+     */
+    where?: TrustScoreHistoryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of TrustScoreHistories to fetch.
+     */
+    orderBy?: TrustScoreHistoryOrderByWithRelationInput | TrustScoreHistoryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing TrustScoreHistories.
+     */
+    cursor?: TrustScoreHistoryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` TrustScoreHistories from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` TrustScoreHistories.
+     */
+    skip?: number
+    distinct?: TrustScoreHistoryScalarFieldEnum | TrustScoreHistoryScalarFieldEnum[]
+  }
+
+  /**
+   * TrustScoreHistory create
+   */
+  export type TrustScoreHistoryCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * The data needed to create a TrustScoreHistory.
+     */
+    data: XOR<TrustScoreHistoryCreateInput, TrustScoreHistoryUncheckedCreateInput>
+  }
+
+  /**
+   * TrustScoreHistory createMany
+   */
+  export type TrustScoreHistoryCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many TrustScoreHistories.
+     */
+    data: TrustScoreHistoryCreateManyInput | TrustScoreHistoryCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * TrustScoreHistory createManyAndReturn
+   */
+  export type TrustScoreHistoryCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many TrustScoreHistories.
+     */
+    data: TrustScoreHistoryCreateManyInput | TrustScoreHistoryCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * TrustScoreHistory update
+   */
+  export type TrustScoreHistoryUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * The data needed to update a TrustScoreHistory.
+     */
+    data: XOR<TrustScoreHistoryUpdateInput, TrustScoreHistoryUncheckedUpdateInput>
+    /**
+     * Choose, which TrustScoreHistory to update.
+     */
+    where: TrustScoreHistoryWhereUniqueInput
+  }
+
+  /**
+   * TrustScoreHistory updateMany
+   */
+  export type TrustScoreHistoryUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update TrustScoreHistories.
+     */
+    data: XOR<TrustScoreHistoryUpdateManyMutationInput, TrustScoreHistoryUncheckedUpdateManyInput>
+    /**
+     * Filter which TrustScoreHistories to update
+     */
+    where?: TrustScoreHistoryWhereInput
+  }
+
+  /**
+   * TrustScoreHistory upsert
+   */
+  export type TrustScoreHistoryUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * The filter to search for the TrustScoreHistory to update in case it exists.
+     */
+    where: TrustScoreHistoryWhereUniqueInput
+    /**
+     * In case the TrustScoreHistory found by the `where` argument doesn't exist, create a new TrustScoreHistory with this data.
+     */
+    create: XOR<TrustScoreHistoryCreateInput, TrustScoreHistoryUncheckedCreateInput>
+    /**
+     * In case the TrustScoreHistory was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<TrustScoreHistoryUpdateInput, TrustScoreHistoryUncheckedUpdateInput>
+  }
+
+  /**
+   * TrustScoreHistory delete
+   */
+  export type TrustScoreHistoryDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+    /**
+     * Filter which TrustScoreHistory to delete.
+     */
+    where: TrustScoreHistoryWhereUniqueInput
+  }
+
+  /**
+   * TrustScoreHistory deleteMany
+   */
+  export type TrustScoreHistoryDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which TrustScoreHistories to delete
+     */
+    where?: TrustScoreHistoryWhereInput
+  }
+
+  /**
+   * TrustScoreHistory without action
+   */
+  export type TrustScoreHistoryDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the TrustScoreHistory
+     */
+    select?: TrustScoreHistorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: TrustScoreHistoryInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model DiscomFeedback
+   */
+
+  export type AggregateDiscomFeedback = {
+    _count: DiscomFeedbackCountAggregateOutputType | null
+    _avg: DiscomFeedbackAvgAggregateOutputType | null
+    _sum: DiscomFeedbackSumAggregateOutputType | null
+    _min: DiscomFeedbackMinAggregateOutputType | null
+    _max: DiscomFeedbackMaxAggregateOutputType | null
+  }
+
+  export type DiscomFeedbackAvgAggregateOutputType = {
+    deliveredQty: number | null
+    expectedQty: number | null
+    deliveryRatio: number | null
+    trustImpact: number | null
+  }
+
+  export type DiscomFeedbackSumAggregateOutputType = {
+    deliveredQty: number | null
+    expectedQty: number | null
+    deliveryRatio: number | null
+    trustImpact: number | null
+  }
+
+  export type DiscomFeedbackMinAggregateOutputType = {
+    id: string | null
+    orderId: string | null
+    sellerId: string | null
+    transactionId: string | null
+    deliveredQty: number | null
+    expectedQty: number | null
+    deliveryRatio: number | null
+    status: string | null
+    trustImpact: number | null
+    verifiedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type DiscomFeedbackMaxAggregateOutputType = {
+    id: string | null
+    orderId: string | null
+    sellerId: string | null
+    transactionId: string | null
+    deliveredQty: number | null
+    expectedQty: number | null
+    deliveryRatio: number | null
+    status: string | null
+    trustImpact: number | null
+    verifiedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type DiscomFeedbackCountAggregateOutputType = {
+    id: number
+    orderId: number
+    sellerId: number
+    transactionId: number
+    deliveredQty: number
+    expectedQty: number
+    deliveryRatio: number
+    status: number
+    trustImpact: number
+    verifiedAt: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type DiscomFeedbackAvgAggregateInputType = {
+    deliveredQty?: true
+    expectedQty?: true
+    deliveryRatio?: true
+    trustImpact?: true
+  }
+
+  export type DiscomFeedbackSumAggregateInputType = {
+    deliveredQty?: true
+    expectedQty?: true
+    deliveryRatio?: true
+    trustImpact?: true
+  }
+
+  export type DiscomFeedbackMinAggregateInputType = {
+    id?: true
+    orderId?: true
+    sellerId?: true
+    transactionId?: true
+    deliveredQty?: true
+    expectedQty?: true
+    deliveryRatio?: true
+    status?: true
+    trustImpact?: true
+    verifiedAt?: true
+    createdAt?: true
+  }
+
+  export type DiscomFeedbackMaxAggregateInputType = {
+    id?: true
+    orderId?: true
+    sellerId?: true
+    transactionId?: true
+    deliveredQty?: true
+    expectedQty?: true
+    deliveryRatio?: true
+    status?: true
+    trustImpact?: true
+    verifiedAt?: true
+    createdAt?: true
+  }
+
+  export type DiscomFeedbackCountAggregateInputType = {
+    id?: true
+    orderId?: true
+    sellerId?: true
+    transactionId?: true
+    deliveredQty?: true
+    expectedQty?: true
+    deliveryRatio?: true
+    status?: true
+    trustImpact?: true
+    verifiedAt?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type DiscomFeedbackAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which DiscomFeedback to aggregate.
+     */
+    where?: DiscomFeedbackWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DiscomFeedbacks to fetch.
+     */
+    orderBy?: DiscomFeedbackOrderByWithRelationInput | DiscomFeedbackOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: DiscomFeedbackWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DiscomFeedbacks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DiscomFeedbacks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned DiscomFeedbacks
+    **/
+    _count?: true | DiscomFeedbackCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: DiscomFeedbackAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: DiscomFeedbackSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: DiscomFeedbackMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: DiscomFeedbackMaxAggregateInputType
+  }
+
+  export type GetDiscomFeedbackAggregateType<T extends DiscomFeedbackAggregateArgs> = {
+        [P in keyof T & keyof AggregateDiscomFeedback]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateDiscomFeedback[P]>
+      : GetScalarType<T[P], AggregateDiscomFeedback[P]>
+  }
+
+
+
+
+  export type DiscomFeedbackGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: DiscomFeedbackWhereInput
+    orderBy?: DiscomFeedbackOrderByWithAggregationInput | DiscomFeedbackOrderByWithAggregationInput[]
+    by: DiscomFeedbackScalarFieldEnum[] | DiscomFeedbackScalarFieldEnum
+    having?: DiscomFeedbackScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: DiscomFeedbackCountAggregateInputType | true
+    _avg?: DiscomFeedbackAvgAggregateInputType
+    _sum?: DiscomFeedbackSumAggregateInputType
+    _min?: DiscomFeedbackMinAggregateInputType
+    _max?: DiscomFeedbackMaxAggregateInputType
+  }
+
+  export type DiscomFeedbackGroupByOutputType = {
+    id: string
+    orderId: string
+    sellerId: string
+    transactionId: string
+    deliveredQty: number
+    expectedQty: number
+    deliveryRatio: number
+    status: string
+    trustImpact: number
+    verifiedAt: Date
+    createdAt: Date
+    _count: DiscomFeedbackCountAggregateOutputType | null
+    _avg: DiscomFeedbackAvgAggregateOutputType | null
+    _sum: DiscomFeedbackSumAggregateOutputType | null
+    _min: DiscomFeedbackMinAggregateOutputType | null
+    _max: DiscomFeedbackMaxAggregateOutputType | null
+  }
+
+  type GetDiscomFeedbackGroupByPayload<T extends DiscomFeedbackGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<DiscomFeedbackGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof DiscomFeedbackGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], DiscomFeedbackGroupByOutputType[P]>
+            : GetScalarType<T[P], DiscomFeedbackGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type DiscomFeedbackSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    orderId?: boolean
+    sellerId?: boolean
+    transactionId?: boolean
+    deliveredQty?: boolean
+    expectedQty?: boolean
+    deliveryRatio?: boolean
+    status?: boolean
+    trustImpact?: boolean
+    verifiedAt?: boolean
+    createdAt?: boolean
+    seller?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["discomFeedback"]>
+
+  export type DiscomFeedbackSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    orderId?: boolean
+    sellerId?: boolean
+    transactionId?: boolean
+    deliveredQty?: boolean
+    expectedQty?: boolean
+    deliveryRatio?: boolean
+    status?: boolean
+    trustImpact?: boolean
+    verifiedAt?: boolean
+    createdAt?: boolean
+    seller?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["discomFeedback"]>
+
+  export type DiscomFeedbackSelectScalar = {
+    id?: boolean
+    orderId?: boolean
+    sellerId?: boolean
+    transactionId?: boolean
+    deliveredQty?: boolean
+    expectedQty?: boolean
+    deliveryRatio?: boolean
+    status?: boolean
+    trustImpact?: boolean
+    verifiedAt?: boolean
+    createdAt?: boolean
+  }
+
+  export type DiscomFeedbackInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    seller?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type DiscomFeedbackIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    seller?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $DiscomFeedbackPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "DiscomFeedback"
+    objects: {
+      seller: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      orderId: string
+      sellerId: string
+      transactionId: string
+      deliveredQty: number
+      expectedQty: number
+      deliveryRatio: number
+      status: string
+      trustImpact: number
+      verifiedAt: Date
+      createdAt: Date
+    }, ExtArgs["result"]["discomFeedback"]>
+    composites: {}
+  }
+
+  type DiscomFeedbackGetPayload<S extends boolean | null | undefined | DiscomFeedbackDefaultArgs> = $Result.GetResult<Prisma.$DiscomFeedbackPayload, S>
+
+  type DiscomFeedbackCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<DiscomFeedbackFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: DiscomFeedbackCountAggregateInputType | true
+    }
+
+  export interface DiscomFeedbackDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['DiscomFeedback'], meta: { name: 'DiscomFeedback' } }
+    /**
+     * Find zero or one DiscomFeedback that matches the filter.
+     * @param {DiscomFeedbackFindUniqueArgs} args - Arguments to find a DiscomFeedback
+     * @example
+     * // Get one DiscomFeedback
+     * const discomFeedback = await prisma.discomFeedback.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends DiscomFeedbackFindUniqueArgs>(args: SelectSubset<T, DiscomFeedbackFindUniqueArgs<ExtArgs>>): Prisma__DiscomFeedbackClient<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one DiscomFeedback that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {DiscomFeedbackFindUniqueOrThrowArgs} args - Arguments to find a DiscomFeedback
+     * @example
+     * // Get one DiscomFeedback
+     * const discomFeedback = await prisma.discomFeedback.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends DiscomFeedbackFindUniqueOrThrowArgs>(args: SelectSubset<T, DiscomFeedbackFindUniqueOrThrowArgs<ExtArgs>>): Prisma__DiscomFeedbackClient<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first DiscomFeedback that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DiscomFeedbackFindFirstArgs} args - Arguments to find a DiscomFeedback
+     * @example
+     * // Get one DiscomFeedback
+     * const discomFeedback = await prisma.discomFeedback.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends DiscomFeedbackFindFirstArgs>(args?: SelectSubset<T, DiscomFeedbackFindFirstArgs<ExtArgs>>): Prisma__DiscomFeedbackClient<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first DiscomFeedback that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DiscomFeedbackFindFirstOrThrowArgs} args - Arguments to find a DiscomFeedback
+     * @example
+     * // Get one DiscomFeedback
+     * const discomFeedback = await prisma.discomFeedback.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends DiscomFeedbackFindFirstOrThrowArgs>(args?: SelectSubset<T, DiscomFeedbackFindFirstOrThrowArgs<ExtArgs>>): Prisma__DiscomFeedbackClient<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more DiscomFeedbacks that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DiscomFeedbackFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all DiscomFeedbacks
+     * const discomFeedbacks = await prisma.discomFeedback.findMany()
+     * 
+     * // Get first 10 DiscomFeedbacks
+     * const discomFeedbacks = await prisma.discomFeedback.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const discomFeedbackWithIdOnly = await prisma.discomFeedback.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends DiscomFeedbackFindManyArgs>(args?: SelectSubset<T, DiscomFeedbackFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a DiscomFeedback.
+     * @param {DiscomFeedbackCreateArgs} args - Arguments to create a DiscomFeedback.
+     * @example
+     * // Create one DiscomFeedback
+     * const DiscomFeedback = await prisma.discomFeedback.create({
+     *   data: {
+     *     // ... data to create a DiscomFeedback
+     *   }
+     * })
+     * 
+     */
+    create<T extends DiscomFeedbackCreateArgs>(args: SelectSubset<T, DiscomFeedbackCreateArgs<ExtArgs>>): Prisma__DiscomFeedbackClient<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many DiscomFeedbacks.
+     * @param {DiscomFeedbackCreateManyArgs} args - Arguments to create many DiscomFeedbacks.
+     * @example
+     * // Create many DiscomFeedbacks
+     * const discomFeedback = await prisma.discomFeedback.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends DiscomFeedbackCreateManyArgs>(args?: SelectSubset<T, DiscomFeedbackCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many DiscomFeedbacks and returns the data saved in the database.
+     * @param {DiscomFeedbackCreateManyAndReturnArgs} args - Arguments to create many DiscomFeedbacks.
+     * @example
+     * // Create many DiscomFeedbacks
+     * const discomFeedback = await prisma.discomFeedback.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many DiscomFeedbacks and only return the `id`
+     * const discomFeedbackWithIdOnly = await prisma.discomFeedback.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends DiscomFeedbackCreateManyAndReturnArgs>(args?: SelectSubset<T, DiscomFeedbackCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a DiscomFeedback.
+     * @param {DiscomFeedbackDeleteArgs} args - Arguments to delete one DiscomFeedback.
+     * @example
+     * // Delete one DiscomFeedback
+     * const DiscomFeedback = await prisma.discomFeedback.delete({
+     *   where: {
+     *     // ... filter to delete one DiscomFeedback
+     *   }
+     * })
+     * 
+     */
+    delete<T extends DiscomFeedbackDeleteArgs>(args: SelectSubset<T, DiscomFeedbackDeleteArgs<ExtArgs>>): Prisma__DiscomFeedbackClient<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one DiscomFeedback.
+     * @param {DiscomFeedbackUpdateArgs} args - Arguments to update one DiscomFeedback.
+     * @example
+     * // Update one DiscomFeedback
+     * const discomFeedback = await prisma.discomFeedback.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends DiscomFeedbackUpdateArgs>(args: SelectSubset<T, DiscomFeedbackUpdateArgs<ExtArgs>>): Prisma__DiscomFeedbackClient<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more DiscomFeedbacks.
+     * @param {DiscomFeedbackDeleteManyArgs} args - Arguments to filter DiscomFeedbacks to delete.
+     * @example
+     * // Delete a few DiscomFeedbacks
+     * const { count } = await prisma.discomFeedback.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends DiscomFeedbackDeleteManyArgs>(args?: SelectSubset<T, DiscomFeedbackDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more DiscomFeedbacks.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DiscomFeedbackUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many DiscomFeedbacks
+     * const discomFeedback = await prisma.discomFeedback.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends DiscomFeedbackUpdateManyArgs>(args: SelectSubset<T, DiscomFeedbackUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one DiscomFeedback.
+     * @param {DiscomFeedbackUpsertArgs} args - Arguments to update or create a DiscomFeedback.
+     * @example
+     * // Update or create a DiscomFeedback
+     * const discomFeedback = await prisma.discomFeedback.upsert({
+     *   create: {
+     *     // ... data to create a DiscomFeedback
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the DiscomFeedback we want to update
+     *   }
+     * })
+     */
+    upsert<T extends DiscomFeedbackUpsertArgs>(args: SelectSubset<T, DiscomFeedbackUpsertArgs<ExtArgs>>): Prisma__DiscomFeedbackClient<$Result.GetResult<Prisma.$DiscomFeedbackPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of DiscomFeedbacks.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DiscomFeedbackCountArgs} args - Arguments to filter DiscomFeedbacks to count.
+     * @example
+     * // Count the number of DiscomFeedbacks
+     * const count = await prisma.discomFeedback.count({
+     *   where: {
+     *     // ... the filter for the DiscomFeedbacks we want to count
+     *   }
+     * })
+    **/
+    count<T extends DiscomFeedbackCountArgs>(
+      args?: Subset<T, DiscomFeedbackCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], DiscomFeedbackCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a DiscomFeedback.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DiscomFeedbackAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends DiscomFeedbackAggregateArgs>(args: Subset<T, DiscomFeedbackAggregateArgs>): Prisma.PrismaPromise<GetDiscomFeedbackAggregateType<T>>
+
+    /**
+     * Group by DiscomFeedback.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DiscomFeedbackGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends DiscomFeedbackGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: DiscomFeedbackGroupByArgs['orderBy'] }
+        : { orderBy?: DiscomFeedbackGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, DiscomFeedbackGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetDiscomFeedbackGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the DiscomFeedback model
+   */
+  readonly fields: DiscomFeedbackFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for DiscomFeedback.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__DiscomFeedbackClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    seller<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the DiscomFeedback model
+   */ 
+  interface DiscomFeedbackFieldRefs {
+    readonly id: FieldRef<"DiscomFeedback", 'String'>
+    readonly orderId: FieldRef<"DiscomFeedback", 'String'>
+    readonly sellerId: FieldRef<"DiscomFeedback", 'String'>
+    readonly transactionId: FieldRef<"DiscomFeedback", 'String'>
+    readonly deliveredQty: FieldRef<"DiscomFeedback", 'Float'>
+    readonly expectedQty: FieldRef<"DiscomFeedback", 'Float'>
+    readonly deliveryRatio: FieldRef<"DiscomFeedback", 'Float'>
+    readonly status: FieldRef<"DiscomFeedback", 'String'>
+    readonly trustImpact: FieldRef<"DiscomFeedback", 'Float'>
+    readonly verifiedAt: FieldRef<"DiscomFeedback", 'DateTime'>
+    readonly createdAt: FieldRef<"DiscomFeedback", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * DiscomFeedback findUnique
+   */
+  export type DiscomFeedbackFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * Filter, which DiscomFeedback to fetch.
+     */
+    where: DiscomFeedbackWhereUniqueInput
+  }
+
+  /**
+   * DiscomFeedback findUniqueOrThrow
+   */
+  export type DiscomFeedbackFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * Filter, which DiscomFeedback to fetch.
+     */
+    where: DiscomFeedbackWhereUniqueInput
+  }
+
+  /**
+   * DiscomFeedback findFirst
+   */
+  export type DiscomFeedbackFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * Filter, which DiscomFeedback to fetch.
+     */
+    where?: DiscomFeedbackWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DiscomFeedbacks to fetch.
+     */
+    orderBy?: DiscomFeedbackOrderByWithRelationInput | DiscomFeedbackOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for DiscomFeedbacks.
+     */
+    cursor?: DiscomFeedbackWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DiscomFeedbacks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DiscomFeedbacks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of DiscomFeedbacks.
+     */
+    distinct?: DiscomFeedbackScalarFieldEnum | DiscomFeedbackScalarFieldEnum[]
+  }
+
+  /**
+   * DiscomFeedback findFirstOrThrow
+   */
+  export type DiscomFeedbackFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * Filter, which DiscomFeedback to fetch.
+     */
+    where?: DiscomFeedbackWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DiscomFeedbacks to fetch.
+     */
+    orderBy?: DiscomFeedbackOrderByWithRelationInput | DiscomFeedbackOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for DiscomFeedbacks.
+     */
+    cursor?: DiscomFeedbackWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DiscomFeedbacks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DiscomFeedbacks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of DiscomFeedbacks.
+     */
+    distinct?: DiscomFeedbackScalarFieldEnum | DiscomFeedbackScalarFieldEnum[]
+  }
+
+  /**
+   * DiscomFeedback findMany
+   */
+  export type DiscomFeedbackFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * Filter, which DiscomFeedbacks to fetch.
+     */
+    where?: DiscomFeedbackWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DiscomFeedbacks to fetch.
+     */
+    orderBy?: DiscomFeedbackOrderByWithRelationInput | DiscomFeedbackOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing DiscomFeedbacks.
+     */
+    cursor?: DiscomFeedbackWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DiscomFeedbacks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DiscomFeedbacks.
+     */
+    skip?: number
+    distinct?: DiscomFeedbackScalarFieldEnum | DiscomFeedbackScalarFieldEnum[]
+  }
+
+  /**
+   * DiscomFeedback create
+   */
+  export type DiscomFeedbackCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * The data needed to create a DiscomFeedback.
+     */
+    data: XOR<DiscomFeedbackCreateInput, DiscomFeedbackUncheckedCreateInput>
+  }
+
+  /**
+   * DiscomFeedback createMany
+   */
+  export type DiscomFeedbackCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many DiscomFeedbacks.
+     */
+    data: DiscomFeedbackCreateManyInput | DiscomFeedbackCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * DiscomFeedback createManyAndReturn
+   */
+  export type DiscomFeedbackCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many DiscomFeedbacks.
+     */
+    data: DiscomFeedbackCreateManyInput | DiscomFeedbackCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * DiscomFeedback update
+   */
+  export type DiscomFeedbackUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * The data needed to update a DiscomFeedback.
+     */
+    data: XOR<DiscomFeedbackUpdateInput, DiscomFeedbackUncheckedUpdateInput>
+    /**
+     * Choose, which DiscomFeedback to update.
+     */
+    where: DiscomFeedbackWhereUniqueInput
+  }
+
+  /**
+   * DiscomFeedback updateMany
+   */
+  export type DiscomFeedbackUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update DiscomFeedbacks.
+     */
+    data: XOR<DiscomFeedbackUpdateManyMutationInput, DiscomFeedbackUncheckedUpdateManyInput>
+    /**
+     * Filter which DiscomFeedbacks to update
+     */
+    where?: DiscomFeedbackWhereInput
+  }
+
+  /**
+   * DiscomFeedback upsert
+   */
+  export type DiscomFeedbackUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * The filter to search for the DiscomFeedback to update in case it exists.
+     */
+    where: DiscomFeedbackWhereUniqueInput
+    /**
+     * In case the DiscomFeedback found by the `where` argument doesn't exist, create a new DiscomFeedback with this data.
+     */
+    create: XOR<DiscomFeedbackCreateInput, DiscomFeedbackUncheckedCreateInput>
+    /**
+     * In case the DiscomFeedback was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<DiscomFeedbackUpdateInput, DiscomFeedbackUncheckedUpdateInput>
+  }
+
+  /**
+   * DiscomFeedback delete
+   */
+  export type DiscomFeedbackDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+    /**
+     * Filter which DiscomFeedback to delete.
+     */
+    where: DiscomFeedbackWhereUniqueInput
+  }
+
+  /**
+   * DiscomFeedback deleteMany
+   */
+  export type DiscomFeedbackDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which DiscomFeedbacks to delete
+     */
+    where?: DiscomFeedbackWhereInput
+  }
+
+  /**
+   * DiscomFeedback without action
+   */
+  export type DiscomFeedbackDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DiscomFeedback
+     */
+    select?: DiscomFeedbackSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DiscomFeedbackInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -11408,6 +13888,13 @@ export namespace Prisma {
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     lastLoginAt: 'lastLoginAt',
+    trustScore: 'trustScore',
+    allowedTradeLimit: 'allowedTradeLimit',
+    baselineTrustScore: 'baselineTrustScore',
+    meterDataAnalyzed: 'meterDataAnalyzed',
+    productionCapacity: 'productionCapacity',
+    meterVerifiedCapacity: 'meterVerifiedCapacity',
+    meterPdfUrl: 'meterPdfUrl',
     providerId: 'providerId'
   };
 
@@ -11507,7 +13994,11 @@ export namespace Prisma {
     quoteJson: 'quoteJson',
     version: 'version',
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    cancelledAt: 'cancelledAt',
+    cancelledBy: 'cancelledBy',
+    cancelReason: 'cancelReason',
+    discomVerified: 'discomVerified'
   };
 
   export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]
@@ -11549,6 +14040,39 @@ export namespace Prisma {
   };
 
   export type SettlementRecordScalarFieldEnum = (typeof SettlementRecordScalarFieldEnum)[keyof typeof SettlementRecordScalarFieldEnum]
+
+
+  export const TrustScoreHistoryScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    previousScore: 'previousScore',
+    newScore: 'newScore',
+    previousLimit: 'previousLimit',
+    newLimit: 'newLimit',
+    reason: 'reason',
+    orderId: 'orderId',
+    metadata: 'metadata',
+    createdAt: 'createdAt'
+  };
+
+  export type TrustScoreHistoryScalarFieldEnum = (typeof TrustScoreHistoryScalarFieldEnum)[keyof typeof TrustScoreHistoryScalarFieldEnum]
+
+
+  export const DiscomFeedbackScalarFieldEnum: {
+    id: 'id',
+    orderId: 'orderId',
+    sellerId: 'sellerId',
+    transactionId: 'transactionId',
+    deliveredQty: 'deliveredQty',
+    expectedQty: 'expectedQty',
+    deliveryRatio: 'deliveryRatio',
+    status: 'status',
+    trustImpact: 'trustImpact',
+    verifiedAt: 'verifiedAt',
+    createdAt: 'createdAt'
+  };
+
+  export type DiscomFeedbackScalarFieldEnum = (typeof DiscomFeedbackScalarFieldEnum)[keyof typeof DiscomFeedbackScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -11660,10 +14184,19 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     lastLoginAt?: DateTimeNullableFilter<"User"> | Date | string | null
+    trustScore?: FloatFilter<"User"> | number
+    allowedTradeLimit?: FloatFilter<"User"> | number
+    baselineTrustScore?: FloatFilter<"User"> | number
+    meterDataAnalyzed?: BoolFilter<"User"> | boolean
+    productionCapacity?: FloatNullableFilter<"User"> | number | null
+    meterVerifiedCapacity?: FloatNullableFilter<"User"> | number | null
+    meterPdfUrl?: StringNullableFilter<"User"> | string | null
     providerId?: StringNullableFilter<"User"> | string | null
     provider?: XOR<ProviderNullableRelationFilter, ProviderWhereInput> | null
     orders?: OrderListRelationFilter
     sessions?: SessionListRelationFilter
+    trustHistory?: TrustScoreHistoryListRelationFilter
+    discomFeedback?: DiscomFeedbackListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -11677,10 +14210,19 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrderInput | SortOrder
+    trustScore?: SortOrder
+    allowedTradeLimit?: SortOrder
+    baselineTrustScore?: SortOrder
+    meterDataAnalyzed?: SortOrder
+    productionCapacity?: SortOrderInput | SortOrder
+    meterVerifiedCapacity?: SortOrderInput | SortOrder
+    meterPdfUrl?: SortOrderInput | SortOrder
     providerId?: SortOrderInput | SortOrder
     provider?: ProviderOrderByWithRelationInput
     orders?: OrderOrderByRelationAggregateInput
     sessions?: SessionOrderByRelationAggregateInput
+    trustHistory?: TrustScoreHistoryOrderByRelationAggregateInput
+    discomFeedback?: DiscomFeedbackOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -11698,9 +14240,18 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     lastLoginAt?: DateTimeNullableFilter<"User"> | Date | string | null
+    trustScore?: FloatFilter<"User"> | number
+    allowedTradeLimit?: FloatFilter<"User"> | number
+    baselineTrustScore?: FloatFilter<"User"> | number
+    meterDataAnalyzed?: BoolFilter<"User"> | boolean
+    productionCapacity?: FloatNullableFilter<"User"> | number | null
+    meterVerifiedCapacity?: FloatNullableFilter<"User"> | number | null
+    meterPdfUrl?: StringNullableFilter<"User"> | string | null
     provider?: XOR<ProviderNullableRelationFilter, ProviderWhereInput> | null
     orders?: OrderListRelationFilter
     sessions?: SessionListRelationFilter
+    trustHistory?: TrustScoreHistoryListRelationFilter
+    discomFeedback?: DiscomFeedbackListRelationFilter
   }, "id" | "email" | "googleId" | "providerId">
 
   export type UserOrderByWithAggregationInput = {
@@ -11714,6 +14265,13 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrderInput | SortOrder
+    trustScore?: SortOrder
+    allowedTradeLimit?: SortOrder
+    baselineTrustScore?: SortOrder
+    meterDataAnalyzed?: SortOrder
+    productionCapacity?: SortOrderInput | SortOrder
+    meterVerifiedCapacity?: SortOrderInput | SortOrder
+    meterPdfUrl?: SortOrderInput | SortOrder
     providerId?: SortOrderInput | SortOrder
     _count?: UserCountOrderByAggregateInput
     _avg?: UserAvgOrderByAggregateInput
@@ -11736,6 +14294,13 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     lastLoginAt?: DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+    trustScore?: FloatWithAggregatesFilter<"User"> | number
+    allowedTradeLimit?: FloatWithAggregatesFilter<"User"> | number
+    baselineTrustScore?: FloatWithAggregatesFilter<"User"> | number
+    meterDataAnalyzed?: BoolWithAggregatesFilter<"User"> | boolean
+    productionCapacity?: FloatNullableWithAggregatesFilter<"User"> | number | null
+    meterVerifiedCapacity?: FloatNullableWithAggregatesFilter<"User"> | number | null
+    meterPdfUrl?: StringNullableWithAggregatesFilter<"User"> | string | null
     providerId?: StringNullableWithAggregatesFilter<"User"> | string | null
   }
 
@@ -12196,6 +14761,10 @@ export namespace Prisma {
     version?: IntFilter<"Order"> | number
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
+    cancelledAt?: DateTimeNullableFilter<"Order"> | Date | string | null
+    cancelledBy?: StringNullableFilter<"Order"> | string | null
+    cancelReason?: StringNullableFilter<"Order"> | string | null
+    discomVerified?: BoolFilter<"Order"> | boolean
     provider?: XOR<ProviderNullableRelationFilter, ProviderWhereInput> | null
     selectedOffer?: XOR<CatalogOfferNullableRelationFilter, CatalogOfferWhereInput> | null
     buyer?: XOR<UserNullableRelationFilter, UserWhereInput> | null
@@ -12217,6 +14786,10 @@ export namespace Prisma {
     version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    cancelledAt?: SortOrderInput | SortOrder
+    cancelledBy?: SortOrderInput | SortOrder
+    cancelReason?: SortOrderInput | SortOrder
+    discomVerified?: SortOrder
     provider?: ProviderOrderByWithRelationInput
     selectedOffer?: CatalogOfferOrderByWithRelationInput
     buyer?: UserOrderByWithRelationInput
@@ -12241,6 +14814,10 @@ export namespace Prisma {
     version?: IntFilter<"Order"> | number
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
+    cancelledAt?: DateTimeNullableFilter<"Order"> | Date | string | null
+    cancelledBy?: StringNullableFilter<"Order"> | string | null
+    cancelReason?: StringNullableFilter<"Order"> | string | null
+    discomVerified?: BoolFilter<"Order"> | boolean
     provider?: XOR<ProviderNullableRelationFilter, ProviderWhereInput> | null
     selectedOffer?: XOR<CatalogOfferNullableRelationFilter, CatalogOfferWhereInput> | null
     buyer?: XOR<UserNullableRelationFilter, UserWhereInput> | null
@@ -12262,6 +14839,10 @@ export namespace Prisma {
     version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    cancelledAt?: SortOrderInput | SortOrder
+    cancelledBy?: SortOrderInput | SortOrder
+    cancelReason?: SortOrderInput | SortOrder
+    discomVerified?: SortOrder
     _count?: OrderCountOrderByAggregateInput
     _avg?: OrderAvgOrderByAggregateInput
     _max?: OrderMaxOrderByAggregateInput
@@ -12287,6 +14868,10 @@ export namespace Prisma {
     version?: IntWithAggregatesFilter<"Order"> | number
     createdAt?: DateTimeWithAggregatesFilter<"Order"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Order"> | Date | string
+    cancelledAt?: DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+    cancelledBy?: StringNullableWithAggregatesFilter<"Order"> | string | null
+    cancelReason?: StringNullableWithAggregatesFilter<"Order"> | string | null
+    discomVerified?: BoolWithAggregatesFilter<"Order"> | boolean
   }
 
   export type EventWhereInput = {
@@ -12477,6 +15062,175 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"SettlementRecord"> | Date | string
   }
 
+  export type TrustScoreHistoryWhereInput = {
+    AND?: TrustScoreHistoryWhereInput | TrustScoreHistoryWhereInput[]
+    OR?: TrustScoreHistoryWhereInput[]
+    NOT?: TrustScoreHistoryWhereInput | TrustScoreHistoryWhereInput[]
+    id?: StringFilter<"TrustScoreHistory"> | string
+    userId?: StringFilter<"TrustScoreHistory"> | string
+    previousScore?: FloatFilter<"TrustScoreHistory"> | number
+    newScore?: FloatFilter<"TrustScoreHistory"> | number
+    previousLimit?: FloatFilter<"TrustScoreHistory"> | number
+    newLimit?: FloatFilter<"TrustScoreHistory"> | number
+    reason?: StringFilter<"TrustScoreHistory"> | string
+    orderId?: StringNullableFilter<"TrustScoreHistory"> | string | null
+    metadata?: StringNullableFilter<"TrustScoreHistory"> | string | null
+    createdAt?: DateTimeFilter<"TrustScoreHistory"> | Date | string
+    user?: XOR<UserRelationFilter, UserWhereInput>
+  }
+
+  export type TrustScoreHistoryOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    previousScore?: SortOrder
+    newScore?: SortOrder
+    previousLimit?: SortOrder
+    newLimit?: SortOrder
+    reason?: SortOrder
+    orderId?: SortOrderInput | SortOrder
+    metadata?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type TrustScoreHistoryWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: TrustScoreHistoryWhereInput | TrustScoreHistoryWhereInput[]
+    OR?: TrustScoreHistoryWhereInput[]
+    NOT?: TrustScoreHistoryWhereInput | TrustScoreHistoryWhereInput[]
+    userId?: StringFilter<"TrustScoreHistory"> | string
+    previousScore?: FloatFilter<"TrustScoreHistory"> | number
+    newScore?: FloatFilter<"TrustScoreHistory"> | number
+    previousLimit?: FloatFilter<"TrustScoreHistory"> | number
+    newLimit?: FloatFilter<"TrustScoreHistory"> | number
+    reason?: StringFilter<"TrustScoreHistory"> | string
+    orderId?: StringNullableFilter<"TrustScoreHistory"> | string | null
+    metadata?: StringNullableFilter<"TrustScoreHistory"> | string | null
+    createdAt?: DateTimeFilter<"TrustScoreHistory"> | Date | string
+    user?: XOR<UserRelationFilter, UserWhereInput>
+  }, "id">
+
+  export type TrustScoreHistoryOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    previousScore?: SortOrder
+    newScore?: SortOrder
+    previousLimit?: SortOrder
+    newLimit?: SortOrder
+    reason?: SortOrder
+    orderId?: SortOrderInput | SortOrder
+    metadata?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: TrustScoreHistoryCountOrderByAggregateInput
+    _avg?: TrustScoreHistoryAvgOrderByAggregateInput
+    _max?: TrustScoreHistoryMaxOrderByAggregateInput
+    _min?: TrustScoreHistoryMinOrderByAggregateInput
+    _sum?: TrustScoreHistorySumOrderByAggregateInput
+  }
+
+  export type TrustScoreHistoryScalarWhereWithAggregatesInput = {
+    AND?: TrustScoreHistoryScalarWhereWithAggregatesInput | TrustScoreHistoryScalarWhereWithAggregatesInput[]
+    OR?: TrustScoreHistoryScalarWhereWithAggregatesInput[]
+    NOT?: TrustScoreHistoryScalarWhereWithAggregatesInput | TrustScoreHistoryScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"TrustScoreHistory"> | string
+    userId?: StringWithAggregatesFilter<"TrustScoreHistory"> | string
+    previousScore?: FloatWithAggregatesFilter<"TrustScoreHistory"> | number
+    newScore?: FloatWithAggregatesFilter<"TrustScoreHistory"> | number
+    previousLimit?: FloatWithAggregatesFilter<"TrustScoreHistory"> | number
+    newLimit?: FloatWithAggregatesFilter<"TrustScoreHistory"> | number
+    reason?: StringWithAggregatesFilter<"TrustScoreHistory"> | string
+    orderId?: StringNullableWithAggregatesFilter<"TrustScoreHistory"> | string | null
+    metadata?: StringNullableWithAggregatesFilter<"TrustScoreHistory"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"TrustScoreHistory"> | Date | string
+  }
+
+  export type DiscomFeedbackWhereInput = {
+    AND?: DiscomFeedbackWhereInput | DiscomFeedbackWhereInput[]
+    OR?: DiscomFeedbackWhereInput[]
+    NOT?: DiscomFeedbackWhereInput | DiscomFeedbackWhereInput[]
+    id?: StringFilter<"DiscomFeedback"> | string
+    orderId?: StringFilter<"DiscomFeedback"> | string
+    sellerId?: StringFilter<"DiscomFeedback"> | string
+    transactionId?: StringFilter<"DiscomFeedback"> | string
+    deliveredQty?: FloatFilter<"DiscomFeedback"> | number
+    expectedQty?: FloatFilter<"DiscomFeedback"> | number
+    deliveryRatio?: FloatFilter<"DiscomFeedback"> | number
+    status?: StringFilter<"DiscomFeedback"> | string
+    trustImpact?: FloatFilter<"DiscomFeedback"> | number
+    verifiedAt?: DateTimeFilter<"DiscomFeedback"> | Date | string
+    createdAt?: DateTimeFilter<"DiscomFeedback"> | Date | string
+    seller?: XOR<UserRelationFilter, UserWhereInput>
+  }
+
+  export type DiscomFeedbackOrderByWithRelationInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    sellerId?: SortOrder
+    transactionId?: SortOrder
+    deliveredQty?: SortOrder
+    expectedQty?: SortOrder
+    deliveryRatio?: SortOrder
+    status?: SortOrder
+    trustImpact?: SortOrder
+    verifiedAt?: SortOrder
+    createdAt?: SortOrder
+    seller?: UserOrderByWithRelationInput
+  }
+
+  export type DiscomFeedbackWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    orderId?: string
+    AND?: DiscomFeedbackWhereInput | DiscomFeedbackWhereInput[]
+    OR?: DiscomFeedbackWhereInput[]
+    NOT?: DiscomFeedbackWhereInput | DiscomFeedbackWhereInput[]
+    sellerId?: StringFilter<"DiscomFeedback"> | string
+    transactionId?: StringFilter<"DiscomFeedback"> | string
+    deliveredQty?: FloatFilter<"DiscomFeedback"> | number
+    expectedQty?: FloatFilter<"DiscomFeedback"> | number
+    deliveryRatio?: FloatFilter<"DiscomFeedback"> | number
+    status?: StringFilter<"DiscomFeedback"> | string
+    trustImpact?: FloatFilter<"DiscomFeedback"> | number
+    verifiedAt?: DateTimeFilter<"DiscomFeedback"> | Date | string
+    createdAt?: DateTimeFilter<"DiscomFeedback"> | Date | string
+    seller?: XOR<UserRelationFilter, UserWhereInput>
+  }, "id" | "orderId">
+
+  export type DiscomFeedbackOrderByWithAggregationInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    sellerId?: SortOrder
+    transactionId?: SortOrder
+    deliveredQty?: SortOrder
+    expectedQty?: SortOrder
+    deliveryRatio?: SortOrder
+    status?: SortOrder
+    trustImpact?: SortOrder
+    verifiedAt?: SortOrder
+    createdAt?: SortOrder
+    _count?: DiscomFeedbackCountOrderByAggregateInput
+    _avg?: DiscomFeedbackAvgOrderByAggregateInput
+    _max?: DiscomFeedbackMaxOrderByAggregateInput
+    _min?: DiscomFeedbackMinOrderByAggregateInput
+    _sum?: DiscomFeedbackSumOrderByAggregateInput
+  }
+
+  export type DiscomFeedbackScalarWhereWithAggregatesInput = {
+    AND?: DiscomFeedbackScalarWhereWithAggregatesInput | DiscomFeedbackScalarWhereWithAggregatesInput[]
+    OR?: DiscomFeedbackScalarWhereWithAggregatesInput[]
+    NOT?: DiscomFeedbackScalarWhereWithAggregatesInput | DiscomFeedbackScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"DiscomFeedback"> | string
+    orderId?: StringWithAggregatesFilter<"DiscomFeedback"> | string
+    sellerId?: StringWithAggregatesFilter<"DiscomFeedback"> | string
+    transactionId?: StringWithAggregatesFilter<"DiscomFeedback"> | string
+    deliveredQty?: FloatWithAggregatesFilter<"DiscomFeedback"> | number
+    expectedQty?: FloatWithAggregatesFilter<"DiscomFeedback"> | number
+    deliveryRatio?: FloatWithAggregatesFilter<"DiscomFeedback"> | number
+    status?: StringWithAggregatesFilter<"DiscomFeedback"> | string
+    trustImpact?: FloatWithAggregatesFilter<"DiscomFeedback"> | number
+    verifiedAt?: DateTimeWithAggregatesFilter<"DiscomFeedback"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"DiscomFeedback"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
@@ -12488,9 +15242,18 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     provider?: ProviderCreateNestedOneWithoutUserInput
     orders?: OrderCreateNestedManyWithoutBuyerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
+    trustHistory?: TrustScoreHistoryCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackCreateNestedManyWithoutSellerInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -12504,9 +15267,18 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     providerId?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutBuyerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    trustHistory?: TrustScoreHistoryUncheckedCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackUncheckedCreateNestedManyWithoutSellerInput
   }
 
   export type UserUpdateInput = {
@@ -12520,9 +15292,18 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     provider?: ProviderUpdateOneWithoutUserNestedInput
     orders?: OrderUpdateManyWithoutBuyerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
+    trustHistory?: TrustScoreHistoryUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUpdateManyWithoutSellerNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -12536,9 +15317,18 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     providerId?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutBuyerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    trustHistory?: TrustScoreHistoryUncheckedUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUncheckedUpdateManyWithoutSellerNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -12552,6 +15342,13 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     providerId?: string | null
   }
 
@@ -12566,6 +15363,13 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type UserUncheckedUpdateManyInput = {
@@ -12579,6 +15383,13 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     providerId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
@@ -13070,6 +15881,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     provider?: ProviderCreateNestedOneWithoutOrdersInput
     selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
     buyer?: UserCreateNestedOneWithoutOrdersInput
@@ -13091,6 +15906,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
   }
 
@@ -13106,6 +15925,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
     selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
     buyer?: UserUpdateOneWithoutOrdersNestedInput
@@ -13127,6 +15950,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
   }
 
@@ -13145,6 +15972,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
   }
 
   export type OrderUpdateManyMutationInput = {
@@ -13159,6 +15990,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type OrderUncheckedUpdateManyInput = {
@@ -13176,6 +16011,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type EventCreateInput = {
@@ -13399,6 +16238,193 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type TrustScoreHistoryCreateInput = {
+    id?: string
+    previousScore: number
+    newScore: number
+    previousLimit: number
+    newLimit: number
+    reason: string
+    orderId?: string | null
+    metadata?: string | null
+    createdAt?: Date | string
+    user: UserCreateNestedOneWithoutTrustHistoryInput
+  }
+
+  export type TrustScoreHistoryUncheckedCreateInput = {
+    id?: string
+    userId: string
+    previousScore: number
+    newScore: number
+    previousLimit: number
+    newLimit: number
+    reason: string
+    orderId?: string | null
+    metadata?: string | null
+    createdAt?: Date | string
+  }
+
+  export type TrustScoreHistoryUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    previousScore?: FloatFieldUpdateOperationsInput | number
+    newScore?: FloatFieldUpdateOperationsInput | number
+    previousLimit?: FloatFieldUpdateOperationsInput | number
+    newLimit?: FloatFieldUpdateOperationsInput | number
+    reason?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutTrustHistoryNestedInput
+  }
+
+  export type TrustScoreHistoryUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    previousScore?: FloatFieldUpdateOperationsInput | number
+    newScore?: FloatFieldUpdateOperationsInput | number
+    previousLimit?: FloatFieldUpdateOperationsInput | number
+    newLimit?: FloatFieldUpdateOperationsInput | number
+    reason?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TrustScoreHistoryCreateManyInput = {
+    id?: string
+    userId: string
+    previousScore: number
+    newScore: number
+    previousLimit: number
+    newLimit: number
+    reason: string
+    orderId?: string | null
+    metadata?: string | null
+    createdAt?: Date | string
+  }
+
+  export type TrustScoreHistoryUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    previousScore?: FloatFieldUpdateOperationsInput | number
+    newScore?: FloatFieldUpdateOperationsInput | number
+    previousLimit?: FloatFieldUpdateOperationsInput | number
+    newLimit?: FloatFieldUpdateOperationsInput | number
+    reason?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TrustScoreHistoryUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    previousScore?: FloatFieldUpdateOperationsInput | number
+    newScore?: FloatFieldUpdateOperationsInput | number
+    previousLimit?: FloatFieldUpdateOperationsInput | number
+    newLimit?: FloatFieldUpdateOperationsInput | number
+    reason?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DiscomFeedbackCreateInput = {
+    id?: string
+    orderId: string
+    transactionId: string
+    deliveredQty: number
+    expectedQty: number
+    deliveryRatio: number
+    status: string
+    trustImpact: number
+    verifiedAt: Date | string
+    createdAt?: Date | string
+    seller: UserCreateNestedOneWithoutDiscomFeedbackInput
+  }
+
+  export type DiscomFeedbackUncheckedCreateInput = {
+    id?: string
+    orderId: string
+    sellerId: string
+    transactionId: string
+    deliveredQty: number
+    expectedQty: number
+    deliveryRatio: number
+    status: string
+    trustImpact: number
+    verifiedAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type DiscomFeedbackUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    deliveredQty?: FloatFieldUpdateOperationsInput | number
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveryRatio?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    trustImpact?: FloatFieldUpdateOperationsInput | number
+    verifiedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    seller?: UserUpdateOneRequiredWithoutDiscomFeedbackNestedInput
+  }
+
+  export type DiscomFeedbackUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    sellerId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    deliveredQty?: FloatFieldUpdateOperationsInput | number
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveryRatio?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    trustImpact?: FloatFieldUpdateOperationsInput | number
+    verifiedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DiscomFeedbackCreateManyInput = {
+    id?: string
+    orderId: string
+    sellerId: string
+    transactionId: string
+    deliveredQty: number
+    expectedQty: number
+    deliveryRatio: number
+    status: string
+    trustImpact: number
+    verifiedAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type DiscomFeedbackUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    deliveredQty?: FloatFieldUpdateOperationsInput | number
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveryRatio?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    trustImpact?: FloatFieldUpdateOperationsInput | number
+    verifiedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DiscomFeedbackUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    sellerId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    deliveredQty?: FloatFieldUpdateOperationsInput | number
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveryRatio?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    trustImpact?: FloatFieldUpdateOperationsInput | number
+    verifiedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -13467,6 +16493,17 @@ export namespace Prisma {
     not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
   }
 
+  export type FloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
+  }
+
   export type ProviderNullableRelationFilter = {
     is?: ProviderWhereInput | null
     isNot?: ProviderWhereInput | null
@@ -13484,6 +16521,18 @@ export namespace Prisma {
     none?: SessionWhereInput
   }
 
+  export type TrustScoreHistoryListRelationFilter = {
+    every?: TrustScoreHistoryWhereInput
+    some?: TrustScoreHistoryWhereInput
+    none?: TrustScoreHistoryWhereInput
+  }
+
+  export type DiscomFeedbackListRelationFilter = {
+    every?: DiscomFeedbackWhereInput
+    some?: DiscomFeedbackWhereInput
+    none?: DiscomFeedbackWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -13494,6 +16543,14 @@ export namespace Prisma {
   }
 
   export type SessionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type TrustScoreHistoryOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type DiscomFeedbackOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -13508,11 +16565,23 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrder
+    trustScore?: SortOrder
+    allowedTradeLimit?: SortOrder
+    baselineTrustScore?: SortOrder
+    meterDataAnalyzed?: SortOrder
+    productionCapacity?: SortOrder
+    meterVerifiedCapacity?: SortOrder
+    meterPdfUrl?: SortOrder
     providerId?: SortOrder
   }
 
   export type UserAvgOrderByAggregateInput = {
     balance?: SortOrder
+    trustScore?: SortOrder
+    allowedTradeLimit?: SortOrder
+    baselineTrustScore?: SortOrder
+    productionCapacity?: SortOrder
+    meterVerifiedCapacity?: SortOrder
   }
 
   export type UserMaxOrderByAggregateInput = {
@@ -13526,6 +16595,13 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrder
+    trustScore?: SortOrder
+    allowedTradeLimit?: SortOrder
+    baselineTrustScore?: SortOrder
+    meterDataAnalyzed?: SortOrder
+    productionCapacity?: SortOrder
+    meterVerifiedCapacity?: SortOrder
+    meterPdfUrl?: SortOrder
     providerId?: SortOrder
   }
 
@@ -13540,11 +16616,23 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     lastLoginAt?: SortOrder
+    trustScore?: SortOrder
+    allowedTradeLimit?: SortOrder
+    baselineTrustScore?: SortOrder
+    meterDataAnalyzed?: SortOrder
+    productionCapacity?: SortOrder
+    meterVerifiedCapacity?: SortOrder
+    meterPdfUrl?: SortOrder
     providerId?: SortOrder
   }
 
   export type UserSumOrderByAggregateInput = {
     balance?: SortOrder
+    trustScore?: SortOrder
+    allowedTradeLimit?: SortOrder
+    baselineTrustScore?: SortOrder
+    productionCapacity?: SortOrder
+    meterVerifiedCapacity?: SortOrder
   }
 
   export type StringWithAggregatesFilter<$PrismaModel = never> = {
@@ -13633,6 +16721,22 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedDateTimeNullableFilter<$PrismaModel>
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  }
+
+  export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedFloatNullableFilter<$PrismaModel>
+    _min?: NestedFloatNullableFilter<$PrismaModel>
+    _max?: NestedFloatNullableFilter<$PrismaModel>
   }
 
   export type UserRelationFilter = {
@@ -13954,17 +17058,6 @@ export namespace Prisma {
     version?: SortOrder
   }
 
-  export type FloatNullableFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
-  }
-
   export type CatalogOfferNullableRelationFilter = {
     is?: CatalogOfferWhereInput | null
     isNot?: CatalogOfferWhereInput | null
@@ -13985,6 +17078,10 @@ export namespace Prisma {
     version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    cancelledAt?: SortOrder
+    cancelledBy?: SortOrder
+    cancelReason?: SortOrder
+    discomVerified?: SortOrder
   }
 
   export type OrderAvgOrderByAggregateInput = {
@@ -14008,6 +17105,10 @@ export namespace Prisma {
     version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    cancelledAt?: SortOrder
+    cancelledBy?: SortOrder
+    cancelReason?: SortOrder
+    discomVerified?: SortOrder
   }
 
   export type OrderMinOrderByAggregateInput = {
@@ -14025,28 +17126,16 @@ export namespace Prisma {
     version?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    cancelledAt?: SortOrder
+    cancelledBy?: SortOrder
+    cancelReason?: SortOrder
+    discomVerified?: SortOrder
   }
 
   export type OrderSumOrderByAggregateInput = {
     totalQty?: SortOrder
     totalPrice?: SortOrder
     version?: SortOrder
-  }
-
-  export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatNullableWithAggregatesFilter<$PrismaModel> | number | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _avg?: NestedFloatNullableFilter<$PrismaModel>
-    _sum?: NestedFloatNullableFilter<$PrismaModel>
-    _min?: NestedFloatNullableFilter<$PrismaModel>
-    _max?: NestedFloatNullableFilter<$PrismaModel>
   }
 
   export type EventCountOrderByAggregateInput = {
@@ -14165,6 +17254,115 @@ export namespace Prisma {
     total?: SortOrder
   }
 
+  export type TrustScoreHistoryCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    previousScore?: SortOrder
+    newScore?: SortOrder
+    previousLimit?: SortOrder
+    newLimit?: SortOrder
+    reason?: SortOrder
+    orderId?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type TrustScoreHistoryAvgOrderByAggregateInput = {
+    previousScore?: SortOrder
+    newScore?: SortOrder
+    previousLimit?: SortOrder
+    newLimit?: SortOrder
+  }
+
+  export type TrustScoreHistoryMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    previousScore?: SortOrder
+    newScore?: SortOrder
+    previousLimit?: SortOrder
+    newLimit?: SortOrder
+    reason?: SortOrder
+    orderId?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type TrustScoreHistoryMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    previousScore?: SortOrder
+    newScore?: SortOrder
+    previousLimit?: SortOrder
+    newLimit?: SortOrder
+    reason?: SortOrder
+    orderId?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type TrustScoreHistorySumOrderByAggregateInput = {
+    previousScore?: SortOrder
+    newScore?: SortOrder
+    previousLimit?: SortOrder
+    newLimit?: SortOrder
+  }
+
+  export type DiscomFeedbackCountOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    sellerId?: SortOrder
+    transactionId?: SortOrder
+    deliveredQty?: SortOrder
+    expectedQty?: SortOrder
+    deliveryRatio?: SortOrder
+    status?: SortOrder
+    trustImpact?: SortOrder
+    verifiedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type DiscomFeedbackAvgOrderByAggregateInput = {
+    deliveredQty?: SortOrder
+    expectedQty?: SortOrder
+    deliveryRatio?: SortOrder
+    trustImpact?: SortOrder
+  }
+
+  export type DiscomFeedbackMaxOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    sellerId?: SortOrder
+    transactionId?: SortOrder
+    deliveredQty?: SortOrder
+    expectedQty?: SortOrder
+    deliveryRatio?: SortOrder
+    status?: SortOrder
+    trustImpact?: SortOrder
+    verifiedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type DiscomFeedbackMinOrderByAggregateInput = {
+    id?: SortOrder
+    orderId?: SortOrder
+    sellerId?: SortOrder
+    transactionId?: SortOrder
+    deliveredQty?: SortOrder
+    expectedQty?: SortOrder
+    deliveryRatio?: SortOrder
+    status?: SortOrder
+    trustImpact?: SortOrder
+    verifiedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type DiscomFeedbackSumOrderByAggregateInput = {
+    deliveredQty?: SortOrder
+    expectedQty?: SortOrder
+    deliveryRatio?: SortOrder
+    trustImpact?: SortOrder
+  }
+
   export type ProviderCreateNestedOneWithoutUserInput = {
     create?: XOR<ProviderCreateWithoutUserInput, ProviderUncheckedCreateWithoutUserInput>
     connectOrCreate?: ProviderCreateOrConnectWithoutUserInput
@@ -14185,6 +17383,20 @@ export namespace Prisma {
     connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
   }
 
+  export type TrustScoreHistoryCreateNestedManyWithoutUserInput = {
+    create?: XOR<TrustScoreHistoryCreateWithoutUserInput, TrustScoreHistoryUncheckedCreateWithoutUserInput> | TrustScoreHistoryCreateWithoutUserInput[] | TrustScoreHistoryUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: TrustScoreHistoryCreateOrConnectWithoutUserInput | TrustScoreHistoryCreateOrConnectWithoutUserInput[]
+    createMany?: TrustScoreHistoryCreateManyUserInputEnvelope
+    connect?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+  }
+
+  export type DiscomFeedbackCreateNestedManyWithoutSellerInput = {
+    create?: XOR<DiscomFeedbackCreateWithoutSellerInput, DiscomFeedbackUncheckedCreateWithoutSellerInput> | DiscomFeedbackCreateWithoutSellerInput[] | DiscomFeedbackUncheckedCreateWithoutSellerInput[]
+    connectOrCreate?: DiscomFeedbackCreateOrConnectWithoutSellerInput | DiscomFeedbackCreateOrConnectWithoutSellerInput[]
+    createMany?: DiscomFeedbackCreateManySellerInputEnvelope
+    connect?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+  }
+
   export type OrderUncheckedCreateNestedManyWithoutBuyerInput = {
     create?: XOR<OrderCreateWithoutBuyerInput, OrderUncheckedCreateWithoutBuyerInput> | OrderCreateWithoutBuyerInput[] | OrderUncheckedCreateWithoutBuyerInput[]
     connectOrCreate?: OrderCreateOrConnectWithoutBuyerInput | OrderCreateOrConnectWithoutBuyerInput[]
@@ -14197,6 +17409,20 @@ export namespace Prisma {
     connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
     createMany?: SessionCreateManyUserInputEnvelope
     connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+  }
+
+  export type TrustScoreHistoryUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<TrustScoreHistoryCreateWithoutUserInput, TrustScoreHistoryUncheckedCreateWithoutUserInput> | TrustScoreHistoryCreateWithoutUserInput[] | TrustScoreHistoryUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: TrustScoreHistoryCreateOrConnectWithoutUserInput | TrustScoreHistoryCreateOrConnectWithoutUserInput[]
+    createMany?: TrustScoreHistoryCreateManyUserInputEnvelope
+    connect?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+  }
+
+  export type DiscomFeedbackUncheckedCreateNestedManyWithoutSellerInput = {
+    create?: XOR<DiscomFeedbackCreateWithoutSellerInput, DiscomFeedbackUncheckedCreateWithoutSellerInput> | DiscomFeedbackCreateWithoutSellerInput[] | DiscomFeedbackUncheckedCreateWithoutSellerInput[]
+    connectOrCreate?: DiscomFeedbackCreateOrConnectWithoutSellerInput | DiscomFeedbackCreateOrConnectWithoutSellerInput[]
+    createMany?: DiscomFeedbackCreateManySellerInputEnvelope
+    connect?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -14225,6 +17451,14 @@ export namespace Prisma {
 
   export type NullableDateTimeFieldUpdateOperationsInput = {
     set?: Date | string | null
+  }
+
+  export type NullableFloatFieldUpdateOperationsInput = {
+    set?: number | null
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
   }
 
   export type ProviderUpdateOneWithoutUserNestedInput = {
@@ -14265,6 +17499,34 @@ export namespace Prisma {
     deleteMany?: SessionScalarWhereInput | SessionScalarWhereInput[]
   }
 
+  export type TrustScoreHistoryUpdateManyWithoutUserNestedInput = {
+    create?: XOR<TrustScoreHistoryCreateWithoutUserInput, TrustScoreHistoryUncheckedCreateWithoutUserInput> | TrustScoreHistoryCreateWithoutUserInput[] | TrustScoreHistoryUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: TrustScoreHistoryCreateOrConnectWithoutUserInput | TrustScoreHistoryCreateOrConnectWithoutUserInput[]
+    upsert?: TrustScoreHistoryUpsertWithWhereUniqueWithoutUserInput | TrustScoreHistoryUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: TrustScoreHistoryCreateManyUserInputEnvelope
+    set?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+    disconnect?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+    delete?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+    connect?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+    update?: TrustScoreHistoryUpdateWithWhereUniqueWithoutUserInput | TrustScoreHistoryUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: TrustScoreHistoryUpdateManyWithWhereWithoutUserInput | TrustScoreHistoryUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: TrustScoreHistoryScalarWhereInput | TrustScoreHistoryScalarWhereInput[]
+  }
+
+  export type DiscomFeedbackUpdateManyWithoutSellerNestedInput = {
+    create?: XOR<DiscomFeedbackCreateWithoutSellerInput, DiscomFeedbackUncheckedCreateWithoutSellerInput> | DiscomFeedbackCreateWithoutSellerInput[] | DiscomFeedbackUncheckedCreateWithoutSellerInput[]
+    connectOrCreate?: DiscomFeedbackCreateOrConnectWithoutSellerInput | DiscomFeedbackCreateOrConnectWithoutSellerInput[]
+    upsert?: DiscomFeedbackUpsertWithWhereUniqueWithoutSellerInput | DiscomFeedbackUpsertWithWhereUniqueWithoutSellerInput[]
+    createMany?: DiscomFeedbackCreateManySellerInputEnvelope
+    set?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+    disconnect?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+    delete?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+    connect?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+    update?: DiscomFeedbackUpdateWithWhereUniqueWithoutSellerInput | DiscomFeedbackUpdateWithWhereUniqueWithoutSellerInput[]
+    updateMany?: DiscomFeedbackUpdateManyWithWhereWithoutSellerInput | DiscomFeedbackUpdateManyWithWhereWithoutSellerInput[]
+    deleteMany?: DiscomFeedbackScalarWhereInput | DiscomFeedbackScalarWhereInput[]
+  }
+
   export type OrderUncheckedUpdateManyWithoutBuyerNestedInput = {
     create?: XOR<OrderCreateWithoutBuyerInput, OrderUncheckedCreateWithoutBuyerInput> | OrderCreateWithoutBuyerInput[] | OrderUncheckedCreateWithoutBuyerInput[]
     connectOrCreate?: OrderCreateOrConnectWithoutBuyerInput | OrderCreateOrConnectWithoutBuyerInput[]
@@ -14291,6 +17553,34 @@ export namespace Prisma {
     update?: SessionUpdateWithWhereUniqueWithoutUserInput | SessionUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: SessionUpdateManyWithWhereWithoutUserInput | SessionUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: SessionScalarWhereInput | SessionScalarWhereInput[]
+  }
+
+  export type TrustScoreHistoryUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<TrustScoreHistoryCreateWithoutUserInput, TrustScoreHistoryUncheckedCreateWithoutUserInput> | TrustScoreHistoryCreateWithoutUserInput[] | TrustScoreHistoryUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: TrustScoreHistoryCreateOrConnectWithoutUserInput | TrustScoreHistoryCreateOrConnectWithoutUserInput[]
+    upsert?: TrustScoreHistoryUpsertWithWhereUniqueWithoutUserInput | TrustScoreHistoryUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: TrustScoreHistoryCreateManyUserInputEnvelope
+    set?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+    disconnect?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+    delete?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+    connect?: TrustScoreHistoryWhereUniqueInput | TrustScoreHistoryWhereUniqueInput[]
+    update?: TrustScoreHistoryUpdateWithWhereUniqueWithoutUserInput | TrustScoreHistoryUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: TrustScoreHistoryUpdateManyWithWhereWithoutUserInput | TrustScoreHistoryUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: TrustScoreHistoryScalarWhereInput | TrustScoreHistoryScalarWhereInput[]
+  }
+
+  export type DiscomFeedbackUncheckedUpdateManyWithoutSellerNestedInput = {
+    create?: XOR<DiscomFeedbackCreateWithoutSellerInput, DiscomFeedbackUncheckedCreateWithoutSellerInput> | DiscomFeedbackCreateWithoutSellerInput[] | DiscomFeedbackUncheckedCreateWithoutSellerInput[]
+    connectOrCreate?: DiscomFeedbackCreateOrConnectWithoutSellerInput | DiscomFeedbackCreateOrConnectWithoutSellerInput[]
+    upsert?: DiscomFeedbackUpsertWithWhereUniqueWithoutSellerInput | DiscomFeedbackUpsertWithWhereUniqueWithoutSellerInput[]
+    createMany?: DiscomFeedbackCreateManySellerInputEnvelope
+    set?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+    disconnect?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+    delete?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+    connect?: DiscomFeedbackWhereUniqueInput | DiscomFeedbackWhereUniqueInput[]
+    update?: DiscomFeedbackUpdateWithWhereUniqueWithoutSellerInput | DiscomFeedbackUpdateWithWhereUniqueWithoutSellerInput[]
+    updateMany?: DiscomFeedbackUpdateManyWithWhereWithoutSellerInput | DiscomFeedbackUpdateManyWithWhereWithoutSellerInput[]
+    deleteMany?: DiscomFeedbackScalarWhereInput | DiscomFeedbackScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutSessionsInput = {
@@ -14815,14 +18105,6 @@ export namespace Prisma {
     connect?: OfferBlockWhereUniqueInput | OfferBlockWhereUniqueInput[]
   }
 
-  export type NullableFloatFieldUpdateOperationsInput = {
-    set?: number | null
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
-  }
-
   export type ProviderUpdateOneWithoutOrdersNestedInput = {
     create?: XOR<ProviderCreateWithoutOrdersInput, ProviderUncheckedCreateWithoutOrdersInput>
     connectOrCreate?: ProviderCreateOrConnectWithoutOrdersInput
@@ -14879,6 +18161,34 @@ export namespace Prisma {
     update?: OfferBlockUpdateWithWhereUniqueWithoutOrderInput | OfferBlockUpdateWithWhereUniqueWithoutOrderInput[]
     updateMany?: OfferBlockUpdateManyWithWhereWithoutOrderInput | OfferBlockUpdateManyWithWhereWithoutOrderInput[]
     deleteMany?: OfferBlockScalarWhereInput | OfferBlockScalarWhereInput[]
+  }
+
+  export type UserCreateNestedOneWithoutTrustHistoryInput = {
+    create?: XOR<UserCreateWithoutTrustHistoryInput, UserUncheckedCreateWithoutTrustHistoryInput>
+    connectOrCreate?: UserCreateOrConnectWithoutTrustHistoryInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutTrustHistoryNestedInput = {
+    create?: XOR<UserCreateWithoutTrustHistoryInput, UserUncheckedCreateWithoutTrustHistoryInput>
+    connectOrCreate?: UserCreateOrConnectWithoutTrustHistoryInput
+    upsert?: UserUpsertWithoutTrustHistoryInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutTrustHistoryInput, UserUpdateWithoutTrustHistoryInput>, UserUncheckedUpdateWithoutTrustHistoryInput>
+  }
+
+  export type UserCreateNestedOneWithoutDiscomFeedbackInput = {
+    create?: XOR<UserCreateWithoutDiscomFeedbackInput, UserUncheckedCreateWithoutDiscomFeedbackInput>
+    connectOrCreate?: UserCreateOrConnectWithoutDiscomFeedbackInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutDiscomFeedbackNestedInput = {
+    create?: XOR<UserCreateWithoutDiscomFeedbackInput, UserUncheckedCreateWithoutDiscomFeedbackInput>
+    connectOrCreate?: UserCreateOrConnectWithoutDiscomFeedbackInput
+    upsert?: UserUpsertWithoutDiscomFeedbackInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutDiscomFeedbackInput, UserUpdateWithoutDiscomFeedbackInput>, UserUncheckedUpdateWithoutDiscomFeedbackInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -14945,6 +18255,17 @@ export namespace Prisma {
     gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
+  export type NestedFloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
   }
 
   export type NestedStringWithAggregatesFilter<$PrismaModel = never> = {
@@ -15055,33 +18376,6 @@ export namespace Prisma {
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
-  export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedIntFilter<$PrismaModel>
-    _min?: NestedIntFilter<$PrismaModel>
-    _max?: NestedIntFilter<$PrismaModel>
-  }
-
-  export type NestedFloatNullableFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
-  }
-
   export type NestedFloatNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | FloatFieldRefInput<$PrismaModel> | null
     in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
@@ -15096,6 +18390,22 @@ export namespace Prisma {
     _sum?: NestedFloatNullableFilter<$PrismaModel>
     _min?: NestedFloatNullableFilter<$PrismaModel>
     _max?: NestedFloatNullableFilter<$PrismaModel>
+  }
+
+  export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
   }
 
   export type ProviderCreateWithoutUserInput = {
@@ -15143,6 +18453,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     provider?: ProviderCreateNestedOneWithoutOrdersInput
     selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
     blocks?: OfferBlockCreateNestedManyWithoutOrderInput
@@ -15162,6 +18476,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
   }
 
@@ -15200,6 +18518,76 @@ export namespace Prisma {
 
   export type SessionCreateManyUserInputEnvelope = {
     data: SessionCreateManyUserInput | SessionCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type TrustScoreHistoryCreateWithoutUserInput = {
+    id?: string
+    previousScore: number
+    newScore: number
+    previousLimit: number
+    newLimit: number
+    reason: string
+    orderId?: string | null
+    metadata?: string | null
+    createdAt?: Date | string
+  }
+
+  export type TrustScoreHistoryUncheckedCreateWithoutUserInput = {
+    id?: string
+    previousScore: number
+    newScore: number
+    previousLimit: number
+    newLimit: number
+    reason: string
+    orderId?: string | null
+    metadata?: string | null
+    createdAt?: Date | string
+  }
+
+  export type TrustScoreHistoryCreateOrConnectWithoutUserInput = {
+    where: TrustScoreHistoryWhereUniqueInput
+    create: XOR<TrustScoreHistoryCreateWithoutUserInput, TrustScoreHistoryUncheckedCreateWithoutUserInput>
+  }
+
+  export type TrustScoreHistoryCreateManyUserInputEnvelope = {
+    data: TrustScoreHistoryCreateManyUserInput | TrustScoreHistoryCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type DiscomFeedbackCreateWithoutSellerInput = {
+    id?: string
+    orderId: string
+    transactionId: string
+    deliveredQty: number
+    expectedQty: number
+    deliveryRatio: number
+    status: string
+    trustImpact: number
+    verifiedAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type DiscomFeedbackUncheckedCreateWithoutSellerInput = {
+    id?: string
+    orderId: string
+    transactionId: string
+    deliveredQty: number
+    expectedQty: number
+    deliveryRatio: number
+    status: string
+    trustImpact: number
+    verifiedAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type DiscomFeedbackCreateOrConnectWithoutSellerInput = {
+    where: DiscomFeedbackWhereUniqueInput
+    create: XOR<DiscomFeedbackCreateWithoutSellerInput, DiscomFeedbackUncheckedCreateWithoutSellerInput>
+  }
+
+  export type DiscomFeedbackCreateManySellerInputEnvelope = {
+    data: DiscomFeedbackCreateManySellerInput | DiscomFeedbackCreateManySellerInput[]
     skipDuplicates?: boolean
   }
 
@@ -15276,6 +18664,10 @@ export namespace Prisma {
     version?: IntFilter<"Order"> | number
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
+    cancelledAt?: DateTimeNullableFilter<"Order"> | Date | string | null
+    cancelledBy?: StringNullableFilter<"Order"> | string | null
+    cancelReason?: StringNullableFilter<"Order"> | string | null
+    discomVerified?: BoolFilter<"Order"> | boolean
   }
 
   export type SessionUpsertWithWhereUniqueWithoutUserInput = {
@@ -15307,6 +18699,71 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Session"> | Date | string
   }
 
+  export type TrustScoreHistoryUpsertWithWhereUniqueWithoutUserInput = {
+    where: TrustScoreHistoryWhereUniqueInput
+    update: XOR<TrustScoreHistoryUpdateWithoutUserInput, TrustScoreHistoryUncheckedUpdateWithoutUserInput>
+    create: XOR<TrustScoreHistoryCreateWithoutUserInput, TrustScoreHistoryUncheckedCreateWithoutUserInput>
+  }
+
+  export type TrustScoreHistoryUpdateWithWhereUniqueWithoutUserInput = {
+    where: TrustScoreHistoryWhereUniqueInput
+    data: XOR<TrustScoreHistoryUpdateWithoutUserInput, TrustScoreHistoryUncheckedUpdateWithoutUserInput>
+  }
+
+  export type TrustScoreHistoryUpdateManyWithWhereWithoutUserInput = {
+    where: TrustScoreHistoryScalarWhereInput
+    data: XOR<TrustScoreHistoryUpdateManyMutationInput, TrustScoreHistoryUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type TrustScoreHistoryScalarWhereInput = {
+    AND?: TrustScoreHistoryScalarWhereInput | TrustScoreHistoryScalarWhereInput[]
+    OR?: TrustScoreHistoryScalarWhereInput[]
+    NOT?: TrustScoreHistoryScalarWhereInput | TrustScoreHistoryScalarWhereInput[]
+    id?: StringFilter<"TrustScoreHistory"> | string
+    userId?: StringFilter<"TrustScoreHistory"> | string
+    previousScore?: FloatFilter<"TrustScoreHistory"> | number
+    newScore?: FloatFilter<"TrustScoreHistory"> | number
+    previousLimit?: FloatFilter<"TrustScoreHistory"> | number
+    newLimit?: FloatFilter<"TrustScoreHistory"> | number
+    reason?: StringFilter<"TrustScoreHistory"> | string
+    orderId?: StringNullableFilter<"TrustScoreHistory"> | string | null
+    metadata?: StringNullableFilter<"TrustScoreHistory"> | string | null
+    createdAt?: DateTimeFilter<"TrustScoreHistory"> | Date | string
+  }
+
+  export type DiscomFeedbackUpsertWithWhereUniqueWithoutSellerInput = {
+    where: DiscomFeedbackWhereUniqueInput
+    update: XOR<DiscomFeedbackUpdateWithoutSellerInput, DiscomFeedbackUncheckedUpdateWithoutSellerInput>
+    create: XOR<DiscomFeedbackCreateWithoutSellerInput, DiscomFeedbackUncheckedCreateWithoutSellerInput>
+  }
+
+  export type DiscomFeedbackUpdateWithWhereUniqueWithoutSellerInput = {
+    where: DiscomFeedbackWhereUniqueInput
+    data: XOR<DiscomFeedbackUpdateWithoutSellerInput, DiscomFeedbackUncheckedUpdateWithoutSellerInput>
+  }
+
+  export type DiscomFeedbackUpdateManyWithWhereWithoutSellerInput = {
+    where: DiscomFeedbackScalarWhereInput
+    data: XOR<DiscomFeedbackUpdateManyMutationInput, DiscomFeedbackUncheckedUpdateManyWithoutSellerInput>
+  }
+
+  export type DiscomFeedbackScalarWhereInput = {
+    AND?: DiscomFeedbackScalarWhereInput | DiscomFeedbackScalarWhereInput[]
+    OR?: DiscomFeedbackScalarWhereInput[]
+    NOT?: DiscomFeedbackScalarWhereInput | DiscomFeedbackScalarWhereInput[]
+    id?: StringFilter<"DiscomFeedback"> | string
+    orderId?: StringFilter<"DiscomFeedback"> | string
+    sellerId?: StringFilter<"DiscomFeedback"> | string
+    transactionId?: StringFilter<"DiscomFeedback"> | string
+    deliveredQty?: FloatFilter<"DiscomFeedback"> | number
+    expectedQty?: FloatFilter<"DiscomFeedback"> | number
+    deliveryRatio?: FloatFilter<"DiscomFeedback"> | number
+    status?: StringFilter<"DiscomFeedback"> | string
+    trustImpact?: FloatFilter<"DiscomFeedback"> | number
+    verifiedAt?: DateTimeFilter<"DiscomFeedback"> | Date | string
+    createdAt?: DateTimeFilter<"DiscomFeedback"> | Date | string
+  }
+
   export type UserCreateWithoutSessionsInput = {
     id?: string
     email: string
@@ -15318,8 +18775,17 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     provider?: ProviderCreateNestedOneWithoutUserInput
     orders?: OrderCreateNestedManyWithoutBuyerInput
+    trustHistory?: TrustScoreHistoryCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackCreateNestedManyWithoutSellerInput
   }
 
   export type UserUncheckedCreateWithoutSessionsInput = {
@@ -15333,8 +18799,17 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     providerId?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutBuyerInput
+    trustHistory?: TrustScoreHistoryUncheckedCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackUncheckedCreateNestedManyWithoutSellerInput
   }
 
   export type UserCreateOrConnectWithoutSessionsInput = {
@@ -15364,8 +18839,17 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     provider?: ProviderUpdateOneWithoutUserNestedInput
     orders?: OrderUpdateManyWithoutBuyerNestedInput
+    trustHistory?: TrustScoreHistoryUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUpdateManyWithoutSellerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -15379,8 +18863,17 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     providerId?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutBuyerNestedInput
+    trustHistory?: TrustScoreHistoryUncheckedUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUncheckedUpdateManyWithoutSellerNestedInput
   }
 
   export type UserCreateWithoutProviderInput = {
@@ -15394,8 +18887,17 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     orders?: OrderCreateNestedManyWithoutBuyerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
+    trustHistory?: TrustScoreHistoryCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackCreateNestedManyWithoutSellerInput
   }
 
   export type UserUncheckedCreateWithoutProviderInput = {
@@ -15409,8 +18911,17 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutBuyerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    trustHistory?: TrustScoreHistoryUncheckedCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackUncheckedCreateNestedManyWithoutSellerInput
   }
 
   export type UserCreateOrConnectWithoutProviderInput = {
@@ -15508,6 +19019,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
     buyer?: UserCreateNestedOneWithoutOrdersInput
     blocks?: OfferBlockCreateNestedManyWithoutOrderInput
@@ -15527,6 +19042,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
   }
 
@@ -15604,8 +19123,17 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUpdateManyWithoutBuyerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
+    trustHistory?: TrustScoreHistoryUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUpdateManyWithoutSellerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutProviderInput = {
@@ -15619,8 +19147,17 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutBuyerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    trustHistory?: TrustScoreHistoryUncheckedUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUncheckedUpdateManyWithoutSellerNestedInput
   }
 
   export type CatalogItemUpsertWithWhereUniqueWithoutProviderInput = {
@@ -16046,6 +19583,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     provider?: ProviderCreateNestedOneWithoutOrdersInput
     buyer?: UserCreateNestedOneWithoutOrdersInput
     blocks?: OfferBlockCreateNestedManyWithoutOrderInput
@@ -16065,6 +19606,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     blocks?: OfferBlockUncheckedCreateNestedManyWithoutOrderInput
   }
 
@@ -16299,6 +19844,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
     provider?: ProviderCreateNestedOneWithoutOrdersInput
     selectedOffer?: CatalogOfferCreateNestedOneWithoutOrdersInput
     buyer?: UserCreateNestedOneWithoutOrdersInput
@@ -16319,6 +19868,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
   }
 
   export type OrderCreateOrConnectWithoutBlocksInput = {
@@ -16468,6 +20021,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
     selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
     buyer?: UserUpdateOneWithoutOrdersNestedInput
@@ -16488,6 +20045,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type ProviderCreateWithoutOrdersInput = {
@@ -16571,8 +20132,17 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     provider?: ProviderCreateNestedOneWithoutUserInput
     sessions?: SessionCreateNestedManyWithoutUserInput
+    trustHistory?: TrustScoreHistoryCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackCreateNestedManyWithoutSellerInput
   }
 
   export type UserUncheckedCreateWithoutOrdersInput = {
@@ -16586,8 +20156,17 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
     providerId?: string | null
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    trustHistory?: TrustScoreHistoryUncheckedCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackUncheckedCreateNestedManyWithoutSellerInput
   }
 
   export type UserCreateOrConnectWithoutOrdersInput = {
@@ -16741,8 +20320,17 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     provider?: ProviderUpdateOneWithoutUserNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
+    trustHistory?: TrustScoreHistoryUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUpdateManyWithoutSellerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOrdersInput = {
@@ -16756,8 +20344,17 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
     providerId?: NullableStringFieldUpdateOperationsInput | string | null
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    trustHistory?: TrustScoreHistoryUncheckedUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUncheckedUpdateManyWithoutSellerNestedInput
   }
 
   export type OfferBlockUpsertWithWhereUniqueWithoutOrderInput = {
@@ -16776,6 +20373,230 @@ export namespace Prisma {
     data: XOR<OfferBlockUpdateManyMutationInput, OfferBlockUncheckedUpdateManyWithoutOrderInput>
   }
 
+  export type UserCreateWithoutTrustHistoryInput = {
+    id?: string
+    email: string
+    name?: string | null
+    picture?: string | null
+    googleId?: string | null
+    profileComplete?: boolean
+    balance?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
+    provider?: ProviderCreateNestedOneWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutBuyerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackCreateNestedManyWithoutSellerInput
+  }
+
+  export type UserUncheckedCreateWithoutTrustHistoryInput = {
+    id?: string
+    email: string
+    name?: string | null
+    picture?: string | null
+    googleId?: string | null
+    profileComplete?: boolean
+    balance?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
+    providerId?: string | null
+    orders?: OrderUncheckedCreateNestedManyWithoutBuyerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    discomFeedback?: DiscomFeedbackUncheckedCreateNestedManyWithoutSellerInput
+  }
+
+  export type UserCreateOrConnectWithoutTrustHistoryInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutTrustHistoryInput, UserUncheckedCreateWithoutTrustHistoryInput>
+  }
+
+  export type UserUpsertWithoutTrustHistoryInput = {
+    update: XOR<UserUpdateWithoutTrustHistoryInput, UserUncheckedUpdateWithoutTrustHistoryInput>
+    create: XOR<UserCreateWithoutTrustHistoryInput, UserUncheckedCreateWithoutTrustHistoryInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutTrustHistoryInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutTrustHistoryInput, UserUncheckedUpdateWithoutTrustHistoryInput>
+  }
+
+  export type UserUpdateWithoutTrustHistoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    picture?: NullableStringFieldUpdateOperationsInput | string | null
+    googleId?: NullableStringFieldUpdateOperationsInput | string | null
+    profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: ProviderUpdateOneWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutBuyerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUpdateManyWithoutSellerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutTrustHistoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    picture?: NullableStringFieldUpdateOperationsInput | string | null
+    googleId?: NullableStringFieldUpdateOperationsInput | string | null
+    profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerId?: NullableStringFieldUpdateOperationsInput | string | null
+    orders?: OrderUncheckedUpdateManyWithoutBuyerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    discomFeedback?: DiscomFeedbackUncheckedUpdateManyWithoutSellerNestedInput
+  }
+
+  export type UserCreateWithoutDiscomFeedbackInput = {
+    id?: string
+    email: string
+    name?: string | null
+    picture?: string | null
+    googleId?: string | null
+    profileComplete?: boolean
+    balance?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
+    provider?: ProviderCreateNestedOneWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutBuyerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    trustHistory?: TrustScoreHistoryCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutDiscomFeedbackInput = {
+    id?: string
+    email: string
+    name?: string | null
+    picture?: string | null
+    googleId?: string | null
+    profileComplete?: boolean
+    balance?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    lastLoginAt?: Date | string | null
+    trustScore?: number
+    allowedTradeLimit?: number
+    baselineTrustScore?: number
+    meterDataAnalyzed?: boolean
+    productionCapacity?: number | null
+    meterVerifiedCapacity?: number | null
+    meterPdfUrl?: string | null
+    providerId?: string | null
+    orders?: OrderUncheckedCreateNestedManyWithoutBuyerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    trustHistory?: TrustScoreHistoryUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutDiscomFeedbackInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutDiscomFeedbackInput, UserUncheckedCreateWithoutDiscomFeedbackInput>
+  }
+
+  export type UserUpsertWithoutDiscomFeedbackInput = {
+    update: XOR<UserUpdateWithoutDiscomFeedbackInput, UserUncheckedUpdateWithoutDiscomFeedbackInput>
+    create: XOR<UserCreateWithoutDiscomFeedbackInput, UserUncheckedCreateWithoutDiscomFeedbackInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutDiscomFeedbackInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutDiscomFeedbackInput, UserUncheckedUpdateWithoutDiscomFeedbackInput>
+  }
+
+  export type UserUpdateWithoutDiscomFeedbackInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    picture?: NullableStringFieldUpdateOperationsInput | string | null
+    googleId?: NullableStringFieldUpdateOperationsInput | string | null
+    profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: ProviderUpdateOneWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutBuyerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    trustHistory?: TrustScoreHistoryUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutDiscomFeedbackInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    picture?: NullableStringFieldUpdateOperationsInput | string | null
+    googleId?: NullableStringFieldUpdateOperationsInput | string | null
+    profileComplete?: BoolFieldUpdateOperationsInput | boolean
+    balance?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastLoginAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    trustScore?: FloatFieldUpdateOperationsInput | number
+    allowedTradeLimit?: FloatFieldUpdateOperationsInput | number
+    baselineTrustScore?: FloatFieldUpdateOperationsInput | number
+    meterDataAnalyzed?: BoolFieldUpdateOperationsInput | boolean
+    productionCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterVerifiedCapacity?: NullableFloatFieldUpdateOperationsInput | number | null
+    meterPdfUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerId?: NullableStringFieldUpdateOperationsInput | string | null
+    orders?: OrderUncheckedUpdateManyWithoutBuyerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    trustHistory?: TrustScoreHistoryUncheckedUpdateManyWithoutUserNestedInput
+  }
+
   export type OrderCreateManyBuyerInput = {
     id: string
     transactionId: string
@@ -16790,6 +20611,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
   }
 
   export type SessionCreateManyUserInput = {
@@ -16798,6 +20623,31 @@ export namespace Prisma {
     deviceInfo?: string | null
     ipAddress?: string | null
     expiresAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type TrustScoreHistoryCreateManyUserInput = {
+    id?: string
+    previousScore: number
+    newScore: number
+    previousLimit: number
+    newLimit: number
+    reason: string
+    orderId?: string | null
+    metadata?: string | null
+    createdAt?: Date | string
+  }
+
+  export type DiscomFeedbackCreateManySellerInput = {
+    id?: string
+    orderId: string
+    transactionId: string
+    deliveredQty: number
+    expectedQty: number
+    deliveryRatio: number
+    status: string
+    trustImpact: number
+    verifiedAt: Date | string
     createdAt?: Date | string
   }
 
@@ -16813,6 +20663,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
     selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
     blocks?: OfferBlockUpdateManyWithoutOrderNestedInput
@@ -16832,6 +20686,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
   }
 
@@ -16849,6 +20707,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type SessionUpdateWithoutUserInput = {
@@ -16875,6 +20737,81 @@ export namespace Prisma {
     deviceInfo?: NullableStringFieldUpdateOperationsInput | string | null
     ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TrustScoreHistoryUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    previousScore?: FloatFieldUpdateOperationsInput | number
+    newScore?: FloatFieldUpdateOperationsInput | number
+    previousLimit?: FloatFieldUpdateOperationsInput | number
+    newLimit?: FloatFieldUpdateOperationsInput | number
+    reason?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TrustScoreHistoryUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    previousScore?: FloatFieldUpdateOperationsInput | number
+    newScore?: FloatFieldUpdateOperationsInput | number
+    previousLimit?: FloatFieldUpdateOperationsInput | number
+    newLimit?: FloatFieldUpdateOperationsInput | number
+    reason?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type TrustScoreHistoryUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    previousScore?: FloatFieldUpdateOperationsInput | number
+    newScore?: FloatFieldUpdateOperationsInput | number
+    previousLimit?: FloatFieldUpdateOperationsInput | number
+    newLimit?: FloatFieldUpdateOperationsInput | number
+    reason?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DiscomFeedbackUpdateWithoutSellerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    deliveredQty?: FloatFieldUpdateOperationsInput | number
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveryRatio?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    trustImpact?: FloatFieldUpdateOperationsInput | number
+    verifiedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DiscomFeedbackUncheckedUpdateWithoutSellerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    deliveredQty?: FloatFieldUpdateOperationsInput | number
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveryRatio?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    trustImpact?: FloatFieldUpdateOperationsInput | number
+    verifiedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DiscomFeedbackUncheckedUpdateManyWithoutSellerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderId?: StringFieldUpdateOperationsInput | string
+    transactionId?: StringFieldUpdateOperationsInput | string
+    deliveredQty?: FloatFieldUpdateOperationsInput | number
+    expectedQty?: FloatFieldUpdateOperationsInput | number
+    deliveryRatio?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    trustImpact?: FloatFieldUpdateOperationsInput | number
+    verifiedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -16917,6 +20854,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
   }
 
   export type OfferBlockCreateManyProviderInput = {
@@ -17030,6 +20971,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     selectedOffer?: CatalogOfferUpdateOneWithoutOrdersNestedInput
     buyer?: UserUpdateOneWithoutOrdersNestedInput
     blocks?: OfferBlockUpdateManyWithoutOrderNestedInput
@@ -17049,6 +20994,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
   }
 
@@ -17066,6 +21015,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type OfferBlockUpdateWithoutProviderInput = {
@@ -17270,6 +21223,10 @@ export namespace Prisma {
     version?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    cancelReason?: string | null
+    discomVerified?: boolean
   }
 
   export type OfferBlockUpdateWithoutOfferInput = {
@@ -17332,6 +21289,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     provider?: ProviderUpdateOneWithoutOrdersNestedInput
     buyer?: UserUpdateOneWithoutOrdersNestedInput
     blocks?: OfferBlockUpdateManyWithoutOrderNestedInput
@@ -17351,6 +21312,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
     blocks?: OfferBlockUncheckedUpdateManyWithoutOrderNestedInput
   }
 
@@ -17368,6 +21333,10 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    cancelReason?: NullableStringFieldUpdateOperationsInput | string | null
+    discomVerified?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type OfferBlockCreateManyOrderInput = {
@@ -17495,6 +21464,14 @@ export namespace Prisma {
      * @deprecated Use SettlementRecordDefaultArgs instead
      */
     export type SettlementRecordArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = SettlementRecordDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use TrustScoreHistoryDefaultArgs instead
+     */
+    export type TrustScoreHistoryArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = TrustScoreHistoryDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use DiscomFeedbackDefaultArgs instead
+     */
+    export type DiscomFeedbackArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = DiscomFeedbackDefaultArgs<ExtArgs>
 
   /**
    * Batch Payload for updateMany & deleteMany & createMany

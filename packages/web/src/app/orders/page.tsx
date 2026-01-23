@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ShoppingBag, Sun, Wind, Droplets, Package, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { ShoppingBag, Sun, Wind, Droplets, Package, ArrowDownLeft, ArrowUpRight, X } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
-import { Card, Badge, EmptyState, SkeletonList } from '@/components/ui';
+import { Card, Badge, EmptyState, SkeletonList, Button } from '@/components/ui';
 import { buyerApi, sellerApi, ApiError } from '@/lib/api';
 import { formatCurrency, formatDateTime, truncateId } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
@@ -18,6 +18,7 @@ type OrderType = 'bought' | 'sold';
 
 interface UnifiedOrder {
   id: string;
+  transactionId: string;
   type: OrderType;
   status: string;
   sourceType: string;
@@ -33,13 +34,14 @@ export default function OrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState<UnifiedOrder[]>([]);
   const [filter, setFilter] = useState<'all' | 'bought' | 'sold'>('all');
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     if (!isAuthenticated) {
       setIsLoading(false);
       return;
     }
-    
+
     try {
       setIsLoading(true);
       const allOrders: UnifiedOrder[] = [];
@@ -50,6 +52,7 @@ export default function OrdersPage() {
         for (const order of buyerData.orders) {
           allOrders.push({
             id: order.id,
+            transactionId: (order as any).transaction_id || order.id,
             type: 'bought',
             status: order.status,
             sourceType: order.itemInfo?.source_type || 'MIXED',
@@ -76,6 +79,7 @@ export default function OrdersPage() {
               const itemInfo = (order as { itemInfo?: { source_type?: string; sold_quantity?: number; price_per_kwh?: number } }).itemInfo;
               allOrders.push({
                 id: order.id,
+                transactionId: (order as any).transaction_id || order.id,
                 type: 'sold',
                 status: order.status,
                 sourceType: itemInfo?.source_type || 'MIXED',
@@ -121,7 +125,32 @@ export default function OrdersPage() {
       case 'ACTIVE': return 'success';
       case 'PENDING': return 'warning';
       case 'COMPLETED': return 'primary';
+      case 'CANCELLED': return 'danger';
       default: return 'default';
+    }
+  };
+
+  const handleCancelOrder = async (order: UnifiedOrder) => {
+    if (cancellingOrderId) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel this order for ${order.quantity} kWh?\n\nNote: Cancellation may affect your trust score.`
+    );
+    if (!confirmed) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      await buyerApi.cancelOrder({
+        transaction_id: order.transactionId,
+        order_id: order.id,
+        reason: 'User requested cancellation',
+      });
+      // Reload orders
+      await loadOrders();
+    } catch (err: any) {
+      alert(err.message || 'Failed to cancel order');
+    } finally {
+      setCancellingOrderId(null);
     }
   };
 
@@ -140,32 +169,29 @@ export default function OrdersPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-subtle)]'
-            }`}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'all'
+              ? 'bg-[var(--color-primary)] text-white'
+              : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-subtle)]'
+              }`}
           >
             All ({orders.length})
           </button>
           <button
             onClick={() => setFilter('bought')}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
-              filter === 'bought'
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-subtle)]'
-            }`}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${filter === 'bought'
+              ? 'bg-[var(--color-primary)] text-white'
+              : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-subtle)]'
+              }`}
           >
             <ArrowDownLeft className="w-3 h-3" />
             Bought ({boughtCount})
           </button>
           <button
             onClick={() => setFilter('sold')}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
-              filter === 'sold'
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-subtle)]'
-            }`}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${filter === 'sold'
+              ? 'bg-[var(--color-primary)] text-white'
+              : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-subtle)]'
+              }`}
           >
             <ArrowUpRight className="w-3 h-3" />
             Sold ({soldCount})
@@ -177,11 +203,11 @@ export default function OrdersPage() {
             icon={<ShoppingBag className="h-12 w-12" />}
             title={filter === 'all' ? 'No orders yet' : `No ${filter} orders`}
             description={
-              filter === 'bought' 
-                ? 'Energy you purchase will appear here' 
+              filter === 'bought'
+                ? 'Energy you purchase will appear here'
                 : filter === 'sold'
-                ? 'Orders for your listings will appear here'
-                : 'Your energy transactions will appear here'
+                  ? 'Orders for your listings will appear here'
+                  : 'Your energy transactions will appear here'
             }
           />
         ) : (
@@ -190,29 +216,27 @@ export default function OrdersPage() {
               const SourceIcon = sourceIcons[order.sourceType] || Package;
               const isBought = order.type === 'bought';
               const fee = Math.round(order.totalPrice * 0.025 * 100) / 100;
-              
+
               return (
                 <Card key={order.id}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-[10px] flex items-center justify-center ${
-                        isBought 
-                          ? 'bg-[var(--color-primary-light)]' 
-                          : 'bg-[var(--color-success-light)]'
-                      }`}>
-                        <SourceIcon className={`h-5 w-5 ${
-                          isBought 
-                            ? 'text-[var(--color-primary)]' 
-                            : 'text-[var(--color-success)]'
-                        }`} />
+                      <div className={`w-10 h-10 rounded-[10px] flex items-center justify-center ${isBought
+                        ? 'bg-[var(--color-primary-light)]'
+                        : 'bg-[var(--color-success-light)]'
+                        }`}>
+                        <SourceIcon className={`h-5 w-5 ${isBought
+                          ? 'text-[var(--color-primary)]'
+                          : 'text-[var(--color-success)]'
+                          }`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium text-[var(--color-text)]">
                             {order.sourceType} Energy
                           </p>
-                          <Badge 
-                            variant={isBought ? 'primary' : 'success'} 
+                          <Badge
+                            variant={isBought ? 'primary' : 'success'}
                             size="sm"
                           >
                             {isBought ? (
@@ -237,7 +261,7 @@ export default function OrdersPage() {
                       {order.status}
                     </Badge>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                     <div>
                       <p className="text-xs text-[var(--color-text-muted)]">Quantity</p>
@@ -252,7 +276,7 @@ export default function OrdersPage() {
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="pt-3 border-t border-[var(--color-border)]">
                     {isBought ? (
                       // Buyer view: show what they paid (including fee)
@@ -286,7 +310,24 @@ export default function OrdersPage() {
                       </div>
                     )}
                   </div>
-                  
+
+                  {/* Cancel Button for active bought orders */}
+                  {isBought && (order.status === 'ACTIVE' || order.status === 'PENDING') && (
+                    <div className="mt-3">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        fullWidth
+                        onClick={() => handleCancelOrder(order)}
+                        loading={cancellingOrderId === order.id}
+                        disabled={!!cancellingOrderId}
+                      >
+                        <X className="w-4 h-4" />
+                        Cancel Order
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center mt-2 text-xs text-[var(--color-text-muted)]">
                     <span>{formatDateTime(order.createdAt)}</span>
                     <span>ID: {truncateId(order.id)}</span>

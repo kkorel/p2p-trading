@@ -20,3 +20,6 @@ export * from './seed';
 
 // Export authentication
 export * from './auth';
+
+// Export trust score system
+export * from './trust';

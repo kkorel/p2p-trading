@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { AddOfferSheet } from '@/components/sell/add-offer-sheet';
 import { Card, Button, Badge, EmptyState, SkeletonList } from '@/components/ui';
 import { sellerApi, type Offer, type Order, type Provider } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatTime, formatDateTime, truncateId, cn } from '@/lib/utils';
 
 const sourceIcons: Record<string, typeof Sun> = {
@@ -17,12 +18,13 @@ const sourceIcons: Record<string, typeof Sun> = {
 type Tab = 'offers' | 'orders';
 
 export default function SellPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('offers');
   const [isLoading, setIsLoading] = useState(true);
   const [provider, setProvider] = useState<Provider | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  
+
   const [showAddOffer, setShowAddOffer] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -32,7 +34,7 @@ export default function SellPage() {
         sellerApi.getMyProfile(),
         sellerApi.getMyOrders(),
       ]);
-      
+
       setProvider(profileData.provider);
       setOffers(profileData.offers);
       setOrders(ordersData.orders);
@@ -88,7 +90,7 @@ export default function SellPage() {
             </Card>
             <Card padding="sm" className="text-center">
               <p className="text-xl font-semibold text-[var(--color-success)]">
-                {Math.round(provider.trust_score * 100)}%
+                {Math.round((user?.trustScore ?? 0.3) * 100)}%
               </p>
               <p className="text-xs text-[var(--color-text-muted)]">Trust Score</p>
             </Card>
@@ -139,7 +141,7 @@ export default function SellPage() {
                 {offers.map((offer) => {
                   const sourceType = offer.source_type || 'SOLAR';
                   const SourceIcon = sourceIcons[sourceType] || Package;
-                  
+
                   return (
                     <Card key={offer.id}>
                       <div className="flex items-start justify-between mb-2">
@@ -217,7 +219,7 @@ export default function SellPage() {
                       <Badge
                         variant={
                           order.status === 'ACTIVE' ? 'success' :
-                          order.status === 'PENDING' ? 'warning' : 'default'
+                            order.status === 'PENDING' ? 'warning' : 'default'
                         }
                       >
                         {order.status}
