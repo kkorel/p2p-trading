@@ -46,5 +46,6 @@ EXPOSE 4000
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Start the app (note: TypeScript outputs to dist/bap/src/ due to monorepo structure)
-CMD ["node", "packages/bap/dist/bap/src/index.js"]
+# Start script: run migrations then start app
+# Migrations need to run at startup (not build) because DATABASE_URL is only available at runtime
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=./packages/shared/prisma/schema.prisma && node packages/bap/dist/bap/src/index.js"]
