@@ -16,8 +16,10 @@
     "test:concurrency": "cd ../.. && jest --testPathPattern=concurrency --runInBand"
   },
   "dependencies": {
+    "@digitalbazaar/ed25519-signature-2020": "^4.0.0",
     "@prisma/client": "^5.22.0",
     "ioredis": "^5.4.1",
+    "jsonld": "^9.0.0",
     "redlock": "^5.0.0-beta.2",
     "uuid": "^9.0.1"
   },

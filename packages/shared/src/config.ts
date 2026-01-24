@@ -43,6 +43,16 @@ export const config = {
     enableLedgerWrites: process.env.ENABLE_LEDGER_WRITES === 'true',
   },
 
+  // Verifiable Credentials configuration
+  vc: {
+    // Trusted issuer DIDs for VC verification
+    trustedIssuers: (process.env.VC_TRUSTED_ISSUERS || '').split(',').filter(Boolean),
+    // Whether to require cryptographic proof verification
+    requireProofVerification: process.env.VC_REQUIRE_PROOF === 'true',
+    // VC Portal API key (if required)
+    portalApiKey: process.env.VC_PORTAL_API_KEY || '',
+  },
+
   // BAP identity
   bap: {
     id: process.env.BAP_ID || 'bap.p2p-trading.local',
