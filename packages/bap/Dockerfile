@@ -22,11 +22,11 @@ RUN npm ci --ignore-scripts
 RUN npx prisma generate --schema=./packages/shared/prisma/schema.prisma
 
 # Build shared first, then bap
-RUN npm run build --workspace=@p2p/shared
-RUN npm run build --workspace=@p2p/bap
+RUN echo "=== Building shared package ===" && npm run build --workspace=@p2p/shared || (echo "Shared build failed!" && exit 1)
+RUN echo "=== Building bap package ===" && npm run build --workspace=@p2p/bap || (echo "BAP build failed!" && exit 1)
 
 # Verify build output exists
-RUN ls -la packages/bap/dist/ && echo "Build successful: dist folder exists"
+RUN echo "=== Checking build output ===" && ls -la packages/bap/ && ls -la packages/bap/dist/ && echo "Build successful: dist folder exists"
 
 # Expose port
 EXPOSE 4000

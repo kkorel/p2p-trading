@@ -7,19 +7,20 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://your-railway-backend-url.railway.app/api/:path*"
+            "destination": "https://p2p-trading-production-c4e8.up.railway.app/api/:path*"
         },
         {
             "source": "/auth/:path*",
-            "destination": "https://your-railway-backend-url.railway.app/auth/:path*"
+            "destination": "https://p2p-trading-production-c4e8.up.railway.app/auth/:path*"
         },
         {
             "source": "/seller/:path*",
-            "destination": "https://your-railway-backend-url.railway.app/seller/:path*"
+            "destination": "https://p2p-trading-production-c4e8.up.railway.app/seller/:path*"
         },
         {
             "source": "/callbacks/:path*",
-            "destination": "https://your-railway-backend-url.railway.app/callbacks/:path*"
+            "destination": "https://p2p-trading-production-c4e8.up.railway.app/callbacks/:path*"
         }
     ]
 }
+
