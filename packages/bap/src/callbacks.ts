@@ -220,6 +220,7 @@ router.post('/on_init', async (req: Request, res: Response) => {
 
 /**
  * POST /callbacks/on_confirm - Receive order confirmation from BPP
+ * This is where we write the trade to the DEG Ledger
  */
 router.post('/on_confirm', async (req: Request, res: Response) => {
   const message = req.body as OnConfirmMessage;
@@ -237,6 +238,9 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
   
   await logEvent(context.transaction_id, context.message_id, 'on_confirm', 'INBOUND', JSON.stringify(message));
   
+  // Get transaction state to retrieve buyer info
+  const txState = await getTransaction(context.transaction_id);
+  
   await updateTransaction(context.transaction_id, {
     order: content.order,
     status: 'ACTIVE',
@@ -244,6 +248,41 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
   
   logger.info(`Order confirmed: ${content.order.id}, status: ${content.order.status}`, {
     transaction_id: context.transaction_id,
+  });
+
+  // Write trade to DEG Ledger (async, don't block response)
+  // Import dynamically to avoid circular dependencies
+  import('./ledger').then(async ({ writeTradeToLedger }) => {
+    try {
+      const buyerId = txState?.buyerId || 'unknown-buyer';
+      const sellerId = content.order.provider?.id || 'unknown-seller';
+      
+      const ledgerResult = await writeTradeToLedger(
+        context.transaction_id,
+        content.order,
+        buyerId,
+        sellerId
+      );
+      
+      if (ledgerResult.success) {
+        logger.info('Trade recorded in ledger', {
+          transaction_id: context.transaction_id,
+          ledger_record_id: ledgerResult.recordId,
+        });
+      } else {
+        logger.warn('Failed to record trade in ledger (non-blocking)', {
+          transaction_id: context.transaction_id,
+          error: ledgerResult.error,
+        });
+      }
+    } catch (ledgerError: any) {
+      logger.error('Ledger write error (non-blocking)', {
+        transaction_id: context.transaction_id,
+        error: ledgerError.message,
+      });
+    }
+  }).catch(err => {
+    logger.error('Failed to load ledger module', { error: err.message });
   });
 
   res.json({ status: 'ok', order_id: content.order.id, order_status: content.order.status });

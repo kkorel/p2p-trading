@@ -5,7 +5,8 @@
 export const config = {
   // Database configuration
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://p2p_user:p2p_password@localhost:5432/p2p_trading',
+    url: process.env.DATABASE_URL ||
+        'postgresql://p2p_user:p2p_password@localhost:5432/p2p_trading',
   },
 
   // Redis configuration
@@ -19,35 +20,50 @@ export const config = {
     cds: parseInt(process.env.CDS_PORT || '4001'),
     bpp: parseInt(process.env.BPP_PORT || '4002'),
   },
-  
+
   // Service URLs (BAP and BPP now on same host)
   urls: {
     bap: process.env.BAP_URL || 'http://localhost:4000',
     cds: process.env.CDS_URL || 'http://localhost:4001',
     bpp: process.env.BPP_URL || 'http://localhost:4000',
   },
-  
+
+  // External Beckn services (production endpoints)
+  external: {
+    // Catalog Discovery Service (Beckn network CDS)
+    cds: process.env.EXTERNAL_CDS_URL ||
+        'https://34.93.141.21.sslip.io/beckn/catalog',
+    // DEG Ledger for immutable trade records
+    ledger: process.env.LEDGER_URL || 'https://34.93.166.38.sslip.io',
+    // Verifiable Credentials portal
+    vcPortal: process.env.VC_PORTAL_URL || 'https://open-vcs.up.railway.app',
+    // Use external CDS instead of local mock
+    useExternalCds: process.env.USE_EXTERNAL_CDS === 'true',
+    // Enable ledger writes (disable for local dev)
+    enableLedgerWrites: process.env.ENABLE_LEDGER_WRITES === 'true',
+  },
+
   // BAP identity
   bap: {
     id: process.env.BAP_ID || 'bap.p2p-trading.local',
     uri: process.env.BAP_URI || 'http://localhost:4000',
   },
-  
+
   // BPP identity (now on same host as BAP)
   bpp: {
     id: process.env.BPP_ID || 'bpp.p2p-trading.local',
     uri: process.env.BPP_URI || 'http://localhost:4000',
   },
-  
+
   // CDS identity
   cds: {
     id: process.env.CDS_ID || 'cds.p2p-trading.local',
     uri: process.env.CDS_URI || 'http://localhost:4001',
   },
-  
+
   // Callback delay (ms) - simulates async processing
   callbackDelay: parseInt(process.env.CALLBACK_DELAY || '100'),
-  
+
   // Matching algorithm configuration
   matching: {
     weights: {
