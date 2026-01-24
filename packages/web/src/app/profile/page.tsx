@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Mail, Shield, Wallet, Check, AlertCircle } from 'lucide-react';
+import { LogOut, User, Mail, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
@@ -80,6 +80,17 @@ export default function ProfilePage() {
   const [isSavingCapacity, setIsSavingCapacity] = useState(false);
   const [capacityError, setCapacityError] = useState<string | null>(null);
   const [capacitySuccess, setCapacitySuccess] = useState(false);
+  
+  // Meter PDF analyzer state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{
+    extractedCapacity: number | null;
+    quality: string;
+    matchesDeclaration: boolean;
+    insights: string;
+    trustBonus: string | null;
+  } | null>(null);
   
   // Initialize capacity input when user loads
   useEffect(() => {
@@ -359,6 +370,203 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+        </Card>
+
+        {/* Meter PDF Analyzer Card */}
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[var(--color-primary)]" />
+              Verify with Meter Reading
+              <Badge variant="success" size="sm">+10% Trust</Badge>
+            </h3>
+          </div>
+
+          {user.meterDataAnalyzed ? (
+            // Already analyzed
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-[var(--color-success-light)] border border-[var(--color-success)]">
+                <div className="flex items-center gap-2 text-[var(--color-success)] mb-2">
+                  <Check className="w-5 h-5" />
+                  <span className="font-medium">Meter Data Verified!</span>
+                </div>
+                {user.meterVerifiedCapacity && (
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    Verified capacity: <strong>{user.meterVerifiedCapacity} kWh/month</strong>
+                  </p>
+                )}
+                {!user.meterVerifiedCapacity && (
+                  <p className="text-sm text-[var(--color-warning)]">
+                    Capacity could not be extracted. Try uploading again with a clearer document.
+                  </p>
+                )}
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Your trust score has been boosted based on your meter verification.
+              </p>
+              {/* Reset button for re-uploading */}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await authApi.resetMeter();
+                    // Refresh user data
+                    const { user: updatedUser } = await authApi.getMe();
+                    updateUser(updatedUser);
+                    setAnalysisResult(null);
+                    setAnalysisError(null);
+                  } catch (err: any) {
+                    setAnalysisError(err.message || 'Failed to reset');
+                  }
+                }}
+              >
+                Upload Different Document
+              </Button>
+            </div>
+          ) : (
+            // Upload form
+            <div className="space-y-3">
+              <p className="text-sm text-[var(--color-text-muted)]">
+                Upload your electricity meter reading PDF to <strong>automatically set your production capacity</strong> and get a <strong>+10% trust score bonus</strong>.
+              </p>
+
+              {/* Error Message */}
+              {analysisError && (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--color-danger-light)]">
+                  <AlertCircle className="w-4 h-4 text-[var(--color-danger)]" />
+                  <span className="text-sm text-[var(--color-danger)]">{analysisError}</span>
+                </div>
+              )}
+
+              {/* Success Result */}
+              {analysisResult && (
+                <div className="p-3 rounded-lg bg-[var(--color-success-light)] border border-[var(--color-success)]">
+                  <div className="flex items-center gap-2 text-[var(--color-success)] mb-2">
+                    <Sparkles className="w-5 h-5" />
+                    <span className="font-medium">Analysis Complete!</span>
+                    {analysisResult.trustBonus && (
+                      <Badge variant="success">{analysisResult.trustBonus}</Badge>
+                    )}
+                  </div>
+                  {analysisResult.extractedCapacity && (
+                    <p className="text-sm text-[var(--color-text)]">
+                      Extracted capacity: <strong>{analysisResult.extractedCapacity} kWh/month</strong>
+                    </p>
+                  )}
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                    {analysisResult.insights}
+                  </p>
+                </div>
+              )}
+
+              {/* Upload Button */}
+              {!analysisResult && (
+                <>
+                  <div className="flex items-center justify-center w-full">
+                    <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                      isAnalyzing 
+                        ? 'bg-[var(--color-bg-subtle)] border-[var(--color-border)] cursor-wait' 
+                        : 'bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-primary-light)] hover:border-[var(--color-primary)]'
+                    }`}>
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        {isAnalyzing ? (
+                          <>
+                            <div className="w-8 h-8 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mb-2" />
+                            <p className="text-sm text-[var(--color-text-muted)]">Analyzing with AI...</p>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 mb-2 text-[var(--color-text-muted)]" />
+                            <p className="text-sm text-[var(--color-text-muted)]">
+                              <span className="font-semibold text-[var(--color-primary)]">Click to upload</span> meter reading PDF
+                            </p>
+                            <p className="text-xs text-[var(--color-text-muted)]">PDF (Max 5MB)</p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf"
+                        disabled={isAnalyzing}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+
+                          // Validate file
+                          if (!file.type.includes('pdf')) {
+                            setAnalysisError('Please upload a PDF file');
+                            return;
+                          }
+
+                          if (file.size > 5 * 1024 * 1024) {
+                            setAnalysisError('File size must be less than 5MB');
+                            return;
+                          }
+
+                          setIsAnalyzing(true);
+                          setAnalysisError(null);
+
+                          try {
+                            // Read file as base64
+                            const reader = new FileReader();
+                            reader.onload = async () => {
+                              try {
+                                const base64 = (reader.result as string).split(',')[1];
+                                
+                                // Call API - will auto-extract capacity from PDF
+                                const result = await authApi.analyzeMeter(base64);
+                                
+                                if (result.success) {
+                                  setAnalysisResult({
+                                    extractedCapacity: result.analysis.extractedCapacity,
+                                    quality: result.analysis.quality,
+                                    matchesDeclaration: result.analysis.matchesDeclaration,
+                                    insights: result.analysis.insights,
+                                    trustBonus: result.trustBonus,
+                                  });
+                                  // Update user context (includes new productionCapacity!)
+                                  updateUser(result.user);
+                                  // Also update local capacity input
+                                  if (result.analysis.extractedCapacity) {
+                                    setCapacityInput(result.analysis.extractedCapacity.toString());
+                                  }
+                                }
+                              } catch (err: any) {
+                                setAnalysisError(err.message || 'Analysis failed. Please try again.');
+                              } finally {
+                                setIsAnalyzing(false);
+                              }
+                            };
+                            reader.onerror = () => {
+                              setAnalysisError('Failed to read file');
+                              setIsAnalyzing(false);
+                            };
+                            reader.readAsDataURL(file);
+                          } catch (err: any) {
+                            setAnalysisError(err.message || 'Failed to process file');
+                            setIsAnalyzing(false);
+                          }
+
+                          // Reset input
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="p-3 bg-[var(--color-bg-subtle)] rounded-lg">
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      <strong>How it works:</strong> Upload your electricity bill or meter reading PDF. 
+                      Our AI will extract your production capacity and <strong>automatically set it</strong> for you.
+                      You get +10% trust bonus!
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Balance Card */}

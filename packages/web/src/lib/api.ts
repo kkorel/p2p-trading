@@ -85,6 +85,29 @@ export const authApi = {
       body: JSON.stringify(data),
     }),
 
+  analyzeMeter: (pdfBase64: string) =>
+    request<{
+      success: boolean;
+      message: string;
+      analysis: {
+        extractedCapacity: number | null;
+        declaredCapacity: number;
+        quality: 'HIGH' | 'MEDIUM' | 'LOW';
+        matchesDeclaration: boolean;
+        insights: string;
+      };
+      trustBonus: string | null;
+      user: User;
+    }>('/auth/analyze-meter', {
+      method: 'POST',
+      body: JSON.stringify({ pdfBase64 }),
+    }),
+
+  resetMeter: () =>
+    request<{ success: boolean; message: string }>('/auth/reset-meter', {
+      method: 'POST',
+    }),
+
   logout: () =>
     request<{ success: boolean }>('/auth/logout', { method: 'POST' }),
 
