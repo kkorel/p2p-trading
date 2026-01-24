@@ -35,12 +35,22 @@ This platform enables prosumers (producer-consumers) to buy and sell renewable e
 
 ### Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20
 - Docker and Docker Compose
 
 ### Installation
 
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd p2p-trading
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your configuration (especially GOOGLE_CLIENT_ID)
+nano .env
+
 # Install dependencies
 npm install
 
@@ -50,9 +60,6 @@ npm run docker:up
 # Initialize database
 npm run db:push
 npm run db:generate
-
-# Seed sample data
-npm run seed
 
 # Start all services
 npm run dev:all
@@ -82,11 +89,11 @@ npm run setup
 4. **Sell**: Create and manage your energy listings
 5. **Orders**: View your purchase and sales history
 
-## Trust Score System
+## Features
+
+### Trust Score System
 
 A credit-score-like reputation system that governs trading privileges:
-
-### How It Works
 
 | Trust Score | Tier | Trade Limit | Description |
 |------------|------|-------------|-------------|
@@ -97,38 +104,25 @@ A credit-score-like reputation system that governs trading privileges:
 | 0.85 - 0.94 | 🏆 Gold | 80% | Excellent reputation |
 | ≥ 0.95 | 💎 Platinum | 100% | Full trading privileges |
 
-### Score Changes
+### Meter PDF Analysis
 
-**Increases**:
-- Successful energy delivery (verified by DISCOM)
-- Good meter data quality (via DeepSeek analysis)
+Upload your electricity meter reading PDF to:
+- Auto-extract and set your production capacity
+- Get +10% trust score bonus
+- Uses OpenRouter LLM with regex fallback
 
-**Decreases**:
-- Partial delivery: `penalty = 0.10 × (1 - delivered/expected)`
-- Failed delivery: -0.10 to trust score
-- Order cancellation: -0.05 (within cancellation window)
+### Escrow System
 
-### DISCOM Mock Service
-
-Simulates utility company verification of energy delivery:
-- Runs as background job checking completed orders
-- Applies proportional trust updates based on delivery ratio
-- Configurable success rate via `DISCOM_SUCCESS_RATE`
+- Funds are held in escrow when buyer confirms order
+- Seller receives payment after DISCOM verifies delivery
+- Partial delivery: seller receives proportional payment
+- Cancellation: 90% refund to buyer, 5% to seller, 5% to platform
 
 ### Order Cancellation
 
-Buyers can cancel orders within a configurable window:
-- Releases reserved energy blocks back to seller
-- Applies trust penalty to buyer
-- Follows Beckn `/cancel` → `/on_cancel` flow
-
-### Production Capacity
-
-Users declare their monthly production capacity to determine trade limits:
-- Set in profile: "How much electricity do you produce monthly? (kWh)"
-- Trade limit = Trust % × Production Capacity
-- Example: 30% trust + 500 kWh production = 50 kWh trade limit
-- Optional: Upload meter PDF for DeepSeek verification to boost trust
+- Can cancel up to 30 minutes before delivery start time
+- 10% penalty fee (5% to seller, 5% to platform)
+- Trust score penalty for cancellations
 
 ## Development
 
@@ -146,73 +140,92 @@ npm run db:studio
 npm run docker:down
 ```
 
+## Production Deployment
+
+### Using Docker Compose
+
+```bash
+# Build and deploy all services
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+### Environment Variables
+
+Create a `.env` file from `.env.example` and configure:
+
+**Required:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `REDIS_URL` - Redis connection string
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID
+- `SESSION_SECRET` - Secure session secret (32+ characters)
+
+**Optional:**
+- `OPENROUTER_API_KEY` - For meter PDF analysis
+- `DEV_MODE` - Set to `false` in production (protects demo endpoints)
+
+### Health Checks
+
+All services expose health check endpoints:
+- BAP: `GET /health`
+- CDS: `GET /health`
+
+### Scaling Considerations
+
+- Use a managed PostgreSQL instance for production
+- Use Redis Cluster or managed Redis for high availability
+- Configure proper CORS headers for your domain
+- Set up SSL/TLS termination via reverse proxy (nginx/traefik)
+
 ## Testing
 
 ```bash
-npm test              # All tests (102 tests)
+npm test              # All tests
 npm run test:unit     # Unit tests
 npm run test:e2e      # End-to-end tests
 npm run test:coverage # With coverage report
 ```
 
 ### Test Suites
-- **Trust Engine**: 26 tests for penalty calculations, tier limits
+- **Trust Engine**: Penalty calculations, tier limits
+- **Payment Logic**: Escrow, cancellation, partial delivery
 - **Concurrency**: Block claiming race conditions
 - **E2E**: Full trading flows
 - **Integration**: API endpoints
-
-## Environment Variables
-
-Create a `.env` file:
-
-```env
-# Database
-DATABASE_URL=postgresql://p2p_user:p2p_password@localhost:5432/p2p_trading
-REDIS_URL=redis://localhost:6379
-
-# Authentication
-GOOGLE_CLIENT_ID=your-google-client-id
-
-# Trust Score System
-TRUST_DEFAULT_SCORE=0.3      # Starting trust for new users
-TRUST_DEFAULT_LIMIT=10       # Starting trade limit (kWh)
-TRUST_SUCCESS_BONUS=0.05     # Bonus for successful delivery
-TRUST_FAILURE_PENALTY=0.10   # Max penalty for failed delivery
-TRUST_METER_BONUS=0.10       # Bonus for good meter data
-TRUST_CANCEL_PENALTY=0.05    # Penalty for buyer cancellation
-
-# DISCOM Mock Service
-DISCOM_SUCCESS_RATE=0.85     # 85% delivery success rate
-DISCOM_CHECK_INTERVAL_MS=60000  # Check interval (default: 1 min)
-
-# Order Cancellation
-CANCEL_WINDOW_MINUTES=30     # Time window for cancellation
-
-# DeepSeek LLM (for meter analysis)
-DEEPSEEK_API_KEY=your-deepseek-api-key
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-```
 
 ## Project Structure
 
 ```
 p2p-trading/
 ├── packages/
-│   ├── web/          # Next.js frontend
-│   │   └── src/app/
-│   │       ├── profile/  # Trust badge display
-│   │       ├── orders/   # Order cancellation
-│   │       └── sell/     # Seller dashboard
-│   ├── bap/          # Prosumer API (BAP + BPP)
+│   ├── web/              # Next.js frontend
 │   │   └── src/
-│   │       ├── seller-routes.ts  # Cancel route
-│   │       └── discom-mock.ts    # DISCOM verification
-│   ├── cds-mock/     # Catalog Discovery Service
-│   └── shared/       # Shared types, Prisma, Redis
-│       ├── prisma/schema.prisma  # Trust models
-│       └── src/trust/            # Trust engine
-├── scripts/          # Utility scripts
-├── docker-compose.yml
+│   │       ├── app/      # Pages (buy, sell, orders, profile)
+│   │       ├── components/
+│   │       ├── contexts/ # Auth, Balance contexts
+│   │       └── lib/      # API client
+│   ├── bap/              # Prosumer API (BAP + BPP)
+│   │   └── src/
+│   │       ├── routes.ts        # Buyer APIs
+│   │       ├── seller-routes.ts # Seller APIs
+│   │       ├── auth-routes.ts   # Authentication
+│   │       ├── discom-mock.ts   # DISCOM verification
+│   │       └── meter-analyzer.ts # PDF analysis
+│   ├── cds-mock/         # Catalog Discovery Service
+│   └── shared/           # Shared types, Prisma, Redis
+│       ├── prisma/schema.prisma
+│       └── src/
+│           ├── trust/    # Trust score engine
+│           ├── auth/     # Google OAuth, sessions
+│           └── db/       # Database utilities
+├── docker-compose.yml        # Development (DB + Redis)
+├── docker-compose.prod.yml   # Production (full stack)
+├── .env.example             # Environment template
 └── package.json
 ```
 
@@ -226,16 +239,40 @@ p2p-trading/
 | POST `/api/init` | Initialize order |
 | POST `/api/confirm` | Confirm purchase |
 | POST `/api/cancel` | Cancel order (buyer) |
+| GET `/api/status/:transactionId` | Get order status |
+
+### Buyer APIs
+| Endpoint | Description |
+|----------|-------------|
+| GET `/api/my-orders` | Get buyer's orders |
+| POST `/api/transactions` | Create new transaction |
 
 ### Seller APIs
 | Endpoint | Description |
 |----------|-------------|
 | GET `/seller/profile` | Get seller profile & offers |
-| POST `/seller/offers` | Create new energy offer |
+| POST `/seller/offers/direct` | Create energy offer |
 | DELETE `/seller/offers/:id` | Delete an offer |
-| GET `/seller/orders` | List incoming orders |
+| GET `/seller/my-orders` | List incoming orders |
+
+### Authentication
+| Endpoint | Description |
+|----------|-------------|
+| GET `/auth/config` | Get OAuth config |
+| POST `/auth/google` | Authenticate with Google |
+| POST `/auth/logout` | Logout current session |
+| GET `/auth/me` | Get current user |
+| PUT `/auth/profile` | Update profile |
+| POST `/auth/analyze-meter` | Analyze meter PDF |
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `npm test`
+5. Submit a pull request
 
 ## License
 
 MIT
-

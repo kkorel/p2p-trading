@@ -24,7 +24,7 @@ import {
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
-import { optionalAuthMiddleware, authMiddleware } from './middleware/auth';
+import { optionalAuthMiddleware, authMiddleware, devModeOnly, adminOnly } from './middleware';
 import { prisma } from '@p2p/shared';
 
 const router = Router();
@@ -1213,8 +1213,9 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
 
 /**
  * POST /api/settlement/reset - Clear settlement records (demo reset)
+ * Protected: DEV_MODE only
  */
-router.post('/api/settlement/reset', async (req: Request, res: Response) => {
+router.post('/api/settlement/reset', devModeOnly, async (req: Request, res: Response) => {
   await prisma.settlementRecord.deleteMany({});
   logger.info('Cleared settlement_records for demo reset');
   res.json({ status: 'ok' });
@@ -1222,8 +1223,9 @@ router.post('/api/settlement/reset', async (req: Request, res: Response) => {
 
 /**
  * DELETE /api/transactions - Clear all in-memory transactions
+ * Protected: DEV_MODE only
  */
-router.delete('/api/transactions', async (req: Request, res: Response) => {
+router.delete('/api/transactions', devModeOnly, async (req: Request, res: Response) => {
   const transactions = await getAllTransactions();
   const count = transactions.length;
   await clearAllTransactions();
@@ -1232,11 +1234,13 @@ router.delete('/api/transactions', async (req: Request, res: Response) => {
 });
 
 // ==================== DEMO ACCOUNT ENDPOINTS ====================
+// These endpoints are only available in development/demo mode
 
 /**
  * GET /api/demo/accounts - Get all demo account balances and transactions
+ * Protected: DEV_MODE only
  */
-router.get('/api/demo/accounts', (req: Request, res: Response) => {
+router.get('/api/demo/accounts', devModeOnly, (req: Request, res: Response) => {
   const accounts = getAllDemoAccounts();
   const transactions = getAllDemoTransactions();
   res.json({ accounts, transactions });
@@ -1244,8 +1248,9 @@ router.get('/api/demo/accounts', (req: Request, res: Response) => {
 
 /**
  * GET /api/demo/accounts/:id - Get specific demo account
+ * Protected: DEV_MODE only
  */
-router.get('/api/demo/accounts/:id', (req: Request, res: Response) => {
+router.get('/api/demo/accounts/:id', devModeOnly, (req: Request, res: Response) => {
   const account = getDemoAccount(req.params.id);
   if (!account) {
     return res.status(404).json({ error: 'Account not found' });
@@ -1255,16 +1260,18 @@ router.get('/api/demo/accounts/:id', (req: Request, res: Response) => {
 
 /**
  * GET /api/demo/transactions - Get transaction history
+ * Protected: DEV_MODE only
  */
-router.get('/api/demo/transactions', (req: Request, res: Response) => {
+router.get('/api/demo/transactions', devModeOnly, (req: Request, res: Response) => {
   const transactions = getAllDemoTransactions();
   res.json({ transactions });
 });
 
 /**
  * POST /api/demo/accounts/reset - Reset all demo accounts to initial balances
+ * Protected: DEV_MODE only
  */
-router.post('/api/demo/accounts/reset', (req: Request, res: Response) => {
+router.post('/api/demo/accounts/reset', devModeOnly, (req: Request, res: Response) => {
   initializeDemoAccounts();
   const accounts = getAllDemoAccounts();
   res.json({ status: 'ok', message: 'Demo accounts reset to initial balances', accounts });
@@ -1272,8 +1279,9 @@ router.post('/api/demo/accounts/reset', (req: Request, res: Response) => {
 
 /**
  * POST /api/demo/reset-all - Reset everything for a fresh demo
+ * Protected: DEV_MODE only
  */
-router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
+router.post('/api/demo/reset-all', devModeOnly, async (req: Request, res: Response) => {
   // Reset in-memory transactions
   await clearAllTransactions();
 

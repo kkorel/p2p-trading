@@ -12,7 +12,10 @@ import {
   connectRedis,
   disconnectRedis,
   checkRedisConnection,
+  createLogger,
 } from '@p2p/shared';
+
+const logger = createLogger('CDS-DB');
 
 // Re-export for use in other modules
 export {
@@ -28,7 +31,7 @@ export {
 export async function initDb(): Promise<void> {
   await connectPrisma();
   await connectRedis();
-  console.log('Database connections initialized');
+  logger.info('Database connections initialized');
 }
 
 /**
@@ -37,7 +40,7 @@ export async function initDb(): Promise<void> {
 export async function closeDb(): Promise<void> {
   await disconnectPrisma();
   await disconnectRedis();
-  console.log('Database connections closed');
+  logger.info('Database connections closed');
 }
 
 /**

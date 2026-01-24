@@ -11,8 +11,11 @@ import {
   deleteSession,
   deleteAllUserSessions,
   GOOGLE_CONFIG,
+  createLogger,
 } from '@p2p/shared';
-import { authMiddleware } from './middleware/auth';
+import { authMiddleware, devModeOnly } from './middleware';
+
+const logger = createLogger('Auth');
 
 const router = Router();
 
@@ -97,7 +100,7 @@ router.post('/google', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Google auth error:', error);
+    logger.error(`Google auth error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Authentication failed. Please try again.',
@@ -120,7 +123,7 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
       message: 'Logged out successfully',
     });
   } catch (error: any) {
-    console.error('Logout error:', error);
+    logger.error(`Logout error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Logout failed',
@@ -142,7 +145,7 @@ router.post('/logout-all', authMiddleware, async (req: Request, res: Response) =
       sessionsTerminated: count,
     });
   } catch (error: any) {
-    console.error('Logout all error:', error);
+    logger.error(`Logout all error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Logout failed',
@@ -201,7 +204,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Get me error:', error);
+    logger.error(`Get me error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Failed to get user info',
@@ -272,7 +275,7 @@ router.put('/profile', authMiddleware, async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Update profile error:', error);
+    logger.error(`Update profile error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Failed to update profile',
@@ -330,7 +333,7 @@ router.post('/setup-provider', authMiddleware, async (req: Request, res: Respons
       },
     });
   } catch (error: any) {
-    console.error('Setup provider error:', error);
+    logger.error(`Setup provider error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Failed to create seller profile',
@@ -361,7 +364,7 @@ router.get('/balance', authMiddleware, async (req: Request, res: Response) => {
       balance: user.balance,
     });
   } catch (error: any) {
-    console.error('Get balance error:', error);
+    logger.error(`Get balance error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Failed to get balance',
@@ -395,7 +398,7 @@ router.put('/balance', authMiddleware, async (req: Request, res: Response) => {
       balance: user.balance,
     });
   } catch (error: any) {
-    console.error('Update balance error:', error);
+    logger.error(`Update balance error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Failed to update balance',
@@ -470,7 +473,7 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
       newBalance: buyer.balance,
     });
   } catch (error: any) {
-    console.error('Payment verification error:', error);
+    logger.error(`Payment verification error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Payment verification failed',
@@ -560,7 +563,7 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
       updateData.meterDataAnalyzed = false; // Don't mark as analyzed if failed
       
       // Log the actual error for debugging
-      console.log('[MeterAnalyzer] API analysis failed:', analysisResult.error);
+      logger.debug(`[MeterAnalyzer] API analysis failed: ${analysisResult.error}`);
       
       message = `Could not extract production capacity from the document. Please try with a clearer meter reading PDF.`;
     }
@@ -648,7 +651,7 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
       },
     });
   } catch (error: any) {
-    console.error('Meter analysis error:', error);
+    logger.error(`Meter analysis error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Failed to analyze meter PDF. Please try again.',
@@ -659,8 +662,9 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
 /**
  * POST /auth/reset-meter - Reset meter analysis (for testing)
  * Allows user to re-upload and re-analyze their meter data
+ * Protected: DEV_MODE only
  */
-router.post('/reset-meter', authMiddleware, async (req: Request, res: Response) => {
+router.post('/reset-meter', devModeOnly, authMiddleware, async (req: Request, res: Response) => {
   try {
     await prisma.user.update({
       where: { id: req.user!.id },
@@ -676,7 +680,7 @@ router.post('/reset-meter', authMiddleware, async (req: Request, res: Response) 
       message: 'Meter data reset. You can now upload a new meter reading.',
     });
   } catch (error: any) {
-    console.error('Reset meter error:', error);
+    logger.error(`Reset meter error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Failed to reset meter data.',

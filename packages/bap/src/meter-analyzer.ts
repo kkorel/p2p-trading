@@ -6,10 +6,13 @@
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createLogger } from '@p2p/shared';
+
+const logger = createLogger('MeterAnalyzer');
 
 // OpenRouter configuration
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 // Using a small, cheap model - can be changed to any OpenRouter model
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
 
@@ -46,11 +49,11 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
             fullText += pageText + '\n';
         }
         
-        console.log('[MeterAnalyzer] Extracted PDF text, length:', fullText.length);
-        console.log('[MeterAnalyzer] Text preview:', fullText.substring(0, 300));
+        logger.debug(`Extracted PDF text, length: ${fullText.length}`);
+        logger.debug(`Text preview: ${fullText.substring(0, 300)}`);
         return fullText;
     } catch (error: any) {
-        console.error('[MeterAnalyzer] PDF text extraction failed:', error.message);
+        logger.error(`PDF text extraction failed: ${error.message}`);
         // Fallback - return error message
         return `[PDF content could not be extracted. Error: ${error.message}]`;
     }
@@ -64,7 +67,7 @@ export async function analyzeMeterPdf(
     declaredCapacity: number
 ): Promise<MeterAnalysisResult> {
     if (!OPENROUTER_API_KEY) {
-        console.warn('[MeterAnalyzer] No OpenRouter API key configured');
+        logger.warn('No OpenRouter API key configured');
         return {
             success: false,
             extractedCapacity: null,
@@ -80,7 +83,7 @@ export async function analyzeMeterPdf(
         const pdfText = await extractPdfText(pdfBuffer);
         
         if (!pdfText || pdfText.length < 50) {
-            console.warn('[MeterAnalyzer] PDF text extraction returned minimal content');
+            logger.warn('PDF text extraction returned minimal content');
         }
 
         const prompt = `You are analyzing an electricity meter reading document. 
@@ -100,8 +103,8 @@ Document text extracted from meter reading PDF:
 ${pdfText.substring(0, 4000)}
 ---`;
 
-        console.log('[MeterAnalyzer] Calling OpenRouter API with model:', OPENROUTER_MODEL);
-        console.log('[MeterAnalyzer] PDF text preview:', pdfText.substring(0, 500));
+        logger.info(`Calling OpenRouter API with model: ${OPENROUTER_MODEL}`);
+        logger.debug(`PDF text preview: ${pdfText.substring(0, 500)}`);
 
         let apiExtractedCapacity: number | null = null;
         let apiQuality: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
@@ -137,7 +140,7 @@ ${pdfText.substring(0, 4000)}
             );
 
             const content = response.data.choices[0]?.message?.content || '';
-            console.log('[MeterAnalyzer] API response content:', content);
+            logger.debug(`API response content: ${content}`);
 
             // Parse JSON from response
             const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -148,12 +151,12 @@ ${pdfText.substring(0, 4000)}
                 apiInsights = parsed.insights || '';
             }
         } catch (apiError: any) {
-            console.log('[MeterAnalyzer] API call failed:', apiError?.response?.data || apiError?.message);
+            logger.warn(`API call failed: ${apiError?.response?.data ? JSON.stringify(apiError.response.data) : apiError?.message}`);
         }
 
         // If API extracted a value, use it
         if (apiExtractedCapacity && apiExtractedCapacity > 0) {
-            console.log('[MeterAnalyzer] API extraction succeeded:', apiExtractedCapacity);
+            logger.info(`API extraction succeeded: ${apiExtractedCapacity} kWh`);
             return {
                 success: true,
                 extractedCapacity: apiExtractedCapacity,
@@ -164,11 +167,11 @@ ${pdfText.substring(0, 4000)}
         }
 
         // FALLBACK: Use regex extraction from PDF text
-        console.log('[MeterAnalyzer] API did not extract value, trying regex fallback...');
+        logger.info('API did not extract value, trying regex fallback...');
         const regexResult = extractCapacityWithRegex(pdfText);
         
         if (regexResult) {
-            console.log('[MeterAnalyzer] Regex fallback succeeded:', regexResult);
+            logger.info(`Regex fallback succeeded: ${regexResult} kWh`);
             return {
                 success: true,
                 extractedCapacity: regexResult,
@@ -179,7 +182,7 @@ ${pdfText.substring(0, 4000)}
         }
 
         // Both methods failed
-        console.log('[MeterAnalyzer] Both API and regex extraction failed');
+        logger.warn('Both API and regex extraction failed');
         return {
             success: false,
             extractedCapacity: null,
@@ -189,7 +192,7 @@ ${pdfText.substring(0, 4000)}
         };
 
     } catch (error: any) {
-        console.error('[MeterAnalyzer] Critical error:', error?.message || error);
+        logger.error(`Critical error: ${error?.message || error}`);
         return {
             success: false,
             extractedCapacity: null,
@@ -222,7 +225,7 @@ function extractCapacityWithRegex(text: string): number | null {
         if (match && match[1]) {
             const value = parseInt(match[1].replace(/,/g, ''), 10);
             if (value > 0 && value < 1000000) { // Reasonable range
-                console.log(`[MeterAnalyzer] Regex matched pattern: ${pattern}, value: ${value}`);
+                logger.debug(`Regex matched pattern: ${pattern}, value: ${value}`);
                 return value;
             }
         }

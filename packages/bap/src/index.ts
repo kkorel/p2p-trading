@@ -5,7 +5,7 @@
 
 import express from 'express';
 import path from 'path';
-import { config, createLogger } from '@p2p/shared';
+import { config, createLogger, validateEnv } from '@p2p/shared';
 import routes from './routes';
 import callbacks from './callbacks';
 import sellerRoutes from './seller-routes';
@@ -81,6 +81,17 @@ app.get('*', (req, res, next) => {
 // Start server after DB initialization
 async function start() {
   try {
+    // Validate environment configuration
+    const envValidation = validateEnv();
+    if (!envValidation.valid) {
+      logger.error('Environment validation failed:');
+      envValidation.errors.forEach(err => logger.error(`  - ${err}`));
+      process.exit(1);
+    }
+
+    // Log environment mode
+    logger.info(`Starting in ${config.env.nodeEnv} mode (DEV_MODE=${config.env.isDevMode})`);
+
     await initDb();
     logger.info('Database and Redis connections initialized');
 
