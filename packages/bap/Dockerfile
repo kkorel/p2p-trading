@@ -46,6 +46,6 @@ EXPOSE 4000
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Start script: run migrations then start app
-# Migrations need to run at startup (not build) because DATABASE_URL is only available at runtime
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=./packages/shared/prisma/schema.prisma && node packages/bap/dist/bap/src/index.js"]
+# Start script: push schema to database then start app
+# db push syncs schema to database (creates tables if they don't exist)
+CMD ["sh", "-c", "npx prisma db push --schema=./packages/shared/prisma/schema.prisma --skip-generate && node packages/bap/dist/bap/src/index.js"]
