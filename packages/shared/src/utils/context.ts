@@ -2,8 +2,9 @@
  * Beckn Context Utilities
  */
 
-import { v4 as uuidv4 } from 'uuid';
-import { BecknContext, BecknAction, BECKN_DOMAIN, BECKN_VERSION } from '../types/beckn';
+import {v4 as uuidv4} from 'uuid';
+
+import {BECKN_DOMAIN, BECKN_SCHEMA_CONTEXT, BECKN_VERSION, BecknAction, BecknContext} from '../types/beckn';
 
 export interface CreateContextOptions {
   action: BecknAction;
@@ -32,6 +33,8 @@ export function createContext(options: CreateContextOptions): BecknContext {
     bpp_id: options.bpp_id,
     bpp_uri: options.bpp_uri,
     ttl: options.ttl || 'PT30S',
+    // Beckn v2.0 requires schema_context
+    schema_context: BECKN_SCHEMA_CONTEXT,
   };
 }
 

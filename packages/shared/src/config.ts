@@ -31,8 +31,8 @@ export const config = {
   // External Beckn services (production endpoints)
   external: {
     // Catalog Discovery Service (Beckn network CDS)
-    cds: process.env.EXTERNAL_CDS_URL ||
-        'https://34.93.141.21.sslip.io/beckn/catalog',
+    // Note: Our code appends /discover, so base URL is /beckn
+    cds: process.env.EXTERNAL_CDS_URL || 'https://34.93.141.21.sslip.io/beckn',
     // DEG Ledger for immutable trade records
     ledger: process.env.LEDGER_URL || 'https://34.93.166.38.sslip.io',
     // Verifiable Credentials portal

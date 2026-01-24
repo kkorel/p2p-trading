@@ -2,9 +2,27 @@
  * Beckn v2 Protocol Types for P2P Energy Trading
  */
 
-// Domain constant
-export const BECKN_DOMAIN = 'energy:trading:p2p';
+// Domain constant - Must match external CDS/Registry domain
+// Format: beckn.one:deg:p2p-trading-interdiscom:2.0.0
+export const BECKN_DOMAIN =
+    process.env.BECKN_DOMAIN || 'beckn.one:deg:p2p-trading-interdiscom:2.0.0';
 export const BECKN_VERSION = '2.0.0';
+
+// Schema context required for Beckn v2.0
+export const BECKN_SCHEMA_CONTEXT = {
+  schema: {
+    domain: {
+      name: BECKN_DOMAIN.split(':').slice(0, -1).join(
+          ':'),  // e.g., beckn.one:deg:p2p-trading-interdiscom
+      version: BECKN_VERSION,
+    },
+  },
+};
+
+// Schema context type for Beckn v2.0
+export interface SchemaContext {
+  schema: {domain: {name: string; version: string;};};
+}
 
 // Context - included in every Beckn message
 export interface BecknContext {
@@ -19,6 +37,8 @@ export interface BecknContext {
   bpp_id?: string;
   bpp_uri?: string;
   ttl: string;
+  // Beckn v2.0 requires schema_context
+  schema_context?: SchemaContext;
 }
 
 // All Beckn actions
