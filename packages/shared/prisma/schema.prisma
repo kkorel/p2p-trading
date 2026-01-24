@@ -219,8 +219,15 @@ model SettlementRecord {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
+  // Verifiable Credentials metadata
+  vcId                String?   @map("vc_id")        // ID of the verified VC
+  vcIssuer            String?   @map("vc_issuer")    // DID of the VC issuer
+  vcVerifiedAt        String?   @map("vc_verified_at") // When VC was verified
+  vcClaims            String?   @map("vc_claims")    // JSON string of extracted claims
+
   @@index([orderId])
   @@index([transactionId])
   @@index([status])
+  @@index([vcId])
   @@map("settlement_records")
 }
