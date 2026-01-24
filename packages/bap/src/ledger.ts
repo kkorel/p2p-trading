@@ -108,17 +108,14 @@ export async function writeTradeToLedger(
       for (const item of order.items) {
         tradeDetails.push({
           tradeType: 'ENERGY',
-          tradeQty: item.quantity?.measure?.value || 0,
+          tradeQty: item.quantity || 0,
           tradeUnit: 'KWH',
         });
 
-        // Extract time window from fulfillment
-        if (order.fulfillments && order.fulfillments.length > 0) {
-          const timeRange = order.fulfillments[0].time;
-          if (timeRange) {
-            deliveryStartTime = timeRange.range?.start;
-            deliveryEndTime = timeRange.range?.end;
-          }
+        // Extract time window from order item
+        if (item.timeWindow) {
+          deliveryStartTime = item.timeWindow.startTime;
+          deliveryEndTime = item.timeWindow.endTime;
         }
       }
     }

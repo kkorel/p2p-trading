@@ -255,7 +255,7 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
   import('./ledger').then(async ({ writeTradeToLedger }) => {
     try {
       const buyerId = txState?.buyerId || 'unknown-buyer';
-      const sellerId = content.order.provider?.id || 'unknown-seller';
+      const sellerId = content.order.items?.[0]?.provider_id || 'unknown-seller';
       
       const ledgerResult = await writeTradeToLedger(
         context.transaction_id,
