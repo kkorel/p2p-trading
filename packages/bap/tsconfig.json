@@ -8,9 +8,7 @@
         "../shared/src"
       ]
     },
-    "types": [
-      "node"
-    ],
+    "types": ["node", "jest"],
     "noImplicitAny": false
   },
   "include": [

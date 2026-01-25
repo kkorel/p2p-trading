@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Package, Tag, ShoppingBag, Sun, Wind, Droplets, Trash2, Clock } from 'lucide-react';
+import { Plus, Package, Tag, ShoppingBag, Sun, Wind, Droplets, Trash2, Clock, AlertCircle, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/app-shell';
 import { AddOfferSheet } from '@/components/sell/add-offer-sheet';
-import { Card, Button, Badge, EmptyState, SkeletonList } from '@/components/ui';
+import { Card, Button, Badge, EmptyState, SkeletonList, useToast, useConfirm } from '@/components/ui';
 import { sellerApi, type Offer, type Order, type Provider } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatTime, formatDateTime, truncateId, cn } from '@/lib/utils';
 
 const sourceIcons: Record<string, typeof Sun> = {
@@ -17,13 +19,58 @@ const sourceIcons: Record<string, typeof Sun> = {
 type Tab = 'offers' | 'orders';
 
 export default function SellPage() {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<Tab>('offers');
   const [isLoading, setIsLoading] = useState(true);
   const [provider, setProvider] = useState<Provider | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  
+
   const [showAddOffer, setShowAddOffer] = useState(false);
+  const [quotaStats, setQuotaStats] = useState<{
+    totalSold: number;
+    totalUnsoldInOffers: number;
+    totalCommitted: number;
+  } | null>(null);
+
+  // Check if user has set production capacity
+  const hasProductionCapacity = user?.productionCapacity && user.productionCapacity > 0;
+  
+  // Calculate trade limit
+  const tradeLimit = hasProductionCapacity 
+    ? (user.productionCapacity! * (user.allowedTradeLimit ?? 10)) / 100 
+    : 0;
+
+  // Use quota stats from backend (tracks sold orders permanently)
+  // totalCommitted = sold (from orders) + unsold (in active offers)
+  const totalCommitted = quotaStats?.totalCommitted ?? 0;
+  const totalSold = quotaStats?.totalSold ?? 0;
+  const totalUnsoldInOffers = quotaStats?.totalUnsoldInOffers ?? 0;
+
+  // Remaining capacity
+  const remainingCapacity = Math.max(0, tradeLimit - totalCommitted);
+
+  const handleCreateOffer = () => {
+    if (!hasProductionCapacity) {
+      showToast({
+        type: 'warning',
+        title: 'Set Production Capacity',
+        message: 'Please set your production capacity in Profile before creating offers.',
+      });
+      return;
+    }
+    if (remainingCapacity <= 0) {
+      showToast({
+        type: 'error',
+        title: 'Trade Limit Reached',
+        message: `You've reached your trade limit of ${tradeLimit.toFixed(1)} kWh. Delete an offer or increase your trust score.`,
+      });
+      return;
+    }
+    setShowAddOffer(true);
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -32,10 +79,13 @@ export default function SellPage() {
         sellerApi.getMyProfile(),
         sellerApi.getMyOrders(),
       ]);
-      
+
       setProvider(profileData.provider);
       setOffers(profileData.offers);
       setOrders(ordersData.orders);
+      if (profileData.quotaStats) {
+        setQuotaStats(profileData.quotaStats);
+      }
     } catch (error) {
       console.error('Failed to load seller data:', error);
     } finally {
@@ -53,14 +103,36 @@ export default function SellPage() {
     max_qty: number;
     time_window: { startTime: string; endTime: string };
   }) => {
-    await sellerApi.addOfferDirect(data);
-    await loadData();
+    try {
+      await sellerApi.addOfferDirect(data);
+      await loadData();
+      showToast({ type: 'success', title: 'Offer created successfully!' });
+    } catch (error: any) {
+      // Extract error message from API response
+      const message = error.message || 'Failed to create offer';
+      showToast({ type: 'error', title: message });
+      throw error; // Re-throw so the sheet knows it failed
+    }
   };
 
   const handleDeleteOffer = async (offerId: string) => {
-    if (!confirm('Delete this offer?')) return;
-    await sellerApi.deleteOffer(offerId);
-    await loadData();
+    const confirmed = await confirm({
+      title: 'Delete Offer?',
+      message: 'Are you sure you want to delete this offer? This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Keep',
+      variant: 'danger',
+    });
+    
+    if (!confirmed) return;
+    
+    try {
+      await sellerApi.deleteOffer(offerId);
+      await loadData();
+      showToast({ type: 'success', title: 'Offer deleted successfully' });
+    } catch (error: any) {
+      showToast({ type: 'error', title: error.message || 'Failed to delete offer' });
+    }
   };
 
   const tabs: { id: Tab; label: string; count: number }[] = [
@@ -88,7 +160,7 @@ export default function SellPage() {
             </Card>
             <Card padding="sm" className="text-center">
               <p className="text-xl font-semibold text-[var(--color-success)]">
-                {Math.round(provider.trust_score * 100)}%
+                {Math.round((user?.trustScore ?? 0.3) * 100)}%
               </p>
               <p className="text-xs text-[var(--color-text-muted)]">Trust Score</p>
             </Card>
@@ -121,6 +193,71 @@ export default function SellPage() {
           ))}
         </div>
 
+        {/* Production Capacity Warning */}
+        {!hasProductionCapacity && (
+          <Card className="border-[var(--color-warning)] bg-[var(--color-warning-light)]">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-[var(--color-warning)] flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-[var(--color-text)]">
+                  Set your production capacity
+                </p>
+                <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                  You need to set how much energy you produce monthly before creating offers.
+                </p>
+                <Link href="/profile">
+                  <Button size="sm" className="mt-2">
+                    Go to Profile
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Trade Limit Info */}
+        {hasProductionCapacity && (
+          <Card padding="sm">
+            <div className="space-y-2">
+              {/* Remaining Capacity - Main Focus */}
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-[var(--color-text)]">Available to offer:</span>
+                <span className={`text-lg font-bold ${remainingCapacity > 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
+                  {remainingCapacity.toFixed(1)} kWh
+                </span>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[var(--color-primary)] rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, (totalCommitted / tradeLimit) * 100)}%` }}
+                />
+              </div>
+              
+              {/* Breakdown */}
+              <div className="flex flex-col gap-1 text-xs text-[var(--color-text-muted)]">
+                <div className="flex justify-between">
+                  <span>Sold (from orders):</span>
+                  <span>{totalSold.toFixed(1)} kWh</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Unsold in offers:</span>
+                  <span>{totalUnsoldInOffers.toFixed(1)} kWh</span>
+                </div>
+                <div className="flex justify-between font-medium text-[var(--color-text)]">
+                  <span>Total committed:</span>
+                  <span>{totalCommitted.toFixed(1)} / {tradeLimit.toFixed(1)} kWh</span>
+                </div>
+              </div>
+              
+              <p className="text-xs text-[var(--color-text-muted)] pt-1 border-t border-[var(--color-border)]">
+                Trade limit = {user?.allowedTradeLimit ?? 10}% of {user?.productionCapacity} kWh production
+              </p>
+            </div>
+          </Card>
+        )}
+
         {/* Content */}
         {activeTab === 'offers' && (
           <div className="flex flex-col gap-3">
@@ -128,18 +265,21 @@ export default function SellPage() {
               <EmptyState
                 icon={<Tag className="h-12 w-12" />}
                 title="No offers yet"
-                description="Create your first offer to start selling energy"
-                action={{
+                description={hasProductionCapacity 
+                  ? "Create your first offer to start selling energy"
+                  : "Set your production capacity in Profile to create offers"
+                }
+                action={hasProductionCapacity ? {
                   label: 'Create Offer',
-                  onClick: () => setShowAddOffer(true),
-                }}
+                  onClick: handleCreateOffer,
+                } : undefined}
               />
             ) : (
               <>
                 {offers.map((offer) => {
                   const sourceType = offer.source_type || 'SOLAR';
                   const SourceIcon = sourceIcons[sourceType] || Package;
-                  
+
                   return (
                     <Card key={offer.id}>
                       <div className="flex items-start justify-between mb-2">
@@ -166,7 +306,7 @@ export default function SellPage() {
                       <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] mb-2">
                         <Clock className="h-3.5 w-3.5" />
                         <span>
-                          {formatTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
+                          {formatDateTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
                         </span>
                       </div>
                       {offer.blockStats && (
@@ -178,7 +318,12 @@ export default function SellPage() {
                     </Card>
                   );
                 })}
-                <Button variant="secondary" fullWidth onClick={() => setShowAddOffer(true)}>
+                <Button 
+                  variant="secondary" 
+                  fullWidth 
+                  onClick={handleCreateOffer}
+                  disabled={!hasProductionCapacity}
+                >
                   <Plus className="h-4 w-4" />
                   Create Offer
                 </Button>
@@ -217,7 +362,7 @@ export default function SellPage() {
                       <Badge
                         variant={
                           order.status === 'ACTIVE' ? 'success' :
-                          order.status === 'PENDING' ? 'warning' : 'default'
+                            order.status === 'PENDING' ? 'warning' : 'default'
                         }
                       >
                         {order.status}
@@ -237,14 +382,114 @@ export default function SellPage() {
                         </p>
                       </div>
                     </div>
-                    {order.quote && (
-                      <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--color-border)]">
-                        <span className="text-sm text-[var(--color-text-muted)]">Total</span>
-                        <span className="text-base font-semibold text-[var(--color-success)]">
-                          {formatCurrency(order.quote.price.value)}
+                    
+                    {/* Delivery Time */}
+                    {(order as any).deliveryTime && (
+                      <div className="flex items-center gap-2 mt-2 p-2 bg-[var(--color-surface)] rounded-lg">
+                        <Clock className="h-4 w-4 text-[var(--color-text-muted)]" />
+                        <span className="text-xs text-[var(--color-text-muted)]">
+                          Delivery: {formatDateTime((order as any).deliveryTime.start)}
+                          {(order as any).deliveryTime.end && ` - ${formatTime((order as any).deliveryTime.end)}`}
                         </span>
                       </div>
                     )}
+                    {/* Payment Info - Differs by status */}
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--color-border)]">
+                      {order.status === 'CANCELLED' && (order as any).cancellation ? (
+                        // Cancelled - show compensation
+                        <>
+                          <span className="text-sm text-[var(--color-text-muted)]">Compensation (5%)</span>
+                          <span className="text-base font-semibold text-[var(--color-success)]">
+                            +{formatCurrency((order as any).cancellation.compensation || 0)}
+                          </span>
+                        </>
+                      ) : (order as any).paymentStatus === 'RELEASED' ? (
+                        // Payment released after delivery
+                        <>
+                          <span className="text-sm text-[var(--color-text-muted)]">Received</span>
+                          <span className="text-base font-semibold text-[var(--color-success)]">
+                            +{formatCurrency(order.quote?.price?.value || 0)}
+                          </span>
+                        </>
+                      ) : order.quote ? (
+                        // Payment in escrow
+                        <>
+                          <span className="text-sm text-[var(--color-text-muted)]">In Escrow</span>
+                          <span className="text-base font-semibold text-[var(--color-warning)]">
+                            {formatCurrency(order.quote.price.value)}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                    
+                    {/* Fulfillment Status (DISCOM Verification) */}
+                    {order.fulfillment && (
+                      <div className={`mt-3 p-3 rounded-lg ${
+                        order.fulfillment.status === 'FULL' 
+                          ? 'bg-[var(--color-success-light)]' 
+                          : order.fulfillment.status === 'PARTIAL'
+                            ? 'bg-[var(--color-warning-light)]'
+                            : 'bg-[var(--color-danger-light)]'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          {order.fulfillment.status === 'FULL' ? (
+                            <CheckCircle className="h-4 w-4 text-[var(--color-success)]" />
+                          ) : order.fulfillment.status === 'PARTIAL' ? (
+                            <AlertTriangle className="h-4 w-4 text-[var(--color-warning)]" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-[var(--color-danger)]" />
+                          )}
+                          <span className={`text-sm font-medium ${
+                            order.fulfillment.status === 'FULL' 
+                              ? 'text-[var(--color-success)]' 
+                              : order.fulfillment.status === 'PARTIAL'
+                                ? 'text-[var(--color-warning)]'
+                                : 'text-[var(--color-danger)]'
+                          }`}>
+                            {order.fulfillment.status === 'FULL' 
+                              ? 'Fully Delivered' 
+                              : order.fulfillment.status === 'PARTIAL'
+                                ? 'Partially Delivered'
+                                : 'Delivery Failed'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-[var(--color-text-muted)]">Delivered: </span>
+                            <span className="font-medium text-[var(--color-text)]">
+                              {order.fulfillment.deliveredQty} / {order.fulfillment.expectedQty} kWh
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[var(--color-text-muted)]">Ratio: </span>
+                            <span className="font-medium text-[var(--color-text)]">
+                              {(order.fulfillment.deliveryRatio * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-[var(--color-border)] text-xs">
+                          <span className="text-[var(--color-text-muted)]">Trust Impact: </span>
+                          <span className={`font-medium ${
+                            order.fulfillment.trustImpact >= 0 
+                              ? 'text-[var(--color-success)]' 
+                              : 'text-[var(--color-danger)]'
+                          }`}>
+                            {order.fulfillment.trustImpact >= 0 ? '+' : ''}{(order.fulfillment.trustImpact * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Pending verification indicator */}
+                    {order.status === 'COMPLETED' && !order.fulfillment && (
+                      <div className="mt-3 p-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)]">
+                        <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+                          <Clock className="h-3.5 w-3.5 animate-pulse" />
+                          <span>Awaiting DISCOM verification...</span>
+                        </div>
+                      </div>
+                    )}
+
                     <p className="text-xs text-[var(--color-text-muted)] mt-2">
                       Order ID: {truncateId(order.id)}
                     </p>

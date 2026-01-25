@@ -108,9 +108,14 @@ export default function BuyPage() {
     if (!selectedOffer || !transaction) return null;
 
     try {
-      // Select the offer
+      // Create a new transaction for this specific purchase
+      // This allows multiple purchases from the same discovery results
+      const newTx = await buyerApi.createTransaction();
+      const txId = newTx.transaction_id;
+
+      // Select the offer with the new transaction
       await buyerApi.select({
-        transaction_id: transaction.transaction_id,
+        transaction_id: txId,
         offer_id: selectedOffer.offer.id,
         quantity,
       });
@@ -119,18 +124,18 @@ export default function BuyPage() {
       await new Promise(r => setTimeout(r, 500));
 
       // Initialize order
-      await buyerApi.init(transaction.transaction_id);
+      await buyerApi.init(txId);
 
       // Wait for init callback
       await new Promise(r => setTimeout(r, 500));
 
       // Get order ID from transaction
-      let txState = await buyerApi.getTransaction(transaction.transaction_id);
+      let txState = await buyerApi.getTransaction(txId);
       let attempts = 0;
       
       while (!txState.order && !txState.error && attempts < 10) {
         await new Promise(r => setTimeout(r, 500));
-        txState = await buyerApi.getTransaction(transaction.transaction_id);
+        txState = await buyerApi.getTransaction(txId);
         attempts++;
       }
 
@@ -144,13 +149,26 @@ export default function BuyPage() {
       }
 
       // Confirm order
-      await buyerApi.confirm(transaction.transaction_id, txState.order.id);
+      await buyerApi.confirm(txId, txState.order.id);
 
       // Wait for confirmation
       await new Promise(r => setTimeout(r, 500));
 
       // Get final state
-      txState = await buyerApi.getTransaction(transaction.transaction_id);
+      txState = await buyerApi.getTransaction(txId);
+
+      // After successful purchase, update the offer's available quantity in local state
+      if (txState.order) {
+        setOffers(prevOffers => prevOffers.map(o => {
+          if (o.offer.id === selectedOffer.offer.id) {
+            return {
+              ...o,
+              availableQty: Math.max(0, o.availableQty - quantity),
+            };
+          }
+          return o;
+        }).filter(o => o.availableQty > 0)); // Remove sold-out offers
+      }
       
       return txState.order || null;
     } catch (error) {

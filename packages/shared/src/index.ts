@@ -23,3 +23,6 @@ export * from './auth';
 
 // Export Verifiable Credentials module
 export * from './vc';
+
+// Export trust score system
+export * from './trust';

@@ -60,7 +60,9 @@ export type BecknAction =
   | 'confirm' 
   | 'on_confirm' 
   | 'status' 
-  | 'on_status';
+  | 'on_status'
+  | 'cancel'
+  | 'on_cancel';
 
 // ACK response
 export interface BecknAck {

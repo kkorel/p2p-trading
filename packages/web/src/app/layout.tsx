@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/contexts/auth-context';
 import { BalanceProvider } from '@/contexts/balance-context';
+import { ToastProvider, ConfirmProvider } from '@/components/ui';
 import './globals.css';
 
 const inter = Inter({
@@ -41,7 +42,11 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         <AuthProvider>
-          <BalanceProvider>{children}</BalanceProvider>
+          <BalanceProvider>
+            <ToastProvider>
+              <ConfirmProvider>{children}</ConfirmProvider>
+            </ToastProvider>
+          </BalanceProvider>
         </AuthProvider>
       </body>
     </html>
