@@ -21,6 +21,14 @@ import {
   DeliveryMode,
   CatalogOffer,
   Provider,
+  // VC imports
+  VerifiableCredential,
+  VerificationOptions,
+  verifyCredential,
+  parseAndVerifyCredential,
+  verifyGenerationProfile,
+  getIssuerId,
+  validateProviderMatch,
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
@@ -987,12 +995,34 @@ router.post('/api/settlement/confirm-funded', async (req: Request, res: Response
 });
 
 /**
- * POST /api/settlement/verify-outcome - Decide release/refund (demo hook)
+ * POST /api/settlement/verify-outcome - Decide release/refund
+ * Supports both manual outcome and VC-based verification
+ * 
+ * Body options:
+ * 1. Manual: { tradeId, outcome: 'SUCCESS' | 'FAIL' }
+ * 2. VC-based: { tradeId, credential: VerifiableCredential, verificationOptions?: VerificationOptions }
  */
 router.post('/api/settlement/verify-outcome', async (req: Request, res: Response) => {
-  const { tradeId, outcome } = req.body as { tradeId?: string; outcome?: SettlementOutcome };
-  if (!tradeId || (outcome !== 'SUCCESS' && outcome !== 'FAIL')) {
-    return res.status(400).json({ error: 'tradeId and outcome=SUCCESS|FAIL are required' });
+  const { tradeId, outcome, credential, verificationOptions } = req.body as {
+    tradeId?: string;
+    outcome?: SettlementOutcome;
+    credential?: unknown;
+    verificationOptions?: VerificationOptions;
+  };
+
+  if (!tradeId) {
+    return res.status(400).json({ error: 'tradeId is required' });
+  }
+
+  // Must provide either manual outcome OR credential for VC verification
+  if (!outcome && !credential) {
+    return res.status(400).json({
+      error: 'Either outcome (SUCCESS|FAIL) or credential (VC) is required',
+      usage: {
+        manual: '{ tradeId, outcome: "SUCCESS" | "FAIL" }',
+        vcBased: '{ tradeId, credential: {...}, verificationOptions?: {...} }',
+      },
+    });
   }
 
   const record = await getSettlementRecord(tradeId);
@@ -1008,30 +1038,92 @@ router.post('/api/settlement/verify-outcome', async (req: Request, res: Response
     return res.status(400).json({ error: 'Escrow not funded yet' });
   }
 
-  const expired = new Date(record.expiresAt).getTime() < Date.now();
+  const expired = new Date(record.expiresAt!).getTime() < Date.now();
   if (expired) {
     await updateSettlementRecord(tradeId, { status: 'ERROR_EXPIRED' });
     const updated = await getSettlementRecord(tradeId);
     return res.status(400).json({ error: 'Settlement expired', record: updated, status: 'ERROR_EXPIRED' });
   }
 
+  let finalOutcome: SettlementOutcome;
+  let verificationResult = null;
+  let vcMetadata: { vcId?: string; vcIssuer?: string; vcClaims?: string } = {};
+
+  if (credential) {
+    // VC-based verification
+    try {
+      verificationResult = await verifyCredential(credential, verificationOptions);
+      finalOutcome = verificationResult.verified ? 'SUCCESS' : 'FAIL';
+      
+      const vc = credential as VerifiableCredential;
+      vcMetadata = {
+        vcId: vc.id || `vc-${Date.now()}`,
+        vcIssuer: getIssuerId(vc.issuer),
+        vcClaims: JSON.stringify(verificationResult.claims || {}),
+      };
+
+      logger.info('=== [STEP 5] VC-based verification complete', {
+        tradeId,
+        vcVerified: verificationResult.verified,
+        vcId: vcMetadata.vcId,
+        issuer: vcMetadata.vcIssuer,
+        checksRun: verificationResult.checks.length,
+        checksFailed: verificationResult.checks.filter(c => c.status === 'failed').length,
+      });
+    } catch (error: any) {
+      logger.error(`VC verification failed: ${error.message}`, { tradeId });
+      return res.status(400).json({
+        error: `VC verification failed: ${error.message}`,
+        tradeId,
+      });
+    }
+  } else {
+    // Manual outcome
+    if (outcome !== 'SUCCESS' && outcome !== 'FAIL') {
+      return res.status(400).json({ error: 'outcome must be SUCCESS or FAIL' });
+    }
+    finalOutcome = outcome;
+    logger.info('=== [STEP 5] Manual verification outcome set', { tradeId, outcome: finalOutcome });
+  }
+
+  // Update settlement record
   await updateSettlementRecord(tradeId, {
-    verificationOutcome: outcome,
+    verificationOutcome: finalOutcome,
     verifiedAt: nowIso(),
   });
 
+  // Try to store VC metadata if available (fields may not exist yet)
+  if (vcMetadata.vcId) {
+    try {
+      await prisma.settlementRecord.update({
+        where: { tradeId },
+        data: {
+          vcId: vcMetadata.vcId,
+          vcIssuer: vcMetadata.vcIssuer,
+          vcVerifiedAt: new Date().toISOString(),
+          vcClaims: vcMetadata.vcClaims,
+        },
+      });
+    } catch (e) {
+      // Fields may not exist yet if migration hasn't run - that's OK
+      logger.debug('Could not store VC metadata fields - schema may need migration');
+    }
+  }
+
   const updated = await getSettlementRecord(tradeId);
-  logger.info('=== [STEP 5] TE decides outcome using verification result + timing', { tradeId, outcome });
   logger.info('=== [STEP 6] TE -> Bank: Execute settlement instruction', {
     tradeId,
-    action: outcome === 'SUCCESS' ? 'RELEASE' : 'REFUND',
+    action: finalOutcome === 'SUCCESS' ? 'RELEASE' : 'REFUND',
+    method: credential ? 'VC-based' : 'manual',
   });
 
   res.json({
     status: 'ok',
+    method: credential ? 'vc-based' : 'manual',
     record: updated,
-    payout: buildPayoutInstruction(updated, outcome),
+    payout: buildPayoutInstruction(updated, finalOutcome),
     steps: buildPaymentSteps(updated),
+    verificationResult: verificationResult || undefined,
   });
 });
 
@@ -1242,6 +1334,260 @@ router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
     status: 'ok',
     message: 'Full demo reset complete',
     accounts: getAllDemoAccounts(),
+  });
+});
+
+// ==================== VERIFIABLE CREDENTIALS ENDPOINTS ====================
+
+/**
+ * POST /api/vc/verify - Verify a Verifiable Credential
+ * Accepts raw VC JSON and returns verification result
+ */
+router.post('/api/vc/verify', async (req: Request, res: Response) => {
+  const { credential, options } = req.body as {
+    credential?: unknown;
+    options?: VerificationOptions;
+  };
+
+  if (!credential) {
+    return res.status(400).json({ error: 'credential is required in request body' });
+  }
+
+  try {
+    const result = await verifyCredential(credential, options);
+    
+    logger.info('VC verification completed', {
+      verified: result.verified,
+      credentialId: result.credentialId,
+      issuer: result.issuer,
+      checksRun: result.checks.length,
+      checksFailed: result.checks.filter(c => c.status === 'failed').length,
+    });
+
+    res.json({
+      status: 'ok',
+      result,
+    });
+  } catch (error: any) {
+    logger.error(`VC verification failed: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/vc/verify-json - Verify a VC from JSON string
+ * Useful when receiving VC as a string (e.g., from file upload)
+ */
+router.post('/api/vc/verify-json', async (req: Request, res: Response) => {
+  const { json, options } = req.body as {
+    json?: string;
+    options?: VerificationOptions;
+  };
+
+  if (!json || typeof json !== 'string') {
+    return res.status(400).json({ error: 'json string is required in request body' });
+  }
+
+  try {
+    const result = await parseAndVerifyCredential(json, options);
+    
+    logger.info('VC JSON verification completed', {
+      verified: result.verified,
+      credentialId: result.credentialId,
+    });
+
+    res.json({
+      status: 'ok',
+      result,
+    });
+  } catch (error: any) {
+    logger.error(`VC JSON verification failed: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/vc/verify-generation-profile - Verify a Generation Profile VC
+ * Specialized endpoint for energy generation credentials
+ */
+router.post('/api/vc/verify-generation-profile', async (req: Request, res: Response) => {
+  const { credential, expectedProviderId, options } = req.body as {
+    credential?: unknown;
+    expectedProviderId?: string;
+    options?: VerificationOptions;
+  };
+
+  if (!credential) {
+    return res.status(400).json({ error: 'credential is required in request body' });
+  }
+
+  try {
+    const result = await verifyGenerationProfile(credential, options);
+    
+    // If provider ID verification is requested, add that check
+    if (expectedProviderId && result.verified) {
+      const providerCheck = validateProviderMatch(
+        credential as VerifiableCredential,
+        expectedProviderId
+      );
+      result.checks.push(providerCheck);
+      
+      // Update verified status if provider check failed
+      if (providerCheck.status === 'failed') {
+        result.verified = false;
+        result.error = 'Provider ID mismatch';
+      }
+    }
+
+    logger.info('Generation Profile VC verification completed', {
+      verified: result.verified,
+      credentialId: result.credentialId,
+      providerId: result.generationProfile?.providerId,
+      sourceType: result.generationProfile?.sourceType,
+      capacityKW: result.generationProfile?.installedCapacityKW,
+    });
+
+    res.json({
+      status: 'ok',
+      result,
+      generationProfile: result.generationProfile,
+    });
+  } catch (error: any) {
+    logger.error(`Generation Profile verification failed: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/vc/verify-and-settle/:tradeId - Verify VC and update settlement
+ * Combines VC verification with settlement outcome update
+ */
+router.post('/api/vc/verify-and-settle/:tradeId', async (req: Request, res: Response) => {
+  const { tradeId } = req.params;
+  const { credential, options } = req.body as {
+    credential?: unknown;
+    options?: VerificationOptions;
+  };
+
+  if (!credential) {
+    return res.status(400).json({ error: 'credential is required in request body' });
+  }
+
+  // Get settlement record
+  const record = await getSettlementRecord(tradeId);
+  if (!record) {
+    return res.status(404).json({ error: 'Settlement record not found', status: 'ERROR_NO_RECORD' });
+  }
+
+  if (record.status === 'RELEASED' || record.status === 'REFUNDED') {
+    return res.json({
+      status: 'ok',
+      message: 'Settlement already completed',
+      record,
+    });
+  }
+
+  if (record.status !== 'FUNDED') {
+    return res.status(400).json({ error: 'Escrow not funded yet - cannot verify' });
+  }
+
+  try {
+    // Verify the credential
+    const verificationResult = await verifyCredential(credential, options);
+    const vc = credential as VerifiableCredential;
+    
+    // Determine settlement outcome based on verification
+    const outcome: SettlementOutcome = verificationResult.verified ? 'SUCCESS' : 'FAIL';
+    
+    // Check if settlement has expired
+    const expired = new Date(record.expiresAt!).getTime() < Date.now();
+    if (expired) {
+      await updateSettlementRecord(tradeId, { status: 'ERROR_EXPIRED' });
+      const updated = await getSettlementRecord(tradeId);
+      return res.status(400).json({
+        error: 'Settlement expired',
+        record: updated,
+        status: 'ERROR_EXPIRED',
+        verificationResult,
+      });
+    }
+
+    // Update settlement with VC verification info
+    await updateSettlementRecord(tradeId, {
+      verificationOutcome: outcome,
+      verifiedAt: nowIso(),
+      // Store VC metadata in the existing fields (we'll extend schema later)
+    });
+
+    // Also store VC details via separate update for the new fields
+    try {
+      await prisma.settlementRecord.update({
+        where: { tradeId },
+        data: {
+          vcId: vc.id || `vc-${Date.now()}`,
+          vcIssuer: getIssuerId(vc.issuer),
+          vcVerifiedAt: new Date().toISOString(),
+          vcClaims: JSON.stringify(verificationResult.claims || {}),
+        },
+      });
+    } catch (e) {
+      // Fields may not exist yet if migration hasn't run
+      logger.warn('Could not store VC metadata - schema may need migration');
+    }
+
+    const updated = await getSettlementRecord(tradeId);
+
+    logger.info('=== [VC SETTLEMENT] Verification complete', {
+      tradeId,
+      outcome,
+      vcVerified: verificationResult.verified,
+      vcId: vc.id,
+      issuer: getIssuerId(vc.issuer),
+    });
+
+    res.json({
+      status: 'ok',
+      tradeId,
+      outcome,
+      verificationResult,
+      record: updated,
+      payout: buildPayoutInstruction(updated!, outcome),
+      steps: buildPaymentSteps(updated),
+    });
+  } catch (error: any) {
+    logger.error(`VC settlement verification failed: ${error.message}`, { tradeId });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/vc/schemas - Get information about supported VC schemas
+ */
+router.get('/api/vc/schemas', (req: Request, res: Response) => {
+  res.json({
+    schemas: [
+      {
+        type: 'GenerationProfileCredential',
+        description: 'Energy generation profile credential for prosumers/providers',
+        requiredClaims: ['providerId', 'installedCapacityKW', 'sourceType', 'gridConnectionStatus'],
+        optionalClaims: ['providerName', 'authorizedCapacityKW', 'meterId', 'distributionUtility', 'location', 'certifications'],
+        contextUrl: 'https://github.com/nfh-trust-labs/vc-schemas/tree/ies-vcs/energy-credentials/generation-profile-vc',
+      },
+      {
+        type: 'GridConnectionCredential',
+        description: 'Grid connection credential for energy assets',
+        requiredClaims: ['connectionId', 'meterId', 'sanctionedLoad', 'distributionUtility', 'connectionType', 'voltageLevel', 'phaseType', 'tariffCategory', 'status'],
+        optionalClaims: ['contractDemand', 'division', 'circle', 'billingCycle', 'connectionDate'],
+        contextUrl: 'https://github.com/India-Energy-Stack/ies-specs/tree/main/energy-credentials',
+      },
+    ],
+    verificationEndpoints: {
+      verify: 'POST /api/vc/verify',
+      verifyJson: 'POST /api/vc/verify-json',
+      verifyGenerationProfile: 'POST /api/vc/verify-generation-profile',
+      verifyAndSettle: 'POST /api/vc/verify-and-settle/:tradeId',
+    },
+    vcPortal: config.external.vcPortal,
   });
 });
 
