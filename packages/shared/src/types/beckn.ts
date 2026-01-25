@@ -3,25 +3,32 @@
  */
 
 // Domain constant - Must match external CDS/Registry domain
-// Format: beckn.one:deg:p2p-trading-interdiscom:2.0.0
+// Use beckn.one:deg:p2p-trading:2.0.0 for external CDS
 export const BECKN_DOMAIN =
-    process.env.BECKN_DOMAIN || 'beckn.one:deg:p2p-trading-interdiscom:2.0.0';
+    process.env.BECKN_DOMAIN || 'beckn.one:deg:p2p-trading:2.0.0';
 export const BECKN_VERSION = '2.0.0';
 
-// Schema context required for Beckn v2.0
-export const BECKN_SCHEMA_CONTEXT = {
-  schema: {
-    domain: {
-      name: BECKN_DOMAIN.split(':').slice(0, -1).join(
-          ':'),  // e.g., beckn.one:deg:p2p-trading-interdiscom
-      version: BECKN_VERSION,
-    },
+// Schema context required for Beckn v2.0 - Array of JSON-LD schema URLs
+export const BECKN_SCHEMA_CONTEXT: string[] = [
+  'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/p2p-trading/schema/EnergyResource/v0.2/context.jsonld'
+];
+
+// Location for Beckn context (required by external CDS)
+export const BECKN_DEFAULT_LOCATION = {
+  city: {
+    code: 'BLR',
+    name: 'Bangalore'
   },
+  country: {
+    code: 'IND',
+    name: 'India'
+  }
 };
 
-// Schema context type for Beckn v2.0
-export interface SchemaContext {
-  schema: {domain: {name: string; version: string;};};
+// Location type for context
+export interface BecknLocation {
+  city: { code: string; name: string };
+  country: { code: string; name: string };
 }
 
 // Context - included in every Beckn message
@@ -37,8 +44,9 @@ export interface BecknContext {
   bpp_id?: string;
   bpp_uri?: string;
   ttl: string;
-  // Beckn v2.0 requires schema_context
-  schema_context?: SchemaContext;
+  // Beckn v2.0 requires location and schema_context
+  location?: BecknLocation;
+  schema_context?: string[];  // Array of JSON-LD schema URLs
 }
 
 // All Beckn actions

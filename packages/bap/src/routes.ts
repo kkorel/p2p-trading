@@ -369,15 +369,28 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     minQuantity,
     timeWindow,
   });
-  // Build filter expression
-  // Note: deliveryMode is always 'SCHEDULED' for P2P energy trading, so we don't filter by it
+  // Build JSONPath filter expression for external CDS
+  // Format: $[?(@.beckn:itemAttributes.sourceType == 'SOLAR' && ...)]
   const filterParts: string[] = [];
-  if (sourceType) filterParts.push(`sourceType='${sourceType}'`);
-  if (minQuantity) filterParts.push(`availableQuantity>=${minQuantity}`);
+  if (sourceType) {
+    filterParts.push(`@.beckn:itemAttributes.sourceType == '${sourceType}'`);
+  }
+  if (deliveryMode) {
+    filterParts.push(`@.beckn:itemAttributes.deliveryMode == '${deliveryMode}'`);
+  } else {
+    // Default to GRID_INJECTION for P2P trading
+    filterParts.push(`@.beckn:itemAttributes.deliveryMode == 'GRID_INJECTION'`);
+  }
+  if (minQuantity) {
+    filterParts.push(`@.beckn:itemAttributes.availableQuantity >= ${minQuantity}`);
+  }
   
-  const expression = filterParts.length > 0 ? filterParts.join(' && ') : '*';
+  // Build JSONPath expression
+  const expression = filterParts.length > 0 
+    ? `$[?(${filterParts.join(' && ')})]`
+    : '$[*]';
   
-  // Create context
+  // Create context with location for external CDS
   const context = createContext({
     action: 'discover',
     transaction_id: txnId,
@@ -385,24 +398,15 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     bap_uri: config.bap.uri,
   });
   
-  // Build discover message
-  const discoverMessage: DiscoverMessage = {
+  // Build discover message in external CDS format
+  // Note: External CDS expects only 'filters' in message, not 'intent'
+  const discoverMessage = {
     context,
     message: {
-      intent: {
-        item: {
-          itemAttributes: {
-            sourceType,
-            deliveryMode: 'SCHEDULED', // Always scheduled for P2P energy trading
-            availableQuantity: minQuantity,
-          },
-        },
-        fulfillment: timeWindow ? { time: timeWindow } : undefined,
-        quantity: minQuantity ? { value: minQuantity, unit: 'kWh' } : undefined,
-      },
       filters: {
         type: 'jsonpath',
         expression,
+        expressionType: 'jsonpath',
       },
     },
   };
