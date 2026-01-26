@@ -23,3 +23,9 @@ export * from './auth';
 
 // Export Verifiable Credentials module
 export * from './vc';
+
+// Export Beckn protocol security (signing & verification)
+export * from './beckn';
+
+// Export Trust Score module
+export * from './trust';

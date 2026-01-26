@@ -1,11 +1,27 @@
 /**
  * Combined Prosumer Application - BAP (Consumer) + BPP (Provider)
  * Single Express server hosting both buyer and seller functionality
+ * 
+ * Implements Beckn Protocol v2 security measures:
+ * - Helmet for HTTP security headers
+ * - CORS configuration
+ * - Rate limiting
+ * - Request validation
+ * - Cryptographic signing (optional, enabled via env)
  */
 
 import express from 'express';
 import path from 'path';
-import { config, createLogger, validateEnv } from '@p2p/shared';
+import { 
+  config, 
+  createLogger, 
+  validateEnv,
+  applySecurityMiddleware,
+  initializeSecureClient,
+  initializeVerification,
+  validateBecknMessage,
+  logBecknSignature,
+} from '@p2p/shared';
 import routes from './routes';
 import callbacks from './callbacks';
 import sellerRoutes from './seller-routes';
@@ -17,17 +33,20 @@ const app = express();
 const logger = createLogger('PROSUMER');
 const PORT = config.ports.bap;
 
-// Middleware
-app.use(express.json());
+// Apply security middleware (helmet, cors, rate limiting)
+applySecurityMiddleware(app, {
+  corsOrigins: process.env.CORS_ORIGINS?.split(',') || '*',
+  corsCredentials: true,
+  rateLimitWindowMs: 15 * 60 * 1000, // 15 minutes
+  rateLimitMax: 1000,                 // 1000 requests per window
+  trustedProxies: 1,
+});
+
+// JSON body parser with size limit
+app.use(express.json({ limit: '5mb' }));
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../public')));
-
-// Request logging
-app.use((req, res, next) => {
-  logger.debug(`${req.method} ${req.path}`);
-  next();
-});
 
 // Authentication routes (public - no auth required for login/OTP)
 app.use('/auth', authRoutes);
@@ -92,6 +111,26 @@ async function start() {
     // Log environment mode
     logger.info(`Starting in ${config.env.nodeEnv} mode (DEV_MODE=${config.env.isDevMode})`);
 
+    // Initialize Beckn signing (for outgoing requests)
+    const signingEnabled = process.env.BECKN_SIGNING_ENABLED === 'true';
+    if (signingEnabled) {
+      const keyPair = initializeSecureClient({
+        enabled: true,
+        ttlSeconds: parseInt(process.env.BECKN_SIGNATURE_TTL || '30', 10),
+      });
+      logger.info('Beckn message signing enabled', { keyId: keyPair.keyId });
+    } else {
+      logger.info('Beckn message signing disabled (set BECKN_SIGNING_ENABLED=true to enable)');
+    }
+
+    // Initialize Beckn signature verification (for incoming requests)
+    const verificationEnabled = process.env.BECKN_VERIFY_SIGNATURES === 'true';
+    initializeVerification({
+      enabled: verificationEnabled,
+      allowUnsigned: !verificationEnabled, // Allow unsigned in dev mode
+    });
+    logger.info(`Beckn signature verification: ${verificationEnabled ? 'ENABLED' : 'DISABLED (dev mode)'}`);
+
     await initDb();
     logger.info('Database and Redis connections initialized');
 
@@ -100,6 +139,7 @@ async function start() {
       logger.info(`CDS URL: ${config.urls.cds}`);
       logger.info(`Roles: Consumer (BAP) + Provider (BPP)`);
       logger.info(`Matching weights: price=${config.matching.weights.price}, trust=${config.matching.weights.trust}, time=${config.matching.weights.timeWindowFit}`);
+      logger.info(`Security: Helmet=ON, CORS=ON, RateLimit=ON`);
 
       // Start DISCOM mock service for trust score verification
       startDiscomMockService();

@@ -19,6 +19,8 @@
   ],
   "exclude": [
     "../shared/src/tests/**/*",
+    "../shared/src/**/*.test.ts",
+    "../shared/src/**/*.spec.ts",
     "**/*.test.ts",
     "**/*.spec.ts"
   ]

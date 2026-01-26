@@ -1,9 +1,21 @@
 /**
  * CDS Mock - Catalog Discovery Service
+ * 
+ * Implements Beckn Protocol v2 security measures:
+ * - Helmet for HTTP security headers
+ * - CORS configuration
+ * - Rate limiting
+ * - Request validation
  */
 
 import express from 'express';
-import { config, createLogger } from '@p2p/shared';
+import { 
+  config, 
+  createLogger,
+  applySecurityMiddleware,
+  initializeVerification,
+  validateBecknMessage,
+} from '@p2p/shared';
 import routes from './routes';
 import { initDb, closeDb, checkDbHealth } from './db';
 
@@ -11,14 +23,17 @@ const app = express();
 const logger = createLogger('CDS');
 const PORT = config.ports.cds;
 
-// Middleware
-app.use(express.json());
-
-// Request logging
-app.use((req, res, next) => {
-  logger.debug(`${req.method} ${req.path}`);
-  next();
+// Apply security middleware (helmet, cors, rate limiting)
+applySecurityMiddleware(app, {
+  corsOrigins: '*', // CDS accepts requests from any BAP
+  corsCredentials: true,
+  rateLimitWindowMs: 15 * 60 * 1000, // 15 minutes
+  rateLimitMax: 2000,                 // Higher limit for discovery service
+  trustedProxies: 1,
 });
+
+// JSON body parser with size limit
+app.use(express.json({ limit: '5mb' }));
 
 // Routes
 app.use('/', routes);
@@ -50,12 +65,21 @@ app.get('/health', async (req, res) => {
 // Start server after DB initialization
 async function start() {
   try {
+    // Initialize Beckn signature verification (for incoming requests)
+    const verificationEnabled = process.env.BECKN_VERIFY_SIGNATURES === 'true';
+    initializeVerification({
+      enabled: verificationEnabled,
+      allowUnsigned: !verificationEnabled, // Allow unsigned in dev mode
+    });
+    logger.info(`Beckn signature verification: ${verificationEnabled ? 'ENABLED' : 'DISABLED (dev mode)'}`);
+
     await initDb();
     logger.info('Database and Redis connections initialized');
     
     const server = app.listen(PORT, () => {
       logger.info(`CDS Mock running on port ${PORT}`);
       logger.info(`Callback delay: ${config.callbackDelay}ms`);
+      logger.info(`Security: Helmet=ON, CORS=ON, RateLimit=ON`);
     });
 
     // Graceful shutdown handler

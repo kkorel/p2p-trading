@@ -255,6 +255,11 @@ export const sellerApi = {
       provider: Provider;
       items: CatalogItem[];
       offers: Offer[];
+      quotaStats?: {
+        totalSold: number;
+        totalUnsoldInOffers: number;
+        totalCommitted: number;
+      };
     }>('/seller/my-profile'),
 
   getMyOrders: () =>
