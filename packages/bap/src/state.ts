@@ -54,7 +54,7 @@ export interface TransactionState {
   excludeProviderId?: string | null; // User's own provider to exclude from results
   buyerId?: string | null; // User ID of the buyer for order association
   error?: string; // Error message if the transaction failed
-  status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED';
+  status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
   updated_at: string;
 }
@@ -66,7 +66,7 @@ export interface TransactionState {
 function fromRedisState(redisState: RedisTransactionState): TransactionState {
   const state: TransactionState = {
     ...redisState,
-    providers: redisState.providers 
+    providers: redisState.providers
       ? new Map(Object.entries(redisState.providers))
       : undefined,
   };
@@ -106,7 +106,7 @@ export async function getTransaction(transaction_id: string): Promise<Transactio
  * Update transaction state
  */
 export async function updateTransaction(
-  transaction_id: string, 
+  transaction_id: string,
   updates: Partial<Omit<TransactionState, 'transaction_id' | 'created_at'>>
 ): Promise<TransactionState | undefined> {
   const redisUpdates = toRedisState(updates);

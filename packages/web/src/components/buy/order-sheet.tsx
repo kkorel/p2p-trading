@@ -33,6 +33,7 @@ export function OrderSheet({
   const [quantity, setQuantity] = useState(initialQuantity || 10);
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Reset quantity when offer changes or sheet opens
   useEffect(() => {
@@ -52,7 +53,7 @@ export function OrderSheet({
   };
 
   const handleConfirmPayment = async () => {
-    if (!offer) return;
+    if (!offer || isProcessing) return;
     
     if (!hasEnoughBalance) {
       setError('Insufficient balance. Please add funds in your profile.');
@@ -60,6 +61,7 @@ export function OrderSheet({
       return;
     }
 
+    setIsProcessing(true);
     setStep('processing');
     setError(null);
 
@@ -72,7 +74,7 @@ export function OrderSheet({
       
       setOrder(result);
 
-      // Process the payment (deduct from buyer, add to seller)
+      // Process the payment verification (escrow already done in /confirm)
       await processPayment(result.id, totalPrice, providerId);
       
       // Refresh balance to get latest
@@ -82,6 +84,8 @@ export function OrderSheet({
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
       setStep('error');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -92,6 +96,7 @@ export function OrderSheet({
       setStep('quantity');
       setError(null);
       setOrder(null);
+      setIsProcessing(false);
     }, 200);
   };
 
@@ -218,14 +223,15 @@ export function OrderSheet({
 
           {/* Action buttons */}
           <div className="flex gap-3">
-            <Button fullWidth variant="secondary" onClick={() => setStep('quantity')}>
+            <Button fullWidth variant="secondary" onClick={() => setStep('quantity')} disabled={isProcessing}>
               Back
             </Button>
             <Button 
               fullWidth 
               size="lg" 
               onClick={handleConfirmPayment}
-              disabled={!hasEnoughBalance}
+              disabled={!hasEnoughBalance || isProcessing}
+              loading={isProcessing}
             >
               Confirm & Pay
             </Button>
@@ -285,18 +291,22 @@ export function OrderSheet({
           <div className="w-16 h-16 bg-[var(--color-danger-light)] rounded-full flex items-center justify-center mb-4">
             <AlertCircle className="h-8 w-8 text-[var(--color-danger)]" />
           </div>
-          <p className="text-lg font-semibold text-[var(--color-text)] mb-1">Payment Failed</p>
+          <p className="text-lg font-semibold text-[var(--color-text)] mb-1">
+            {error?.toLowerCase().includes('trust score') ? 'Trust Score Too Low' : 'Order Failed'}
+          </p>
           <p className="text-sm text-[var(--color-text-muted)] text-center mb-6 max-w-[280px]">
             {error || 'Something went wrong. Please try again.'}
           </p>
 
           <div className="flex gap-3 w-full">
             <Button fullWidth variant="secondary" onClick={handleClose}>
-              Cancel
+              Close
             </Button>
-            <Button fullWidth onClick={() => setStep('quantity')}>
-              Try Again
-            </Button>
+            {!error?.toLowerCase().includes('trust score') && (
+              <Button fullWidth onClick={() => setStep('quantity')}>
+                Try Again
+              </Button>
+            )}
           </div>
         </div>
       )}

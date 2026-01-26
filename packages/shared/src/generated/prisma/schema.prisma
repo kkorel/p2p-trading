@@ -27,14 +27,31 @@ model User {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   lastLoginAt     DateTime? @map("last_login_at")
 
+  // Trust score system (like credit score)
+  trustScore         Float   @default(0.3) @map("trust_score") // 0.0 - 1.0
+  allowedTradeLimit  Float   @default(10.0) @map("allowed_trade_limit") // % of surplus allowed
+  baselineTrustScore Float   @default(0.3) @map("baseline_trust_score") // Initial score from meter analysis
+  meterDataAnalyzed  Boolean @default(false) @map("meter_data_analyzed")
+
+  // Production capacity (kWh per month)
+  productionCapacity    Float?  @map("production_capacity") // User-declared production
+  meterVerifiedCapacity Float?  @map("meter_verified_capacity") // Verified from meter PDF
+  meterPdfUrl           String? @map("meter_pdf_url") // Uploaded meter PDF path
+
   // Prosumer can be both provider and consumer
   provider   Provider? @relation(fields: [providerId], references: [id])
   providerId String?   @unique @map("provider_id")
 
   // User's orders as buyer
-  orders   Order[]
+  orders         Order[]
   // Sessions
-  sessions Session[]
+  sessions       Session[]
+  // Trust history
+  trustHistory   TrustScoreHistory[]
+  discomFeedback DiscomFeedback[]
+  // Payment records
+  buyerPayments  PaymentRecord[]     @relation("BuyerPayments")
+  sellerPayments PaymentRecord[]     @relation("SellerPayments")
 
   @@index([email])
   @@index([googleId])
@@ -169,14 +186,31 @@ model Order {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  provider      Provider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  selectedOffer CatalogOffer? @relation(fields: [selectedOfferId], references: [id], onDelete: SetNull)
-  buyer         User?         @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  // Cancellation tracking
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledBy   String?   @map("cancelled_by") // 'BUYER' | 'SELLER' | 'SYSTEM'
+  cancelReason  String?   @map("cancel_reason")
+  cancelPenalty Float?    @map("cancel_penalty") // Total penalty amount
+  cancelRefund  Float?    @map("cancel_refund") // Amount refunded to buyer
+
+  // Payment tracking (escrow)
+  paymentStatus String    @default("PENDING") @map("payment_status") // PENDING | ESCROWED | RELEASED | REFUNDED
+  escrowedAt    DateTime? @map("escrowed_at")
+  releasedAt    DateTime? @map("released_at")
+
+  // DISCOM verification
+  discomVerified Boolean @default(false) @map("discom_verified")
+
+  provider      Provider?       @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  selectedOffer CatalogOffer?   @relation(fields: [selectedOfferId], references: [id], onDelete: SetNull)
+  buyer         User?           @relation(fields: [buyerId], references: [id], onDelete: SetNull)
   blocks        OfferBlock[]
+  payments      PaymentRecord[]
 
   @@index([providerId])
   @@index([buyerId])
   @@index([status])
+  @@index([paymentStatus])
   @@map("orders")
 }
 
@@ -230,4 +264,78 @@ model SettlementRecord {
   @@index([status])
   @@index([vcId])
   @@map("settlement_records")
+}
+
+// ============================================
+// Trust Score System
+// ============================================
+
+model TrustScoreHistory {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  previousScore Float    @map("previous_score")
+  newScore      Float    @map("new_score")
+  previousLimit Float    @map("previous_limit")
+  newLimit      Float    @map("new_limit")
+  reason        String // 'SIGNUP' | 'METER_ANALYSIS' | 'DELIVERY_SUCCESS' | 'DELIVERY_PARTIAL' | 'DELIVERY_FAILED' | 'BUYER_CANCEL'
+  orderId       String?  @map("order_id")
+  metadata      String? // JSON with details (deliveredQty, expectedQty, etc)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orderId])
+  @@map("trust_score_history")
+}
+
+model DiscomFeedback {
+  id            String   @id @default(uuid())
+  orderId       String   @unique @map("order_id")
+  sellerId      String   @map("seller_id")
+  transactionId String   @map("transaction_id")
+  deliveredQty  Float    @map("delivered_qty")
+  expectedQty   Float    @map("expected_qty")
+  deliveryRatio Float    @map("delivery_ratio") // deliveredQty/expectedQty
+  status        String // 'FULL' | 'PARTIAL' | 'FAILED'
+  trustImpact   Float    @map("trust_impact") // Actual penalty/bonus applied
+  verifiedAt    DateTime @map("verified_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  seller User @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([orderId])
+  @@map("discom_feedback")
+}
+
+// Payment records for tracking money flow
+model PaymentRecord {
+  id       String  @id @default(uuid())
+  type     String // 'ESCROW' | 'RELEASE' | 'CANCEL_PENALTY' | 'REFUND'
+  orderId  String  @map("order_id")
+  buyerId  String? @map("buyer_id")
+  sellerId String? @map("seller_id")
+
+  // Amounts
+  totalAmount  Float  @map("total_amount") // Original order amount
+  buyerRefund  Float? @map("buyer_refund") // Amount returned to buyer
+  sellerAmount Float? @map("seller_amount") // Amount paid to seller
+  platformFee  Float? @map("platform_fee") // Platform's share
+
+  // Status
+  status      String    @default("PENDING") // PENDING | COMPLETED | FAILED
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyer  User? @relation("BuyerPayments", fields: [buyerId], references: [id], onDelete: SetNull)
+  seller User? @relation("SellerPayments", fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([type])
+  @@map("payment_records")
 }

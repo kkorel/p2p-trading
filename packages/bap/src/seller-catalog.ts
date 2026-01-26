@@ -290,6 +290,8 @@ export interface BlockStats {
   available: number;
   reserved: number;
   sold: number;
+  delivered: number; // Sold blocks whose orders are completed + verified
+  activeCommitment: number; // What counts against trade limit (available + reserved + undelivered sold)
 }
 
 /**
@@ -576,37 +578,24 @@ export async function markBlocksAsSoldWithLock(orderId: string): Promise<number>
 }
 
 /**
- * Check and delete offers that have no available blocks
- * Returns the IDs of deleted offers
+ * Check offers that have no available blocks
+ * NOTE: We no longer delete sold-out offers - they're kept for trade limit tracking
+ * Returns the IDs of sold-out offers (for logging purposes)
  */
 export async function cleanupEmptyOffers(offerIds: string[]): Promise<string[]> {
-  const deletedOfferIds: string[] = [];
+  const soldOutOfferIds: string[] = [];
   
   for (const offerId of offerIds) {
     const stats = await getBlockStats(offerId);
     
-    // If no available blocks remain, delete the offer
+    // Just log sold-out offers, don't delete them
     if (stats.available === 0) {
-      try {
-        // Delete all blocks for this offer first
-        await prisma.offerBlock.deleteMany({
-          where: { offerId },
-        });
-        
-        // Delete the offer
-        await prisma.catalogOffer.deleteMany({
-          where: { id: offerId },
-        });
-        
-        deletedOfferIds.push(offerId);
-        console.log(`[CATALOG] Auto-deleted offer ${offerId} - no available units remaining`);
-      } catch (error: any) {
-        console.error(`[CATALOG] Failed to delete empty offer ${offerId}: ${error.message}`);
-      }
+      soldOutOfferIds.push(offerId);
+      console.log(`[CATALOG] Offer ${offerId} is sold out (${stats.sold} blocks sold, keeping for trade limit tracking)`);
     }
   }
   
-  return deletedOfferIds;
+  return soldOutOfferIds;
 }
 
 /**
@@ -666,17 +655,37 @@ export async function releaseBlocksByOrderIdWithLock(orderId: string): Promise<n
  * Get block statistics for an offer
  */
 export async function getBlockStats(offerId: string): Promise<BlockStats> {
-  const [available, reserved, sold] = await Promise.all([
+  const [available, reserved, soldBlocks] = await Promise.all([
     prisma.offerBlock.count({ where: { offerId, status: 'AVAILABLE' } }),
     prisma.offerBlock.count({ where: { offerId, status: 'RESERVED' } }),
-    prisma.offerBlock.count({ where: { offerId, status: 'SOLD' } }),
+    // Get sold blocks with their order status to determine if delivered
+    prisma.offerBlock.findMany({ 
+      where: { offerId, status: 'SOLD' },
+      include: {
+        order: {
+          select: { status: true, discomVerified: true },
+        },
+      },
+    }),
   ]);
+  
+  const sold = soldBlocks.length;
+  
+  // Count sold blocks that are delivered (order completed + verified)
+  const delivered = soldBlocks.filter(block => 
+    block.order?.status === 'COMPLETED' && block.order?.discomVerified
+  ).length;
+  
+  // Active commitment = available + reserved + sold (not yet delivered)
+  const activeCommitment = available + reserved + (sold - delivered);
   
   return {
     total: available + reserved + sold,
     available,
     reserved,
     sold,
+    delivered,
+    activeCommitment, // This is what counts against trade limit
   };
 }
 

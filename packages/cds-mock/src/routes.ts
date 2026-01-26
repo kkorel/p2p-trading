@@ -27,13 +27,13 @@ const logger = createLogger('CDS');
 router.post('/discover', async (req: Request, res: Response) => {
   const message = req.body as DiscoverMessage;
   const { context, message: content } = message;
-  
+
   logger.info('Received discover request', {
     transaction_id: context.transaction_id,
     message_id: context.message_id,
     action: context.action,
   });
-  
+
   // Check for duplicate message
   if (await isDuplicateMessage(context.message_id)) {
     logger.warn('Duplicate message detected, returning ACK', {
@@ -42,7 +42,7 @@ router.post('/discover', async (req: Request, res: Response) => {
     });
     return res.json(createAck(context));
   }
-  
+
   // Log inbound event
   await logEvent(
     context.transaction_id,
@@ -51,16 +51,26 @@ router.post('/discover', async (req: Request, res: Response) => {
     'INBOUND',
     JSON.stringify(message)
   );
-  
+
   // Send ACK immediately
   res.json(createAck(context));
-  
+
   // Process asynchronously and send callback
   setTimeout(async () => {
     try {
       // Get full catalog
       let catalog = await getCatalog();
-      
+
+      // Debug: Log catalog state before filtering
+      const initialOfferCount = catalog.providers.reduce((sum, p) => sum + p.items.reduce((s, i) => s + i.offers.length, 0), 0);
+      logger.info('===DEBUG=== Catalog before filter', {
+        transaction_id: context.transaction_id,
+        providers: catalog.providers.length,
+        offers: initialOfferCount,
+        hasIntent: !!content.intent,
+        hasFilters: !!content.filters?.expression,
+      });
+
       // Apply filters if provided
       if (content.filters?.expression) {
         const criteria = parseFilterExpression(content.filters.expression);
@@ -71,22 +81,39 @@ router.post('/discover', async (req: Request, res: Response) => {
         // Note: deliveryMode is always 'SCHEDULED' for P2P energy trading
         const criteria = {
           sourceType: content.intent.item?.itemAttributes?.sourceType,
-          minQuantity: content.intent.item?.itemAttributes?.availableQuantity || 
-                       content.intent.quantity?.value,
+          minQuantity: content.intent.item?.itemAttributes?.availableQuantity ||
+            content.intent.quantity?.value,
         };
         const requestedTimeWindow = content.intent.fulfillment?.time;
+
+        // Debug logging
+        const beforeCount = catalog.providers.reduce((sum, p) => sum + p.items.reduce((s, i) => s + i.offers.length, 0), 0);
+        logger.info('Filtering catalog', {
+          transaction_id: context.transaction_id,
+          beforeOffers: beforeCount,
+          criteria,
+          requestedTimeWindow,
+        });
+
         catalog = filterCatalog(catalog, criteria, requestedTimeWindow);
+
+        const afterCount = catalog.providers.reduce((sum, p) => sum + p.items.reduce((s, i) => s + i.offers.length, 0), 0);
+        logger.info('Catalog filtered', {
+          transaction_id: context.transaction_id,
+          afterOffers: afterCount,
+          providersRemaining: catalog.providers.length,
+        });
       }
-      
+
       // Create callback context
       const callbackContext = createCallbackContext(context, 'on_discover');
-      
+
       // Build on_discover message
       const onDiscoverMessage: OnDiscoverMessage = {
         context: callbackContext,
         message: { catalog },
       };
-      
+
       // Log outbound event
       await logEvent(
         context.transaction_id,
@@ -95,7 +122,7 @@ router.post('/discover', async (req: Request, res: Response) => {
         'OUTBOUND',
         JSON.stringify(onDiscoverMessage)
       );
-      
+
       // Send callback to BAP
       const callbackUrl = `${context.bap_uri}/callbacks/on_discover`;
       logger.info(`Sending on_discover callback to ${callbackUrl}`, {
@@ -103,9 +130,9 @@ router.post('/discover', async (req: Request, res: Response) => {
         message_id: callbackContext.message_id,
         action: 'on_discover',
       });
-      
+
       await axios.post(callbackUrl, onDiscoverMessage);
-      
+
       logger.info('on_discover callback sent successfully', {
         transaction_id: context.transaction_id,
         action: 'on_discover',
@@ -126,14 +153,14 @@ router.post('/discover', async (req: Request, res: Response) => {
  */
 router.post('/sync/provider', async (req: Request, res: Response) => {
   const { id, name, trust_score } = req.body;
-  
+
   if (!id || !name) {
     return res.status(400).json({ error: 'id and name are required' });
   }
-  
+
   await syncProvider({ id, name, trust_score });
   logger.info(`Synced provider: ${id} (${name})`);
-  
+
   res.json({ status: 'ok', synced: 'provider', id });
 });
 
@@ -142,14 +169,14 @@ router.post('/sync/provider', async (req: Request, res: Response) => {
  */
 router.post('/sync/item', async (req: Request, res: Response) => {
   const item = req.body;
-  
+
   if (!item.id || !item.provider_id) {
     return res.status(400).json({ error: 'id and provider_id are required' });
   }
-  
+
   await syncItem(item);
   logger.info(`Synced item: ${item.id}`);
-  
+
   res.json({ status: 'ok', synced: 'item', id: item.id });
 });
 
@@ -158,14 +185,14 @@ router.post('/sync/item', async (req: Request, res: Response) => {
  */
 router.post('/sync/offer', async (req: Request, res: Response) => {
   const offer = req.body;
-  
+
   if (!offer.id || !offer.item_id || !offer.provider_id) {
     return res.status(400).json({ error: 'id, item_id, and provider_id are required' });
   }
-  
+
   await syncOffer(offer);
   logger.info(`Synced offer: ${offer.id}`);
-  
+
   res.json({ status: 'ok', synced: 'offer', id: offer.id });
 });
 
@@ -175,7 +202,7 @@ router.post('/sync/offer', async (req: Request, res: Response) => {
 router.delete('/sync/offer/:id', async (req: Request, res: Response) => {
   await deleteOffer(req.params.id);
   logger.info(`Deleted offer: ${req.params.id}`);
-  
+
   res.json({ status: 'ok', deleted: 'offer', id: req.params.id });
 });
 
@@ -184,15 +211,29 @@ router.delete('/sync/offer/:id', async (req: Request, res: Response) => {
  */
 router.post('/sync/blocks', async (req: Request, res: Response) => {
   const { offer_id, block_ids, status, order_id, transaction_id } = req.body;
-  
+
+  logger.info(`===DEBUG=== /sync/blocks called`, {
+    offer_id,
+    block_count: block_ids?.length,
+    status,
+    sample_ids: block_ids?.slice(0, 3),
+  });
+
   if (!offer_id || !block_ids || !status) {
     return res.status(400).json({ error: 'offer_id, block_ids, and status are required' });
   }
-  
+
   await updateBlockStatus(offer_id, block_ids, status, order_id, transaction_id);
-  logger.info(`Updated ${block_ids.length} blocks for offer ${offer_id} to status ${status}`);
-  
-  res.json({ status: 'ok', synced: 'blocks', count: block_ids.length });
+  logger.info(`===DEBUG=== Updated ${block_ids.length} blocks for offer ${offer_id} to status ${status}`);
+
+  // Verify the update
+  const { prisma } = await import('./db');
+  const availableCount = await prisma.offerBlock.count({
+    where: { offerId: offer_id, status: 'AVAILABLE' },
+  });
+  logger.info(`===DEBUG=== Offer ${offer_id} now has ${availableCount} AVAILABLE blocks after sync`);
+
+  res.json({ status: 'ok', synced: 'blocks', count: block_ids.length, availableNow: availableCount });
 });
 
 /**

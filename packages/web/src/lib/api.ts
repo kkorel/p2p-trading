@@ -64,7 +64,7 @@ async function request<T>(
 // Auth APIs
 export const authApi = {
   getConfig: () => request<{ googleClientId: string }>('/auth/config'),
-  
+
   loginWithGoogle: (idToken: string) =>
     request<{
       success: boolean;
@@ -79,10 +79,33 @@ export const authApi = {
   getMe: () =>
     request<{ user: User }>('/auth/me'),
 
-  updateProfile: (data: { name: string }) =>
+  updateProfile: (data: { name?: string; productionCapacity?: number }) =>
     request<{ success: boolean; user: User }>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+
+  analyzeMeter: (pdfBase64: string) =>
+    request<{
+      success: boolean;
+      message: string;
+      analysis: {
+        extractedCapacity: number | null;
+        declaredCapacity: number;
+        quality: 'HIGH' | 'MEDIUM' | 'LOW';
+        matchesDeclaration: boolean;
+        insights: string;
+      };
+      trustBonus: string | null;
+      user: User;
+    }>('/auth/analyze-meter', {
+      method: 'POST',
+      body: JSON.stringify({ pdfBase64 }),
+    }),
+
+  resetMeter: () =>
+    request<{ success: boolean; message: string }>('/auth/reset-meter', {
+      method: 'POST',
     }),
 
   logout: () =>
@@ -127,6 +150,11 @@ export const buyerApi = {
       body: JSON.stringify(params),
     }),
 
+  createTransaction: () =>
+    request<{ transaction_id: string }>('/api/transactions', {
+      method: 'POST',
+    }),
+
   getTransaction: (transactionId: string) =>
     request<TransactionState>(`/api/transactions/${transactionId}`),
 
@@ -154,6 +182,12 @@ export const buyerApi = {
 
   getMyOrders: () =>
     request<{ orders: BuyerOrder[] }>('/api/my-orders'),
+
+  cancelOrder: (params: { transaction_id: string; order_id: string; reason?: string }) =>
+    request<{ status: string; message?: string }>('/api/cancel', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
 };
 
 // Settlement/Payment APIs
@@ -257,6 +291,13 @@ export interface User {
   profileComplete: boolean;
   balance: number;
   providerId: string | null;
+  // Trust score fields
+  trustScore?: number;
+  allowedTradeLimit?: number;
+  meterDataAnalyzed?: boolean;
+  // Production capacity fields
+  productionCapacity?: number | null;      // kWh per month (user-declared)
+  meterVerifiedCapacity?: number | null;   // kWh per month (from PDF analysis)
 }
 
 export interface Provider {
@@ -284,7 +325,13 @@ export interface Offer {
   price: { value: number; currency: string };
   maxQuantity: number;
   timeWindow: { startTime: string; endTime: string };
-  blockStats?: { total: number; available: number };
+  blockStats?: { 
+    total: number; 
+    available: number; 
+    sold?: number;
+    delivered?: number;
+    activeCommitment?: number; // What counts against trade limit
+  };
 }
 
 export interface Order {
@@ -299,6 +346,16 @@ export interface Order {
     source_type?: string;
     price_per_kwh?: number;
   };
+  // DISCOM fulfillment verification
+  fulfillment?: {
+    verified: boolean;
+    deliveredQty: number;
+    expectedQty: number;
+    deliveryRatio: number;
+    status: 'FULL' | 'PARTIAL' | 'FAILED';
+    trustImpact: number;
+    verifiedAt: string;
+  } | null;
 }
 
 export interface BuyerOrder {
@@ -314,6 +371,10 @@ export interface BuyerOrder {
     price_per_kwh: number;
     quantity: number;
   };
+  // Cancellation fields
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancelReason?: string;
 }
 
 export interface DiscoverParams {

@@ -87,13 +87,18 @@ function matchesOfferCriteria(
 ): boolean {
   // Check time window overlap if requested
   if (requestedTimeWindow && !timeWindowsOverlap(offer.timeWindow, requestedTimeWindow)) {
+    console.log(`[FILTER] Offer ${offer.id} REJECTED: time window mismatch`);
+    console.log(`  Offer window: ${offer.timeWindow.startTime} - ${offer.timeWindow.endTime}`);
+    console.log(`  Request window: ${requestedTimeWindow.startTime} - ${requestedTimeWindow.endTime}`);
     return false;
   }
   
   // Check quantity available
   if (criteria.minQuantity !== undefined && offer.maxQuantity < criteria.minQuantity) {
+    console.log(`[FILTER] Offer ${offer.id} REJECTED: quantity ${offer.maxQuantity} < min ${criteria.minQuantity}`);
     return false;
   }
   
+  console.log(`[FILTER] Offer ${offer.id} ACCEPTED: qty=${offer.maxQuantity}, window matches`);
   return true;
 }

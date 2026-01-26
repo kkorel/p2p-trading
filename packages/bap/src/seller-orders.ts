@@ -9,6 +9,18 @@ import { prisma } from './db';
 import { Order, OrderStatus, OrderItem, Quote, withOrderLock } from '@p2p/shared';
 
 /**
+ * Extended Order type with cancellation and payment fields
+ */
+export type ExtendedOrder = Order & {
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancelReason?: string;
+  cancelPenalty?: number;
+  cancelRefund?: number;
+  paymentStatus?: string;
+};
+
+/**
  * Error thrown when optimistic locking fails
  */
 export class OptimisticLockError extends Error {
@@ -19,9 +31,9 @@ export class OptimisticLockError extends Error {
 }
 
 /**
- * Convert Prisma order to Order type
+ * Convert Prisma order to Order type (with extra fields for UI)
  */
-function toOrder(dbOrder: any): Order {
+function toOrder(dbOrder: any): ExtendedOrder {
   const items = JSON.parse(dbOrder.itemsJson || '[]');
   const quote = JSON.parse(dbOrder.quoteJson || '{}');
   
@@ -36,6 +48,13 @@ function toOrder(dbOrder: any): Order {
     },
     created_at: dbOrder.createdAt.toISOString(),
     updated_at: dbOrder.updatedAt.toISOString(),
+    // Cancellation and payment fields
+    cancelledAt: dbOrder.cancelledAt?.toISOString(),
+    cancelledBy: dbOrder.cancelledBy,
+    cancelReason: dbOrder.cancelReason,
+    cancelPenalty: dbOrder.cancelPenalty,
+    cancelRefund: dbOrder.cancelRefund,
+    paymentStatus: dbOrder.paymentStatus,
   };
 }
 
@@ -183,7 +202,7 @@ export async function updateOrderStatusSafely(
 /**
  * Get all orders for a provider
  */
-export async function getOrdersByProviderId(providerId: string): Promise<Order[]> {
+export async function getOrdersByProviderId(providerId: string): Promise<ExtendedOrder[]> {
   const orders = await prisma.order.findMany({
     where: { providerId },
     orderBy: { createdAt: 'desc' },
