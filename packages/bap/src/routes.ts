@@ -38,6 +38,96 @@ import { prisma } from '@p2p/shared';
 const router = Router();
 const logger = createLogger('BAP');
 
+/**
+ * Transform external CDS catalog format (beckn: prefixed) to our internal format
+ * External format uses:
+ * - catalogs[] instead of catalog.providers[]
+ * - beckn:id, beckn:items, beckn:offers with beckn: prefix
+ * - offers at catalog level instead of nested in items
+ */
+function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
+  // Check if it's already in our internal format
+  if (rawMessage.catalog?.providers) {
+    return rawMessage.catalog;
+  }
+  
+  // Check for external format with catalogs array
+  const catalogs = rawMessage.catalogs || rawMessage.message?.catalogs || [];
+  
+  if (!catalogs.length) {
+    logger.debug('No catalogs found in response');
+    return { providers: [] };
+  }
+  
+  const providers: any[] = [];
+  
+  for (const catalog of catalogs) {
+    const providerId = catalog['beckn:providerId'] || catalog.providerId || catalog['beckn:id'] || catalog.id;
+    const providerName = catalog['beckn:descriptor']?.['schema:name'] || 
+                         catalog.descriptor?.name ||
+                         catalog['beckn:bppId'] ||
+                         'Unknown Provider';
+    
+    const rawItems = catalog['beckn:items'] || catalog.items || [];
+    const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
+    
+    const transformedItems: any[] = [];
+    
+    for (const item of rawItems) {
+      const itemId = item['beckn:id'] || item.id;
+      const itemAttrs = item['beckn:itemAttributes'] || item.itemAttributes || {};
+      
+      const itemOffers: any[] = [];
+      
+      for (const offer of catalogOffers) {
+        const offerItems = offer['beckn:items'] || offer.items || [];
+        const offerId = offer['beckn:id'] || offer.id;
+        
+        if (offerItems.includes(itemId) || offerItems.length === 0) {
+          const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
+          const price = offerAttrs['beckn:price'] || offerAttrs.price || {};
+          const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || {};
+          const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
+          
+          itemOffers.push({
+            id: offerId,
+            item_id: itemId,
+            provider_id: providerId,
+            price: {
+              value: price.value || 0,
+              currency: price.currency || 'INR',
+            },
+            maxQuantity: maxQty.unitQuantity || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100,
+            timeWindow: {
+              startTime: timeWindow['schema:startTime'] || timeWindow.startTime,
+              endTime: timeWindow['schema:endTime'] || timeWindow.endTime,
+            },
+          });
+        }
+      }
+      
+      transformedItems.push({
+        id: itemId,
+        offers: itemOffers,
+        itemAttributes: {
+          sourceType: itemAttrs.sourceType || 'MIXED',
+          availableQuantity: itemAttrs.availableQuantity || 100,
+          deliveryMode: itemAttrs.deliveryMode || 'GRID_INJECTION',
+          meterId: itemAttrs.meterId,
+        },
+      });
+    }
+    
+    providers.push({
+      id: providerId,
+      descriptor: { name: providerName },
+      items: transformedItems,
+    });
+  }
+  
+  return { providers };
+}
+
 const ESCROW_ACCOUNT = {
   bankName: 'HDFC Bank',
   accountName: 'P2P Energy Escrow',
@@ -430,6 +520,74 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   
   try {
     const response = await axios.post(`${config.urls.cds}/discover`, discoverMessage);
+    
+    // Check if the CDS returned catalog data synchronously in the response
+    // External CDS may return data in ack.message.catalogs instead of via callback
+    const syncCatalog = response.data?.ack?.message?.catalogs || 
+                        response.data?.message?.catalogs ||
+                        response.data?.catalogs;
+    
+    if (syncCatalog && syncCatalog.length > 0) {
+      logger.info('Processing synchronous catalog response from CDS', {
+        transaction_id: txnId,
+        catalogCount: syncCatalog.length,
+      });
+      
+      // Transform and store the synchronous catalog response
+      const catalog = transformExternalCatalogFormat({ catalogs: syncCatalog });
+      
+      // Get the provider ID to exclude (user's own provider)
+      const currentTxState = await getTransaction(txnId);
+      const excludeProviderId = currentTxState?.excludeProviderId;
+      
+      // Filter out user's own provider from catalog
+      const filteredProviders = catalog.providers.filter(p => p.id !== excludeProviderId);
+      
+      // Extract providers and offers for matching
+      const providers = new Map<string, Provider>();
+      const allOffers: CatalogOffer[] = [];
+      
+      for (const providerCatalog of filteredProviders) {
+        providers.set(providerCatalog.id, {
+          id: providerCatalog.id,
+          name: providerCatalog.descriptor?.name || 'Unknown',
+          trust_score: config.matching.defaultTrustScore,
+          total_orders: 0,
+          successful_orders: 0,
+        });
+        
+        for (const item of providerCatalog.items || []) {
+          allOffers.push(...(item.offers || []));
+        }
+      }
+      
+      // Run matching algorithm if we have discovery criteria
+      let matchingResults = null;
+      if (currentTxState?.discoveryCriteria && allOffers.length > 0) {
+        const criteria: MatchingCriteria = {
+          requestedQuantity: currentTxState.discoveryCriteria.minQuantity || 30,
+          requestedTimeWindow: currentTxState.discoveryCriteria.timeWindow,
+        };
+        
+        try {
+          matchingResults = matchOffers(allOffers, providers, criteria);
+        } catch (matchError: any) {
+          logger.error(`Matching algorithm error: ${matchError.message}`, { transaction_id: txnId });
+        }
+      }
+      
+      // Update transaction state with the catalog
+      await updateTransaction(txnId, {
+        catalog: { providers: filteredProviders },
+        providers,
+        matchingResults,
+        status: 'SELECTING',
+      });
+      
+      logger.info(`Synchronous catalog processed: ${filteredProviders.length} providers, ${allOffers.length} offers`, {
+        transaction_id: txnId,
+      });
+    }
     
     res.json({
       status: 'ok',
