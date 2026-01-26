@@ -134,7 +134,6 @@ export function validateEnv(): { valid: boolean; errors: string[] } {
     if (!process.env.DATABASE_URL) errors.push('DATABASE_URL is required in production');
     if (!process.env.REDIS_URL) errors.push('REDIS_URL is required in production');
     if (!process.env.GOOGLE_CLIENT_ID) errors.push('GOOGLE_CLIENT_ID is required in production');
-    if (!process.env.SESSION_SECRET) errors.push('SESSION_SECRET is required in production');
     
     // Warn about optional but recommended
     if (!process.env.OPENROUTER_API_KEY) {
