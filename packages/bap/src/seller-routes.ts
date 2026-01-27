@@ -1566,6 +1566,7 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
 
   // Republish the full catalog without the deleted offer (non-blocking)
   // This updates the CDS with the current catalog state
+  // If all offers are deleted, revoke the catalog entirely
   (async () => {
     try {
       if (isExternalCDSEnabled()) {
@@ -1597,13 +1598,25 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
           settlement_type: offer.offerAttributes.settlementType,
         }));
         
+        // If no offers remain, revoke the catalog (set isActive: false)
+        // Otherwise republish with remaining offers
+        const isActive = syncOffers.length > 0;
+        
         await publishCatalogToCDS(
           { id: provider_id, name: providerName },
           syncItems,
           syncOffers,
-          true // still active
+          isActive
         );
-        logger.info('Catalog republished to CDS after offer deletion', { providerId: provider_id });
+        
+        if (isActive) {
+          logger.info('Catalog republished to CDS after offer deletion', { 
+            providerId: provider_id, 
+            remainingOffers: syncOffers.length 
+          });
+        } else {
+          logger.info('Catalog revoked from CDS (no offers remaining)', { providerId: provider_id });
+        }
       }
     } catch (err: any) {
       logger.error('Failed to republish catalog after deletion', { error: err.message });
