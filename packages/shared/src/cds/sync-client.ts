@@ -387,11 +387,10 @@ export async function publishCatalogToCDS(
       itemCount: items.length,
       offerCount: offers.length,
       isActive,
-      context: {
-        action: publishMessage.context.action,
-        transaction_id: publishMessage.context.transaction_id,
-        bpp_id: publishMessage.context.bpp_id,
-      },
+      catalog_bppId: catalog['beckn:bppId'],
+      catalog_bppUri: catalog['beckn:bppUri'],
+      context_bpp_id: publishMessage.context.bpp_id,
+      context_bpp_uri: publishMessage.context.bpp_uri,
     });
 
     // Use plain axios for CDS publish (no Beckn signing needed for catalog service)
@@ -420,13 +419,17 @@ export async function publishCatalogToCDS(
 
     return true;
   } catch (error: any) {
-    logger.error('Failed to publish catalog to CDS', {
+    const errorDetails = {
       providerId: provider.id,
       error: error.message,
+      code: error.code,
       status: error.response?.status,
-      responseData: JSON.stringify(error.response?.data || {}).substring(0, 500),
+      statusText: error.response?.statusText,
+      responseData: error.response?.data ? JSON.stringify(error.response.data).substring(0, 1000) : 'no response data',
       url: getCDSPublishUrl(),
-    });
+    };
+    logger.error('Failed to publish catalog to CDS: ' + JSON.stringify(errorDetails));
+    console.error('[CDS-PUBLISH-ERROR]', errorDetails);
     return false;
   }
 }
