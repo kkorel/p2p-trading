@@ -427,9 +427,9 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
     // Check if order exists and payment was escrowed
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      select: { 
-        id: true, 
-        paymentStatus: true, 
+      select: {
+        id: true,
+        paymentStatus: true,
         buyerId: true,
         totalPrice: true,
       },
@@ -537,10 +537,10 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
 
     if (analysisResult.success && analysisResult.extractedCapacity) {
       extractedCapacity = analysisResult.extractedCapacity;
-      
+
       // Store the extracted capacity as verified
       updateData.meterVerifiedCapacity = extractedCapacity;
-      
+
       // AUTO-SET production capacity from the meter reading!
       updateData.productionCapacity = extractedCapacity;
 
@@ -561,10 +561,10 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
       // Analysis failed - NO trust bonus if we couldn't extract capacity
       trustBonus = 0;
       updateData.meterDataAnalyzed = false; // Don't mark as analyzed if failed
-      
+
       // Log the actual error for debugging
       logger.debug(`[MeterAnalyzer] API analysis failed: ${analysisResult.error}`);
-      
+
       message = `Could not extract production capacity from the document. Please try with a clearer meter reading PDF.`;
     }
 
@@ -684,6 +684,157 @@ router.post('/reset-meter', devModeOnly, authMiddleware, async (req: Request, re
     res.status(500).json({
       success: false,
       error: 'Failed to reset meter data.',
+    });
+  }
+});
+
+// =============================================================================
+// Verifiable Credentials API
+// =============================================================================
+
+/**
+ * POST /auth/vc/verify
+ * Verify a Verifiable Credential (VC)
+ * Accepts both JSON object or VC ID string
+ */
+router.post('/vc/verify', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { credential, vcId, options } = req.body;
+
+    if (!credential && !vcId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Either credential (JSON) or vcId (string) is required',
+      });
+    }
+
+    // Import VC verification utilities
+    const { verifyCredential, VCPortalClient } = await import('@p2p/shared');
+
+    let vcToVerify = credential;
+    let fetchedFromPortal = false;
+
+    // If vcId provided, try to fetch from portal
+    if (vcId && !credential) {
+      try {
+        const portalClient = new VCPortalClient();
+        vcToVerify = await portalClient.fetchCredential(vcId);
+        fetchedFromPortal = true;
+
+        if (!vcToVerify) {
+          return res.status(404).json({
+            success: false,
+            error: `Credential not found: ${vcId}`,
+          });
+        }
+      } catch (fetchError: any) {
+        return res.status(400).json({
+          success: false,
+          error: `Failed to fetch credential: ${fetchError.message}`,
+        });
+      }
+    }
+
+    // Validate credential structure
+    if (!vcToVerify || typeof vcToVerify !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid credential format',
+      });
+    }
+
+    // Perform verification
+    const verificationResult = await verifyCredential(vcToVerify, options || {});
+
+    // Store or update the credential record for this user
+    // (In a full implementation, you'd have a UserCredential table)
+
+    res.json({
+      success: true,
+      verified: verificationResult.verified,
+      credentialId: vcToVerify.id || vcId,
+      credentialType: vcToVerify.type,
+      issuer: typeof vcToVerify.issuer === 'string' ? vcToVerify.issuer : vcToVerify.issuer?.id,
+      subject: vcToVerify.credentialSubject?.id,
+      fetchedFromPortal,
+      checks: verificationResult.checks,
+      error: verificationResult.error,
+    });
+  } catch (error: any) {
+    logger.error(`VC verification error: ${error}`);
+    res.status(500).json({
+      success: false,
+      error: 'Credential verification failed',
+    });
+  }
+});
+
+/**
+ * GET /auth/me/credentials
+ * List the user's verified credentials
+ * Note: This is a simplified version - in production you'd have a UserCredential table
+ */
+router.get('/me/credentials', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: {
+        id: true,
+        email: true,
+        meterDataAnalyzed: true,
+        meterVerifiedCapacity: true,
+        meterPdfUrl: true,
+        providerId: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    // Build list of credentials based on user's verification status
+    const credentials: Array<{
+      type: string;
+      status: 'verified' | 'pending' | 'not_submitted';
+      description: string;
+      verifiedAt?: string;
+      details?: Record<string, any>;
+    }> = [];
+
+    // Utility Customer Credential (required for energy trading)
+    credentials.push({
+      type: 'UtilityCustomerCredential',
+      status: user.meterDataAnalyzed ? 'verified' : 'not_submitted',
+      description: 'Proof of connection to the electricity grid',
+      details: user.meterDataAnalyzed ? {
+        verifiedCapacity: user.meterVerifiedCapacity,
+        pdfUploaded: !!user.meterPdfUrl,
+      } : undefined,
+    });
+
+    // DER Certificate (for sellers with solar panels)
+    if (user.providerId) {
+      credentials.push({
+        type: 'DERCertificateCredential',
+        status: 'pending', // Would check against stored VC
+        description: 'Certificate proving ownership of Distributed Energy Resource (e.g., solar panel)',
+      });
+    }
+
+    res.json({
+      success: true,
+      credentials,
+      totalVerified: credentials.filter(c => c.status === 'verified').length,
+      totalPending: credentials.filter(c => c.status === 'pending').length,
+    });
+  } catch (error: any) {
+    logger.error(`Get credentials error: ${error}`);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch credentials',
     });
   }
 });

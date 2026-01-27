@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Mail, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles } from 'lucide-react';
+import { LogOut, User, Mail, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, KeyRound, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
-import { authApi } from '@/lib/api';
+import { authApi, type VCCredential } from '@/lib/api';
 import { Card, Button, Input, Badge } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 
@@ -18,6 +18,150 @@ const profileSchema = z.object({
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
+
+// VC Status badge variant helper
+function getVCStatusBadgeVariant(status: VCCredential['status']): 'success' | 'warning' | 'default' {
+  if (status === 'verified') return 'success';
+  if (status === 'pending') return 'warning';
+  return 'default';
+}
+
+// Verifiable Credentials Card Component
+function VerifiableCredentialsCard() {
+  const [credentials, setCredentials] = useState<VCCredential[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [vcIdInput, setVcIdInput] = useState('');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifySuccess, setVerifySuccess] = useState<string | null>(null);
+
+  // Fetch user's credentials on mount
+  useEffect(() => {
+    const fetchCredentials = async () => {
+      try {
+        const result = await authApi.getCredentials();
+        if (result.success) {
+          setCredentials(result.credentials);
+        }
+      } catch (err) {
+        console.error('Failed to fetch credentials:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCredentials();
+  }, []);
+
+  const handleVerifyVC = async () => {
+    if (!vcIdInput.trim()) {
+      setVerifyError('Please enter a VC ID');
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerifyError(null);
+    setVerifySuccess(null);
+
+    try {
+      const result = await authApi.verifyVC({ vcId: vcIdInput.trim() });
+
+      if (result.verified) {
+        setVerifySuccess(`✓ Credential verified! Type: ${result.credentialType?.join(', ') || 'Unknown'}`);
+        setVcIdInput('');
+        // Refresh credentials list
+        const refreshed = await authApi.getCredentials();
+        if (refreshed.success) {
+          setCredentials(refreshed.credentials);
+        }
+      } else {
+        setVerifyError(result.error || 'Verification failed');
+      }
+    } catch (err: any) {
+      setVerifyError(err.message || 'Verification failed');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+          <KeyRound className="w-4 h-4 text-[var(--color-primary)]" />
+          Verifiable Credentials
+        </h3>
+        <a
+          href="https://open-vcs.up.railway.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-[var(--color-primary)] flex items-center gap-1 hover:underline"
+        >
+          VC Portal <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
+
+      {/* Credentials List */}
+      <div className="space-y-2 mb-4">
+        {isLoading ? (
+          <div className="text-sm text-[var(--color-text-muted)]">Loading credentials...</div>
+        ) : credentials.length === 0 ? (
+          <div className="text-sm text-[var(--color-text-muted)]">No credentials found</div>
+        ) : (
+          credentials.map((cred, idx) => (
+            <div key={idx} className="flex items-center justify-between py-2 border-b border-[var(--color-border)] last:border-0">
+              <div>
+                <span className="text-sm font-medium text-[var(--color-text)]">{cred.type}</span>
+                <p className="text-xs text-[var(--color-text-muted)]">{cred.description}</p>
+              </div>
+              <Badge variant={getVCStatusBadgeVariant(cred.status)} size="sm">
+                {cred.status === 'verified' && <Check className="w-3 h-3 mr-1" />}
+                {cred.status}
+              </Badge>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Verify New Credential */}
+      <div className="border-t border-[var(--color-border)] pt-3">
+        <p className="text-sm font-medium text-[var(--color-text)] mb-2">Verify a Credential</p>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Enter VC ID from portal"
+            value={vcIdInput}
+            onChange={(e) => {
+              setVcIdInput(e.target.value);
+              setVerifyError(null);
+              setVerifySuccess(null);
+            }}
+            className="flex-1"
+          />
+          <Button
+            onClick={handleVerifyVC}
+            loading={isVerifying}
+            disabled={!vcIdInput.trim()}
+          >
+            Verify
+          </Button>
+        </div>
+
+        {verifyError && (
+          <div className="flex items-center gap-2 mt-2 text-sm text-[var(--color-danger)]">
+            <AlertCircle className="w-4 h-4" />
+            {verifyError}
+          </div>
+        )}
+
+        {verifySuccess && (
+          <div className="flex items-center gap-2 mt-2 text-sm text-[var(--color-success)]">
+            <Check className="w-4 h-4" />
+            {verifySuccess}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 // Trust score helper functions
 function getTrustTierName(score?: number): string {
@@ -74,13 +218,13 @@ export default function ProfilePage() {
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [balanceInput, setBalanceInput] = useState(balance.toString());
-  
+
   // Production capacity state
   const [capacityInput, setCapacityInput] = useState('');
   const [isSavingCapacity, setIsSavingCapacity] = useState(false);
   const [capacityError, setCapacityError] = useState<string | null>(null);
   const [capacitySuccess, setCapacitySuccess] = useState(false);
-  
+
   // Meter PDF analyzer state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -91,7 +235,7 @@ export default function ProfilePage() {
     insights: string;
     trustBonus: string | null;
   } | null>(null);
-  
+
   // Initialize capacity input when user loads
   useEffect(() => {
     if (user?.productionCapacity) {
@@ -247,6 +391,9 @@ export default function ProfilePage() {
           </div>
         </Card>
 
+        {/* Verifiable Credentials Card */}
+        <VerifiableCredentialsCard />
+
         {/* Production Capacity Card */}
         <Card>
           <div className="flex items-center justify-between mb-3">
@@ -300,34 +447,34 @@ export default function ProfilePage() {
               loading={isSavingCapacity}
               onClick={async () => {
                 const value = parseFloat(capacityInput);
-                
+
                 // Validate
                 if (isNaN(value) || capacityInput.trim() === '') {
                   setCapacityError('Please enter a valid number');
                   return;
                 }
-                
+
                 if (value < 0) {
                   setCapacityError('Capacity cannot be negative');
                   return;
                 }
-                
+
                 if (value > 100000) {
                   setCapacityError('Value seems too high. Please enter a realistic capacity.');
                   return;
                 }
-                
+
                 // Check if value changed
                 if (value === user.productionCapacity) {
                   setCapacitySuccess(true);
                   setTimeout(() => setCapacitySuccess(false), 2000);
                   return;
                 }
-                
+
                 setIsSavingCapacity(true);
                 setCapacityError(null);
                 setCapacitySuccess(false);
-                
+
                 try {
                   const result = await authApi.updateProfile({ productionCapacity: value });
                   updateUser(result.user);
@@ -464,11 +611,10 @@ export default function ProfilePage() {
               {!analysisResult && (
                 <>
                   <div className="flex items-center justify-center w-full">
-                    <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                      isAnalyzing 
-                        ? 'bg-[var(--color-bg-subtle)] border-[var(--color-border)] cursor-wait' 
-                        : 'bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-primary-light)] hover:border-[var(--color-primary)]'
-                    }`}>
+                    <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isAnalyzing
+                      ? 'bg-[var(--color-bg-subtle)] border-[var(--color-border)] cursor-wait'
+                      : 'bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-primary-light)] hover:border-[var(--color-primary)]'
+                      }`}>
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
                         {isAnalyzing ? (
                           <>
@@ -514,10 +660,10 @@ export default function ProfilePage() {
                             reader.onload = async () => {
                               try {
                                 const base64 = (reader.result as string).split(',')[1];
-                                
+
                                 // Call API - will auto-extract capacity from PDF
                                 const result = await authApi.analyzeMeter(base64);
-                                
+
                                 if (result.success) {
                                   setAnalysisResult({
                                     extractedCapacity: result.analysis.extractedCapacity,
@@ -558,7 +704,7 @@ export default function ProfilePage() {
 
                   <div className="p-3 bg-[var(--color-bg-subtle)] rounded-lg">
                     <p className="text-xs text-[var(--color-text-muted)]">
-                      <strong>How it works:</strong> Upload your electricity bill or meter reading PDF. 
+                      <strong>How it works:</strong> Upload your electricity bill or meter reading PDF.
                       Our AI will extract your production capacity and <strong>automatically set it</strong> for you.
                       You get +10% trust bonus!
                     </p>

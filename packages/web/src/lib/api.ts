@@ -136,6 +136,31 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(params),
     }),
+
+  // Verifiable Credentials API
+  getCredentials: () =>
+    request<{
+      success: boolean;
+      credentials: VCCredential[];
+      totalVerified: number;
+      totalPending: number;
+    }>('/auth/me/credentials'),
+
+  verifyVC: (params: { credential?: object; vcId?: string; options?: object }) =>
+    request<{
+      success: boolean;
+      verified: boolean;
+      credentialId: string;
+      credentialType: string[];
+      issuer: string;
+      subject: string;
+      fetchedFromPortal: boolean;
+      checks: VCCheck[];
+      error?: string;
+    }>('/auth/vc/verify', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
 };
 
 // Buyer APIs
@@ -330,9 +355,9 @@ export interface Offer {
   price: { value: number; currency: string };
   maxQuantity: number;
   timeWindow: { startTime: string; endTime: string } | null;
-  blockStats?: { 
-    total: number; 
-    available: number; 
+  blockStats?: {
+    total: number;
+    available: number;
     sold?: number;
     delivered?: number;
     activeCommitment?: number; // What counts against trade limit
@@ -526,4 +551,19 @@ export interface TransactionState {
     percentage: string;
     message: string;
   };
+}
+
+// Verifiable Credentials Types
+export interface VCCredential {
+  type: string;
+  status: 'verified' | 'pending' | 'not_submitted';
+  description: string;
+  verifiedAt?: string;
+  details?: Record<string, any>;
+}
+
+export interface VCCheck {
+  check: string;
+  status: 'passed' | 'failed' | 'skipped';
+  message?: string;
 }
