@@ -9,7 +9,8 @@ import Image from 'next/image';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
-import { authApi, buyerApi, sellerApi, type VCCredential, type BuyerOrder, type Order } from '@/lib/api';
+import { useP2PStats } from '@/contexts/p2p-stats-context';
+import { authApi, type VCCredential } from '@/lib/api';
 import { Card, Button, Input, Badge, useConfirm } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 
@@ -226,82 +227,21 @@ function getTierGradientStyle(score?: number): React.CSSProperties {
 // P2P Value Insight Component - Shows financial benefits of P2P trading
 function P2PValueInsight() {
   const [showDetails, setShowDetails] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [p2pStats, setP2pStats] = useState({
-    totalSold: 0,
-    avgSellPrice: 0,
-    totalBought: 0,
-    avgBuyPrice: 0,
-  });
+  const { totalSold, avgSellPrice, totalBought, avgBuyPrice, totalValue, isLoading } = useP2PStats();
 
   // Reference DISCOM rates
   const DISCOM_BUY_RATE = 8;    // Rs per kWh (what DISCOM charges consumers)
   const DISCOM_SELLBACK_RATE = 2; // Rs per kWh (what DISCOM pays for surplus)
 
-  // Fetch real order data on mount
-  useEffect(() => {
-    const fetchOrderStats = async () => {
-      try {
-        // Fetch both buyer and seller orders
-        const [buyerResult, sellerResult] = await Promise.all([
-          buyerApi.getMyOrders().catch(() => ({ orders: [] })),
-          sellerApi.getMyOrders().catch(() => ({ orders: [] })),
-        ]);
+  // Calculate breakdown
+  const sellerGain = totalSold * (avgSellPrice - DISCOM_SELLBACK_RATE);
+  const buyerSavings = totalBought * (DISCOM_BUY_RATE - avgBuyPrice);
 
-        // Filter for confirmed/completed orders only
-        const confirmedBuyerOrders = buyerResult.orders.filter(
-          (o) => o.status === 'CONFIRMED' || o.status === 'COMPLETED'
-        );
-        const confirmedSellerOrders = sellerResult.orders.filter(
-          (o) => o.status === 'CONFIRMED' || o.status === 'COMPLETED'
-        );
-
-        // Calculate buyer stats
-        let totalBought = 0;
-        let totalBuyValue = 0;
-        for (const order of confirmedBuyerOrders) {
-          const qty = order.itemInfo?.quantity || order.quote?.totalQuantity || 0;
-          const price = order.itemInfo?.price_per_kwh || (order.quote?.price?.value && order.quote?.totalQuantity ? order.quote.price.value / order.quote.totalQuantity : 0);
-          totalBought += qty;
-          totalBuyValue += qty * price;
-        }
-
-        // Calculate seller stats
-        let totalSold = 0;
-        let totalSellValue = 0;
-        for (const order of confirmedSellerOrders) {
-          const qty = order.itemInfo?.sold_quantity || order.quote?.totalQuantity || 0;
-          const price = order.itemInfo?.price_per_kwh || (order.quote?.price?.value && order.quote?.totalQuantity ? order.quote.price.value / order.quote.totalQuantity : 0);
-          totalSold += qty;
-          totalSellValue += qty * price;
-        }
-
-        setP2pStats({
-          totalSold,
-          avgSellPrice: totalSold > 0 ? totalSellValue / totalSold : 0,
-          totalBought,
-          avgBuyPrice: totalBought > 0 ? totalBuyValue / totalBought : 0,
-        });
-      } catch (err) {
-        console.error('Failed to fetch order stats:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrderStats();
-  }, []);
-
-  // Calculate value gained from P2P
-  const sellerGain = p2pStats.totalSold * (p2pStats.avgSellPrice - DISCOM_SELLBACK_RATE);
-  const buyerSavings = p2pStats.totalBought * (DISCOM_BUY_RATE - p2pStats.avgBuyPrice);
-  const totalValue = sellerGain + buyerSavings;
-
-  // Don't show if loading or no trading activity
+  // Don't show if loading
   if (isLoading) return null;
-  if (p2pStats.totalSold === 0 && p2pStats.totalBought === 0) {
-    return null;
-  }
+
+  // Show even with zero value - helps users understand the feature
+  const hasActivity = p2pStats.totalSold > 0 || p2pStats.totalBought > 0;
 
   return (
     <Card>
@@ -324,29 +264,35 @@ function P2PValueInsight() {
 
       {/* Primary Value Display */}
       <div className="text-center py-3">
-        <p className="text-3xl font-bold text-[var(--color-success)]">
+        <p className={`text-3xl font-bold ${hasActivity ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
           +{formatCurrency(totalValue)}
         </p>
         <p className="text-sm text-[var(--color-text-muted)] mt-1">
-          Extra value from P2P trading
+          {hasActivity ? 'Extra value from P2P trading' : 'Start trading to see your savings!'}
         </p>
       </div>
 
       {/* Breakdown (always visible) */}
-      <div className="flex justify-between text-sm border-t border-[var(--color-border)] pt-3 mt-2">
-        {sellerGain > 0 && (
-          <div>
-            <p className="text-[var(--color-text-muted)]">Earned selling</p>
-            <p className="font-medium text-[var(--color-text)]">+{formatCurrency(sellerGain)}</p>
-          </div>
-        )}
-        {buyerSavings > 0 && (
-          <div className="text-right">
-            <p className="text-[var(--color-text-muted)]">Saved buying</p>
-            <p className="font-medium text-[var(--color-text)]">+{formatCurrency(buyerSavings)}</p>
-          </div>
-        )}
-      </div>
+      {hasActivity ? (
+        <div className="flex justify-between text-sm border-t border-[var(--color-border)] pt-3 mt-2">
+          {sellerGain > 0 && (
+            <div>
+              <p className="text-[var(--color-text-muted)]">Earned selling</p>
+              <p className="font-medium text-[var(--color-text)]">+{formatCurrency(sellerGain)}</p>
+            </div>
+          )}
+          {buyerSavings > 0 && (
+            <div className="text-right">
+              <p className="text-[var(--color-text-muted)]">Saved buying</p>
+              <p className="font-medium text-[var(--color-text)]">+{formatCurrency(buyerSavings)}</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center text-xs text-[var(--color-text-muted)] border-t border-[var(--color-border)] pt-3 mt-2">
+          <p>Complete your first trade to start earning value!</p>
+        </div>
+      )}
 
       {/* Progressive Disclosure - DISCOM Rate Comparison */}
       {showDetails && (
@@ -366,16 +312,16 @@ function P2PValueInsight() {
               <span className="font-medium text-[var(--color-text)]">{formatCurrency(DISCOM_SELLBACK_RATE)}/kWh</span>
             </div>
             <div className="border-t border-[var(--color-border)] pt-2 mt-2">
-              {p2pStats.totalSold > 0 && (
+              {totalSold > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-[var(--color-text-muted)]">Your avg P2P sell ({p2pStats.totalSold} kWh)</span>
-                  <span className="font-medium text-[var(--color-success)]">{formatCurrency(p2pStats.avgSellPrice)}/kWh</span>
+                  <span className="text-[var(--color-text-muted)]">Your avg P2P sell ({totalSold} kWh)</span>
+                  <span className="font-medium text-[var(--color-success)]">{formatCurrency(avgSellPrice)}/kWh</span>
                 </div>
               )}
-              {p2pStats.totalBought > 0 && (
+              {totalBought > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-[var(--color-text-muted)]">Your avg P2P buy ({p2pStats.totalBought} kWh)</span>
-                  <span className="font-medium text-[var(--color-success)]">{formatCurrency(p2pStats.avgBuyPrice)}/kWh</span>
+                  <span className="text-[var(--color-text-muted)]">Your avg P2P buy ({totalBought} kWh)</span>
+                  <span className="font-medium text-[var(--color-success)]">{formatCurrency(avgBuyPrice)}/kWh</span>
                 </div>
               )}
             </div>

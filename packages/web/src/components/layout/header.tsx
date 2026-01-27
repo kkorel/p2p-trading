@@ -2,7 +2,8 @@
 
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
-import { Zap, Wallet } from 'lucide-react';
+import { useP2PStats } from '@/contexts/p2p-stats-context';
+import { Zap, Wallet, TrendingUp } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
@@ -14,6 +15,7 @@ interface HeaderProps {
 export function Header({ title }: HeaderProps) {
   const { user } = useAuth();
   const { balance } = useBalance();
+  const { totalValue, isLoading: statsLoading } = useP2PStats();
 
   return (
     <header className="sticky top-0 z-30 bg-[var(--color-bg)]/95 backdrop-blur-sm border-b border-[var(--color-border)]">
@@ -30,11 +32,26 @@ export function Header({ title }: HeaderProps) {
 
         {/* Balance and Profile */}
         {user && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* P2P Value display */}
+            {!statsLoading && (
+              <Link
+                href="/profile"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--color-success-light)] rounded-full hover:bg-[var(--color-success)]/20 transition-colors"
+                title="P2P Trading Value"
+              >
+                <TrendingUp className="h-3.5 w-3.5 text-[var(--color-success)]" />
+                <span className="text-sm font-semibold text-[var(--color-success)]">
+                  +{formatCurrency(totalValue)}
+                </span>
+              </Link>
+            )}
+
             {/* Balance display */}
-            <Link 
+            <Link
               href="/profile"
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--color-surface)] rounded-full hover:bg-[var(--color-border-subtle)] transition-colors"
+              title="Wallet Balance"
             >
               <Wallet className="h-3.5 w-3.5 text-[var(--color-primary)]" />
               <span className="text-sm font-semibold text-[var(--color-text)]">
