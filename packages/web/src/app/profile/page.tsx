@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Mail, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, KeyRound, ExternalLink, Zap } from 'lucide-react';
+import { LogOut, User, Mail, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, KeyRound, ExternalLink, Zap, Info, TrendingUp } from 'lucide-react';
 import Image from 'next/image';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
 import { authApi, type VCCredential } from '@/lib/api';
-import { Card, Button, Input, Badge } from '@/components/ui';
+import { Card, Button, Input, Badge, useConfirm } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 
 const profileSchema = z.object({
@@ -223,10 +223,128 @@ function getTierGradientStyle(score?: number): React.CSSProperties {
   return { background: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 50%, #d1d5db 100%)' }; // New gray
 }
 
+// P2P Value Insight Component - Shows financial benefits of P2P trading
+function P2PValueInsight() {
+  const [showDetails, setShowDetails] = useState(false);
+
+  // Reference DISCOM rates
+  const DISCOM_BUY_RATE = 8;    // Rs per kWh (what DISCOM charges consumers)
+  const DISCOM_SELLBACK_RATE = 2; // Rs per kWh (what DISCOM pays for surplus)
+
+  // Example P2P trading stats (in real app, these would come from API/orders)
+  // For now, show a placeholder or example values
+  const p2pStats = {
+    totalSold: 120,        // kWh sold via P2P
+    avgSellPrice: 5.50,    // Average price received per kWh
+    totalBought: 80,       // kWh bought via P2P  
+    avgBuyPrice: 6.00,     // Average price paid per kWh
+  };
+
+  // Calculate value gained from P2P
+  const sellerGain = p2pStats.totalSold * (p2pStats.avgSellPrice - DISCOM_SELLBACK_RATE);
+  const buyerSavings = p2pStats.totalBought * (DISCOM_BUY_RATE - p2pStats.avgBuyPrice);
+  const totalValue = sellerGain + buyerSavings;
+
+  // If no trading activity, don't show the component
+  if (p2pStats.totalSold === 0 && p2pStats.totalBought === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      {/* Headline Value */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-[var(--color-success)]" />
+          <h3 className="text-base font-semibold text-[var(--color-text)]">
+            P2P Trading Value
+          </h3>
+        </div>
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="p-1.5 rounded-full hover:bg-[var(--color-bg-subtle)] transition-colors"
+          aria-label="Show calculation details"
+        >
+          <Info className="w-4 h-4 text-[var(--color-text-muted)]" />
+        </button>
+      </div>
+
+      {/* Primary Value Display */}
+      <div className="text-center py-3">
+        <p className="text-3xl font-bold text-[var(--color-success)]">
+          +{formatCurrency(totalValue)}
+        </p>
+        <p className="text-sm text-[var(--color-text-muted)] mt-1">
+          Extra value from P2P trading
+        </p>
+      </div>
+
+      {/* Breakdown (always visible) */}
+      <div className="flex justify-between text-sm border-t border-[var(--color-border)] pt-3 mt-2">
+        {sellerGain > 0 && (
+          <div>
+            <p className="text-[var(--color-text-muted)]">Earned selling</p>
+            <p className="font-medium text-[var(--color-text)]">+{formatCurrency(sellerGain)}</p>
+          </div>
+        )}
+        {buyerSavings > 0 && (
+          <div className="text-right">
+            <p className="text-[var(--color-text-muted)]">Saved buying</p>
+            <p className="font-medium text-[var(--color-text)]">+{formatCurrency(buyerSavings)}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Progressive Disclosure - DISCOM Rate Comparison */}
+      {showDetails && (
+        <div className="mt-4 pt-4 border-t border-[var(--color-border)] space-y-3">
+          <p className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">
+            How this is calculated
+          </p>
+
+          {/* Rate Comparison Table */}
+          <div className="bg-[var(--color-bg-subtle)] rounded-lg p-3 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-[var(--color-text-muted)]">DISCOM buy rate (reference)</span>
+              <span className="font-medium text-[var(--color-text)]">{formatCurrency(DISCOM_BUY_RATE)}/kWh</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-[var(--color-text-muted)]">DISCOM sell-back rate (reference)</span>
+              <span className="font-medium text-[var(--color-text)]">{formatCurrency(DISCOM_SELLBACK_RATE)}/kWh</span>
+            </div>
+            <div className="border-t border-[var(--color-border)] pt-2 mt-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--color-text-muted)]">Your avg P2P sell price</span>
+                <span className="font-medium text-[var(--color-success)]">{formatCurrency(p2pStats.avgSellPrice)}/kWh</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--color-text-muted)]">Your avg P2P buy price</span>
+                <span className="font-medium text-[var(--color-success)]">{formatCurrency(p2pStats.avgBuyPrice)}/kWh</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Explanation */}
+          <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+            Value is calculated as the difference between P2P trading prices and standard DISCOM rates.
+            When selling, you earn more than DISCOM&apos;s {formatCurrency(DISCOM_SELLBACK_RATE)}/kWh buy-back rate.
+            When buying, you pay less than DISCOM&apos;s {formatCurrency(DISCOM_BUY_RATE)}/kWh consumer rate.
+          </p>
+
+          <p className="text-[10px] text-[var(--color-text-muted)] italic">
+            Reference rates are representative values for comparison purposes.
+          </p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 
 export default function ProfilePage() {
   const { user, logout, updateUser } = useAuth();
   const { balance, setBalance } = useBalance();
+  const { confirm } = useConfirm();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -359,6 +477,9 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* P2P Value Insight Card */}
+        <P2PValueInsight />
 
         {/* Verifiable Credentials Card */}
         <VerifiableCredentialsCard />
@@ -530,9 +651,13 @@ export default function ProfilePage() {
                   variant="secondary"
                   size="sm"
                   onClick={async () => {
-                    const confirmed = window.confirm(
-                      'Uploading a new document will reset your meter verification and remove the +10% trust bonus until re-verified. Continue?'
-                    );
+                    const confirmed = await confirm({
+                      title: 'Reset Meter Verification?',
+                      message: 'Uploading a new document will reset your meter verification and remove the +10% trust bonus until re-verified.',
+                      confirmText: 'Reset & Upload New',
+                      cancelText: 'Cancel',
+                      variant: 'warning',
+                    });
                     if (!confirmed) return;
 
                     try {
@@ -810,32 +935,6 @@ export default function ProfilePage() {
           )}
         </Card>
 
-        {/* Account Status */}
-        <Card>
-          <h3 className="text-base font-semibold text-[var(--color-text)] mb-3">
-            Account Status
-          </h3>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <Shield className="h-4 w-4 text-[var(--color-text-muted)]" />
-                <span className="text-sm text-[var(--color-text)]">Profile Complete</span>
-              </div>
-              <Badge variant={user.profileComplete ? 'success' : 'warning'}>
-                {user.profileComplete ? 'Yes' : 'No'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between py-2 border-t border-[var(--color-border)]">
-              <div className="flex items-center gap-3">
-                <Shield className="h-4 w-4 text-[var(--color-text-muted)]" />
-                <span className="text-sm text-[var(--color-text)]">Seller Profile</span>
-              </div>
-              <Badge variant={user.providerId ? 'success' : 'default'}>
-                {user.providerId ? 'Active' : 'Not set up'}
-              </Badge>
-            </div>
-          </div>
-        </Card>
 
         {/* Logout */}
         <Button
