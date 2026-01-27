@@ -37,10 +37,10 @@ export default function SellPage() {
 
   // Check if user has set production capacity
   const hasProductionCapacity = user?.productionCapacity && user.productionCapacity > 0;
-  
+
   // Calculate trade limit
-  const tradeLimit = hasProductionCapacity 
-    ? (user.productionCapacity! * (user.allowedTradeLimit ?? 10)) / 100 
+  const tradeLimit = hasProductionCapacity
+    ? (user.productionCapacity! * (user.allowedTradeLimit ?? 10)) / 100
     : 0;
 
   // Use quota stats from backend (tracks sold orders permanently)
@@ -123,9 +123,9 @@ export default function SellPage() {
       cancelText: 'Keep',
       variant: 'danger',
     });
-    
+
     if (!confirmed) return;
-    
+
     try {
       await sellerApi.deleteOffer(offerId);
       await loadData();
@@ -215,45 +215,51 @@ export default function SellPage() {
           </Card>
         )}
 
-        {/* Trade Limit Info */}
+        {/* Trade Limit - Simplified Visual */}
         {hasProductionCapacity && (
           <Card padding="sm">
-            <div className="space-y-2">
-              {/* Remaining Capacity - Main Focus */}
+            <div className="space-y-3">
+              {/* Advisory Guidance */}
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-[var(--color-text)]">Available to offer:</span>
+                <span className="text-sm text-[var(--color-text-muted)]">Recommended to offer:</span>
                 <span className={`text-lg font-bold ${remainingCapacity > 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
-                  {remainingCapacity.toFixed(1)} kWh
+                  up to {remainingCapacity.toFixed(0)} kWh
                 </span>
               </div>
-              
-              {/* Progress Bar */}
-              <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[var(--color-primary)] rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (totalCommitted / tradeLimit) * 100)}%` }}
-                />
+
+              {/* Color-Only Segmented Progress Bar */}
+              <div className="h-3 bg-[var(--color-bg-subtle)] rounded-full overflow-hidden flex">
+                {/* Sold (green) */}
+                {totalSold > 0 && (
+                  <div
+                    className="h-full bg-[var(--color-success)]"
+                    style={{ width: `${(totalSold / tradeLimit) * 100}%` }}
+                    title={`Sold: ${totalSold.toFixed(0)} kWh`}
+                  />
+                )}
+                {/* Unsold in offers (amber) */}
+                {totalUnsoldInOffers > 0 && (
+                  <div
+                    className="h-full bg-[var(--color-warning)]"
+                    style={{ width: `${(totalUnsoldInOffers / tradeLimit) * 100}%` }}
+                    title={`In offers: ${totalUnsoldInOffers.toFixed(0)} kWh`}
+                  />
+                )}
+                {/* Remaining is implicit (gray background) */}
               </div>
-              
-              {/* Breakdown */}
-              <div className="flex flex-col gap-1 text-xs text-[var(--color-text-muted)]">
-                <div className="flex justify-between">
-                  <span>Sold (from orders):</span>
-                  <span>{totalSold.toFixed(1)} kWh</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Unsold in offers:</span>
-                  <span>{totalUnsoldInOffers.toFixed(1)} kWh</span>
-                </div>
-                <div className="flex justify-between font-medium text-[var(--color-text)]">
-                  <span>Total committed:</span>
-                  <span>{totalCommitted.toFixed(1)} / {tradeLimit.toFixed(1)} kWh</span>
-                </div>
+
+              {/* Minimal Legend - Only colors, no text */}
+              <div className="flex items-center justify-center gap-4 text-xs text-[var(--color-text-muted)]">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-[var(--color-success)]" /> Sold
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-[var(--color-warning)]" /> Listed
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-[var(--color-bg-subtle)] border border-[var(--color-border)]" /> Available
+                </span>
               </div>
-              
-              <p className="text-xs text-[var(--color-text-muted)] pt-1 border-t border-[var(--color-border)]">
-                Trade limit = {user?.allowedTradeLimit ?? 10}% of {user?.productionCapacity} kWh production
-              </p>
             </div>
           </Card>
         )}
@@ -265,7 +271,7 @@ export default function SellPage() {
               <EmptyState
                 icon={<Tag className="h-12 w-12" />}
                 title="No offers yet"
-                description={hasProductionCapacity 
+                description={hasProductionCapacity
                   ? "Create your first offer to start selling energy"
                   : "Set your production capacity in Profile to create offers"
                 }
@@ -306,24 +312,33 @@ export default function SellPage() {
                       <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] mb-2">
                         <Clock className="h-3.5 w-3.5" />
                         <span>
-                          {offer.timeWindow 
+                          {offer.timeWindow
                             ? `${formatDateTime(offer.timeWindow.startTime)} - ${formatTime(offer.timeWindow.endTime)}`
                             : 'Flexible timing'
                           }
                         </span>
                       </div>
                       {offer.blockStats && (
-                        <div className="flex gap-2">
-                          <Badge variant="success">{offer.blockStats.available} available</Badge>
-                          <Badge variant="default">{offer.blockStats.total - offer.blockStats.available} sold</Badge>
+                        <div className="mt-2">
+                          {/* Color-only mini progress bar */}
+                          <div className="h-1.5 bg-[var(--color-bg-subtle)] rounded-full overflow-hidden flex">
+                            <div
+                              className="h-full bg-[var(--color-success)]"
+                              style={{ width: `${((offer.blockStats.total - offer.blockStats.available) / offer.blockStats.total) * 100}%` }}
+                              title={`Sold: ${offer.blockStats.total - offer.blockStats.available} kWh`}
+                            />
+                          </div>
+                          <p className="text-[10px] text-[var(--color-text-muted)] mt-1 text-center">
+                            {offer.blockStats.available} of {offer.blockStats.total} kWh available
+                          </p>
                         </div>
                       )}
                     </Card>
                   );
                 })}
-                <Button 
-                  variant="secondary" 
-                  fullWidth 
+                <Button
+                  variant="secondary"
+                  fullWidth
                   onClick={handleCreateOffer}
                   disabled={!hasProductionCapacity}
                 >
@@ -385,7 +400,7 @@ export default function SellPage() {
                         </p>
                       </div>
                     </div>
-                    
+
                     {/* Delivery Time */}
                     {(order as any).deliveryTime && (
                       <div className="flex items-center gap-2 mt-2 p-2 bg-[var(--color-surface)] rounded-lg">
@@ -424,16 +439,15 @@ export default function SellPage() {
                         </>
                       ) : null}
                     </div>
-                    
+
                     {/* Fulfillment Status (DISCOM Verification) */}
                     {order.fulfillment && (
-                      <div className={`mt-3 p-3 rounded-lg ${
-                        order.fulfillment.status === 'FULL' 
-                          ? 'bg-[var(--color-success-light)]' 
-                          : order.fulfillment.status === 'PARTIAL'
-                            ? 'bg-[var(--color-warning-light)]'
-                            : 'bg-[var(--color-danger-light)]'
-                      }`}>
+                      <div className={`mt-3 p-3 rounded-lg ${order.fulfillment.status === 'FULL'
+                        ? 'bg-[var(--color-success-light)]'
+                        : order.fulfillment.status === 'PARTIAL'
+                          ? 'bg-[var(--color-warning-light)]'
+                          : 'bg-[var(--color-danger-light)]'
+                        }`}>
                         <div className="flex items-center gap-2 mb-2">
                           {order.fulfillment.status === 'FULL' ? (
                             <CheckCircle className="h-4 w-4 text-[var(--color-success)]" />
@@ -442,15 +456,14 @@ export default function SellPage() {
                           ) : (
                             <XCircle className="h-4 w-4 text-[var(--color-danger)]" />
                           )}
-                          <span className={`text-sm font-medium ${
-                            order.fulfillment.status === 'FULL' 
-                              ? 'text-[var(--color-success)]' 
-                              : order.fulfillment.status === 'PARTIAL'
-                                ? 'text-[var(--color-warning)]'
-                                : 'text-[var(--color-danger)]'
-                          }`}>
-                            {order.fulfillment.status === 'FULL' 
-                              ? 'Fully Delivered' 
+                          <span className={`text-sm font-medium ${order.fulfillment.status === 'FULL'
+                            ? 'text-[var(--color-success)]'
+                            : order.fulfillment.status === 'PARTIAL'
+                              ? 'text-[var(--color-warning)]'
+                              : 'text-[var(--color-danger)]'
+                            }`}>
+                            {order.fulfillment.status === 'FULL'
+                              ? 'Fully Delivered'
                               : order.fulfillment.status === 'PARTIAL'
                                 ? 'Partially Delivered'
                                 : 'Delivery Failed'}
@@ -472,17 +485,16 @@ export default function SellPage() {
                         </div>
                         <div className="mt-2 pt-2 border-t border-[var(--color-border)] text-xs">
                           <span className="text-[var(--color-text-muted)]">Trust Impact: </span>
-                          <span className={`font-medium ${
-                            order.fulfillment.trustImpact >= 0 
-                              ? 'text-[var(--color-success)]' 
-                              : 'text-[var(--color-danger)]'
-                          }`}>
+                          <span className={`font-medium ${order.fulfillment.trustImpact >= 0
+                            ? 'text-[var(--color-success)]'
+                            : 'text-[var(--color-danger)]'
+                            }`}>
                             {order.fulfillment.trustImpact >= 0 ? '+' : ''}{(order.fulfillment.trustImpact * 100).toFixed(1)}%
                           </span>
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Pending verification indicator */}
                     {order.status === 'COMPLETED' && !order.fulfillment && (
                       <div className="mt-3 p-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)]">

@@ -77,7 +77,7 @@ export function OfferCard({
       <div className="flex items-center gap-1.5 mb-3 text-xs text-[var(--color-text-secondary)]">
         <Clock className="h-3.5 w-3.5" />
         <span>
-          {offer.timeWindow 
+          {offer.timeWindow
             ? `${formatTime(offer.timeWindow.startTime)} - ${formatTime(offer.timeWindow.endTime)}`
             : 'Flexible timing'
           }
@@ -86,13 +86,7 @@ export function OfferCard({
 
       {/* Footer badges */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          <Badge variant="default">{sourceType}</Badge>
-          <Badge variant="primary">
-            <Zap className="h-3 w-3 mr-0.5" />
-            {offer.maxQuantity} kWh
-          </Badge>
-        </div>
+        <Badge variant="default">{sourceType}</Badge>
 
         {score !== undefined && (
           <Badge variant="success">

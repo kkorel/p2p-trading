@@ -109,14 +109,6 @@ function VerifiableCredentialsCard() {
           <KeyRound className="w-4 h-4 text-[var(--color-primary)]" />
           Verifiable Credentials
         </h3>
-        <a
-          href="https://open-vcs.up.railway.app/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-[var(--color-primary)] flex items-center gap-1 hover:underline"
-        >
-          VC Portal <ExternalLink className="w-3 h-3" />
-        </a>
       </div>
 
       {/* Credentials List */}
@@ -220,6 +212,17 @@ function getTrustRingColor(score?: number): string {
   return '#9ca3af'; // Light gray for New
 }
 
+// Tier-based gradient backgrounds for immersive header
+function getTierGradientStyle(score?: number): React.CSSProperties {
+  const s = score ?? 0.3;
+  if (s >= 0.95) return { background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #c084fc 100%)' }; // Platinum purple
+  if (s >= 0.85) return { background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%)' }; // Gold amber
+  if (s >= 0.7) return { background: 'linear-gradient(135deg, #4b5563 0%, #6b7280 50%, #9ca3af 100%)' };  // Silver gray
+  if (s >= 0.5) return { background: 'linear-gradient(135deg, #c2410c 0%, #ea580c 50%, #fb923c 100%)' };  // Bronze orange
+  if (s >= 0.3) return { background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 50%, #60a5fa 100%)' };  // Starter blue
+  return { background: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 50%, #d1d5db 100%)' }; // New gray
+}
+
 function getTrustTierIcon(score?: number): string {
   const s = score ?? 0.3;
   if (s >= 0.95) return '💎';
@@ -303,10 +306,13 @@ export default function ProfilePage() {
   return (
     <AppShell title="Profile">
       <div className="flex flex-col gap-4">
-        {/* Profile Header */}
-        <Card>
+        {/* Profile Header - Tier Gradient Background */}
+        <div
+          className="rounded-xl p-4 shadow-sm"
+          style={getTierGradientStyle(user.trustScore)}
+        >
           <div className="flex items-center gap-4">
-            {/* Avatar with Trust Ring */}
+            {/* Avatar with white ring */}
             <div className="relative">
               {user.picture ? (
                 <Image
@@ -314,28 +320,21 @@ export default function ProfilePage() {
                   alt={user.name || 'Avatar'}
                   width={64}
                   height={64}
-                  className="rounded-full ring-2 ring-offset-2"
-                  style={{
-                    '--tw-ring-color': getTrustRingColor(user.trustScore),
-                  } as React.CSSProperties}
+                  className="rounded-full ring-2 ring-white/50 ring-offset-2 ring-offset-transparent"
                 />
               ) : (
                 <div
-                  className="w-16 h-16 bg-[var(--color-primary-light)] rounded-full flex items-center justify-center ring-2 ring-offset-2"
-                  style={{
-                    '--tw-ring-color': getTrustRingColor(user.trustScore),
-                  } as React.CSSProperties}
+                  className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center ring-2 ring-white/50"
                 >
-                  <span className="text-2xl font-semibold text-[var(--color-primary)]">
+                  <span className="text-2xl font-semibold text-white">
                     {user.name?.[0] || user.email[0].toUpperCase()}
                   </span>
                 </div>
               )}
-              {/* Trust Score Mini Badge */}
+              {/* Tier Icon Badge */}
               <div
-                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-md"
-                style={{ backgroundColor: getTrustRingColor(user.trustScore) }}
-                title={`Trust: ${((user.trustScore ?? 0.3) * 100).toFixed(0)}%`}
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center text-sm bg-white shadow-lg"
+                title={`${getTrustTierName(user.trustScore)} Tier`}
               >
                 {getTrustTierIcon(user.trustScore)}
               </div>
@@ -343,70 +342,83 @@ export default function ProfilePage() {
 
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-0.5">
-                <h2 className="text-lg font-semibold text-[var(--color-text)]">
+                <h2 className="text-lg font-semibold text-white">
                   {user.name || 'No name set'}
                 </h2>
-                <Badge
-                  variant={getTrustBadgeVariant(user.trustScore)}
-                  size="sm"
-                  className="font-semibold"
-                >
+                <span className="px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full text-xs font-semibold text-white">
                   {getTrustTierName(user.trustScore)}
-                </Badge>
+                </span>
               </div>
-              <p className="text-sm text-[var(--color-text-muted)]">{user.email}</p>
+              <p className="text-sm text-white/80">{user.email}</p>
+              {/* Trade limit indicator */}
+              <p className="text-xs text-white/70 mt-1">
+                Trade up to {user.allowedTradeLimit ?? 10}% of surplus
+              </p>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* Trust Score Card */}
+        {/* Trust Level Card - Visual Tier Progression */}
         <Card>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
               <Shield className="w-4 h-4 text-[var(--color-primary)]" />
-              Trust Score
+              Your Trust Level
             </h3>
-            <Badge variant={getTrustBadgeVariant(user.trustScore)}>
-              {getTrustTierName(user.trustScore)}
-            </Badge>
           </div>
 
-          {/* Trust Score Progress */}
+          {/* Tier Progression Visual */}
           <div className="mb-4">
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-[var(--color-text-muted)]">Trust Level</span>
-              <span className="font-semibold text-[var(--color-primary)]">
-                {((user.trustScore ?? 0.3) * 100).toFixed(0)}%
-              </span>
-            </div>
-            <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-success)] rounded-full transition-all duration-500"
-                style={{ width: `${(user.trustScore ?? 0.3) * 100}%` }}
-              />
+            <div className="flex justify-between items-center">
+              {[
+                { tier: 'New', icon: '🆕', threshold: 0 },
+                { tier: 'Starter', icon: '🌱', threshold: 0.3 },
+                { tier: 'Bronze', icon: '🥉', threshold: 0.5 },
+                { tier: 'Silver', icon: '⭐', threshold: 0.7 },
+                { tier: 'Gold', icon: '🏆', threshold: 0.85 },
+                { tier: 'Platinum', icon: '💎', threshold: 0.95 },
+              ].map((t, i) => {
+                const score = user.trustScore ?? 0.3;
+                const isActive = score >= t.threshold;
+                const isCurrent = getTrustTierName(score) === t.tier;
+                return (
+                  <div key={t.tier} className="flex flex-col items-center flex-1">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${isCurrent
+                        ? 'ring-2 ring-[var(--color-primary)] ring-offset-2 scale-110'
+                        : ''
+                        } ${isActive
+                          ? 'bg-[var(--color-primary-light)]'
+                          : 'bg-[var(--color-bg-subtle)] opacity-40'
+                        }`}
+                    >
+                      {t.icon}
+                    </div>
+                    <span className={`text-[10px] mt-1 ${isCurrent ? 'font-bold text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}>
+                      {t.tier}
+                    </span>
+                    {isCurrent && (
+                      <span className="text-[8px] text-[var(--color-primary)] mt-0.5">▲ You</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Trade Limit */}
-          <div className="flex items-center justify-between py-2 border-t border-[var(--color-border)]">
-            <span className="text-sm text-[var(--color-text-muted)]">Trade Limit</span>
-            <div className="text-right">
+          {/* What Your Level Means */}
+          <div className="p-3 bg-[var(--color-bg-subtle)] rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-[var(--color-text)]">Your Trade Limit</span>
               <span className="text-lg font-bold text-[var(--color-primary)]">
                 {user.allowedTradeLimit ?? 10}%
               </span>
-              {user.productionCapacity && (
-                <span className="text-xs text-[var(--color-text-muted)] block">
-                  = {((user.productionCapacity * (user.allowedTradeLimit ?? 10)) / 100).toFixed(1)} kWh/month
-                </span>
-              )}
             </div>
-          </div>
-
-          {/* Trust Tier Info */}
-          <div className="mt-3 p-3 bg-[var(--color-bg-subtle)] rounded-lg">
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {getTrustTierDescription(user.trustScore)}
-            </p>
+            {user.productionCapacity && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                ≈ {((user.productionCapacity * (user.allowedTradeLimit ?? 10)) / 100).toFixed(0)} kWh of your {user.productionCapacity} kWh/month
+              </p>
+            )}
           </div>
         </Card>
 
