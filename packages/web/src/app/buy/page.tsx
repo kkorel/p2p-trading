@@ -140,12 +140,11 @@ export default function BuyPage() {
     if (!selectedOffer || !transaction) return null;
 
     try {
-      // Create a new transaction for this specific purchase
-      // This allows multiple purchases from the same discovery results
-      const newTx = await buyerApi.createTransaction();
-      const txId = newTx.transaction_id;
+      // Use the existing transaction that has the catalog from discovery
+      // This ensures the select/init/confirm flow has access to the catalog data
+      const txId = transaction.transaction_id;
 
-      // Select the offer with the new transaction
+      // Select the offer with the existing transaction
       await buyerApi.select({
         transaction_id: txId,
         offer_id: selectedOffer.offer.id,
@@ -162,12 +161,26 @@ export default function BuyPage() {
       await new Promise(r => setTimeout(r, 500));
 
       // Get order ID from transaction
+      // Store the previous order ID (if any) to detect when a new order is created
       let txState = await buyerApi.getTransaction(txId);
+      const previousOrderId = txState.order?.id;
       let attempts = 0;
       
-      while (!txState.order && !txState.error && attempts < 10) {
+      // Wait for a NEW order (different from previous) or error
+      while (attempts < 10) {
         await new Promise(r => setTimeout(r, 500));
         txState = await buyerApi.getTransaction(txId);
+        
+        // Check for error
+        if (txState.error) {
+          break;
+        }
+        
+        // Check for new order (different from any previous order)
+        if (txState.order && txState.order.id !== previousOrderId) {
+          break;
+        }
+        
         attempts++;
       }
 

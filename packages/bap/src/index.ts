@@ -114,11 +114,28 @@ async function start() {
     // Initialize Beckn signing (for outgoing requests)
     const signingEnabled = process.env.BECKN_SIGNING_ENABLED === 'true';
     if (signingEnabled) {
-      const keyPair = initializeSecureClient({
+      // Load key pair from environment variables if available
+      let keyPair = undefined;
+      if (process.env.BECKN_KEY_ID && process.env.BECKN_PUBLIC_KEY && process.env.BECKN_PRIVATE_KEY) {
+        keyPair = {
+          keyId: process.env.BECKN_KEY_ID,
+          publicKey: process.env.BECKN_PUBLIC_KEY,
+          privateKey: process.env.BECKN_PRIVATE_KEY,
+        };
+        logger.info('Loaded Beckn signing keys from environment', {
+          keyId: keyPair.keyId,
+          publicKeyPreview: keyPair.publicKey.substring(0, 20) + '...'
+        });
+      } else {
+        logger.warn('Beckn keys not found in environment, will generate new ones (NOT RECOMMENDED for production)');
+      }
+
+      const loadedKeyPair = initializeSecureClient({
+        keyPair,
         enabled: true,
         ttlSeconds: parseInt(process.env.BECKN_SIGNATURE_TTL || '30', 10),
       });
-      logger.info('Beckn message signing enabled', { keyId: keyPair.keyId });
+      logger.info('Beckn message signing enabled', { keyId: loadedKeyPair.keyId });
     } else {
       logger.info('Beckn message signing disabled (set BECKN_SIGNING_ENABLED=true to enable)');
     }
