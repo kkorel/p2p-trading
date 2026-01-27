@@ -160,7 +160,18 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     });
   }
   
-  logger.info(`Transformed ${catalogs.length} catalogs into ${providers.length} providers`);
+  // Count total offers
+  const totalOffers = providers.reduce((sum, p) => 
+    sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
+  
+  logger.info(`Transformed ${catalogs.length} catalogs into ${providers.length} providers`, {
+    totalOffers,
+    providerDetails: providers.map(p => ({
+      id: p.id,
+      itemCount: p.items.length,
+      offerCount: p.items.reduce((sum: number, i: any) => sum + (i.offers?.length || 0), 0),
+    })),
+  });
   return { providers };
 }
 
@@ -575,6 +586,18 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         transaction_id: txnId,
         catalogCount: syncCatalog.length,
       });
+      
+      // Debug: Log raw catalog structure
+      for (const cat of syncCatalog) {
+        logger.debug('Raw catalog from CDS', {
+          catalogId: cat['beckn:id'] || cat.id,
+          hasItems: !!(cat['beckn:items'] || cat.items),
+          itemCount: (cat['beckn:items'] || cat.items || []).length,
+          hasOffers: !!(cat['beckn:offers'] || cat.offers),
+          offerCount: (cat['beckn:offers'] || cat.offers || []).length,
+          catalogKeys: Object.keys(cat).slice(0, 15),
+        });
+      }
       
       // Transform and store the synchronous catalog response
       const catalog = transformExternalCatalogFormat({ catalogs: syncCatalog });
