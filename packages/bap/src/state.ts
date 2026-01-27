@@ -65,6 +65,22 @@ export interface TransactionState {
     percentage: string;
     message: string;
   }; // Advisory warning for low trust score buyers
+  
+  // Fulfillment tracking (from on_update callbacks)
+  fulfillmentUpdates?: Array<{
+    itemId: string;
+    deliveryStatus: string;
+    deliveredQty: number;
+    curtailedQty: number;
+    curtailmentReason?: string;
+    meterReadings: any[];
+    lastUpdated: string;
+  }>;
+  lastFulfillmentUpdate?: string;
+  deliveryStatus?: string; // Overall delivery status from DISCOM updates
+  totalDelivered?: number; // Aggregate kWh delivered
+  totalCurtailed?: number; // Aggregate kWh curtailed
+  
   status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
   updated_at: string;

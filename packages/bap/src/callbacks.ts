@@ -509,4 +509,159 @@ router.post('/on_status', async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * POST /callbacks/on_update - Receive delivery updates from Utility BPP (DISCOM)
+ * 
+ * This callback handles real-time delivery progress and curtailment notifications
+ * as energy is being delivered during the order's time window.
+ * 
+ * Schema Reference: EnergyTradeDelivery/v0.2
+ * - https://github.com/beckn/protocol-specifications-new/refs/heads/p2p-trading/schema/EnergyTradeDelivery/v0.2
+ * 
+ * Sender: Utility BPP (DISCOM) - based on meter readings and grid status
+ * 
+ * Use Cases:
+ * 1. Normal delivery progress (deliveredQuantity increasing)
+ * 2. Curtailment due to grid outage
+ * 3. Partial fulfillment (seller under-delivery)
+ * 4. Completion notification with final meter readings
+ */
+router.post('/on_update', async (req: Request, res: Response) => {
+  const message = req.body;
+  // Handle different message formats - external services may use wrapper
+  const context = message.context || message.ack?.context;
+  const content = message.message || message.ack?.message || message;
+  
+  if (!context) {
+    logger.error('No context found in on_update callback', { body: JSON.stringify(message).slice(0, 500) });
+    return res.status(400).json({ status: 'error', message: 'Missing context' });
+  }
+  
+  logger.info('Received on_update callback', {
+    transaction_id: context.transaction_id,
+    message_id: context.message_id,
+    action: context.action,
+    bpp_id: context.bpp_id,
+  });
+  
+  // Check for duplicate
+  if (await isDuplicateMessage(context.message_id)) {
+    logger.warn('Duplicate on_update callback ignored', { message_id: context.message_id });
+    return res.json({ status: 'ok', message: 'duplicate ignored' });
+  }
+  
+  // Log the raw event for audit trail
+  await logEvent(context.transaction_id, context.message_id, 'on_update', 'INBOUND', JSON.stringify(message));
+  
+  // Extract order data from Beckn v2 format
+  const order = content.order || content;
+  const orderId = order['beckn:id'] || order.id;
+  const orderStatus = order['beckn:orderStatus'] || order.status;
+  const orderItems = order['beckn:orderItems'] || order.items || [];
+  
+  // Process each order item's fulfillment data
+  const fulfillmentUpdates: Array<{
+    itemId: string;
+    deliveryStatus: string;
+    deliveredQty: number;
+    curtailedQty: number;
+    curtailmentReason?: string;
+    meterReadings: any[];
+    lastUpdated: string;
+  }> = [];
+  
+  for (const item of orderItems) {
+    const itemId = item['beckn:orderedItem'] || item.orderedItem || item.id;
+    const itemAttrs = item['beckn:orderItemAttributes'] || item.orderItemAttributes || {};
+    const fulfillmentAttrs = itemAttrs.fulfillmentAttributes || {};
+    
+    const update = {
+      itemId,
+      deliveryStatus: fulfillmentAttrs.deliveryStatus || 'UNKNOWN',
+      deliveredQty: fulfillmentAttrs.deliveredQuantity || 0,
+      curtailedQty: fulfillmentAttrs.curtailedQuantity || 0,
+      curtailmentReason: fulfillmentAttrs.curtailmentReason,
+      meterReadings: fulfillmentAttrs.meterReadings || [],
+      lastUpdated: fulfillmentAttrs.lastUpdated || new Date().toISOString(),
+    };
+    
+    fulfillmentUpdates.push(update);
+    
+    // Log curtailment events prominently
+    if (update.curtailedQty > 0) {
+      logger.warn('Curtailment detected in delivery', {
+        transaction_id: context.transaction_id,
+        order_id: orderId,
+        item_id: itemId,
+        curtailed_qty: update.curtailedQty,
+        curtailment_reason: update.curtailmentReason,
+        delivered_qty: update.deliveredQty,
+      });
+    } else {
+      logger.info('Delivery progress update', {
+        transaction_id: context.transaction_id,
+        order_id: orderId,
+        item_id: itemId,
+        delivery_status: update.deliveryStatus,
+        delivered_qty: update.deliveredQty,
+      });
+    }
+  }
+  
+  // Calculate aggregate totals
+  const totalDelivered = fulfillmentUpdates.reduce((sum, u) => sum + u.deliveredQty, 0);
+  const totalCurtailed = fulfillmentUpdates.reduce((sum, u) => sum + u.curtailedQty, 0);
+  const hasCompletedItems = fulfillmentUpdates.some(u => u.deliveryStatus === 'COMPLETED');
+  const hasFailedItems = fulfillmentUpdates.some(u => u.deliveryStatus === 'FAILED');
+  
+  // Determine overall delivery status based on items
+  let effectiveStatus: string = orderStatus;
+  if (hasFailedItems && hasCompletedItems) {
+    effectiveStatus = 'PARTIALLYFULFILLED';
+  } else if (hasCompletedItems && !hasFailedItems) {
+    effectiveStatus = 'COMPLETED';
+  }
+  
+  // Update transaction state with fulfillment data
+  await updateTransaction(context.transaction_id, {
+    fulfillmentUpdates,
+    lastFulfillmentUpdate: new Date().toISOString(),
+    deliveryStatus: effectiveStatus,
+    totalDelivered,
+    totalCurtailed,
+  });
+  
+  logger.info(`Delivery update processed for order ${orderId}`, {
+    transaction_id: context.transaction_id,
+    order_status: orderStatus,
+    effective_status: effectiveStatus,
+    total_delivered: totalDelivered,
+    total_curtailed: totalCurtailed,
+    item_count: fulfillmentUpdates.length,
+  });
+  
+  // If order is completed or has curtailment, this may trigger settlement verification
+  if (effectiveStatus === 'COMPLETED' || effectiveStatus === 'PARTIALLYFULFILLED') {
+    logger.info('Order delivery completed/partially fulfilled - may proceed with settlement verification', {
+      transaction_id: context.transaction_id,
+      order_id: orderId,
+      total_delivered: totalDelivered,
+      total_curtailed: totalCurtailed,
+    });
+    
+    // Could trigger VC-based settlement verification here
+    // This would involve comparing meter readings against VCs
+  }
+  
+  res.json({
+    status: 'ok',
+    order_id: orderId,
+    order_status: effectiveStatus,
+    total_delivered: totalDelivered,
+    total_curtailed: totalCurtailed,
+    items_updated: fulfillmentUpdates.length,
+  });
+});
+
 export default router;
+
