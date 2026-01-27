@@ -411,6 +411,7 @@ router.put('/balance', authMiddleware, async (req: Request, res: Response) => {
  * Verify payment was escrowed for an order
  * NOTE: Actual payment deduction happens in /confirm (escrow)
  *       Seller payment happens after DISCOM verification
+ * FIXED: Now waits for paymentStatus=ESCROWED before returning balance
  */
 router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -424,25 +425,41 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
       });
     }
 
-    // Check if order exists and payment was escrowed
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      select: {
-        id: true,
-        paymentStatus: true,
-        buyerId: true,
-        totalPrice: true,
-      },
-    });
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found',
+    // Wait for order payment status to be ESCROWED (up to 5 seconds)
+    // This handles the race condition where confirm uses setTimeout
+    const maxWaitMs = 5000;
+    const pollIntervalMs = 200;
+    const startTime = Date.now();
+    
+    let order = null;
+    while (Date.now() - startTime < maxWaitMs) {
+      order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          paymentStatus: true,
+          buyerId: true,
+          totalPrice: true,
+        },
       });
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          error: 'Order not found',
+        });
+      }
+
+      // If payment is already escrowed, break out of loop
+      if (order.paymentStatus === 'ESCROWED') {
+        break;
+      }
+
+      // Wait before next poll
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
     }
 
-    // Get buyer's current balance
+    // Get buyer's CURRENT balance (after potential escrow deduction)
     const buyer = await prisma.user.findUnique({
       where: { id: buyerId },
       select: { balance: true },
@@ -457,7 +474,7 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
 
     // Payment is handled via escrow in /confirm
     // Seller will be paid after DISCOM verification
-    // This endpoint just confirms the escrow status
+    // This endpoint confirms the escrow status and returns CURRENT balance
 
     res.json({
       success: true,
@@ -465,7 +482,7 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
       payment: {
         orderId,
         amount,
-        status: order.paymentStatus || 'ESCROWED',
+        status: order?.paymentStatus || 'PENDING',
         // Seller is NOT paid yet - paid after DISCOM verification
         sellerReceived: 0,
         note: 'Seller payment pending delivery verification',
@@ -480,6 +497,7 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
     });
   }
 });
+
 
 /**
  * POST /auth/analyze-meter
