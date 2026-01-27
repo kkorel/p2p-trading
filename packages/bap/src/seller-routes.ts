@@ -69,6 +69,7 @@ import {
   updateOrderStatus,
   updateOrderStatusByTransactionId,
   getOrdersByProviderId,
+  getOrdersForSeller,
   getAllOrders,
 } from './seller-orders';
 import { logEvent, isDuplicateMessage } from './events';
@@ -263,9 +264,43 @@ router.post('/init', async (req: Request, res: Response) => {
     logger.info('Order already exists for transaction', { transaction_id: context.transaction_id });
     res.json(createAck(context));
 
-    // Return existing order in callback
+    // CRITICAL FIX: Check if blocks are claimed for this order
+    // If init is called multiple times, blocks may not be associated with the order yet
     setTimeout(async () => {
       try {
+        // Check if blocks exist for this order
+        const existingBlocks = await getBlocksForOrder(existingOrder.id);
+        
+        if (existingBlocks.length === 0 && existingOrder.items && existingOrder.items.length > 0) {
+          // No blocks claimed - this can happen when init is called twice
+          // Try to claim blocks for each item in the order
+          logger.warn('Order exists but has no blocks - attempting to claim blocks', {
+            transaction_id: context.transaction_id,
+            order_id: existingOrder.id,
+          });
+          
+          for (const item of existingOrder.items) {
+            // Only claim for local offers (not external)
+            const localOffer = await getOfferById(item.offer_id);
+            if (localOffer) {
+              const claimedBlocks = await claimBlocks(
+                item.offer_id,
+                item.quantity,
+                existingOrder.id,
+                context.transaction_id
+              );
+              
+              logger.info(`Claimed ${claimedBlocks.length} blocks for existing order`, {
+                transaction_id: context.transaction_id,
+                order_id: existingOrder.id,
+                offer_id: item.offer_id,
+                requested: item.quantity,
+                claimed: claimedBlocks.length,
+              });
+            }
+          }
+        }
+        
         const callbackContext = createCallbackContext(context, 'on_init');
         const onInitMessage: OnInitMessage = {
           context: callbackContext,
@@ -1127,13 +1162,12 @@ router.get('/seller/my-profile', authMiddleware, async (req: Request, res: Respo
  */
 router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const providerId = req.user!.providerId;
+    const providerId = req.user?.providerId ?? null;
+    const userId = req.user!.id;
 
-    if (!providerId) {
-      return res.json({ orders: [] });
-    }
-
-    const orders = await getOrdersByProviderId(providerId);
+    // Use enhanced query that finds orders by providerId OR by sellerId in payment records
+    // This includes both local orders (providerId set) and external orders (providerId null)
+    const orders = await getOrdersForSeller(providerId, userId);
 
     // Enrich orders with block and item information
     const enrichedOrders = await Promise.all(orders.map(async (order) => {

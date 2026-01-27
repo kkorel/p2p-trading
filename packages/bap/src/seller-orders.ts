@@ -244,6 +244,31 @@ export async function getOrdersByProviderId(providerId: string): Promise<Extende
 }
 
 /**
+ * Get all orders for a seller (by providerId OR sellerId)
+ * This handles both local orders (providerId set) and external orders (providerId null but sellerId in payment record)
+ */
+export async function getOrdersForSeller(providerId: string | null, userId: string): Promise<ExtendedOrder[]> {
+  // Query orders where user is the seller through providerId OR sellerId
+  const orders = await prisma.order.findMany({
+    where: {
+      OR: [
+        // Local orders: providerId matches
+        ...(providerId ? [{ providerId }] : []),
+        // Check if there's a payment record where this user is the seller
+        {
+          payments: {
+            some: { sellerId: userId }
+          }
+        }
+      ]
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  
+  return orders.map(toOrder);
+}
+
+/**
  * Get all orders
  */
 export async function getAllOrders(): Promise<Order[]> {

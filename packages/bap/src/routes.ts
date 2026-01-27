@@ -223,6 +223,53 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
   return { providers };
 }
 
+/**
+ * Check if two time windows overlap
+ * Used for client-side filtering of offers by requested time window
+ */
+function timeWindowsOverlap(offerWindow: TimeWindow | null | undefined, requestedWindow: TimeWindow | null | undefined): boolean {
+  // If no requested window, all offers match
+  if (!requestedWindow || !requestedWindow.startTime || !requestedWindow.endTime) {
+    return true;
+  }
+  
+  // If offer has no time window, it's considered always available (matches any window)
+  if (!offerWindow || !offerWindow.startTime || !offerWindow.endTime) {
+    return true;
+  }
+  
+  const offerStart = new Date(offerWindow.startTime).getTime();
+  const offerEnd = new Date(offerWindow.endTime).getTime();
+  const requestStart = new Date(requestedWindow.startTime).getTime();
+  const requestEnd = new Date(requestedWindow.endTime).getTime();
+  
+  // Check for overlap: offer window must intersect with requested window
+  // Two windows overlap if one starts before the other ends AND ends after the other starts
+  return offerStart < requestEnd && offerEnd > requestStart;
+}
+
+/**
+ * Filter catalog providers to only include offers that match the requested time window
+ */
+function filterCatalogByTimeWindow(catalog: { providers: any[] }, requestedWindow: TimeWindow | null | undefined): { providers: any[] } {
+  if (!requestedWindow) {
+    return catalog; // No filtering needed
+  }
+  
+  const filteredProviders = catalog.providers.map(provider => {
+    const filteredItems = provider.items.map((item: any) => {
+      const filteredOffers = (item.offers || []).filter((offer: any) => 
+        timeWindowsOverlap(offer.timeWindow, requestedWindow)
+      );
+      return { ...item, offers: filteredOffers };
+    }).filter((item: any) => item.offers && item.offers.length > 0); // Remove items with no matching offers
+    
+    return { ...provider, items: filteredItems };
+  }).filter(provider => provider.items.length > 0); // Remove providers with no matching items
+  
+  return { providers: filteredProviders };
+}
+
 const ESCROW_ACCOUNT = {
   bankName: 'HDFC Bank',
   accountName: 'P2P Energy Escrow',
@@ -681,9 +728,27 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       // Get the provider ID to exclude (user's own provider)
       const currentTxState = await getTransaction(txnId);
       const excludeProviderId = currentTxState?.excludeProviderId;
+      const requestedTimeWindow = currentTxState?.discoveryCriteria?.timeWindow;
       
       // Filter out user's own provider from catalog
-      const filteredProviders = catalog.providers.filter(p => p.id !== excludeProviderId);
+      let filteredProviders = catalog.providers.filter(p => p.id !== excludeProviderId);
+      
+      // Apply time window filtering if a time window was requested
+      if (requestedTimeWindow) {
+        const beforeCount = filteredProviders.reduce((sum, p) => 
+          sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
+        
+        const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, requestedTimeWindow);
+        filteredProviders = timeFilteredCatalog.providers;
+        
+        const afterCount = filteredProviders.reduce((sum, p) => 
+          sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
+        
+        logger.info(`Time window filter: ${beforeCount} offers → ${afterCount} offers`, {
+          transaction_id: txnId,
+          requestedWindow: requestedTimeWindow,
+        });
+      }
       
       // Extract providers and offers for matching
       const providers = new Map<string, Provider>();
