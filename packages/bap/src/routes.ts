@@ -78,76 +78,127 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     const rawItems = catalog['beckn:items'] || catalog.items || [];
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
     
+    // Debug logging for raw data
+    logger.debug('Raw catalog data', {
+      providerId,
+      itemCount: rawItems.length,
+      offerCount: catalogOffers.length,
+    });
+    
     const transformedItems: any[] = [];
     
-    for (const item of rawItems) {
-      const itemId = item['beckn:id'] || item.id;
-      const itemAttrs = item['beckn:itemAttributes'] || item.itemAttributes || {};
-      const itemDescriptor = item['beckn:descriptor'] || item.descriptor || {};
+    // Helper function to extract offer data
+    const extractOfferData = (offer: any, itemId: string, itemAttrs: any = {}) => {
+      const offerId = offer['beckn:id'] || offer.id;
+      const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
       
-      const itemOffers: any[] = [];
+      // Extract price from multiple possible formats:
+      // 1. offer['beckn:price']['schema:price'] (new format at root)
+      // 2. offerAttrs['beckn:price']['value'] (old format inside offerAttributes)
+      // 3. offerAttrs.price (simplified format)
+      const offerPrice = offer['beckn:price'] || {};
+      const attrPrice = offerAttrs['beckn:price'] || offerAttrs.price || {};
+      const priceValue = attrPrice.value ?? offerPrice['schema:price'] ?? attrPrice['schema:price'] ?? offerPrice.value ?? 0;
+      const priceCurrency = attrPrice.currency || offerPrice['schema:priceCurrency'] || attrPrice['schema:priceCurrency'] || offerPrice.currency || 'INR';
+      
+      // Extract time window from multiple possible locations
+      const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || offerAttrs.validityWindow || {};
+      const startTime = timeWindow['schema:startTime'] || timeWindow.startTime || null;
+      const endTime = timeWindow['schema:endTime'] || timeWindow.endTime || null;
+      
+      // Extract max quantity from multiple possible formats
+      const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
+      const maxQuantity = maxQty.unitQuantity || maxQty || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
+      
+      logger.debug('Extracted offer', {
+        offerId,
+        price: priceValue,
+        currency: priceCurrency,
+        startTime,
+        endTime,
+        bppUri,
+      });
+      
+      return {
+        id: offerId,
+        item_id: itemId,
+        provider_id: providerId,
+        // BPP routing info for proper Beckn flow
+        bpp_id: bppId,
+        bpp_uri: bppUri,
+        price: {
+          value: typeof priceValue === 'number' ? priceValue : parseFloat(priceValue) || 0,
+          currency: priceCurrency,
+        },
+        maxQuantity: typeof maxQuantity === 'number' ? maxQuantity : parseFloat(maxQuantity) || 100,
+        timeWindow: startTime && endTime ? {
+          startTime,
+          endTime,
+        } : null,
+      };
+    };
+    
+    // Process items if they exist
+    if (rawItems.length > 0) {
+      for (const item of rawItems) {
+        const itemId = item['beckn:id'] || item.id;
+        const itemAttrs = item['beckn:itemAttributes'] || item.itemAttributes || {};
+        
+        const itemOffers: any[] = [];
+        
+        for (const offer of catalogOffers) {
+          const offerItems = offer['beckn:items'] || offer.items || [];
+          
+          if (offerItems.includes(itemId) || offerItems.length === 0) {
+            itemOffers.push(extractOfferData(offer, itemId, itemAttrs));
+          }
+        }
+        
+        transformedItems.push({
+          id: itemId,
+          offers: itemOffers,
+          itemAttributes: {
+            sourceType: itemAttrs.sourceType || 'MIXED',
+            availableQuantity: itemAttrs.availableQuantity || 100,
+            deliveryMode: itemAttrs.deliveryMode || 'GRID_INJECTION',
+            meterId: itemAttrs.meterId,
+          },
+        });
+      }
+    } else if (catalogOffers.length > 0) {
+      // FALLBACK: If no items but offers exist, extract offers with their referenced item IDs
+      // This handles cases where CDS returns offers without explicit items array
+      logger.info('No items found but offers exist, extracting directly', {
+        providerId,
+        offerCount: catalogOffers.length,
+      });
+      
+      // Group offers by their item references
+      const offersByItem = new Map<string, any[]>();
       
       for (const offer of catalogOffers) {
-        const offerItems = offer['beckn:items'] || offer.items || [];
-        const offerId = offer['beckn:id'] || offer.id;
+        const offerItemIds = offer['beckn:items'] || offer.items || [];
+        // Use first item ID or generate a synthetic one
+        const itemId = offerItemIds[0] || `synthetic-item-${providerId}`;
         
-        if (offerItems.includes(itemId) || offerItems.length === 0) {
-          const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
-          
-          // Extract price from multiple possible formats
-          const offerPrice = offer['beckn:price'] || {};
-          const attrPrice = offerAttrs['beckn:price'] || offerAttrs.price || {};
-          const priceValue = attrPrice.value ?? offerPrice['schema:price'] ?? attrPrice['schema:price'] ?? 0;
-          const priceCurrency = attrPrice.currency || offerPrice['schema:priceCurrency'] || attrPrice['schema:priceCurrency'] || 'INR';
-          
-          // Extract time window from multiple possible locations
-          const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || offerAttrs.validityWindow || {};
-          const startTime = timeWindow['schema:startTime'] || timeWindow.startTime || null;
-          const endTime = timeWindow['schema:endTime'] || timeWindow.endTime || null;
-          
-          // Extract max quantity from multiple possible formats
-          const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
-          const maxQuantity = maxQty.unitQuantity || maxQty || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
-          
-          itemOffers.push({
-            id: offerId,
-            item_id: itemId,
-            provider_id: providerId,
-            // BPP routing info for proper Beckn flow
-            bpp_id: bppId,
-            bpp_uri: bppUri,
-            price: {
-              value: typeof priceValue === 'number' ? priceValue : parseFloat(priceValue) || 0,
-              currency: priceCurrency,
-            },
-            maxQuantity: typeof maxQuantity === 'number' ? maxQuantity : parseFloat(maxQuantity) || 100,
-            timeWindow: startTime && endTime ? {
-              startTime,
-              endTime,
-            } : null,
-          });
-          
-          logger.debug('Transformed offer', {
-            offerId,
-            price: priceValue,
-            currency: priceCurrency,
-            startTime,
-            endTime,
-            bppUri,
-          });
+        if (!offersByItem.has(itemId)) {
+          offersByItem.set(itemId, []);
         }
+        offersByItem.get(itemId)!.push(extractOfferData(offer, itemId, {}));
       }
       
-      transformedItems.push({
-        id: itemId,
-        offers: itemOffers,
-        itemAttributes: {
-          sourceType: itemAttrs.sourceType || 'MIXED',
-          availableQuantity: itemAttrs.availableQuantity || 100,
-          deliveryMode: itemAttrs.deliveryMode || 'GRID_INJECTION',
-          meterId: itemAttrs.meterId,
-        },
-      });
+      // Create items from grouped offers
+      for (const [itemId, offers] of offersByItem) {
+        transformedItems.push({
+          id: itemId,
+          offers,
+          itemAttributes: {
+            sourceType: 'MIXED',
+            availableQuantity: 100,
+            deliveryMode: 'GRID_INJECTION',
+          },
+        });
+      }
     }
     
     providers.push({
