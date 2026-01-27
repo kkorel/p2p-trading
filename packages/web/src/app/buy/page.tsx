@@ -305,6 +305,7 @@ export default function BuyPage() {
           providerName={selectedOffer?.providerName || ''}
           initialQuantity={requestedQuantity}
           onConfirm={handleConfirmOrder}
+          trustWarning={transaction?.trustWarning}
         />
       </div>
     </AppShell>

@@ -282,35 +282,31 @@ router.post('/init', async (req: Request, res: Response) => {
       const txState = await getTransactionState(context.transaction_id);
       const buyerId = txState?.buyerId || null;
 
-      // Check buyer trust score - block if below 20%
+      // Check buyer trust score - advisory warning if below 20% (no longer blocks)
       if (buyerId) {
         const buyer = await prisma.user.findUnique({
           where: { id: buyerId },
           select: { trustScore: true },
         });
-        
+
         if (buyer && buyer.trustScore < 0.2) {
-          logger.error(`Buyer trust score too low: ${(buyer.trustScore * 100).toFixed(1)}%`, {
+          logger.warn(`Buyer trust score low (advisory): ${(buyer.trustScore * 100).toFixed(1)}%`, {
             transaction_id: context.transaction_id,
             buyerId,
+            advisory: true,
           });
 
-          const errorCallbackContext = createCallbackContext(context, 'on_init');
-          const errorCallback = {
-            context: errorCallbackContext,
-            error: {
-              code: 'TRUST_SCORE_TOO_LOW',
-              message: `Your trust score (${(buyer.trustScore * 100).toFixed(0)}%) is below the minimum required (20%). Please maintain a good order history to increase your score.`,
+          // Store warning in transaction state for UI to display
+          const { updateTransactionState } = await import('@p2p/shared');
+          await updateTransactionState(context.transaction_id, {
+            trustWarning: {
+              score: buyer.trustScore,
+              percentage: (buyer.trustScore * 100).toFixed(0),
+              message: `Your trust score (${(buyer.trustScore * 100).toFixed(0)}%) is low. Sellers may be cautious. Complete trades successfully to improve your reputation.`,
             },
-          };
+          });
 
-          try {
-            await axios.post(`${context.bap_uri}/callbacks/on_init`, errorCallback);
-          } catch (e) {
-            logger.error('Failed to send trust error callback');
-          }
-
-          return; // Exit the setTimeout callback
+          // Continue with trade (advisory only, no longer blocks)
         }
       }
 

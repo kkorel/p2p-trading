@@ -521,4 +521,9 @@ export interface TransactionState {
       score: number;
     }>;
   };
+  trustWarning?: {
+    score: number;
+    percentage: string;
+    message: string;
+  };
 }

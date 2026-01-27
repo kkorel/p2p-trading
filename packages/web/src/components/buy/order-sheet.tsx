@@ -17,6 +17,11 @@ interface OrderSheetProps {
   providerId?: string;
   initialQuantity?: number;
   onConfirm: (quantity: number) => Promise<Order | null>;
+  trustWarning?: {
+    score: number;
+    percentage: string;
+    message: string;
+  };
 }
 
 export function OrderSheet({
@@ -27,6 +32,7 @@ export function OrderSheet({
   providerId,
   initialQuantity,
   onConfirm,
+  trustWarning,
 }: OrderSheetProps) {
   const { balance, processPayment, refreshBalance } = useBalance();
   const [step, setStep] = useState<OrderStep>('quantity');
@@ -183,10 +189,27 @@ export function OrderSheet({
 
       {step === 'payment' && (
         <div className="flex flex-col gap-4">
+          {/* Trust Score Warning (if applicable) */}
+          {trustWarning && (
+            <div className="p-3 rounded-[12px] bg-[var(--color-warning-light)] border border-[var(--color-warning)]">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-[var(--color-warning)] mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[var(--color-warning)] mb-1">
+                    Advisory: Low Trust Score
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {trustWarning.message}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Payment breakdown */}
           <div className="bg-[var(--color-surface)] rounded-[14px] p-4">
             <p className="text-sm font-medium text-[var(--color-text)] mb-3">Payment Summary</p>
-            
+
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-[var(--color-text-muted)]">Energy ({quantity} kWh)</span>
