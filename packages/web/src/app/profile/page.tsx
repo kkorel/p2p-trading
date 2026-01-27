@@ -54,7 +54,7 @@ function VerifiableCredentialsCard() {
 
   const handleVerifyVC = async () => {
     if (!vcIdInput.trim()) {
-      setVerifyError('Please enter a VC ID');
+      setVerifyError('Please enter a VC ID or paste VC JSON');
       return;
     }
 
@@ -63,7 +63,26 @@ function VerifiableCredentialsCard() {
     setVerifySuccess(null);
 
     try {
-      const result = await authApi.verifyVC({ vcId: vcIdInput.trim() });
+      // Check if input is JSON (starts with { or [)
+      const trimmedInput = vcIdInput.trim();
+      let params: { credential?: object; vcId?: string } = {};
+
+      if (trimmedInput.startsWith('{') || trimmedInput.startsWith('[')) {
+        // Try to parse as JSON
+        try {
+          const parsed = JSON.parse(trimmedInput);
+          params = { credential: parsed };
+        } catch {
+          setVerifyError('Invalid JSON format');
+          setIsVerifying(false);
+          return;
+        }
+      } else {
+        // Treat as VC ID
+        params = { vcId: trimmedInput };
+      }
+
+      const result = await authApi.verifyVC(params);
 
       if (result.verified) {
         setVerifySuccess(`✓ Credential verified! Type: ${result.credentialType?.join(', ') || 'Unknown'}`);
