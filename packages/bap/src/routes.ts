@@ -564,24 +564,25 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   });
   // Build JSONPath filter expression for external CDS
   // Format: $[?(@.beckn:itemAttributes.sourceType == 'SOLAR' && ...)]
+  // Note: Only add filters if explicitly requested, to avoid excluding catalogs
   const filterParts: string[] = [];
   if (sourceType) {
     filterParts.push(`@.beckn:itemAttributes.sourceType == '${sourceType}'`);
   }
   if (deliveryMode) {
     filterParts.push(`@.beckn:itemAttributes.deliveryMode == '${deliveryMode}'`);
-  } else {
-    // Default to GRID_INJECTION for P2P trading
-    filterParts.push(`@.beckn:itemAttributes.deliveryMode == 'GRID_INJECTION'`);
   }
+  // Removed default GRID_INJECTION filter - it was excluding catalogs
   if (minQuantity) {
     filterParts.push(`@.beckn:itemAttributes.availableQuantity >= ${minQuantity}`);
   }
   
-  // Build JSONPath expression
+  // Build JSONPath expression - use $[*] to get ALL catalogs when no filters
   const expression = filterParts.length > 0 
     ? `$[?(${filterParts.join(' && ')})]`
     : '$[*]';
+  
+  console.log(`[DISCOVER-DEBUG] Filter expression: ${expression}`);
   
   // Create context with location for external CDS
   const context = createContext({
@@ -649,23 +650,28 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         catalogCount: syncCatalog.length,
       });
       
-      // Log raw catalog structure to debug offer extraction
-      for (const cat of syncCatalog) {
+      // Log ALL catalogs returned by CDS
+      console.log(`[CDS-DEBUG] Total catalogs returned: ${syncCatalog.length}`);
+      
+      for (let i = 0; i < syncCatalog.length; i++) {
+        const cat = syncCatalog[i];
         const items = cat['beckn:items'] || cat.items || [];
         const offers = cat['beckn:offers'] || cat.offers || [];
         const catalogId = cat['beckn:id'] || cat.id;
-        const catalogKeys = Object.keys(cat);
+        const providerId = cat['beckn:providerId'] || cat.providerId;
+        const bppId = cat['beckn:bppId'] || cat.bppId;
         
-        // Use console.log to ensure data is visible in logs
-        console.log(`[CDS-DEBUG] Catalog ${catalogId}: items=${items.length}, offers=${offers.length}, keys=${catalogKeys.join(',')}`);
-        if (items.length > 0) {
-          console.log(`[CDS-DEBUG] First item keys: ${Object.keys(items[0]).join(',')}`);
-        }
+        console.log(`[CDS-DEBUG] Catalog[${i}]: id=${catalogId}, providerId=${providerId}, bppId=${bppId}, items=${items.length}, offers=${offers.length}`);
+        
+        // Log offer details if any
         if (offers.length > 0) {
-          console.log(`[CDS-DEBUG] First offer keys: ${Object.keys(offers[0]).join(',')}`);
+          for (const offer of offers) {
+            const offerId = offer['beckn:id'] || offer.id;
+            console.log(`[CDS-DEBUG]   Offer: ${offerId}`);
+          }
         }
         
-        logger.info(`Raw catalog from CDS: id=${catalogId}, items=${items.length}, offers=${offers.length}`);
+        logger.info(`Catalog[${i}]: id=${catalogId}, provider=${providerId}, items=${items.length}, offers=${offers.length}`);
       }
       
       // Transform and store the synchronous catalog response
