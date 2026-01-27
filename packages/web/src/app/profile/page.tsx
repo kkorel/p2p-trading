@@ -463,7 +463,7 @@ export default function ProfilePage() {
                   <span className="text-white/60">Trust Level</span>
                   <span className="text-white font-medium">
                     Trade Limit: {user.allowedTradeLimit ?? 10}%
-                    {user.productionCapacity && (
+                    {user.productionCapacity != null && user.productionCapacity > 0 && (
                       <span className="text-white/60 ml-1">
                         ({((user.productionCapacity * (user.allowedTradeLimit ?? 10)) / 100).toFixed(0)} kWh)
                       </span>

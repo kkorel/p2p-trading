@@ -1781,13 +1781,16 @@ router.post('/api/db/reset', async (req: Request, res: Response) => {
     const trustHistory = await prisma.trustScoreHistory.deleteMany();
     deleteCounts.trustScoreHistory = trustHistory.count;
     
-    // 10. Reset user balances and trust scores (but keep accounts)
+    // 10. Reset user balances, trust scores, and meter verification (but keep accounts)
     await prisma.user.updateMany({
       data: {
         balance: 1000, // Reset to default balance
         trustScore: 0.5, // Reset to default trust
         allowedTradeLimit: 10,
-        productionCapacity: 0,
+        productionCapacity: null, // Reset to null (not 0) so UI doesn't render "0"
+        meterVerifiedCapacity: null, // Reset meter verification
+        meterDataAnalyzed: false, // Reset meter analyzed flag
+        meterPdfUrl: null, // Clear uploaded PDF
         providerId: null, // Unlink providers (they were deleted)
       },
     });
