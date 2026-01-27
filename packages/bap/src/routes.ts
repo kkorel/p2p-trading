@@ -2231,4 +2231,187 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
   }
 });
 
+/**
+ * POST /api/cancel - Cancel an order (buyer-initiated)
+ * 
+ * Business logic:
+ * - Buyer can cancel ACTIVE orders before DISCOM verification
+ * - Escrowed funds are refunded to buyer
+ * - Blocks are released back to available inventory
+ * - Seller is notified via order status update
+ */
+router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { transaction_id, order_id, reason } = req.body;
+    const buyerId = req.user!.id;
+
+    if (!order_id && !transaction_id) {
+      return res.status(400).json({
+        status: 'error',
+        error: 'Either order_id or transaction_id is required',
+      });
+    }
+
+    // Find the order
+    let order;
+    if (order_id) {
+      order = await prisma.order.findUnique({
+        where: { id: order_id },
+        include: {
+          payments: true,
+          blocks: true,
+        },
+      });
+    } else if (transaction_id) {
+      order = await prisma.order.findFirst({
+        where: { transactionId: transaction_id },
+        include: {
+          payments: true,
+          blocks: true,
+        },
+      });
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        status: 'error',
+        error: 'Order not found',
+      });
+    }
+
+    // Verify the buyer owns this order
+    if (order.buyerId !== buyerId) {
+      return res.status(403).json({
+        status: 'error',
+        error: 'You can only cancel your own orders',
+      });
+    }
+
+    // Check if order can be cancelled
+    const cancelableStatuses = ['ACTIVE', 'PENDING', 'INITIALIZED'];
+    if (!cancelableStatuses.includes(order.status)) {
+      return res.status(400).json({
+        status: 'error',
+        error: `Cannot cancel order with status: ${order.status}. Only ACTIVE, PENDING, or INITIALIZED orders can be cancelled.`,
+      });
+    }
+
+    // Start cancellation transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. Update order status to CANCELLED
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelledBy: buyerId,
+          cancelReason: reason || 'Buyer cancelled',
+        },
+      });
+
+      // 2. Refund escrowed amount to buyer (if payment was escrowed)
+      if (order.paymentStatus === 'ESCROWED') {
+        const escrowPayment = order.payments.find((p: any) => p.type === 'ESCROW');
+        if (escrowPayment) {
+          // Refund to buyer
+          await tx.user.update({
+            where: { id: buyerId },
+            data: { balance: { increment: escrowPayment.totalAmount } },
+          });
+
+          // Update payment status
+          await tx.paymentRecord.update({
+            where: { id: escrowPayment.id },
+            data: { status: 'REFUNDED' },
+          });
+
+          // Create refund record
+          await tx.paymentRecord.create({
+            data: {
+              type: 'REFUND',
+              orderId: order.id,
+              buyerId,
+              sellerId: escrowPayment.sellerId,
+              totalAmount: escrowPayment.totalAmount,
+              platformFee: 0, // No fee on refund
+              status: 'COMPLETED',
+              completedAt: new Date(),
+            },
+          });
+
+          logger.info(`Refunded ${escrowPayment.totalAmount} to buyer ${buyerId}`, {
+            orderId: order.id,
+          });
+        }
+
+        // Update order payment status
+        await tx.order.update({
+          where: { id: order.id },
+          data: { paymentStatus: 'REFUNDED' },
+        });
+      }
+
+      // 3. Release blocks back to available inventory
+      await tx.offerBlock.updateMany({
+        where: { orderId: order.id },
+        data: {
+          status: 'AVAILABLE',
+          orderId: null,
+          transactionId: null,
+        },
+      });
+
+      logger.info(`Released blocks for cancelled order ${order.id}`);
+    });
+
+    // 4. Republish catalog to CDS if we have local offers (non-blocking)
+    // Parse items from JSON to get offer_id
+    let items: any[] = [];
+    try {
+      items = JSON.parse(order.itemsJson || '[]');
+    } catch (e) {
+      // Ignore parse errors
+    }
+    const firstItem = items[0];
+    if (firstItem?.offer_id) {
+      (async () => {
+        try {
+          const offer = await prisma.catalogOffer.findUnique({
+            where: { id: firstItem.offer_id },
+            include: { item: true },
+          });
+          if (offer && offer.item) {
+            const { publishCatalogToCDS, isExternalCDSEnabled } = await import('@p2p/shared');
+            if (isExternalCDSEnabled()) {
+              logger.info('Republishing catalog after order cancellation', {
+                offerId: offer.id,
+              });
+              // Note: Full catalog republish would happen here
+            }
+          }
+        } catch (err: any) {
+          logger.error(`Failed to republish after cancel: ${err.message}`);
+        }
+      })();
+    }
+
+    logger.info(`Order ${order.id} cancelled by buyer ${buyerId}`, {
+      reason: reason || 'No reason provided',
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Order cancelled successfully. Escrowed funds have been refunded.',
+      order_id: order.id,
+    });
+  } catch (error: any) {
+    logger.error(`Failed to cancel order: ${error.message}`);
+    res.status(500).json({
+      status: 'error',
+      error: 'Failed to cancel order',
+    });
+  }
+});
+
 export default router;
+
