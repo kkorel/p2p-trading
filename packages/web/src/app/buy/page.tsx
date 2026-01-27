@@ -16,6 +16,11 @@ interface DiscoveredOffer {
   sourceType: string;
   availableQty: number;
   score?: number;
+  scoreBreakdown?: {
+    priceScore: number;
+    trustScore: number;
+    timeWindowFitScore: number;
+  };
 }
 
 // Pagination settings
@@ -84,7 +89,7 @@ export default function BuyPage() {
                   const matchedOffer = txState.matchingResults?.allOffers?.find(
                     m => m.offer.id === offer.id
                   );
-                  
+
                   discoveredOffers.push({
                     offer,
                     providerId: provider.id,
@@ -92,6 +97,7 @@ export default function BuyPage() {
                     sourceType: item.itemAttributes?.sourceType || 'MIXED',
                     availableQty: item.itemAttributes?.availableQuantity || offer.maxQuantity,
                     score: matchedOffer?.score,
+                    scoreBreakdown: matchedOffer?.breakdown,
                   });
                 }
               }
@@ -263,6 +269,7 @@ export default function BuyPage() {
                     sourceType={item.sourceType}
                     availableQty={item.availableQty}
                     score={item.score}
+                    scoreBreakdown={item.scoreBreakdown}
                     isSelected={selectedOffer?.offer.id === item.offer.id}
                     onSelect={() => handleSelectOffer(item)}
                   />

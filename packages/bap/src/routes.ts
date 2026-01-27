@@ -532,8 +532,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     bap_uri: config.bap.uri,
   });
   
-  // Build discover message in external CDS format
-  // Note: External CDS expects only 'filters' in message, not 'intent'
+  // Build discover message with both filters and intent
+  // Filters: JSONPath expression for basic filtering
+  // Intent: Time window and quantity for time-based matching
   const discoverMessage = {
     context,
     message: {
@@ -542,6 +543,12 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         expression,
         expressionType: 'jsonpath',
       },
+      intent: timeWindow ? {
+        fulfillment: {
+          time: timeWindow,
+        },
+        quantity: minQuantity ? { value: minQuantity } : undefined,
+      } : undefined,
     },
   };
   

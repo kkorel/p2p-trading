@@ -25,6 +25,11 @@ interface OfferCardProps {
   sourceType: string;
   availableQty: number;
   score?: number;
+  scoreBreakdown?: {
+    priceScore: number;
+    trustScore: number;
+    timeWindowFitScore: number;
+  };
   isSelected?: boolean;
   onSelect: () => void;
 }
@@ -35,6 +40,7 @@ export function OfferCard({
   sourceType,
   availableQty,
   score,
+  scoreBreakdown,
   isSelected,
   onSelect,
 }: OfferCardProps) {
@@ -90,6 +96,27 @@ export function OfferCard({
           </Badge>
         )}
       </div>
+
+      {/* Score breakdown - show if available */}
+      {scoreBreakdown && score !== undefined && (
+        <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+          <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2">Match Score Breakdown</p>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)]">💰 Price</span>
+              <span className="font-medium text-[var(--color-text)]">{Math.round(scoreBreakdown.priceScore * 100)}%</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)]">🛡️ Trust</span>
+              <span className="font-medium text-[var(--color-text)]">{Math.round(scoreBreakdown.trustScore * 100)}%</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)]">⏰ Time Fit</span>
+              <span className="font-medium text-[var(--color-text)]">{Math.round(scoreBreakdown.timeWindowFitScore * 100)}%</span>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

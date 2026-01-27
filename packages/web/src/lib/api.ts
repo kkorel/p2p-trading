@@ -540,10 +540,20 @@ export interface TransactionState {
     selectedOffer?: {
       offer: Offer;
       score: number;
+      breakdown?: {
+        priceScore: number;
+        trustScore: number;
+        timeWindowFitScore: number;
+      };
     };
     allOffers: Array<{
       offer: Offer;
       score: number;
+      breakdown?: {
+        priceScore: number;
+        trustScore: number;
+        timeWindowFitScore: number;
+      };
     }>;
   };
   trustWarning?: {
