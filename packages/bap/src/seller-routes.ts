@@ -33,6 +33,9 @@ import {
   syncCompleteOfferToCDS,
   syncBlocksToCDS,
   deleteOfferFromCDS,
+  publishOfferToCDS,
+  publishCatalogToCDS,
+  isExternalCDSEnabled,
 } from '@p2p/shared';
 import {
   getOfferById,
@@ -1319,18 +1322,45 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
 
   logger.info(`New offer created: ${offer.id} for item ${item_id}`);
 
-  // Sync to CDS (non-blocking)
-  syncOfferToCDS({
-    id: offer.id,
-    item_id: offer.item_id,
-    provider_id: offer.provider_id,
-    price_value: offer.price.value,
-    currency: offer.price.currency,
-    max_qty: offer.maxQuantity,
-    time_window: offer.timeWindow,
-    pricing_model: offer.offerAttributes.pricingModel,
-    settlement_type: offer.offerAttributes.settlementType,
-  }).catch(err => logger.error('Failed to sync offer to CDS', { offerId: offer.id, error: err.message }));
+  // Get provider info for CDS publishing (reuse items from validation above)
+  const providerInfo = await getProvider(provider_id);
+  const providerName = providerInfo?.name || req.user!.name || 'Energy Provider';
+  const itemInfo = items.find(i => i.id === item_id);
+
+  // Publish to CDS using proper Beckn catalog_publish format (non-blocking)
+  if (itemInfo) {
+    publishOfferToCDS(
+      {
+        id: provider_id,
+        name: providerName,
+        trust_score: providerInfo?.trust_score || 0.5,
+      },
+      {
+        id: itemInfo.id,
+        provider_id: itemInfo.provider_id,
+        source_type: itemInfo.source_type,
+        delivery_mode: itemInfo.delivery_mode,
+        available_qty: itemInfo.available_qty,
+        production_windows: itemInfo.production_windows,
+        meter_id: itemInfo.meter_id,
+      },
+      {
+        id: offer.id,
+        item_id: offer.item_id,
+        provider_id: offer.provider_id,
+        price_value: offer.price.value,
+        currency: offer.price.currency,
+        max_qty: offer.maxQuantity,
+        time_window: offer.timeWindow,
+        pricing_model: offer.offerAttributes.pricingModel,
+        settlement_type: offer.offerAttributes.settlementType,
+      }
+    ).then(success => {
+      if (success) {
+        logger.info('Offer published to external CDS', { offerId: offer.id });
+      }
+    }).catch(err => logger.error('Failed to publish offer to CDS', { offerId: offer.id, error: err.message }));
+  }
 
   res.json({ status: 'ok', offer });
 });
@@ -1437,29 +1467,42 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
 
   logger.info(`New direct offer created: ${offer.id}`);
 
-  // Sync item to CDS (non-blocking)
-  syncItemToCDS({
-    id: item.id,
-    provider_id: item.provider_id,
-    source_type: item.source_type,
-    delivery_mode: item.delivery_mode,
-    available_qty: item.available_qty,
-    production_windows: item.production_windows,
-    meter_id: item.meter_id,
-  }).catch(err => logger.error('Failed to sync item to CDS', { itemId: item.id, error: err.message }));
+  // Get provider name for CDS publishing
+  const providerInfo = await getProvider(provider_id);
+  const providerName = providerInfo?.name || req.user!.name || 'Energy Provider';
 
-  // Sync offer to CDS (non-blocking)
-  syncOfferToCDS({
-    id: offer.id,
-    item_id: offer.item_id,
-    provider_id: offer.provider_id,
-    price_value: offer.price.value,
-    currency: offer.price.currency,
-    max_qty: offer.maxQuantity,
-    time_window: offer.timeWindow,
-    pricing_model: offer.offerAttributes.pricingModel,
-    settlement_type: offer.offerAttributes.settlementType,
-  }).catch(err => logger.error('Failed to sync offer to CDS', { offerId: offer.id, error: err.message }));
+  // Publish to CDS using proper Beckn catalog_publish format (non-blocking)
+  publishOfferToCDS(
+    {
+      id: provider_id,
+      name: providerName,
+      trust_score: providerInfo?.trust_score || 0.5,
+    },
+    {
+      id: item.id,
+      provider_id: item.provider_id,
+      source_type: item.source_type,
+      delivery_mode: item.delivery_mode,
+      available_qty: item.available_qty,
+      production_windows: item.production_windows,
+      meter_id: item.meter_id,
+    },
+    {
+      id: offer.id,
+      item_id: offer.item_id,
+      provider_id: offer.provider_id,
+      price_value: offer.price.value,
+      currency: offer.price.currency,
+      max_qty: offer.maxQuantity,
+      time_window: offer.timeWindow,
+      pricing_model: offer.offerAttributes.pricingModel,
+      settlement_type: offer.offerAttributes.settlementType,
+    }
+  ).then(success => {
+    if (success) {
+      logger.info('Offer published to external CDS', { offerId: offer.id });
+    }
+  }).catch(err => logger.error('Failed to publish offer to CDS', { offerId: offer.id, error: err.message }));
 
   // Add source_type to the response
   res.json({
@@ -1508,9 +1551,51 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
   await deleteOffer(req.params.id);
   logger.info(`Offer ${req.params.id} deleted by provider ${provider_id}`);
 
-  // Sync deletion to CDS (non-blocking)
-  deleteOfferFromCDS(req.params.id)
-    .catch(err => logger.error('Failed to delete offer from CDS', { offerId: req.params.id, error: err.message }));
+  // Republish the full catalog without the deleted offer (non-blocking)
+  // This updates the CDS with the current catalog state
+  (async () => {
+    try {
+      if (isExternalCDSEnabled()) {
+        const providerInfo = await getProvider(provider_id);
+        const providerName = providerInfo?.name || 'Energy Provider';
+        const items = await getProviderItems(provider_id);
+        const offers = await getProviderOffers(provider_id);
+        
+        // Convert to sync format
+        const syncItems = items.map(item => ({
+          id: item.id,
+          provider_id: item.provider_id,
+          source_type: item.source_type,
+          delivery_mode: item.delivery_mode,
+          available_qty: item.available_qty,
+          production_windows: item.production_windows,
+          meter_id: item.meter_id,
+        }));
+        
+        const syncOffers = offers.map(offer => ({
+          id: offer.id,
+          item_id: offer.item_id,
+          provider_id: offer.provider_id,
+          price_value: offer.price.value,
+          currency: offer.price.currency,
+          max_qty: offer.maxQuantity,
+          time_window: offer.timeWindow,
+          pricing_model: offer.offerAttributes.pricingModel,
+          settlement_type: offer.offerAttributes.settlementType,
+        }));
+        
+        await publishCatalogToCDS(
+          { id: provider_id, name: providerName },
+          syncItems,
+          syncOffers,
+          true // still active
+        );
+        logger.info('Catalog republished to CDS after offer deletion', { providerId: provider_id });
+      }
+    } catch (err: any) {
+      logger.error('Failed to republish catalog after deletion', { error: err.message });
+    }
+  })();
 
   res.json({ status: 'ok', deleted: req.params.id });
 });
