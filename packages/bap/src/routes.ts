@@ -29,6 +29,8 @@ import {
   verifyGenerationProfile,
   getIssuerId,
   validateProviderMatch,
+  // Secure client for signed Beckn requests
+  secureAxios,
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
@@ -779,7 +781,11 @@ router.post('/api/select', async (req: Request, res: Response) => {
     
     logger.info(`Routing select to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
     
-    const response = await axios.post(targetUrl, selectMessage);
+    // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
+    // Use plain axios for local BPP (no signature needed)
+    const response = isExternalBpp 
+      ? await secureAxios.post(targetUrl, selectMessage)
+      : await axios.post(targetUrl, selectMessage);
     
     res.json({
       status: 'ok',
@@ -799,7 +805,11 @@ router.post('/api/select', async (req: Request, res: Response) => {
       ack: response.data,
     });
   } catch (error: any) {
-    logger.error(`Select request failed: ${error.message}`, { transaction_id });
+    logger.error(`Select request failed: ${error.message}`, { 
+      transaction_id,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -866,7 +876,10 @@ router.post('/api/init', async (req: Request, res: Response) => {
     
     logger.info(`Routing init to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
     
-    const response = await axios.post(targetUrl, initMessage);
+    // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
+    const response = isExternalBpp 
+      ? await secureAxios.post(targetUrl, initMessage)
+      : await axios.post(targetUrl, initMessage);
     
     res.json({
       status: 'ok',
@@ -875,7 +888,11 @@ router.post('/api/init', async (req: Request, res: Response) => {
       ack: response.data,
     });
   } catch (error: any) {
-    logger.error(`Init request failed: ${error.message}`, { transaction_id });
+    logger.error(`Init request failed: ${error.message}`, { 
+      transaction_id,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -939,7 +956,10 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     
     logger.info(`Routing confirm to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
     
-    const response = await axios.post(targetUrl, confirmMessage);
+    // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
+    const response = isExternalBpp 
+      ? await secureAxios.post(targetUrl, confirmMessage)
+      : await axios.post(targetUrl, confirmMessage);
 
     // Best-effort settlement initiation (idempotent)
     try {
@@ -1058,7 +1078,10 @@ router.post('/api/status', async (req: Request, res: Response) => {
     
     logger.info(`Routing status to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
     
-    const response = await axios.post(targetUrl, statusMessage);
+    // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
+    const response = isExternalBpp 
+      ? await secureAxios.post(targetUrl, statusMessage)
+      : await axios.post(targetUrl, statusMessage);
     
     res.json({
       status: 'ok',
@@ -1067,7 +1090,11 @@ router.post('/api/status', async (req: Request, res: Response) => {
       ack: response.data,
     });
   } catch (error: any) {
-    logger.error(`Status request failed: ${error.message}`, { transaction_id });
+    logger.error(`Status request failed: ${error.message}`, { 
+      transaction_id,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
     res.status(500).json({ error: error.message });
   }
 });
