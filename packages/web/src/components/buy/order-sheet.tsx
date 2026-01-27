@@ -116,7 +116,10 @@ export function OrderSheet({
           <div className="flex items-center justify-between py-3 border-b border-[var(--color-border)]">
             <span className="text-sm text-[var(--color-text-muted)]">Delivery Time</span>
             <span className="text-sm font-medium text-[var(--color-text)]">
-              {formatTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
+              {offer.timeWindow 
+                ? `${formatTime(offer.timeWindow.startTime)} - ${formatTime(offer.timeWindow.endTime)}`
+                : 'Flexible timing'
+              }
             </span>
           </div>
 

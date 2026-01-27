@@ -21,8 +21,11 @@ export function formatNumber(value: number, decimals = 1): string {
   }).format(value);
 }
 
-export function formatTime(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString('en-IN', {
+export function formatTime(isoString: string | null | undefined): string {
+  if (!isoString) return 'N/A';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
   });

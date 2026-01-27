@@ -306,7 +306,10 @@ export default function SellPage() {
                       <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] mb-2">
                         <Clock className="h-3.5 w-3.5" />
                         <span>
-                          {formatDateTime(offer.timeWindow.startTime)} - {formatTime(offer.timeWindow.endTime)}
+                          {offer.timeWindow 
+                            ? `${formatDateTime(offer.timeWindow.startTime)} - ${formatTime(offer.timeWindow.endTime)}`
+                            : 'Flexible timing'
+                          }
                         </span>
                       </div>
                       {offer.blockStats && (

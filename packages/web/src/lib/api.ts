@@ -329,7 +329,7 @@ export interface Offer {
   source_type?: string;
   price: { value: number; currency: string };
   maxQuantity: number;
-  timeWindow: { startTime: string; endTime: string };
+  timeWindow: { startTime: string; endTime: string } | null;
   blockStats?: { 
     total: number; 
     available: number; 

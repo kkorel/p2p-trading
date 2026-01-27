@@ -44,6 +44,7 @@ const logger = createLogger('BAP');
  * - catalogs[] instead of catalog.providers[]
  * - beckn:id, beckn:items, beckn:offers with beckn: prefix
  * - offers at catalog level instead of nested in items
+ * - Various price formats: beckn:price, schema:price, etc.
  */
 function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
   // Check if it's already in our internal format
@@ -76,6 +77,7 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     for (const item of rawItems) {
       const itemId = item['beckn:id'] || item.id;
       const itemAttrs = item['beckn:itemAttributes'] || item.itemAttributes || {};
+      const itemDescriptor = item['beckn:descriptor'] || item.descriptor || {};
       
       const itemOffers: any[] = [];
       
@@ -85,23 +87,43 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
         
         if (offerItems.includes(itemId) || offerItems.length === 0) {
           const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
-          const price = offerAttrs['beckn:price'] || offerAttrs.price || {};
-          const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || {};
+          
+          // Extract price from multiple possible formats
+          const offerPrice = offer['beckn:price'] || {};
+          const attrPrice = offerAttrs['beckn:price'] || offerAttrs.price || {};
+          const priceValue = attrPrice.value ?? offerPrice['schema:price'] ?? attrPrice['schema:price'] ?? 0;
+          const priceCurrency = attrPrice.currency || offerPrice['schema:priceCurrency'] || attrPrice['schema:priceCurrency'] || 'INR';
+          
+          // Extract time window from multiple possible locations
+          const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || offerAttrs.validityWindow || {};
+          const startTime = timeWindow['schema:startTime'] || timeWindow.startTime || null;
+          const endTime = timeWindow['schema:endTime'] || timeWindow.endTime || null;
+          
+          // Extract max quantity from multiple possible formats
           const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
+          const maxQuantity = maxQty.unitQuantity || maxQty || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
           
           itemOffers.push({
             id: offerId,
             item_id: itemId,
             provider_id: providerId,
             price: {
-              value: price.value || 0,
-              currency: price.currency || 'INR',
+              value: typeof priceValue === 'number' ? priceValue : parseFloat(priceValue) || 0,
+              currency: priceCurrency,
             },
-            maxQuantity: maxQty.unitQuantity || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100,
-            timeWindow: {
-              startTime: timeWindow['schema:startTime'] || timeWindow.startTime,
-              endTime: timeWindow['schema:endTime'] || timeWindow.endTime,
-            },
+            maxQuantity: typeof maxQuantity === 'number' ? maxQuantity : parseFloat(maxQuantity) || 100,
+            timeWindow: startTime && endTime ? {
+              startTime,
+              endTime,
+            } : null,
+          });
+          
+          logger.debug('Transformed offer', {
+            offerId,
+            price: priceValue,
+            currency: priceCurrency,
+            startTime,
+            endTime,
           });
         }
       }
@@ -125,6 +147,7 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     });
   }
   
+  logger.info(`Transformed ${catalogs.length} catalogs into ${providers.length} providers`);
   return { providers };
 }
 
@@ -988,6 +1011,16 @@ router.post('/api/status', async (req: Request, res: Response) => {
     logger.error(`Status request failed: ${error.message}`, { transaction_id });
     res.status(500).json({ error: error.message });
   }
+});
+
+/**
+ * POST /api/transactions - Create a new transaction
+ */
+router.post('/api/transactions', async (req: Request, res: Response) => {
+  const txnId = uuidv4();
+  await createTransaction(txnId);
+  logger.info('Created new transaction', { transaction_id: txnId });
+  res.json({ transaction_id: txnId });
 });
 
 /**
