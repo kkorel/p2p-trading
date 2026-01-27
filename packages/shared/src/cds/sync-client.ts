@@ -371,7 +371,7 @@ export async function publishCatalogToCDS(
       },
     };
 
-    const url = `${getCDSBaseUrl()}/publish`;
+    const url = `${getCDSBaseUrl()}/catalog/publish`;
     logger.info('Publishing catalog to external CDS', {
       url,
       providerId: provider.id,
@@ -417,7 +417,7 @@ export async function publishCatalogToCDS(
       error: error.message,
       status: error.response?.status,
       responseData: JSON.stringify(error.response?.data || {}).substring(0, 500),
-      url: `${getCDSBaseUrl()}/publish`,
+      url: `${getCDSBaseUrl()}/catalog/publish`,
     });
     return false;
   }
