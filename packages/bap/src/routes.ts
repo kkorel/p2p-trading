@@ -564,23 +564,24 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   });
   // Build JSONPath filter expression for external CDS
   // Format: $[?(@.beckn:itemAttributes.sourceType == 'SOLAR' && ...)]
-  // Note: Only add filters if explicitly requested, to avoid excluding catalogs
+  // IMPORTANT: External CDS requires at least one filter to return results
   const filterParts: string[] = [];
   if (sourceType) {
     filterParts.push(`@.beckn:itemAttributes.sourceType == '${sourceType}'`);
+  } else {
+    // When no source type specified, filter for any energy type
+    // This ensures we get results from the external CDS
+    filterParts.push(`(@.beckn:itemAttributes.sourceType == 'SOLAR' || @.beckn:itemAttributes.sourceType == 'WIND' || @.beckn:itemAttributes.sourceType == 'HYDRO' || @.beckn:itemAttributes.sourceType == 'MIXED')`);
   }
   if (deliveryMode) {
     filterParts.push(`@.beckn:itemAttributes.deliveryMode == '${deliveryMode}'`);
   }
-  // Removed default GRID_INJECTION filter - it was excluding catalogs
   if (minQuantity) {
     filterParts.push(`@.beckn:itemAttributes.availableQuantity >= ${minQuantity}`);
   }
   
-  // Build JSONPath expression - use $[*] to get ALL catalogs when no filters
-  const expression = filterParts.length > 0 
-    ? `$[?(${filterParts.join(' && ')})]`
-    : '$[*]';
+  // Build JSONPath expression
+  const expression = `$[?(${filterParts.join(' && ')})]`;
   
   console.log(`[DISCOVER-DEBUG] Filter expression: ${expression}`);
   
