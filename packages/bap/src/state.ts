@@ -54,6 +54,11 @@ export interface TransactionState {
   excludeProviderId?: string | null; // User's own provider to exclude from results
   buyerId?: string | null; // User ID of the buyer for order association
   error?: string; // Error message if the transaction failed
+  trustWarning?: {
+    score: number;
+    percentage: string;
+    message: string;
+  }; // Advisory warning for low trust score buyers
   status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
   updated_at: string;

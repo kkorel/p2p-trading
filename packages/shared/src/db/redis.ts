@@ -27,7 +27,7 @@ export const REDIS_TTL = {
 // Create Redis client singleton
 const createRedisClient = () => {
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-  
+
   const client = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
     retryStrategy: (times) => {
@@ -100,7 +100,12 @@ export interface TransactionState {
   excludeProviderId?: string | null;
   buyerId?: string | null;
   error?: string;
-  status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED';
+  trustWarning?: {
+    score: number;
+    percentage: string;
+    message: string;
+  };
+  status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
   updated_at: string;
 }
@@ -130,7 +135,7 @@ export async function createTransactionState(transactionId: string): Promise<Tra
 export async function getTransactionState(transactionId: string): Promise<TransactionState | null> {
   const key = REDIS_KEYS.transaction(transactionId);
   const data = await redis.get(key);
-  
+
   if (!data) {
     return null;
   }
@@ -147,7 +152,7 @@ export async function updateTransactionState(
 ): Promise<TransactionState | null> {
   const key = REDIS_KEYS.transaction(transactionId);
   const data = await redis.get(key);
-  
+
   if (!data) {
     return null;
   }
@@ -160,7 +165,7 @@ export async function updateTransactionState(
   };
 
   await redis.set(key, JSON.stringify(updatedState), 'EX', REDIS_TTL.transaction);
-  
+
   return updatedState;
 }
 
@@ -169,7 +174,7 @@ export async function updateTransactionState(
  */
 export async function getAllTransactionStates(): Promise<TransactionState[]> {
   const transactionIds = await redis.smembers(REDIS_KEYS.allTransactions);
-  
+
   if (transactionIds.length === 0) {
     return [];
   }
@@ -196,12 +201,12 @@ export async function getAllTransactionStates(): Promise<TransactionState[]> {
  */
 export async function clearAllTransactionStates(): Promise<void> {
   const transactionIds = await redis.smembers(REDIS_KEYS.allTransactions);
-  
+
   if (transactionIds.length > 0) {
     const keys = transactionIds.map(id => REDIS_KEYS.transaction(id));
     await redis.del(...keys);
   }
-  
+
   await redis.del(REDIS_KEYS.allTransactions);
 }
 
