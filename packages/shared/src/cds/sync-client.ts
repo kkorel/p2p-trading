@@ -198,11 +198,19 @@ export function isExternalCDSEnabled(): boolean {
 }
 
 /**
- * Get the CDS base URL (uses same URL as discover for consistency)
+ * Get the CDS base URL for publishing
+ * Returns the URL with /catalog appended if not already present
  */
-function getCDSBaseUrl(): string {
-  // Use CDS_URL (same as discover) if available, otherwise fall back to EXTERNAL_CDS_URL
-  return process.env.CDS_URL || config.external.cds;
+function getCDSPublishUrl(): string {
+  // Use EXTERNAL_CDS_URL for publishing, or fall back to CDS_URL
+  const baseUrl = process.env.EXTERNAL_CDS_URL || process.env.CDS_URL || config.external.cds;
+  
+  // If URL already ends with /catalog, just append /publish
+  // Otherwise append /catalog/publish
+  if (baseUrl.endsWith('/catalog')) {
+    return `${baseUrl}/publish`;
+  }
+  return `${baseUrl}/catalog/publish`;
 }
 
 // ==================== Catalog Building Functions ====================
@@ -371,7 +379,7 @@ export async function publishCatalogToCDS(
       },
     };
 
-    const url = `${getCDSBaseUrl()}/catalog/publish`;
+    const url = getCDSPublishUrl();
     logger.info('Publishing catalog to external CDS', {
       url,
       providerId: provider.id,
@@ -417,7 +425,7 @@ export async function publishCatalogToCDS(
       error: error.message,
       status: error.response?.status,
       responseData: JSON.stringify(error.response?.data || {}).substring(0, 500),
-      url: `${getCDSBaseUrl()}/catalog/publish`,
+      url: getCDSPublishUrl(),
     });
     return false;
   }
