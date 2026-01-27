@@ -79,11 +79,8 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
     
     // Log raw data for debugging
-    logger.info('Processing catalog', {
-      providerId,
-      itemCount: rawItems.length,
-      offerCount: catalogOffers.length,
-    });
+    console.log(`[TRANSFORM-DEBUG] Provider ${providerId}: rawItems=${rawItems.length}, catalogOffers=${catalogOffers.length}`);
+    logger.info(`Processing catalog: provider=${providerId}, items=${rawItems.length}, offers=${catalogOffers.length}`);
     
     const transformedItems: any[] = [];
     
@@ -656,15 +653,19 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       for (const cat of syncCatalog) {
         const items = cat['beckn:items'] || cat.items || [];
         const offers = cat['beckn:offers'] || cat.offers || [];
-        logger.info('Raw catalog from CDS', {
-          catalogId: cat['beckn:id'] || cat.id,
-          itemCount: items.length,
-          offerCount: offers.length,
-          catalogKeys: Object.keys(cat).slice(0, 20),
-          // Log first item and offer structure if they exist
-          firstItemKeys: items[0] ? Object.keys(items[0]).slice(0, 15) : [],
-          firstOfferKeys: offers[0] ? Object.keys(offers[0]).slice(0, 15) : [],
-        });
+        const catalogId = cat['beckn:id'] || cat.id;
+        const catalogKeys = Object.keys(cat);
+        
+        // Use console.log to ensure data is visible in logs
+        console.log(`[CDS-DEBUG] Catalog ${catalogId}: items=${items.length}, offers=${offers.length}, keys=${catalogKeys.join(',')}`);
+        if (items.length > 0) {
+          console.log(`[CDS-DEBUG] First item keys: ${Object.keys(items[0]).join(',')}`);
+        }
+        if (offers.length > 0) {
+          console.log(`[CDS-DEBUG] First offer keys: ${Object.keys(offers[0]).join(',')}`);
+        }
+        
+        logger.info(`Raw catalog from CDS: id=${catalogId}, items=${items.length}, offers=${offers.length}`);
       }
       
       // Transform and store the synchronous catalog response
