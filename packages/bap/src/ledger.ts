@@ -16,15 +16,19 @@ import { config, createLogger, Order } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
-// Ledger API types
+// Ledger API types (matching DEG Ledger spec v0.3.0)
+type TradeType = 'ENERGY' | 'RAISE_CAPACITY' | 'LOWER_CAPACITY' | 'PFR' | 'SFR' | 'TC' | 'BDR';
+type TradeUnit = 'KWH' | 'KW';
+type Role = 'BUYER' | 'SELLER' | 'BUYER_DISCOM' | 'SELLER_DISCOM';
+
 interface TradeDetail {
-  tradeType: 'ENERGY' | 'CAPACITY' | 'CARBON';
+  tradeType: TradeType;
   tradeQty: number;
-  tradeUnit: 'KWH' | 'KW';
+  tradeUnit: TradeUnit;
 }
 
 interface LedgerPutRequest {
-  role: 'BUYER' | 'SELLER';
+  role: Role;
   transactionId: string;
   orderItemId: string;
   platformIdBuyer?: string;
@@ -62,15 +66,18 @@ interface LedgerRecord {
   recordId: string;
   transactionId: string;
   orderItemId: string;
-  platformIdBuyer?: string;
-  platformIdSeller?: string;
-  buyerId?: string;
-  sellerId?: string;
+  platformIdBuyer: string;
+  platformIdSeller: string;
+  discomIdBuyer: string;
+  discomIdSeller: string;
+  buyerId: string;
+  sellerId: string;
   tradeTime?: string;
   deliveryStartTime?: string;
   deliveryEndTime?: string;
   tradeDetails?: TradeDetail[];
   creationTime: string;
+  rowDigest?: string;
 }
 
 interface LedgerGetResponse {
@@ -120,12 +127,18 @@ export async function writeTradeToLedger(
       }
     }
 
+    // Get DISCOM IDs - use environment variables or defaults
+    const discomIdBuyer = process.env.DISCOM_ID_BUYER || 'DISCOM_BUYER_DEFAULT';
+    const discomIdSeller = process.env.DISCOM_ID_SELLER || 'DISCOM_SELLER_DEFAULT';
+
     const request: LedgerPutRequest = {
       role: 'BUYER',
       transactionId,
       orderItemId: order.id,
       platformIdBuyer: config.bap.id,
       platformIdSeller: config.bpp.id,
+      discomIdBuyer,
+      discomIdSeller,
       buyerId,
       sellerId,
       tradeTime: new Date().toISOString(),
@@ -139,6 +152,7 @@ export async function writeTradeToLedger(
       transactionId,
       orderId: order.id,
       ledgerUrl,
+      request: JSON.stringify(request),
     });
 
     const response = await axios.post<LedgerWriteResponse>(
@@ -148,7 +162,8 @@ export async function writeTradeToLedger(
         headers: {
           'Content-Type': 'application/json',
           // TODO: Add Beckn HTTP signature headers for production
-          // 'Authorization': 'Bearer ...',
+          // 'Authorization': 'Signature keyId="...",algorithm="ed25519",headers="(created) (expires) digest",signature="..."',
+          // 'Digest': 'BLAKE-512=...',
         },
         timeout: 10000,
       }
@@ -177,16 +192,36 @@ export async function writeTradeToLedger(
       };
     }
   } catch (error: any) {
-    logger.error('Ledger API error', {
+    // Detailed error logging for debugging
+    const errorDetails = {
       transactionId,
-      error: error.message,
+      errorMessage: error.message,
       status: error.response?.status,
-      data: error.response?.data,
-    });
+      statusText: error.response?.statusText,
+      responseData: error.response?.data,
+      code: error.code,  // e.g., ECONNREFUSED, ETIMEDOUT
+      url: `${ledgerUrl}/ledger/put`,
+    };
+    
+    logger.error('Ledger API error', errorDetails);
+    
+    // Provide specific error messages based on error type
+    let errorMessage = error.message;
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = `Ledger service unreachable at ${ledgerUrl}`;
+    } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      errorMessage = 'Ledger service timeout';
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Ledger authentication failed (missing/invalid signature)';
+    } else if (error.response?.status === 400) {
+      errorMessage = `Ledger validation error: ${JSON.stringify(error.response?.data)}`;
+    } else if (error.response?.status === 403) {
+      errorMessage = 'Ledger authorization failed (insufficient permissions)';
+    }
 
     return {
       success: false,
-      error: error.message,
+      error: errorMessage,
     };
   }
 }
@@ -209,6 +244,10 @@ export async function getTradeFromLedger(
     orderItemId: orderId || 'unknown',
     platformIdBuyer: config.bap.id,
     platformIdSeller: config.bpp.id,
+    discomIdBuyer: process.env.DISCOM_ID_BUYER || 'DISCOM_BUYER_DEFAULT',
+    discomIdSeller: process.env.DISCOM_ID_SELLER || 'DISCOM_SELLER_DEFAULT',
+    buyerId: 'mock-buyer',
+    sellerId: 'mock-seller',
     creationTime: new Date().toISOString(),
     tradeDetails: [
       {

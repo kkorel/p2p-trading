@@ -103,10 +103,12 @@ async function findOrdersPastTimeWindow() {
     const now = new Date();
 
     // Get ACTIVE orders that haven't been DISCOM verified yet
+    // Skip external orders (providerId is null) - we can't verify those locally
     const orders = await prisma.order.findMany({
         where: {
             status: 'ACTIVE',
             discomVerified: false,
+            providerId: { not: null }, // Only process local provider orders
         },
         include: {
             selectedOffer: true,
@@ -132,6 +134,44 @@ async function findOrdersPastTimeWindow() {
     });
 
     return pastWindow;
+}
+
+/**
+ * Handle external orders - mark them as completed since verification happens on external BPP
+ */
+async function handleExternalOrders() {
+    const now = new Date();
+    
+    // Find external orders (providerId is null) that are ACTIVE and past their time window
+    const externalOrders = await prisma.order.findMany({
+        where: {
+            status: 'ACTIVE',
+            discomVerified: false,
+            providerId: null, // External orders
+        },
+    });
+    
+    for (const order of externalOrders) {
+        const timeWindowEnd = getTimeWindowEnd(order);
+        
+        if (!timeWindowEnd || timeWindowEnd >= now) {
+            continue; // Not yet past time window
+        }
+        
+        logger.info(`External order ${order.id.substring(0, 8)}: marking as completed (verification handled by external BPP)`, {
+            transactionId: order.transactionId,
+        });
+        
+        // Mark order as completed and verified
+        await prisma.order.update({
+            where: { id: order.id },
+            data: {
+                status: 'COMPLETED',
+                discomVerified: true,
+                paymentStatus: 'RELEASED', // External orders - assume payment handled externally
+            },
+        });
+    }
 }
 
 /**
@@ -477,6 +517,10 @@ async function processDiscomFeedback(result: DiscomVerifyResult): Promise<void> 
 async function runVerificationCheck(): Promise<void> {
     logger.info('Running DISCOM verification check...');
     try {
+        // First, handle external orders separately
+        await handleExternalOrders();
+        
+        // Then process local orders that need DISCOM verification
         const completedOrders = await findOrdersPastTimeWindow();
 
         if (completedOrders.length === 0) {
