@@ -1472,37 +1472,50 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
   const providerName = providerInfo?.name || req.user!.name || 'Energy Provider';
 
   // Publish to CDS using proper Beckn catalog_publish format (non-blocking)
-  publishOfferToCDS(
-    {
-      id: provider_id,
-      name: providerName,
-      trust_score: providerInfo?.trust_score || 0.5,
-    },
-    {
-      id: item.id,
-      provider_id: item.provider_id,
-      source_type: item.source_type,
-      delivery_mode: item.delivery_mode,
-      available_qty: item.available_qty,
-      production_windows: item.production_windows,
-      meter_id: item.meter_id,
-    },
-    {
-      id: offer.id,
-      item_id: offer.item_id,
-      provider_id: offer.provider_id,
-      price_value: offer.price.value,
-      currency: offer.price.currency,
-      max_qty: offer.maxQuantity,
-      time_window: offer.timeWindow,
-      pricing_model: offer.offerAttributes.pricingModel,
-      settlement_type: offer.offerAttributes.settlementType,
-    }
-  ).then(success => {
-    if (success) {
-      logger.info('Offer published to external CDS', { offerId: offer.id });
-    }
-  }).catch(err => logger.error('Failed to publish offer to CDS', { offerId: offer.id, error: err.message }));
+  // Check if CDS publishing is enabled
+  const cdsEnabled = isExternalCDSEnabled();
+  logger.info(`CDS publishing ${cdsEnabled ? 'ENABLED' : 'DISABLED'}`, { 
+    offerId: offer.id,
+    USE_EXTERNAL_CDS: process.env.USE_EXTERNAL_CDS,
+  });
+  
+  if (cdsEnabled) {
+    publishOfferToCDS(
+      {
+        id: provider_id,
+        name: providerName,
+        trust_score: providerInfo?.trust_score || 0.5,
+      },
+      {
+        id: item.id,
+        provider_id: item.provider_id,
+        source_type: item.source_type,
+        delivery_mode: item.delivery_mode,
+        available_qty: item.available_qty,
+        production_windows: item.production_windows,
+        meter_id: item.meter_id,
+      },
+      {
+        id: offer.id,
+        item_id: offer.item_id,
+        provider_id: offer.provider_id,
+        price_value: offer.price.value,
+        currency: offer.price.currency,
+        max_qty: offer.maxQuantity,
+        time_window: offer.timeWindow,
+        pricing_model: offer.offerAttributes.pricingModel,
+        settlement_type: offer.offerAttributes.settlementType,
+      }
+    ).then(success => {
+      if (success) {
+        logger.info('Offer published to external CDS', { offerId: offer.id });
+      } else {
+        logger.warn('Offer publishing returned false', { offerId: offer.id });
+      }
+    }).catch(err => logger.error('Failed to publish offer to CDS', { offerId: offer.id, error: err.message }));
+  } else {
+    logger.warn('Skipping CDS publish - USE_EXTERNAL_CDS not enabled', { offerId: offer.id });
+  }
 
   // Add source_type to the response
   res.json({
@@ -1647,6 +1660,111 @@ router.get('/seller/orders', async (req: Request, res: Response) => {
   }));
 
   res.json({ orders: enrichedOrders });
+});
+
+/**
+ * GET /seller/cds-status - Check CDS publishing status
+ * Useful for debugging whether offers are being published
+ */
+router.get('/seller/cds-status', async (req: Request, res: Response) => {
+  const enabled = isExternalCDSEnabled();
+  
+  res.json({
+    cds: {
+      publishingEnabled: enabled,
+      externalCdsUrl: config.external.cds,
+      useExternalCds: process.env.USE_EXTERNAL_CDS,
+      envCheck: {
+        USE_EXTERNAL_CDS: process.env.USE_EXTERNAL_CDS || 'NOT SET',
+        EXTERNAL_CDS_URL: process.env.EXTERNAL_CDS_URL || 'NOT SET (using default)',
+      },
+    },
+    message: enabled 
+      ? 'CDS publishing is ENABLED - offers will be published to external CDS'
+      : 'CDS publishing is DISABLED - set USE_EXTERNAL_CDS=true to enable',
+  });
+});
+
+/**
+ * POST /seller/cds-test-publish - Test CDS publishing with a test offer
+ * Only available with authentication
+ */
+router.post('/seller/cds-test-publish', authMiddleware, async (req: Request, res: Response) => {
+  const provider_id = req.user!.providerId;
+  
+  if (!provider_id) {
+    return res.status(400).json({ error: 'No seller profile found' });
+  }
+  
+  const enabled = isExternalCDSEnabled();
+  if (!enabled) {
+    return res.status(400).json({ 
+      error: 'CDS publishing is not enabled',
+      hint: 'Set USE_EXTERNAL_CDS=true in environment variables',
+    });
+  }
+  
+  const providerInfo = await getProvider(provider_id);
+  const providerName = providerInfo?.name || req.user!.name || 'Test Provider';
+  
+  // Create test data
+  const testItemId = `test-item-${Date.now()}`;
+  const testOfferId = `test-offer-${Date.now()}`;
+  const testTimeWindow = {
+    startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+    endTime: new Date(Date.now() + 7200000).toISOString(),   // 2 hours from now
+  };
+  
+  try {
+    const success = await publishOfferToCDS(
+      {
+        id: provider_id,
+        name: providerName,
+        trust_score: providerInfo?.trust_score || 0.5,
+      },
+      {
+        id: testItemId,
+        provider_id: provider_id,
+        source_type: 'SOLAR',
+        delivery_mode: 'GRID_INJECTION',
+        available_qty: 10,
+        production_windows: [testTimeWindow],
+        meter_id: `der://meter/test-${Date.now()}`,
+      },
+      {
+        id: testOfferId,
+        item_id: testItemId,
+        provider_id: provider_id,
+        price_value: 5.0,
+        currency: 'INR',
+        max_qty: 10,
+        time_window: testTimeWindow,
+        pricing_model: 'PER_KWH',
+        settlement_type: 'INSTANT',
+      }
+    );
+    
+    res.json({
+      success,
+      message: success 
+        ? 'Test offer published successfully! It should appear in discover results.'
+        : 'Publishing returned false - check server logs for details',
+      testData: {
+        providerId: provider_id,
+        providerName,
+        itemId: testItemId,
+        offerId: testOfferId,
+        timeWindow: testTimeWindow,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Test CDS publish failed', { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      hint: 'Check if the external CDS is reachable and accepting requests',
+    });
+  }
 });
 
 export default router;
