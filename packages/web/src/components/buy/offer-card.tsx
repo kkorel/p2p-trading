@@ -2,7 +2,7 @@
 
 import { Sun, Wind, Droplets, Sparkles, Clock, Zap } from 'lucide-react';
 import { Card, Badge } from '@/components/ui';
-import { formatCurrency, formatTime, cn } from '@/lib/utils';
+import { formatCurrency, formatDateTime, cn } from '@/lib/utils';
 import type { Offer } from '@/lib/api';
 
 const sourceIcons: Record<string, typeof Sun> = {
@@ -84,7 +84,7 @@ export function OfferCard({
         <Clock className="h-3.5 w-3.5" />
         <span>
           {offer.timeWindow
-            ? `${formatTime(offer.timeWindow.startTime)} - ${formatTime(offer.timeWindow.endTime)}`
+            ? `${formatDateTime(offer.timeWindow.startTime)} - ${formatDateTime(offer.timeWindow.endTime)}`
             : 'Flexible timing'
           }
         </span>
