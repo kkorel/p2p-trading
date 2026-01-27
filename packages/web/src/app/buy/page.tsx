@@ -16,6 +16,8 @@ interface DiscoveredOffer {
   sourceType: string;
   availableQty: number;
   score?: number;
+  matchesFilters?: boolean;
+  filterReasons?: string[];
   scoreBreakdown?: {
     priceScore: number;
     trustScore: number;
@@ -97,6 +99,8 @@ export default function BuyPage() {
                     sourceType: item.itemAttributes?.sourceType || 'MIXED',
                     availableQty: item.itemAttributes?.availableQuantity || offer.maxQuantity,
                     score: matchedOffer?.score,
+                    matchesFilters: matchedOffer?.matchesFilters ?? true,
+                    filterReasons: matchedOffer?.filterReasons,
                     scoreBreakdown: matchedOffer?.breakdown,
                   });
                 }
@@ -269,6 +273,8 @@ export default function BuyPage() {
                     sourceType={item.sourceType}
                     availableQty={item.availableQty}
                     score={item.score}
+                    matchesFilters={item.matchesFilters}
+                    filterReasons={item.filterReasons}
                     scoreBreakdown={item.scoreBreakdown}
                     isSelected={selectedOffer?.offer.id === item.offer.id}
                     onSelect={() => handleSelectOffer(item)}

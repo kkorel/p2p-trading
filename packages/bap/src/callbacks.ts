@@ -207,29 +207,40 @@ router.post('/on_discover', async (req: Request, res: Response) => {
     providers: filteredProviders,
   };
   
-  // Run matching algorithm if we have discovery criteria stored
+  // Always run matching algorithm on all offers to calculate scores
   let matchingResults = null;
-  if (txState.discoveryCriteria && allOffers.length > 0) {
+  if (allOffers.length > 0) {
     const criteria: MatchingCriteria = {
-      requestedQuantity: txState.discoveryCriteria.minQuantity || 30,
-      requestedTimeWindow: txState.discoveryCriteria.timeWindow,
+      requestedQuantity: txState.discoveryCriteria?.minQuantity || 1, // Default to 1 if not specified
+      requestedTimeWindow: txState.discoveryCriteria?.timeWindow, // Can be undefined
+      maxPrice: txState.discoveryCriteria?.maxPrice, // Can be undefined
     };
     
     try {
       matchingResults = matchOffers(allOffers, providers, criteria);
+      
+      logger.info(`Matching algorithm scored ${matchingResults.allOffers.length} offers, ${matchingResults.eligibleCount} eligible`, {
+        transaction_id: context.transaction_id,
+        criteria: {
+          requestedQuantity: criteria.requestedQuantity,
+          hasTimeWindow: !!criteria.requestedTimeWindow,
+          maxPrice: criteria.maxPrice,
+        },
+      });
+      
+      if (matchingResults.selectedOffer) {
+        logger.info(`Best matching offer: ${matchingResults.selectedOffer.offer.id} with score ${matchingResults.selectedOffer.score.toFixed(3)}`, {
+          transaction_id: context.transaction_id,
+          breakdown: matchingResults.selectedOffer.breakdown,
+          matchesFilters: matchingResults.selectedOffer.matchesFilters,
+        });
+      }
     } catch (matchError: any) {
       logger.error(`Matching algorithm error: ${matchError.message}`, {
         transaction_id: context.transaction_id,
         offers: allOffers.map(o => ({ id: o.id, hasTimeWindow: !!o.timeWindow })),
       });
       // Continue without matching results
-    }
-    
-    if (matchingResults && matchingResults.selectedOffer) {
-      logger.info(`Matching algorithm selected best offer: ${matchingResults.selectedOffer.offer.id} with score ${matchingResults.selectedOffer.score.toFixed(3)}`, {
-        transaction_id: context.transaction_id,
-        breakdown: matchingResults.selectedOffer.breakdown,
-      });
     }
   }
   

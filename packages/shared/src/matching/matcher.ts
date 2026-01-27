@@ -4,6 +4,9 @@
  * Based on Uber/Ola style filter-then-rank approach:
  * 1. Hard filters: time window overlap, quantity available
  * 2. Soft scoring: price, trust, time window fit
+ * 
+ * ALL offers are scored and returned, with a flag indicating if they match filters.
+ * This allows the UI to show all offers with their scores, sorted by match quality.
  */
 
 import { CatalogOffer, Provider } from '../types/catalog';
@@ -13,7 +16,7 @@ import { config } from '../config';
 
 export interface MatchingCriteria {
   requestedQuantity: number;
-  requestedTimeWindow: TimeWindow;
+  requestedTimeWindow?: TimeWindow;
   maxPrice?: number;
 }
 
@@ -21,6 +24,8 @@ export interface ScoredOffer {
   offer: CatalogOffer;
   provider: Provider;
   score: number;
+  matchesFilters: boolean;
+  filterReasons: string[];
   breakdown: {
     priceScore: number;
     trustScore: number;
@@ -31,6 +36,7 @@ export interface ScoredOffer {
 export interface MatchingResult {
   selectedOffer: ScoredOffer | null;
   allOffers: ScoredOffer[];
+  eligibleCount: number;
   reason?: string;
 }
 
@@ -43,7 +49,46 @@ function calculatePriceScore(offerPrice: number, minPrice: number, maxPrice: num
 }
 
 /**
- * Main matching function - filters and ranks offers
+ * Check if an offer passes the hard filters
+ */
+function checkOfferFilters(
+  offer: CatalogOffer,
+  provider: Provider | undefined,
+  criteria: MatchingCriteria
+): { matches: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  
+  // Check time window overlap (handle missing timeWindow gracefully)
+  const offerTimeWindow = offer.timeWindow || undefined;
+  if (criteria.requestedTimeWindow && !timeWindowsOverlap(offerTimeWindow, criteria.requestedTimeWindow)) {
+    reasons.push('Time window does not overlap');
+  }
+  
+  // Check quantity available
+  if (offer.maxQuantity < criteria.requestedQuantity) {
+    reasons.push(`Only ${offer.maxQuantity} kWh available (need ${criteria.requestedQuantity})`);
+  }
+  
+  // Check max price if specified
+  if (criteria.maxPrice !== undefined && offer.price.value > criteria.maxPrice) {
+    reasons.push(`Price ${offer.price.value} exceeds max ${criteria.maxPrice}`);
+  }
+  
+  // Check minimum trust threshold
+  if (provider && provider.trust_score < config.matching.minTrustThreshold) {
+    reasons.push(`Trust score ${(provider.trust_score * 100).toFixed(0)}% below minimum ${(config.matching.minTrustThreshold * 100).toFixed(0)}%`);
+  }
+  
+  return {
+    matches: reasons.length === 0,
+    reasons,
+  };
+}
+
+/**
+ * Main matching function - scores ALL offers and ranks them
+ * Returns all offers with scores, sorted by score descending.
+ * Offers that don't match filters have matchesFilters=false but still have scores.
  */
 export function matchOffers(
   offers: CatalogOffer[],
@@ -52,48 +97,22 @@ export function matchOffers(
 ): MatchingResult {
   const weights = config.matching.weights;
   
-  // Step 1: Hard filter - time window overlap and quantity
-  const eligibleOffers = offers.filter(offer => {
-    // Check time window overlap (handle missing timeWindow gracefully)
-    const offerTimeWindow = offer.timeWindow || undefined;
-    if (!timeWindowsOverlap(offerTimeWindow, criteria.requestedTimeWindow)) {
-      return false;
-    }
-    
-    // Check quantity available
-    if (offer.maxQuantity < criteria.requestedQuantity) {
-      return false;
-    }
-    
-    // Check max price if specified
-    if (criteria.maxPrice !== undefined && offer.price.value > criteria.maxPrice) {
-      return false;
-    }
-    
-    // Check minimum trust threshold
-    const provider = providers.get(offer.provider_id);
-    if (provider && provider.trust_score < config.matching.minTrustThreshold) {
-      return false;
-    }
-    
-    return true;
-  });
-  
-  if (eligibleOffers.length === 0) {
+  if (offers.length === 0) {
     return {
       selectedOffer: null,
       allOffers: [],
-      reason: 'No offers match the criteria (time window, quantity, or trust threshold)',
+      eligibleCount: 0,
+      reason: 'No offers available',
     };
   }
   
-  // Step 2: Calculate price range for normalization
-  const prices = eligibleOffers.map(o => o.price.value);
+  // Calculate price range for normalization (using ALL offers)
+  const prices = offers.map(o => o.price.value);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   
-  // Step 3: Score each eligible offer
-  const scoredOffers: ScoredOffer[] = eligibleOffers.map(offer => {
+  // Score ALL offers
+  const scoredOffers: ScoredOffer[] = offers.map(offer => {
     const provider = providers.get(offer.provider_id) || {
       id: offer.provider_id,
       name: 'Unknown Provider',
@@ -102,22 +121,33 @@ export function matchOffers(
       successful_orders: 0,
     };
     
+    // Check if offer passes hard filters
+    const { matches, reasons } = checkOfferFilters(offer, provider, criteria);
+    
     // Calculate individual scores
     const priceScore = calculatePriceScore(offer.price.value, minPrice, maxPrice);
     const trustScore = provider.trust_score;
     const offerTimeWindow = offer.timeWindow || undefined;
-    const timeWindowFitScore = calculateTimeWindowFit(offerTimeWindow, criteria.requestedTimeWindow);
+    const timeWindowFitScore = criteria.requestedTimeWindow 
+      ? calculateTimeWindowFit(offerTimeWindow, criteria.requestedTimeWindow)
+      : 1; // Perfect fit if no time constraints
     
     // Calculate weighted total score
-    const score = 
+    // Offers that don't match filters get a penalty to sort them lower
+    const baseScore = 
       weights.price * priceScore +
       weights.trust * trustScore +
       weights.timeWindowFit * timeWindowFitScore;
+    
+    // Apply penalty for non-matching offers (sort them to the bottom)
+    const score = matches ? baseScore : baseScore * 0.5;
     
     return {
       offer,
       provider,
       score,
+      matchesFilters: matches,
+      filterReasons: reasons,
       breakdown: {
         priceScore,
         trustScore,
@@ -126,12 +156,29 @@ export function matchOffers(
     };
   });
   
-  // Step 4: Sort by score descending
-  scoredOffers.sort((a, b) => b.score - a.score);
+  // Sort by score descending (matching offers will be at the top due to penalty)
+  scoredOffers.sort((a, b) => {
+    // First, sort by matchesFilters (matching offers first)
+    if (a.matchesFilters !== b.matchesFilters) {
+      return a.matchesFilters ? -1 : 1;
+    }
+    // Then by score descending
+    return b.score - a.score;
+  });
+  
+  // Count eligible offers
+  const eligibleCount = scoredOffers.filter(o => o.matchesFilters).length;
+  
+  // Select best eligible offer
+  const selectedOffer = scoredOffers.find(o => o.matchesFilters) || null;
   
   return {
-    selectedOffer: scoredOffers[0] || null,
+    selectedOffer,
     allOffers: scoredOffers,
+    eligibleCount,
+    reason: eligibleCount === 0 
+      ? 'No offers match the criteria (time window, quantity, price, or trust threshold)'
+      : undefined,
   };
 }
 

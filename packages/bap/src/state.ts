@@ -17,6 +17,7 @@ interface DiscoveryCriteria {
   sourceType?: SourceType;
   deliveryMode?: DeliveryMode;
   minQuantity?: number;
+  maxPrice?: number;
   timeWindow?: TimeWindow;
 }
 
@@ -24,21 +25,26 @@ interface MatchingResult {
   selectedOffer: {
     offer: CatalogOffer;
     score: number;
+    matchesFilters?: boolean;
+    filterReasons?: string[];
     breakdown: {
       priceScore: number;
       trustScore: number;
-      timeScore: number;
+      timeWindowFitScore: number;
     };
   } | null;
   allOffers: Array<{
     offer: CatalogOffer;
     score: number;
+    matchesFilters?: boolean;
+    filterReasons?: string[];
     breakdown: {
       priceScore: number;
       trustScore: number;
-      timeScore: number;
+      timeWindowFitScore: number;
     };
   }>;
+  eligibleCount?: number;
   reason?: string;
 }
 

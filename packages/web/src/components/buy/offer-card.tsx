@@ -25,6 +25,8 @@ interface OfferCardProps {
   sourceType: string;
   availableQty: number;
   score?: number;
+  matchesFilters?: boolean;
+  filterReasons?: string[];
   scoreBreakdown?: {
     priceScore: number;
     trustScore: number;
@@ -40,6 +42,8 @@ export function OfferCard({
   sourceType,
   availableQty,
   score,
+  matchesFilters = true,
+  filterReasons,
   scoreBreakdown,
   isSelected,
   onSelect,
@@ -87,15 +91,27 @@ export function OfferCard({
       </div>
 
       {/* Footer badges */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center flex-wrap gap-2">
         <Badge variant="default">{sourceType}</Badge>
         <Badge variant="success">{availableQty} kWh available</Badge>
         {score !== undefined && (
-          <Badge variant="default">
+          <Badge variant={matchesFilters ? 'primary' : 'warning'}>
             {Math.round(score * 100)}% match
           </Badge>
         )}
       </div>
+
+      {/* Filter warning if not matching */}
+      {!matchesFilters && filterReasons && filterReasons.length > 0 && (
+        <div className="mt-2 p-2 bg-amber-50 rounded-lg">
+          <p className="text-xs text-amber-700 font-medium">Does not match your criteria:</p>
+          <ul className="mt-1 text-xs text-amber-600 list-disc list-inside">
+            {filterReasons.map((reason, idx) => (
+              <li key={idx}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Score breakdown - show if available */}
       {scoreBreakdown && score !== undefined && (
@@ -103,16 +119,40 @@ export function OfferCard({
           <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2">Match Score Breakdown</p>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--color-text-muted)]">💰 Price</span>
-              <span className="font-medium text-[var(--color-text)]">{Math.round(scoreBreakdown.priceScore * 100)}%</span>
+              <span className="text-[var(--color-text-muted)]">Price</span>
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-[var(--color-primary)]" 
+                    style={{ width: `${Math.round(scoreBreakdown.priceScore * 100)}%` }}
+                  />
+                </div>
+                <span className="font-medium text-[var(--color-text)] w-8 text-right">{Math.round(scoreBreakdown.priceScore * 100)}%</span>
+              </div>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--color-text-muted)]">🛡️ Trust</span>
-              <span className="font-medium text-[var(--color-text)]">{Math.round(scoreBreakdown.trustScore * 100)}%</span>
+              <span className="text-[var(--color-text-muted)]">Trust</span>
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-[var(--color-success)]" 
+                    style={{ width: `${Math.round(scoreBreakdown.trustScore * 100)}%` }}
+                  />
+                </div>
+                <span className="font-medium text-[var(--color-text)] w-8 text-right">{Math.round(scoreBreakdown.trustScore * 100)}%</span>
+              </div>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--color-text-muted)]">⏰ Time Fit</span>
-              <span className="font-medium text-[var(--color-text)]">{Math.round(scoreBreakdown.timeWindowFitScore * 100)}%</span>
+              <span className="text-[var(--color-text-muted)]">Time Fit</span>
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-[var(--color-warning)]" 
+                    style={{ width: `${Math.round(scoreBreakdown.timeWindowFitScore * 100)}%` }}
+                  />
+                </div>
+                <span className="font-medium text-[var(--color-text)] w-8 text-right">{Math.round(scoreBreakdown.timeWindowFitScore * 100)}%</span>
+              </div>
             </div>
           </div>
         </div>

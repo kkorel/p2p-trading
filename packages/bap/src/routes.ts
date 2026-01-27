@@ -604,16 +604,20 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         }
       }
       
-      // Run matching algorithm if we have discovery criteria
+      // Always run matching algorithm to calculate scores for all offers
       let matchingResults = null;
-      if (currentTxState?.discoveryCriteria && allOffers.length > 0) {
+      if (allOffers.length > 0) {
         const criteria: MatchingCriteria = {
-          requestedQuantity: currentTxState.discoveryCriteria.minQuantity || 30,
-          requestedTimeWindow: currentTxState.discoveryCriteria.timeWindow,
+          requestedQuantity: currentTxState?.discoveryCriteria?.minQuantity || 1,
+          requestedTimeWindow: currentTxState?.discoveryCriteria?.timeWindow,
+          maxPrice: currentTxState?.discoveryCriteria?.maxPrice,
         };
         
         try {
           matchingResults = matchOffers(allOffers, providers, criteria);
+          logger.info(`Matching: scored ${matchingResults.allOffers.length} offers, ${matchingResults.eligibleCount} eligible`, {
+            transaction_id: txnId,
+          });
         } catch (matchError: any) {
           logger.error(`Matching algorithm error: ${matchError.message}`, { transaction_id: txnId });
         }

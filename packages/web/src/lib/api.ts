@@ -540,6 +540,8 @@ export interface TransactionState {
     selectedOffer?: {
       offer: Offer;
       score: number;
+      matchesFilters?: boolean;
+      filterReasons?: string[];
       breakdown?: {
         priceScore: number;
         trustScore: number;
@@ -549,12 +551,15 @@ export interface TransactionState {
     allOffers: Array<{
       offer: Offer;
       score: number;
+      matchesFilters?: boolean;
+      filterReasons?: string[];
       breakdown?: {
         priceScore: number;
         trustScore: number;
         timeWindowFitScore: number;
       };
     }>;
+    eligibleCount?: number;
   };
   trustWarning?: {
     score: number;
