@@ -241,7 +241,7 @@ function P2PValueInsight() {
   if (isLoading) return null;
 
   // Show even with zero value - helps users understand the feature
-  const hasActivity = p2pStats.totalSold > 0 || p2pStats.totalBought > 0;
+  const hasActivity = totalSold > 0 || totalBought > 0;
 
   return (
     <Card>
