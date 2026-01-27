@@ -69,6 +69,10 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
                          catalog['beckn:bppId'] ||
                          'Unknown Provider';
     
+    // IMPORTANT: Extract BPP routing info for proper Beckn flows
+    const bppId = catalog['beckn:bppId'] || catalog.bppId || providerId;
+    const bppUri = catalog['beckn:bppUri'] || catalog.bppUri || null;
+    
     const rawItems = catalog['beckn:items'] || catalog.items || [];
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
     
@@ -107,6 +111,9 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
             id: offerId,
             item_id: itemId,
             provider_id: providerId,
+            // BPP routing info for proper Beckn flow
+            bpp_id: bppId,
+            bpp_uri: bppUri,
             price: {
               value: typeof priceValue === 'number' ? priceValue : parseFloat(priceValue) || 0,
               currency: priceCurrency,
@@ -124,6 +131,7 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
             currency: priceCurrency,
             startTime,
             endTime,
+            bppUri,
           });
         }
       }
@@ -143,6 +151,9 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     providers.push({
       id: providerId,
       descriptor: { name: providerName },
+      // BPP routing info at provider level
+      bpp_id: bppId,
+      bpp_uri: bppUri,
       items: transformedItems,
     });
   }
@@ -720,14 +731,19 @@ router.post('/api/select', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Either offer_id or autoMatch with requestedTimeWindow is required' });
   }
   
-  // Create context
+  // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
+  const targetBppUri = selectedOffer.bpp_uri || config.bpp.uri;
+  const targetBppId = selectedOffer.bpp_id || selectedOffer.provider_id;
+  const isExternalBpp = !!selectedOffer.bpp_uri && selectedOffer.bpp_uri !== config.bpp.uri;
+  
+  // Create context with correct BPP info
   const context = createContext({
     action: 'select',
     transaction_id,
     bap_id: config.bap.id,
     bap_uri: config.bap.uri,
-    bpp_id: selectedOffer.provider_id,
-    bpp_uri: config.bpp.uri,
+    bpp_id: targetBppId,
+    bpp_uri: targetBppUri,
   });
   
   // Build select message
@@ -747,6 +763,8 @@ router.post('/api/select', async (req: Request, res: Response) => {
     message_id: context.message_id,
     action: 'select',
     offer_id: selectedOffer.id,
+    targetBppUri,
+    isExternalBpp,
   });
   
   await logEvent(transaction_id, context.message_id, 'select', 'OUTBOUND', JSON.stringify(selectMessage));
@@ -755,7 +773,13 @@ router.post('/api/select', async (req: Request, res: Response) => {
   await updateTransaction(transaction_id, { selectedOffer, selectedQuantity: quantity });
   
   try {
-    const response = await axios.post(`${config.urls.bpp}/select`, selectMessage);
+    // Route to the correct BPP based on offer's bpp_uri
+    const bppEndpoint = isExternalBpp ? targetBppUri : `${config.urls.bpp}/select`;
+    const targetUrl = isExternalBpp ? `${targetBppUri}/select` : bppEndpoint;
+    
+    logger.info(`Routing select to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
+    
+    const response = await axios.post(targetUrl, selectMessage);
     
     res.json({
       status: 'ok',
@@ -794,14 +818,19 @@ router.post('/api/init', async (req: Request, res: Response) => {
   
   const offer = txState.selectedOffer;
   
-  // Create context
+  // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
+  const targetBppUri = offer.bpp_uri || config.bpp.uri;
+  const targetBppId = offer.bpp_id || offer.provider_id;
+  const isExternalBpp = !!offer.bpp_uri && offer.bpp_uri !== config.bpp.uri;
+  
+  // Create context with correct BPP info
   const context = createContext({
     action: 'init',
     transaction_id,
     bap_id: config.bap.id,
     bap_uri: config.bap.uri,
-    bpp_id: offer.provider_id,
-    bpp_uri: config.bpp.uri,
+    bpp_id: targetBppId,
+    bpp_uri: targetBppUri,
   });
   
   // Build init message - use the quantity from selected offer (set during select)
@@ -825,12 +854,19 @@ router.post('/api/init', async (req: Request, res: Response) => {
     transaction_id,
     message_id: context.message_id,
     action: 'init',
+    targetBppUri,
+    isExternalBpp,
   });
   
   await logEvent(transaction_id, context.message_id, 'init', 'OUTBOUND', JSON.stringify(initMessage));
   
   try {
-    const response = await axios.post(`${config.urls.bpp}/init`, initMessage);
+    // Route to the correct BPP based on offer's bpp_uri
+    const targetUrl = isExternalBpp ? `${targetBppUri}/init` : `${config.urls.bpp}/init`;
+    
+    logger.info(`Routing init to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
+    
+    const response = await axios.post(targetUrl, initMessage);
     
     res.json({
       status: 'ok',
@@ -862,16 +898,20 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'No order ID available. Run init first or provide order_id.' });
   }
   
-  const providerId = txState.selectedOffer?.provider_id || config.bpp.id;
+  // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
+  const offer = txState.selectedOffer;
+  const targetBppUri = offer?.bpp_uri || config.bpp.uri;
+  const targetBppId = offer?.bpp_id || offer?.provider_id || config.bpp.id;
+  const isExternalBpp = !!offer?.bpp_uri && offer.bpp_uri !== config.bpp.uri;
   
-  // Create context
+  // Create context with correct BPP info
   const context = createContext({
     action: 'confirm',
     transaction_id,
     bap_id: config.bap.id,
     bap_uri: config.bap.uri,
-    bpp_id: providerId,
-    bpp_uri: config.bpp.uri,
+    bpp_id: targetBppId,
+    bpp_uri: targetBppUri,
   });
   
   // Build confirm message
@@ -887,12 +927,19 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     message_id: context.message_id,
     action: 'confirm',
     order_id: orderId,
+    targetBppUri,
+    isExternalBpp,
   });
   
   await logEvent(transaction_id, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
   
   try {
-    const response = await axios.post(`${config.urls.bpp}/confirm`, confirmMessage);
+    // Route to the correct BPP based on offer's bpp_uri
+    const targetUrl = isExternalBpp ? `${targetBppUri}/confirm` : `${config.urls.bpp}/confirm`;
+    
+    logger.info(`Routing confirm to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
+    
+    const response = await axios.post(targetUrl, confirmMessage);
 
     // Best-effort settlement initiation (idempotent)
     try {
@@ -970,16 +1017,21 @@ router.post('/api/status', async (req: Request, res: Response) => {
   }
   
   const orderId = order_id || txState.order?.id || '';
-  const providerId = txState.selectedOffer?.provider_id || config.bpp.id;
   
-  // Create context
+  // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
+  const offer = txState.selectedOffer;
+  const targetBppUri = offer?.bpp_uri || config.bpp.uri;
+  const targetBppId = offer?.bpp_id || offer?.provider_id || config.bpp.id;
+  const isExternalBpp = !!offer?.bpp_uri && offer.bpp_uri !== config.bpp.uri;
+  
+  // Create context with correct BPP info
   const context = createContext({
     action: 'status',
     transaction_id,
     bap_id: config.bap.id,
     bap_uri: config.bap.uri,
-    bpp_id: providerId,
-    bpp_uri: config.bpp.uri,
+    bpp_id: targetBppId,
+    bpp_uri: targetBppUri,
   });
   
   // Build status message
@@ -994,12 +1046,19 @@ router.post('/api/status', async (req: Request, res: Response) => {
     transaction_id,
     message_id: context.message_id,
     action: 'status',
+    targetBppUri,
+    isExternalBpp,
   });
   
   await logEvent(transaction_id, context.message_id, 'status', 'OUTBOUND', JSON.stringify(statusMessage));
   
   try {
-    const response = await axios.post(`${config.urls.bpp}/status`, statusMessage);
+    // Route to the correct BPP based on offer's bpp_uri
+    const targetUrl = isExternalBpp ? `${targetBppUri}/status` : `${config.urls.bpp}/status`;
+    
+    logger.info(`Routing status to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
+    
+    const response = await axios.post(targetUrl, statusMessage);
     
     res.json({
       status: 'ok',

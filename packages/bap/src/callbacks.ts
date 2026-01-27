@@ -56,6 +56,10 @@ function transformExternalCatalog(rawMessage: any): { providers: any[] } {
                          catalog['beckn:bppId'] ||
                          'Unknown Provider';
     
+    // IMPORTANT: Extract BPP routing info for proper Beckn flows
+    const bppId = catalog['beckn:bppId'] || catalog.bppId || providerId;
+    const bppUri = catalog['beckn:bppUri'] || catalog.bppUri || null;
+    
     // Extract items - handle beckn: prefix
     const rawItems = catalog['beckn:items'] || catalog.items || [];
     
@@ -89,6 +93,9 @@ function transformExternalCatalog(rawMessage: any): { providers: any[] } {
             id: offerId,
             item_id: itemId,
             provider_id: providerId,
+            // BPP routing info for proper Beckn flows
+            bpp_id: bppId,
+            bpp_uri: bppUri,
             price: {
               value: price.value || 0,
               currency: price.currency || 'INR',
@@ -119,6 +126,9 @@ function transformExternalCatalog(rawMessage: any): { providers: any[] } {
       descriptor: {
         name: providerName,
       },
+      // BPP routing info at provider level
+      bpp_id: bppId,
+      bpp_uri: bppUri,
       items: transformedItems,
     });
   }

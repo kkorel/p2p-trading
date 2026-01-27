@@ -53,6 +53,9 @@ export interface CatalogOffer {
   price: Price;
   maxQuantity: number; // kWh
   timeWindow: TimeWindow;
+  // BPP routing info for proper Beckn flows
+  bpp_id?: string;
+  bpp_uri?: string;
 }
 
 // Provider (BPP) information
@@ -74,5 +77,8 @@ export interface ProviderCatalog {
   descriptor?: {
     name: string;
   };
+  // BPP routing info for proper Beckn flows
+  bpp_id?: string;
+  bpp_uri?: string;
   items: CatalogItem[];
 }
