@@ -227,8 +227,8 @@ export default function SellPage() {
                 </span>
               </div>
 
-              {/* Color-Only Segmented Progress Bar */}
-              <div className="h-3 bg-[var(--color-bg-subtle)] rounded-full overflow-hidden flex">
+              {/* Segmented Progress Bar - More visible gray tube */}
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden flex">
                 {/* Sold (green) */}
                 {totalSold > 0 && (
                   <div
@@ -319,22 +319,7 @@ export default function SellPage() {
                         </span>
                       </div>
                       {offer.blockStats && (
-                        <div className="mt-2 space-y-2">
-                          {/* Badges - green for available */}
-                          <div className="flex gap-2">
-                            <Badge variant="success">{offer.blockStats.available} kWh available</Badge>
-                            {offer.blockStats.total - offer.blockStats.available > 0 && (
-                              <Badge variant="default">{offer.blockStats.total - offer.blockStats.available} kWh sold</Badge>
-                            )}
-                          </div>
-                          {/* Mini progress bar */}
-                          <div className="h-1 bg-[var(--color-bg-subtle)] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[var(--color-success)]"
-                              style={{ width: `${((offer.blockStats.total - offer.blockStats.available) / offer.blockStats.total) * 100}%` }}
-                            />
-                          </div>
-                        </div>
+                        <Badge variant="success">{offer.blockStats.available} kWh available</Badge>
                       )}
                     </Card>
                   );
