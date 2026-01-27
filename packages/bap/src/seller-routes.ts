@@ -849,24 +849,9 @@ router.post('/cancel', async (req: Request, res: Response) => {
         const releasedCount = await releaseBlocksByOrderId(order.id);
         logger.info(`Released ${releasedCount} blocks for cancelled order ${order.id}`);
 
-        // 3. Sync block status to CDS - mark blocks as AVAILABLE again
-        if (order.items && order.items.length > 0) {
-          const blocks = await getBlocksForOrder(order.id);
-          for (const item of order.items) {
-            try {
-              await axios.post(`${config.urls.cds}/sync/blocks`, {
-                offer_id: item.offer_id,
-                block_ids: blocks.filter(b => b.offer_id === item.offer_id).map(b => b.id),
-                status: 'AVAILABLE',
-                order_id: null,
-                transaction_id: null,
-              });
-              logger.info(`Synced released blocks to CDS for offer ${item.offer_id}`);
-            } catch (syncError: any) {
-              logger.error(`Failed to sync block release to CDS: ${syncError.message}`);
-            }
-          }
-        }
+        // 3. Note: External CDS manages catalog state via catalog_publish
+        // Block availability is reflected when sellers republish their catalogs
+        logger.debug('Blocks released - catalog will be updated on next seller publish');
 
         // 4. Update buyer trust (proportional to cancelled quantity)
         // Get buyerId from database (not in Order type)

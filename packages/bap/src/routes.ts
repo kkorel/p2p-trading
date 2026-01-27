@@ -614,19 +614,15 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     },
   };
   
-  // Determine the correct CDS URL - use external CDS when enabled
-  // External CDS: EXTERNAL_CDS_URL (e.g., .../beckn/catalog) → use .../beckn/discover
-  // Local CDS: CDS_URL (e.g., localhost:4001) → use /discover
+  // Get the CDS discover URL from external CDS configuration
+  // EXTERNAL_CDS_URL (e.g., .../beckn/catalog) → use .../beckn/discover
   const getCdsDiscoverUrl = () => {
-    if (config.external.useExternalCds) {
-      const externalUrl = process.env.EXTERNAL_CDS_URL || config.external.cds;
-      // If URL ends with /catalog, replace with /discover for the discover endpoint
-      if (externalUrl.endsWith('/catalog')) {
-        return externalUrl.replace(/\/catalog$/, '/discover');
-      }
-      return `${externalUrl}/discover`;
+    const externalUrl = process.env.EXTERNAL_CDS_URL || config.external.cds;
+    // If URL ends with /catalog, replace with /discover for the discover endpoint
+    if (externalUrl.endsWith('/catalog')) {
+      return externalUrl.replace(/\/catalog$/, '/discover');
     }
-    return `${config.urls.cds}/discover`;
+    return `${externalUrl}/discover`;
   };
   
   const cdsDiscoverUrl = getCdsDiscoverUrl();

@@ -11,10 +11,9 @@ COPY package*.json ./
 COPY packages/web/package*.json ./packages/web/
 
 # Create dummy package.json for other workspaces to satisfy npm
-RUN mkdir -p packages/shared packages/bap packages/cds-mock
+RUN mkdir -p packages/shared packages/bap
 RUN echo '{"name":"@p2p/shared","version":"1.0.0"}' > packages/shared/package.json
 RUN echo '{"name":"@p2p/bap","version":"1.0.0"}' > packages/bap/package.json
-RUN echo '{"name":"@p2p/cds-mock","version":"1.0.0"}' > packages/cds-mock/package.json
 
 # Install dependencies
 RUN npm ci --ignore-scripts
@@ -32,10 +31,9 @@ COPY package*.json ./
 COPY packages/web ./packages/web
 
 # Create dummy workspaces
-RUN mkdir -p packages/shared packages/bap packages/cds-mock
+RUN mkdir -p packages/shared packages/bap
 RUN echo '{"name":"@p2p/shared","version":"1.0.0"}' > packages/shared/package.json
 RUN echo '{"name":"@p2p/bap","version":"1.0.0"}' > packages/bap/package.json
-RUN echo '{"name":"@p2p/cds-mock","version":"1.0.0"}' > packages/cds-mock/package.json
 
 # Build-time environment variables
 ARG NEXT_PUBLIC_API_URL

@@ -41,28 +41,6 @@ services:
     networks:
       - p2p-network
 
-  cds:
-    build:
-      context: .
-      dockerfile: packages/cds-mock/Dockerfile
-    container_name: p2p-cds
-    ports:
-      - "4001:4001"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-p2p_user}:${POSTGRES_PASSWORD:-p2p_password}@postgres:5432/${POSTGRES_DB:-p2p_trading}
-      - REDIS_URL=redis://redis:6379
-      - CDS_PORT=4001
-      - CALLBACK_DELAY=${CALLBACK_DELAY:-100}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - p2p-network
-
   bap:
     build:
       context: .
@@ -76,7 +54,8 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-p2p_user}:${POSTGRES_PASSWORD:-p2p_password}@postgres:5432/${POSTGRES_DB:-p2p_trading}
       - REDIS_URL=redis://redis:6379
       - BAP_PORT=4000
-      - CDS_URL=http://cds:4001
+      - USE_EXTERNAL_CDS=true
+      - EXTERNAL_CDS_URL=${EXTERNAL_CDS_URL:-https://34.93.141.21.sslip.io/beckn/catalog}
       - BAP_URL=http://bap:4000
       - BPP_URL=http://bap:4000
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
@@ -93,8 +72,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      cds:
-        condition: service_started
     restart: unless-stopped
     networks:
       - p2p-network

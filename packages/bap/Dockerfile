@@ -14,8 +14,7 @@ COPY packages/shared ./packages/shared
 COPY packages/bap ./packages/bap
 
 # Create dummy package.json for other workspaces to satisfy npm
-RUN mkdir -p packages/cds-mock packages/web
-RUN echo '{"name":"@p2p/cds-mock","version":"1.0.0"}' > packages/cds-mock/package.json
+RUN mkdir -p packages/web
 RUN echo '{"name":"@p2p/web","version":"1.0.0","private":true}' > packages/web/package.json
 
 # Install dependencies

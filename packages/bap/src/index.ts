@@ -153,7 +153,7 @@ async function start() {
 
     const server = app.listen(PORT, () => {
       logger.info(`Prosumer app running on port ${PORT}`);
-      logger.info(`CDS URL: ${config.urls.cds}`);
+      logger.info(`CDS URL: ${config.external.cds}`);
       logger.info(`Roles: Consumer (BAP) + Provider (BPP)`);
       logger.info(`Matching weights: price=${config.matching.weights.price}, trust=${config.matching.weights.trust}, time=${config.matching.weights.timeWindowFit}`);
       logger.info(`Security: Helmet=ON, CORS=ON, RateLimit=ON`);

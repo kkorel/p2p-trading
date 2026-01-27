@@ -216,7 +216,6 @@ p2p-trading/
 │   │       ├── auth-routes.ts   # Authentication
 │   │       ├── discom-mock.ts   # DISCOM verification
 │   │       └── meter-analyzer.ts # PDF analysis
-│   ├── cds-mock/         # Catalog Discovery Service
 │   └── shared/           # Shared types, Prisma, Redis
 │       ├── prisma/schema.prisma
 │       └── src/

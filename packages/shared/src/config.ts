@@ -30,7 +30,6 @@ export const config = {
   // Service ports
   ports: {
     bap: parseInt(process.env.BAP_PORT || '4000'),
-    cds: parseInt(process.env.CDS_PORT || '4001'),
     bpp: parseInt(process.env.BPP_PORT || '4002'),
     web: parseInt(process.env.WEB_PORT || '3000'),
   },
@@ -38,21 +37,20 @@ export const config = {
   // Service URLs (BAP and BPP now on same host)
   urls: {
     bap: process.env.BAP_URL || 'http://localhost:4000',
-    cds: process.env.CDS_URL || 'http://localhost:4001',
     bpp: process.env.BPP_URL || 'http://localhost:4000',
   },
 
-  // External Beckn services (production endpoints)
+  // External Beckn services (always uses external CDS)
   external: {
     // Catalog Discovery Service (Beckn network CDS)
-    // Note: Our code appends /discover, so base URL is /beckn
-    cds: process.env.EXTERNAL_CDS_URL || 'https://34.93.141.21.sslip.io/beckn',
+    // EXTERNAL_CDS_URL typically ends with /catalog for publish, /beckn for discover
+    cds: process.env.EXTERNAL_CDS_URL || 'https://34.93.141.21.sslip.io/beckn/catalog',
     // DEG Ledger for immutable trade records
     ledger: process.env.LEDGER_URL || 'https://34.93.166.38.sslip.io',
     // Verifiable Credentials portal
     vcPortal: process.env.VC_PORTAL_URL || 'https://open-vcs.up.railway.app',
-    // Use external CDS instead of local mock
-    useExternalCds: process.env.USE_EXTERNAL_CDS === 'true',
+    // External CDS is always used (local CDS mock removed)
+    useExternalCds: process.env.USE_EXTERNAL_CDS !== 'false', // Default true
     // Enable ledger writes (disable for local dev)
     enableLedgerWrites: process.env.ENABLE_LEDGER_WRITES === 'true',
   },
@@ -79,10 +77,10 @@ export const config = {
     uri: process.env.BPP_URI || 'http://localhost:4000',
   },
 
-  // CDS identity
+  // CDS identity (external Beckn network CDS)
   cds: {
-    id: process.env.CDS_ID || 'cds.p2p-trading.local',
-    uri: process.env.CDS_URI || 'http://localhost:4001',
+    id: process.env.CDS_ID || 'cds.beckn-energy.network',
+    uri: process.env.CDS_URI || 'https://34.93.141.21.sslip.io/beckn',
   },
 
   // Callback delay (ms) - simulates async processing

@@ -31,8 +31,7 @@ What it does: Central catalog of all energy offers from all sellers across the n
 How you use it:
 - Your BAP calls POST /search to discover available energy offers
 - CDS responds with on_search callback containing matching offers
-- Replaces your local cds-mock service
-- Integration point: Your /api/discover endpoint should call this CDS instead of localhost:4001
+- Integration complete: /api/discover calls external CDS
 
 2. Ledger - https://34.93.166.38.sslip.io
 What it does: Immutable multi-party record of all trades. Think of it as the "blockchain" of energy trades.
