@@ -78,8 +78,8 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     const rawItems = catalog['beckn:items'] || catalog.items || [];
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
     
-    // Debug logging for raw data
-    logger.debug('Raw catalog data', {
+    // Log raw data for debugging
+    logger.info('Processing catalog', {
       providerId,
       itemCount: rawItems.length,
       offerCount: catalogOffers.length,
@@ -652,15 +652,18 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         catalogCount: syncCatalog.length,
       });
       
-      // Debug: Log raw catalog structure
+      // Log raw catalog structure to debug offer extraction
       for (const cat of syncCatalog) {
-        logger.debug('Raw catalog from CDS', {
+        const items = cat['beckn:items'] || cat.items || [];
+        const offers = cat['beckn:offers'] || cat.offers || [];
+        logger.info('Raw catalog from CDS', {
           catalogId: cat['beckn:id'] || cat.id,
-          hasItems: !!(cat['beckn:items'] || cat.items),
-          itemCount: (cat['beckn:items'] || cat.items || []).length,
-          hasOffers: !!(cat['beckn:offers'] || cat.offers),
-          offerCount: (cat['beckn:offers'] || cat.offers || []).length,
-          catalogKeys: Object.keys(cat).slice(0, 15),
+          itemCount: items.length,
+          offerCount: offers.length,
+          catalogKeys: Object.keys(cat).slice(0, 20),
+          // Log first item and offer structure if they exist
+          firstItemKeys: items[0] ? Object.keys(items[0]).slice(0, 15) : [],
+          firstOfferKeys: offers[0] ? Object.keys(offers[0]).slice(0, 15) : [],
         });
       }
       
