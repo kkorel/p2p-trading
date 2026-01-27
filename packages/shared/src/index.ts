@@ -29,3 +29,6 @@ export * from './beckn';
 
 // Export Trust Score module
 export * from './trust';
+
+// Export CDS Sync Client
+export * from './cds/sync-client';

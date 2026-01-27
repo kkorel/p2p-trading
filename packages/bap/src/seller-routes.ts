@@ -27,6 +27,12 @@ import {
   withTransactionLock,
   InsufficientBlocksError,
   createIdempotencyMiddleware,
+  syncProviderToCDS,
+  syncItemToCDS,
+  syncOfferToCDS,
+  syncCompleteOfferToCDS,
+  syncBlocksToCDS,
+  deleteOfferFromCDS,
 } from '@p2p/shared';
 import {
   getOfferById,
@@ -443,19 +449,20 @@ router.post('/init', async (req: Request, res: Response) => {
             return; // Exit the setTimeout callback
           }
 
-          // Sync reserved blocks to CDS
-          try {
-            await axios.post(`${config.urls.cds}/sync/blocks`, {
-              offer_id: item.offer_id,
-              block_ids: claimedBlocks.map(b => b.id),
-              status: 'RESERVED',
-              order_id: order.id,
-              transaction_id: context.transaction_id,
-            });
-            logger.info(`Synced ${claimedBlocks.length} reserved blocks to CDS for offer ${item.offer_id}`);
-          } catch (syncError: any) {
-            logger.error(`Failed to sync reserved blocks to CDS: ${syncError.message}`);
-          }
+          // Sync reserved blocks to CDS (non-blocking)
+          syncBlocksToCDS({
+            offer_id: item.offer_id,
+            block_ids: claimedBlocks.map(b => b.id),
+            status: 'RESERVED',
+            order_id: order.id,
+            transaction_id: context.transaction_id,
+          }).catch(syncError =>
+            logger.error('Failed to sync reserved blocks to CDS', {
+              offerId: item.offer_id,
+              blockCount: claimedBlocks.length,
+              error: syncError.message
+            })
+          );
         }
       } else {
         logger.info('Skipping block claiming for external offer', {
@@ -539,21 +546,22 @@ router.post('/confirm', async (req: Request, res: Response) => {
           const soldBlocks = await getBlocksForOrder(order!.id);
           logger.info(`Marked ${soldCount} blocks as SOLD for order ${order!.id}`, { transaction_id: context.transaction_id });
 
-          // Sync block status to CDS
+          // Sync block status to CDS (non-blocking)
           if (soldBlocks.length > 0 && order!.items && order!.items.length > 0) {
             const firstItem = order!.items[0];
-            try {
-              await axios.post(`${config.urls.cds}/sync/blocks`, {
-                offer_id: firstItem.offer_id,
-                block_ids: soldBlocks.map(b => b.id),
-                status: 'SOLD',
-                order_id: order!.id,
-                transaction_id: context.transaction_id,
-              });
-              logger.info(`Synced ${soldBlocks.length} sold blocks to CDS for offer ${firstItem.offer_id}`);
-            } catch (syncError: any) {
-              logger.error(`Failed to sync block status to CDS: ${syncError.message}`);
-            }
+            syncBlocksToCDS({
+              offer_id: firstItem.offer_id,
+              block_ids: soldBlocks.map(b => b.id),
+              status: 'SOLD',
+              order_id: order!.id,
+              transaction_id: context.transaction_id,
+            }).catch(syncError =>
+              logger.error('Failed to sync block status to CDS', {
+                offerId: firstItem.offer_id,
+                blockCount: soldBlocks.length,
+                error: syncError.message
+              })
+            );
 
             // NOTE: We no longer auto-delete offers when fully sold
             // This ensures "total offered" tracking remains accurate for trade limit calculations
@@ -942,54 +950,8 @@ router.post('/cancel', async (req: Request, res: Response) => {
 });
 
 // ==================== CDS SYNC HELPERS ====================
-
-/**
- * Sync provider to CDS
- */
-async function syncProviderToCDS(provider: { id: string; name: string; trust_score?: number }) {
-  try {
-    await axios.post(`${config.urls.cds}/sync/provider`, provider);
-    logger.info(`Synced provider ${provider.id} to CDS`);
-  } catch (error: any) {
-    logger.error(`Failed to sync provider to CDS: ${error.message}`);
-  }
-}
-
-/**
- * Sync item to CDS
- */
-async function syncItemToCDS(item: any) {
-  try {
-    await axios.post(`${config.urls.cds}/sync/item`, item);
-    logger.info(`Synced item ${item.id} to CDS`);
-  } catch (error: any) {
-    logger.error(`Failed to sync item to CDS: ${error.message}`);
-  }
-}
-
-/**
- * Sync offer to CDS
- */
-async function syncOfferToCDS(offer: any) {
-  try {
-    await axios.post(`${config.urls.cds}/sync/offer`, offer);
-    logger.info(`Synced offer ${offer.id} to CDS`);
-  } catch (error: any) {
-    logger.error(`Failed to sync offer to CDS: ${error.message}`);
-  }
-}
-
-/**
- * Delete offer from CDS
- */
-async function deleteOfferFromCDS(offerId: string) {
-  try {
-    await axios.delete(`${config.urls.cds}/sync/offer/${offerId}`);
-    logger.info(`Deleted offer ${offerId} from CDS`);
-  } catch (error: any) {
-    logger.error(`Failed to delete offer from CDS: ${error.message}`);
-  }
-}
+// Note: CDS sync functions now imported from @p2p/shared
+// They automatically use secureAxios with Beckn signing when USE_EXTERNAL_CDS=true
 
 // ==================== SELLER APIs (Authenticated) ====================
 
@@ -1357,8 +1319,8 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
 
   logger.info(`New offer created: ${offer.id} for item ${item_id}`);
 
-  // Sync to CDS
-  await syncOfferToCDS({
+  // Sync to CDS (non-blocking)
+  syncOfferToCDS({
     id: offer.id,
     item_id: offer.item_id,
     provider_id: offer.provider_id,
@@ -1366,8 +1328,9 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
     currency: offer.price.currency,
     max_qty: offer.maxQuantity,
     time_window: offer.timeWindow,
-    offer_attributes: offer.offerAttributes,
-  });
+    pricing_model: offer.offerAttributes.pricingModel,
+    settlement_type: offer.offerAttributes.settlementType,
+  }).catch(err => logger.error('Failed to sync offer to CDS', { offerId: offer.id, error: err.message }));
 
   res.json({ status: 'ok', offer });
 });
@@ -1474,11 +1437,19 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
 
   logger.info(`New direct offer created: ${offer.id}`);
 
-  // Sync item to CDS
-  await syncItemToCDS(item);
+  // Sync item to CDS (non-blocking)
+  syncItemToCDS({
+    id: item.id,
+    provider_id: item.provider_id,
+    source_type: item.source_type,
+    delivery_mode: item.delivery_mode,
+    available_qty: item.available_qty,
+    production_windows: item.production_windows,
+    meter_id: item.meter_id,
+  }).catch(err => logger.error('Failed to sync item to CDS', { itemId: item.id, error: err.message }));
 
-  // Sync offer to CDS
-  await syncOfferToCDS({
+  // Sync offer to CDS (non-blocking)
+  syncOfferToCDS({
     id: offer.id,
     item_id: offer.item_id,
     provider_id: offer.provider_id,
@@ -1486,8 +1457,9 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
     currency: offer.price.currency,
     max_qty: offer.maxQuantity,
     time_window: offer.timeWindow,
-    offer_attributes: offer.offerAttributes,
-  });
+    pricing_model: offer.offerAttributes.pricingModel,
+    settlement_type: offer.offerAttributes.settlementType,
+  }).catch(err => logger.error('Failed to sync offer to CDS', { offerId: offer.id, error: err.message }));
 
   // Add source_type to the response
   res.json({
@@ -1536,8 +1508,9 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
   await deleteOffer(req.params.id);
   logger.info(`Offer ${req.params.id} deleted by provider ${provider_id}`);
 
-  // Sync deletion to CDS
-  await deleteOfferFromCDS(req.params.id);
+  // Sync deletion to CDS (non-blocking)
+  deleteOfferFromCDS(req.params.id)
+    .catch(err => logger.error('Failed to delete offer from CDS', { offerId: req.params.id, error: err.message }));
 
   res.json({ status: 'ok', deleted: req.params.id });
 });
