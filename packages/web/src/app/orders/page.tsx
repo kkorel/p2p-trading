@@ -177,6 +177,14 @@ export default function OrdersPage() {
   const boughtCount = orders.filter(o => o.type === 'bought').length;
   const soldCount = orders.filter(o => o.type === 'sold').length;
 
+  // Calculate total energy stats
+  const totalBoughtKwh = orders
+    .filter(o => o.type === 'bought' && o.status !== 'CANCELLED')
+    .reduce((sum, o) => sum + o.quantity, 0);
+  const totalSoldKwh = orders
+    .filter(o => o.type === 'sold' && o.status !== 'CANCELLED')
+    .reduce((sum, o) => sum + o.quantity, 0);
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'success';
@@ -249,6 +257,30 @@ export default function OrdersPage() {
   return (
     <AppShell title="My Orders">
       <div className="flex flex-col gap-4">
+        {/* Energy Summary Card */}
+        {orders.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-[var(--color-primary-light)] rounded-[14px] p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <ArrowDownLeft className="w-4 h-4 text-[var(--color-primary)]" />
+                <span className="text-xs text-[var(--color-primary)]">Energy Bought</span>
+              </div>
+              <p className="text-xl font-bold text-[var(--color-primary)]">
+                {totalBoughtKwh.toLocaleString()} kWh
+              </p>
+            </div>
+            <div className="bg-[var(--color-success-light)] rounded-[14px] p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <ArrowUpRight className="w-4 h-4 text-[var(--color-success)]" />
+                <span className="text-xs text-[var(--color-success)]">Energy Sold</span>
+              </div>
+              <p className="text-xl font-bold text-[var(--color-success)]">
+                {totalSoldKwh.toLocaleString()} kWh
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Filter Tabs */}
         <div className="flex gap-2">
           <button
