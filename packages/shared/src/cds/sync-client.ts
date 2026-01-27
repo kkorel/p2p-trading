@@ -112,14 +112,18 @@ interface BecknOfferAttributes {
   pricingModel: string;
   settlementType: string;
   sourceMeterId?: string;
-  wheelingCharges?: {
-    amount: number;
+  // These fields go inside offerAttributes per Beckn schema
+  'beckn:price': {
+    value: number;
     currency: string;
-    description?: string;
+    unitText?: string;
   };
-  minimumQuantity?: number;
-  maximumQuantity?: number;
-  validityWindow?: {
+  'beckn:maxQuantity': {
+    unitQuantity: number;
+    unitText: string;
+    unitCode?: string;
+  };
+  'beckn:timeWindow'?: {
     '@type': string;
     'schema:startTime': string;
     'schema:endTime': string;
@@ -133,25 +137,6 @@ interface BecknOffer {
   'beckn:descriptor': BecknDescriptor;
   'beckn:provider': string;
   'beckn:items': string[];
-  'beckn:price': {
-    '@type'?: string;
-    value?: number;
-    'schema:price'?: number;
-    currency?: string;
-    'schema:priceCurrency'?: string;
-    unitText?: string;
-    'schema:unitText'?: string;
-  };
-  'beckn:maxQuantity'?: {
-    unitQuantity: number;
-    unitText: string;
-    unitCode?: string;
-  };
-  'beckn:timeWindow'?: {
-    '@type': string;
-    'schema:startTime': string;
-    'schema:endTime': string;
-  };
   'beckn:offerAttributes': BecknOfferAttributes;
 }
 
@@ -261,6 +246,7 @@ function buildBecknItem(item: SyncItem, providerName: string): BecknItem {
 
 /**
  * Build a Beckn-compliant offer from internal data
+ * Schema: beckn:price, beckn:maxQuantity, beckn:timeWindow go INSIDE beckn:offerAttributes
  */
 function buildBecknOffer(offer: SyncOffer, meterId?: string): BecknOffer {
   return {
@@ -273,31 +259,23 @@ function buildBecknOffer(offer: SyncOffer, meterId?: string): BecknOffer {
     },
     'beckn:provider': offer.provider_id,
     'beckn:items': [offer.item_id],
-    'beckn:price': {
-      '@type': 'schema:PriceSpecification',
-      'schema:price': offer.price_value,
-      'schema:priceCurrency': offer.currency || 'INR',
-      'schema:unitText': 'kWh',
-    },
-    'beckn:maxQuantity': {
-      unitQuantity: offer.max_qty,
-      unitText: 'kWh',
-      unitCode: 'KWH',
-    },
-    'beckn:timeWindow': offer.time_window ? {
-      '@type': 'beckn:TimePeriod',
-      'schema:startTime': offer.time_window.startTime,
-      'schema:endTime': offer.time_window.endTime,
-    } : undefined,
     'beckn:offerAttributes': {
       '@context': BECKN_ENERGY_TRADE_OFFER_CONTEXT,
       '@type': 'EnergyTradeOffer',
       pricingModel: offer.pricing_model || 'PER_KWH',
       settlementType: offer.settlement_type || 'INSTANT',
       sourceMeterId: meterId || `der://meter/${offer.item_id}`,
-      minimumQuantity: 1.0,
-      maximumQuantity: offer.max_qty,
-      validityWindow: offer.time_window ? {
+      'beckn:price': {
+        value: offer.price_value,
+        currency: offer.currency || 'INR',
+        unitText: 'kWh',
+      },
+      'beckn:maxQuantity': {
+        unitQuantity: offer.max_qty,
+        unitText: 'kWh',
+        unitCode: 'KWH',
+      },
+      'beckn:timeWindow': offer.time_window ? {
         '@type': 'beckn:TimePeriod',
         'schema:startTime': offer.time_window.startTime,
         'schema:endTime': offer.time_window.endTime,
