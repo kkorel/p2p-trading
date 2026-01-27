@@ -90,6 +90,7 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
 
 /**
  * Create a new order (draft/pending state)
+ * Handles external providers by setting providerId to null if provider doesn't exist locally
  */
 export async function createOrder(
   transactionId: string,
@@ -102,13 +103,44 @@ export async function createOrder(
 ): Promise<Order> {
   const orderId = uuidv4();
   
+  // Check if provider exists locally - if not, set to null (external provider)
+  let validProviderId: string | null = providerId;
+  if (providerId) {
+    const providerExists = await prisma.provider.findUnique({
+      where: { id: providerId },
+      select: { id: true },
+    });
+    
+    if (!providerExists) {
+      // External provider - set providerId to null to avoid FK constraint
+      // Store the external provider ID in the items JSON for reference
+      console.log(`[ORDER] External provider ${providerId} - setting providerId to null`);
+      validProviderId = null;
+    }
+  }
+  
+  // Also check if selected offer exists locally
+  let validOfferId: string | null = offerId;
+  if (offerId) {
+    const offerExists = await prisma.catalogOffer.findUnique({
+      where: { id: offerId },
+      select: { id: true },
+    });
+    
+    if (!offerExists) {
+      // External offer - set to null to avoid FK constraint
+      console.log(`[ORDER] External offer ${offerId} - setting selectedOfferId to null`);
+      validOfferId = null;
+    }
+  }
+  
   const order = await prisma.order.create({
     data: {
       id: orderId,
       transactionId,
       status,
-      providerId,
-      selectedOfferId: offerId,
+      providerId: validProviderId,
+      selectedOfferId: validOfferId,
       buyerId: buyerId || undefined,
       totalQty: quote.totalQuantity,
       totalPrice: quote.price.value,

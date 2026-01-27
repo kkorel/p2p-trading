@@ -321,16 +321,20 @@ router.post('/init', async (req: Request, res: Response) => {
       let currency = 'INR';
       let providerId = content.order.provider.id;
       let selectedOfferId = '';
+      let isExternalOffer = false;
 
       // First pass: calculate prices and validate offers exist
       for (const item of content.order.items) {
-        const offer = await getOfferById(item.offer_id);
-        if (offer) {
-          selectedOfferId = offer.id;
-          const itemPrice = offer.price.value * item.quantity;
+        // Try to get offer from local database first
+        const localOffer = await getOfferById(item.offer_id);
+        
+        if (localOffer) {
+          // Local offer - use local data
+          selectedOfferId = localOffer.id;
+          const itemPrice = localOffer.price.value * item.quantity;
           totalPrice += itemPrice;
           totalQuantity += item.quantity;
-          currency = offer.price.currency;
+          currency = localOffer.price.currency;
 
           // Get source_type from catalog item
           const catalogItem = await prisma.catalogItem.findUnique({
@@ -341,12 +345,60 @@ router.post('/init', async (req: Request, res: Response) => {
           orderItems.push({
             item_id: item.item_id,
             offer_id: item.offer_id,
-            provider_id: offer.provider_id,
+            provider_id: localOffer.provider_id,
             quantity: item.quantity,
             price: { value: itemPrice, currency },
-            timeWindow: offer.timeWindow,
+            timeWindow: localOffer.timeWindow,
             source_type: catalogItem?.sourceType || 'UNKNOWN',
           });
+        } else {
+          // External offer - try to get data from transaction state
+          isExternalOffer = true;
+          selectedOfferId = item.offer_id;
+          
+          // Get offer details from transaction state (populated during discovery)
+          const selectedOffer = txState?.selectedOffer;
+          
+          if (selectedOffer && selectedOffer.id === item.offer_id) {
+            const itemPrice = selectedOffer.price.value * item.quantity;
+            totalPrice += itemPrice;
+            totalQuantity += item.quantity;
+            currency = selectedOffer.price.currency || 'INR';
+
+            orderItems.push({
+              item_id: item.item_id,
+              offer_id: item.offer_id,
+              provider_id: providerId,
+              quantity: item.quantity,
+              price: { value: itemPrice, currency },
+              timeWindow: selectedOffer.timeWindow || undefined,
+              source_type: 'EXTERNAL',
+            });
+            
+            logger.info('Processing external offer from transaction state', {
+              transaction_id: context.transaction_id,
+              offer_id: item.offer_id,
+              price: selectedOffer.price.value,
+            });
+          } else {
+            // No offer data available - log error but continue
+            logger.warn('External offer not found in transaction state', {
+              transaction_id: context.transaction_id,
+              offer_id: item.offer_id,
+            });
+            
+            // Use default values from request
+            totalQuantity += item.quantity;
+            orderItems.push({
+              item_id: item.item_id,
+              offer_id: item.offer_id,
+              provider_id: providerId,
+              quantity: item.quantity,
+              price: { value: 0, currency },
+              timeWindow: undefined,
+              source_type: 'EXTERNAL',
+            });
+          }
         }
       }
 
@@ -358,57 +410,65 @@ router.post('/init', async (req: Request, res: Response) => {
       // Create order first in DRAFT state (so we have a valid order ID for FK constraint)
       const order = await createOrder(context.transaction_id, providerId, selectedOfferId, orderItems, quote, 'DRAFT', buyerId);
 
-      // Now claim blocks using the real order ID
-      for (const item of content.order.items) {
-        const claimedBlocks = await claimBlocks(item.offer_id, item.quantity, order.id, context.transaction_id);
+      // Only claim blocks for local offers (external offers don't have local blocks)
+      if (!isExternalOffer) {
+        // Now claim blocks using the real order ID
+        for (const item of content.order.items) {
+          const claimedBlocks = await claimBlocks(item.offer_id, item.quantity, order.id, context.transaction_id);
 
-        if (claimedBlocks.length < item.quantity) {
-          // Not enough blocks available - release any claimed blocks and send error callback
-          await releaseBlocks(context.transaction_id);
-          const errorMsg = claimedBlocks.length === 0
-            ? 'This offer is sold out. Please try a different offer.'
-            : `Only ${claimedBlocks.length} kWh available, but you requested ${item.quantity} kWh.`;
+          if (claimedBlocks.length < item.quantity) {
+            // Not enough blocks available - release any claimed blocks and send error callback
+            await releaseBlocks(context.transaction_id);
+            const errorMsg = claimedBlocks.length === 0
+              ? 'This offer is sold out. Please try a different offer.'
+              : `Only ${claimedBlocks.length} kWh available, but you requested ${item.quantity} kWh.`;
 
-          logger.error(`Not enough blocks available: requested ${item.quantity}, got ${claimedBlocks.length}`, {
-            transaction_id: context.transaction_id,
-            offer_id: item.offer_id,
-          });
+            logger.error(`Not enough blocks available: requested ${item.quantity}, got ${claimedBlocks.length}`, {
+              transaction_id: context.transaction_id,
+              offer_id: item.offer_id,
+            });
 
-          // Send error callback
-          const errorCallbackContext = createCallbackContext(context, 'on_init');
-          const errorCallback = {
-            context: errorCallbackContext,
-            error: {
-              code: 'INSUFFICIENT_INVENTORY',
-              message: errorMsg,
-            },
-          };
+            // Send error callback
+            const errorCallbackContext = createCallbackContext(context, 'on_init');
+            const errorCallback = {
+              context: errorCallbackContext,
+              error: {
+                code: 'INSUFFICIENT_INVENTORY',
+                message: errorMsg,
+              },
+            };
 
-          try {
-            await axios.post(`${context.bap_uri}/callbacks/on_init`, errorCallback);
-          } catch (e) {
-            logger.error('Failed to send error callback');
+            try {
+              await axios.post(`${context.bap_uri}/callbacks/on_init`, errorCallback);
+            } catch (e) {
+              logger.error('Failed to send error callback');
+            }
+
+            return; // Exit the setTimeout callback
           }
 
-          return; // Exit the setTimeout callback
+          // Sync reserved blocks to CDS
+          try {
+            await axios.post(`${config.urls.cds}/sync/blocks`, {
+              offer_id: item.offer_id,
+              block_ids: claimedBlocks.map(b => b.id),
+              status: 'RESERVED',
+              order_id: order.id,
+              transaction_id: context.transaction_id,
+            });
+            logger.info(`Synced ${claimedBlocks.length} reserved blocks to CDS for offer ${item.offer_id}`);
+          } catch (syncError: any) {
+            logger.error(`Failed to sync reserved blocks to CDS: ${syncError.message}`);
+          }
         }
-
-        // Sync reserved blocks to CDS
-        try {
-          await axios.post(`${config.urls.cds}/sync/blocks`, {
-            offer_id: item.offer_id,
-            block_ids: claimedBlocks.map(b => b.id),
-            status: 'RESERVED',
-            order_id: order.id,
-            transaction_id: context.transaction_id,
-          });
-          logger.info(`Synced ${claimedBlocks.length} reserved blocks to CDS for offer ${item.offer_id}`);
-        } catch (syncError: any) {
-          logger.error(`Failed to sync reserved blocks to CDS: ${syncError.message}`);
-        }
+      } else {
+        logger.info('Skipping block claiming for external offer', {
+          transaction_id: context.transaction_id,
+          providerId,
+        });
       }
 
-      // Update order status to PENDING now that blocks are claimed
+      // Update order status to PENDING now that blocks are claimed (or immediately for external)
       const finalOrder = await updateOrderStatus(order.id, 'PENDING') || order;
 
       const callbackContext = createCallbackContext(context, 'on_init');
