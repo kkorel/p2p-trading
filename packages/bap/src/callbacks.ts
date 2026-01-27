@@ -66,59 +66,106 @@ function transformExternalCatalog(rawMessage: any): { providers: any[] } {
     // Extract offers - can be at catalog level or in items
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
     
+    logger.debug('Raw catalog data', {
+      providerId,
+      itemCount: rawItems.length,
+      offerCount: catalogOffers.length,
+    });
+    
     const transformedItems: any[] = [];
     
-    for (const item of rawItems) {
-      const itemId = item['beckn:id'] || item.id;
-      const itemAttrs = item['beckn:itemAttributes'] || item.itemAttributes || {};
-      const itemProvider = item['beckn:provider'] || item.provider || {};
+    // Helper function to extract offer data
+    const extractOfferData = (offer: any, itemId: string, itemAttrs: any = {}) => {
+      const offerId = offer['beckn:id'] || offer.id;
+      const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
       
-      // Find offers for this item
-      const itemOfferIds = item['beckn:offers'] || [];
-      const itemOffers: any[] = [];
+      // Extract price from multiple possible formats
+      const offerPrice = offer['beckn:price'] || {};
+      const attrPrice = offerAttrs['beckn:price'] || offerAttrs.price || {};
+      const priceValue = attrPrice.value ?? offerPrice['schema:price'] ?? attrPrice['schema:price'] ?? offerPrice.value ?? 0;
+      const priceCurrency = attrPrice.currency || offerPrice['schema:priceCurrency'] || attrPrice['schema:priceCurrency'] || offerPrice.currency || 'INR';
       
-      // If offers are at catalog level, filter by item reference
-      for (const offer of catalogOffers) {
-        const offerItems = offer['beckn:items'] || offer.items || [];
-        const offerId = offer['beckn:id'] || offer.id;
+      const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || offerAttrs.validityWindow || {};
+      const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
+      
+      return {
+        id: offerId,
+        item_id: itemId,
+        provider_id: providerId,
+        // BPP routing info for proper Beckn flows
+        bpp_id: bppId,
+        bpp_uri: bppUri,
+        price: {
+          value: typeof priceValue === 'number' ? priceValue : parseFloat(priceValue) || 0,
+          currency: priceCurrency,
+        },
+        maxQuantity: maxQty.unitQuantity || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100,
+        timeWindow: {
+          startTime: timeWindow['schema:startTime'] || timeWindow.startTime,
+          endTime: timeWindow['schema:endTime'] || timeWindow.endTime,
+        },
+      };
+    };
+    
+    // Process items if they exist
+    if (rawItems.length > 0) {
+      for (const item of rawItems) {
+        const itemId = item['beckn:id'] || item.id;
+        const itemAttrs = item['beckn:itemAttributes'] || item.itemAttributes || {};
         
-        // Check if this offer is for this item
-        if (offerItems.includes(itemId) || offerItems.length === 0) {
-          const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
-          const price = offerAttrs['beckn:price'] || offerAttrs.price || {};
-          const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || {};
-          const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
+        const itemOffers: any[] = [];
+        
+        // If offers are at catalog level, filter by item reference
+        for (const offer of catalogOffers) {
+          const offerItems = offer['beckn:items'] || offer.items || [];
           
-          itemOffers.push({
-            id: offerId,
-            item_id: itemId,
-            provider_id: providerId,
-            // BPP routing info for proper Beckn flows
-            bpp_id: bppId,
-            bpp_uri: bppUri,
-            price: {
-              value: price.value || 0,
-              currency: price.currency || 'INR',
-            },
-            maxQuantity: maxQty.unitQuantity || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100,
-            timeWindow: {
-              startTime: timeWindow['schema:startTime'] || timeWindow.startTime,
-              endTime: timeWindow['schema:endTime'] || timeWindow.endTime,
-            },
-          });
+          // Check if this offer is for this item
+          if (offerItems.includes(itemId) || offerItems.length === 0) {
+            itemOffers.push(extractOfferData(offer, itemId, itemAttrs));
+          }
         }
+        
+        transformedItems.push({
+          id: itemId,
+          offers: itemOffers,
+          itemAttributes: {
+            sourceType: itemAttrs.sourceType || 'MIXED',
+            availableQuantity: itemAttrs.availableQuantity || 100,
+            deliveryMode: itemAttrs.deliveryMode || 'GRID_INJECTION',
+            meterId: itemAttrs.meterId,
+          },
+        });
+      }
+    } else if (catalogOffers.length > 0) {
+      // FALLBACK: If no items but offers exist, extract offers with their referenced item IDs
+      logger.info('No items found but offers exist, extracting directly', {
+        providerId,
+        offerCount: catalogOffers.length,
+      });
+      
+      const offersByItem = new Map<string, any[]>();
+      
+      for (const offer of catalogOffers) {
+        const offerItemIds = offer['beckn:items'] || offer.items || [];
+        const itemId = offerItemIds[0] || `synthetic-item-${providerId}`;
+        
+        if (!offersByItem.has(itemId)) {
+          offersByItem.set(itemId, []);
+        }
+        offersByItem.get(itemId)!.push(extractOfferData(offer, itemId, {}));
       }
       
-      transformedItems.push({
-        id: itemId,
-        offers: itemOffers,
-        itemAttributes: {
-          sourceType: itemAttrs.sourceType || 'MIXED',
-          availableQuantity: itemAttrs.availableQuantity || 100,
-          deliveryMode: itemAttrs.deliveryMode || 'GRID_INJECTION',
-          meterId: itemAttrs.meterId,
-        },
-      });
+      for (const [itemId, offers] of offersByItem) {
+        transformedItems.push({
+          id: itemId,
+          offers,
+          itemAttributes: {
+            sourceType: 'MIXED',
+            availableQuantity: 100,
+            deliveryMode: 'GRID_INJECTION',
+          },
+        });
+      }
     }
     
     providers.push({
