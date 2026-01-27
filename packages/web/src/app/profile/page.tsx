@@ -521,25 +521,35 @@ export default function ProfilePage() {
               <p className="text-xs text-[var(--color-text-muted)]">
                 Your trust score has been boosted based on your meter verification.
               </p>
-              {/* Reset button for re-uploading */}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    await authApi.resetMeter();
-                    // Refresh user data
-                    const { user: updatedUser } = await authApi.getMe();
-                    updateUser(updatedUser);
-                    setAnalysisResult(null);
-                    setAnalysisError(null);
-                  } catch (err: any) {
-                    setAnalysisError(err.message || 'Failed to reset');
-                  }
-                }}
-              >
-                Upload Different Document
-              </Button>
+              {/* Reset option with warning */}
+              <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+                <p className="text-xs text-[var(--color-text-muted)] mb-2">
+                  Want to update your meter reading? Uploading a new document will <strong>temporarily remove the +10% trust bonus</strong> until the new document is verified.
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    const confirmed = window.confirm(
+                      'Uploading a new document will reset your meter verification and remove the +10% trust bonus until re-verified. Continue?'
+                    );
+                    if (!confirmed) return;
+
+                    try {
+                      await authApi.resetMeter();
+                      // Refresh user data
+                      const { user: updatedUser } = await authApi.getMe();
+                      updateUser(updatedUser);
+                      setAnalysisResult(null);
+                      setAnalysisError(null);
+                    } catch (err: any) {
+                      setAnalysisError(err.message || 'Failed to reset');
+                    }
+                  }}
+                >
+                  Upload Different Document
+                </Button>
+              </div>
             </div>
           ) : (
             // Upload form

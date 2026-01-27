@@ -50,31 +50,21 @@ export function OfferCard({
         isSelected && 'ring-2 ring-[var(--color-primary)] border-transparent'
       )}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className={cn('w-9 h-9 rounded-[10px] flex items-center justify-center', colorClass)}>
-            <Icon className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-[var(--color-text)]">
-              {providerName}
-            </p>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {availableQty} kWh available
-            </p>
-          </div>
+      {/* Header - Centered, larger */}
+      <div className="text-center mb-3">
+        <div className={cn('w-10 h-10 mx-auto rounded-[10px] flex items-center justify-center mb-2', colorClass)}>
+          <Icon className="h-5 w-5" />
         </div>
-
-        <div className="text-right">
-          <p className="text-base font-semibold text-[var(--color-primary)]">
-            {formatCurrency(offer.price.value)}
-          </p>
-          <p className="text-xs text-[var(--color-text-muted)]">per kWh</p>
-        </div>
+        <p className="text-base font-semibold text-[var(--color-text)]">
+          {providerName}
+        </p>
+        <p className="text-lg font-bold text-[var(--color-primary)]">
+          {formatCurrency(offer.price.value)}/kWh
+        </p>
       </div>
 
       {/* Time window */}
-      <div className="flex items-center gap-1.5 mb-3 text-xs text-[var(--color-text-secondary)]">
+      <div className="flex items-center justify-center gap-1.5 mb-3 text-xs text-[var(--color-text-secondary)]">
         <Clock className="h-3.5 w-3.5" />
         <span>
           {offer.timeWindow
@@ -85,9 +75,9 @@ export function OfferCard({
       </div>
 
       {/* Footer badges */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-center gap-2 flex-wrap">
         <Badge variant="default">{sourceType}</Badge>
-
+        <Badge variant="default">{availableQty} kWh available</Badge>
         {score !== undefined && (
           <Badge variant="success">
             {Math.round(score * 100)}% match
