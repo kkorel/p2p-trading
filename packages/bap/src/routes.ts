@@ -1724,6 +1724,97 @@ router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * POST /api/db/reset - Full database reset (clears all trading data)
+ * WARNING: This will delete all orders, offers, items, and reset user balances
+ */
+router.post('/api/db/reset', async (req: Request, res: Response) => {
+  try {
+    logger.info('=== DATABASE RESET STARTED ===');
+    
+    // Clear in correct order for foreign key constraints
+    const deleteCounts = {
+      offerBlocks: 0,
+      paymentRecords: 0,
+      orders: 0,
+      events: 0,
+      catalogOffers: 0,
+      catalogItems: 0,
+      settlementRecords: 0,
+      discomFeedback: 0,
+      trustScoreHistory: 0,
+    };
+    
+    // 1. Clear offer blocks
+    const blocks = await prisma.offerBlock.deleteMany();
+    deleteCounts.offerBlocks = blocks.count;
+    
+    // 2. Clear payment records
+    const payments = await prisma.paymentRecord.deleteMany();
+    deleteCounts.paymentRecords = payments.count;
+    
+    // 3. Clear DISCOM feedback
+    const feedback = await prisma.discomFeedback.deleteMany();
+    deleteCounts.discomFeedback = feedback.count;
+    
+    // 4. Clear orders
+    const orders = await prisma.order.deleteMany();
+    deleteCounts.orders = orders.count;
+    
+    // 5. Clear events
+    const events = await prisma.event.deleteMany();
+    deleteCounts.events = events.count;
+    
+    // 6. Clear catalog offers
+    const offers = await prisma.catalogOffer.deleteMany();
+    deleteCounts.catalogOffers = offers.count;
+    
+    // 7. Clear catalog items
+    const items = await prisma.catalogItem.deleteMany();
+    deleteCounts.catalogItems = items.count;
+    
+    // 8. Clear settlement records
+    const settlements = await prisma.settlementRecord.deleteMany();
+    deleteCounts.settlementRecords = settlements.count;
+    
+    // 9. Clear trust score history
+    const trustHistory = await prisma.trustScoreHistory.deleteMany();
+    deleteCounts.trustScoreHistory = trustHistory.count;
+    
+    // 10. Reset user balances and trust scores (but keep accounts)
+    await prisma.user.updateMany({
+      data: {
+        balance: 1000, // Reset to default balance
+        trustScore: 0.5, // Reset to default trust
+        allowedTradeLimit: 10,
+        productionCapacity: 0,
+        providerId: null, // Unlink providers (they were deleted)
+      },
+    });
+    
+    // 11. Clear providers
+    const providers = await prisma.provider.deleteMany();
+    
+    // 12. Clear Redis transaction states
+    await clearAllTransactions();
+    
+    // 13. Reset demo accounts
+    initializeDemoAccounts();
+    
+    logger.info('=== DATABASE RESET COMPLETE ===', deleteCounts);
+    
+    res.json({
+      status: 'ok',
+      message: 'Database reset complete',
+      deleted: deleteCounts,
+      providersDeleted: providers.count,
+    });
+  } catch (error: any) {
+    logger.error(`Database reset failed: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== VERIFIABLE CREDENTIALS ENDPOINTS ====================
 
 /**
