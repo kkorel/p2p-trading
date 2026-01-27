@@ -591,26 +591,74 @@ router.post('/confirm', async (req: Request, res: Response) => {
                   transaction_id: context.transaction_id,
                 });
 
-                // Sync updated quantity to CDS
+              }
+            }
+            
+            // IMPORTANT: Republish the full catalog to CDS with updated availableQuantity
+            // This ensures the external CDS reflects the reduced inventory after a purchase
+            if (isExternalCDSEnabled() && order!.items && order!.items.length > 0) {
+              const sellerProviderId = order!.items[0].provider_id;
+              if (sellerProviderId) {
                 try {
-                  // Get provider_id from the order item (not from Order which doesn't have it)
-                  const providerId = orderItem.provider_id || '';
-                  const items = await getProviderItems(providerId);
-                  const item = items.find(i => i.id === orderItem.item_id);
-                  if (item) {
-                    await syncItemToCDS({
-                      id: item.id,
-                      provider_id: item.provider_id,
-                      source_type: item.source_type,
-                      delivery_mode: item.delivery_mode,
-                      available_qty: newQty,
-                      production_windows: item.production_windows,
-                      meter_id: item.meter_id,
+                  const providerInfo = await getProvider(sellerProviderId);
+                  const providerName = providerInfo?.name || 'Energy Provider';
+                  const allItems = await getProviderItems(sellerProviderId);
+                  const allOffers = await getProviderOffers(sellerProviderId);
+                  
+                  // Convert to sync format with UPDATED availableQuantity from database
+                  const syncItems = allItems.map(item => ({
+                    id: item.id,
+                    provider_id: item.provider_id,
+                    source_type: item.source_type,
+                    delivery_mode: item.delivery_mode,
+                    available_qty: item.available_qty, // This is the updated quantity from database
+                    production_windows: item.production_windows,
+                    meter_id: item.meter_id,
+                  }));
+                  
+                  // For offers, use the available block count as the actual available quantity
+                  const syncOffers = await Promise.all(allOffers.map(async (offer) => {
+                    const availableBlocks = await getAvailableBlockCount(offer.id);
+                    return {
+                      id: offer.id,
+                      item_id: offer.item_id,
+                      provider_id: offer.provider_id,
+                      price_value: offer.price.value,
+                      currency: offer.price.currency,
+                      max_qty: availableBlocks, // Use AVAILABLE blocks, not total maxQuantity
+                      time_window: offer.timeWindow,
+                      pricing_model: offer.offerAttributes.pricingModel,
+                      settlement_type: offer.offerAttributes.settlementType,
+                    };
+                  }));
+                  
+                  // Filter out offers with 0 available blocks (sold out)
+                  const activeOffers = syncOffers.filter(o => o.max_qty > 0);
+                  
+                  // Republish catalog with updated quantities
+                  const publishSuccess = await publishCatalogToCDS(
+                    { id: sellerProviderId, name: providerName },
+                    syncItems,
+                    activeOffers,
+                    activeOffers.length > 0 // isActive: true if offers remain
+                  );
+                  
+                  if (publishSuccess) {
+                    logger.info(`Catalog republished to CDS with updated inventory after order ${order!.id}`, {
+                      providerId: sellerProviderId,
+                      remainingOffers: activeOffers.length,
+                      transaction_id: context.transaction_id,
                     });
-                    logger.info(`Synced updated quantity to CDS for item ${orderItem.item_id}`);
+                  } else {
+                    logger.warn('Failed to republish catalog to CDS after order confirmation', {
+                      providerId: sellerProviderId,
+                      transaction_id: context.transaction_id,
+                    });
                   }
                 } catch (syncError: any) {
-                  logger.error(`Failed to sync quantity update to CDS: ${syncError.message}`);
+                  logger.error(`Failed to republish catalog after order: ${syncError.message}`, {
+                    transaction_id: context.transaction_id,
+                  });
                 }
               }
             }
@@ -849,9 +897,61 @@ router.post('/cancel', async (req: Request, res: Response) => {
         const releasedCount = await releaseBlocksByOrderId(order.id);
         logger.info(`Released ${releasedCount} blocks for cancelled order ${order.id}`);
 
-        // 3. Note: External CDS manages catalog state via catalog_publish
-        // Block availability is reflected when sellers republish their catalogs
-        logger.debug('Blocks released - catalog will be updated on next seller publish');
+        // 3. Republish catalog to CDS with increased availability
+        if (isExternalCDSEnabled() && order.items && order.items.length > 0) {
+          const sellerProviderId = order.items[0].provider_id;
+          if (sellerProviderId) {
+            try {
+              const providerInfo = await getProvider(sellerProviderId);
+              const providerName = providerInfo?.name || 'Energy Provider';
+              const allItems = await getProviderItems(sellerProviderId);
+              const allOffers = await getProviderOffers(sellerProviderId);
+              
+              // Convert to sync format with updated availability
+              const syncItems = allItems.map(item => ({
+                id: item.id,
+                provider_id: item.provider_id,
+                source_type: item.source_type,
+                delivery_mode: item.delivery_mode,
+                available_qty: item.available_qty,
+                production_windows: item.production_windows,
+                meter_id: item.meter_id,
+              }));
+              
+              // For offers, use the available block count
+              const syncOffers = await Promise.all(allOffers.map(async (offer) => {
+                const availableBlocks = await getAvailableBlockCount(offer.id);
+                return {
+                  id: offer.id,
+                  item_id: offer.item_id,
+                  provider_id: offer.provider_id,
+                  price_value: offer.price.value,
+                  currency: offer.price.currency,
+                  max_qty: availableBlocks,
+                  time_window: offer.timeWindow,
+                  pricing_model: offer.offerAttributes.pricingModel,
+                  settlement_type: offer.offerAttributes.settlementType,
+                };
+              }));
+              
+              const activeOffers = syncOffers.filter(o => o.max_qty > 0);
+              
+              await publishCatalogToCDS(
+                { id: sellerProviderId, name: providerName },
+                syncItems,
+                activeOffers,
+                activeOffers.length > 0
+              );
+              
+              logger.info(`Catalog republished to CDS after order cancellation`, {
+                providerId: sellerProviderId,
+                releasedBlocks: releasedCount,
+              });
+            } catch (syncError: any) {
+              logger.error(`Failed to republish catalog after cancellation: ${syncError.message}`);
+            }
+          }
+        }
 
         // 4. Update buyer trust (proportional to cancelled quantity)
         // Get buyerId from database (not in Order type)
