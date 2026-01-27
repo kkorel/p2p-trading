@@ -11,7 +11,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { secureAxios } from '../beckn/secure-client';
+import axios from 'axios';
 import { config } from '../config';
 import { createLogger } from '../utils/logger';
 import { TimeWindow } from '../types/beckn';
@@ -198,10 +198,11 @@ export function isExternalCDSEnabled(): boolean {
 }
 
 /**
- * Get the CDS base URL
+ * Get the CDS base URL (uses same URL as discover for consistency)
  */
 function getCDSBaseUrl(): string {
-  return config.external.cds;
+  // Use CDS_URL (same as discover) if available, otherwise fall back to EXTERNAL_CDS_URL
+  return process.env.CDS_URL || config.external.cds;
 }
 
 // ==================== Catalog Building Functions ====================
@@ -378,14 +379,35 @@ export async function publishCatalogToCDS(
       itemCount: items.length,
       offerCount: offers.length,
       isActive,
+      context: {
+        action: publishMessage.context.action,
+        transaction_id: publishMessage.context.transaction_id,
+        bpp_id: publishMessage.context.bpp_id,
+      },
     });
 
-    const response = await secureAxios.post(url, publishMessage);
+    // Use plain axios for CDS publish (no Beckn signing needed for catalog service)
+    const response = await axios.post(url, publishMessage, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000, // 30 second timeout
+    });
+
+    // Check for NACK response
+    if (response.data?.ack_status === 'NACK') {
+      logger.error('CDS returned NACK for catalog publish', {
+        providerId: provider.id,
+        error: response.data?.error,
+      });
+      return false;
+    }
 
     logger.info('Catalog published successfully', {
       providerId: provider.id,
       status: response.status,
-      data: response.data,
+      ack_status: response.data?.ack_status,
+      data: JSON.stringify(response.data).substring(0, 500), // Truncate for logging
     });
 
     return true;
@@ -394,7 +416,8 @@ export async function publishCatalogToCDS(
       providerId: provider.id,
       error: error.message,
       status: error.response?.status,
-      data: error.response?.data,
+      responseData: JSON.stringify(error.response?.data || {}).substring(0, 500),
+      url: `${getCDSBaseUrl()}/publish`,
     });
     return false;
   }
