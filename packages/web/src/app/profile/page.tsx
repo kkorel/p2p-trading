@@ -9,7 +9,7 @@ import Image from 'next/image';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
-import { authApi, type VCCredential } from '@/lib/api';
+import { authApi, buyerApi, sellerApi, type VCCredential, type BuyerOrder, type Order } from '@/lib/api';
 import { Card, Button, Input, Badge, useConfirm } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 
@@ -226,26 +226,79 @@ function getTierGradientStyle(score?: number): React.CSSProperties {
 // P2P Value Insight Component - Shows financial benefits of P2P trading
 function P2PValueInsight() {
   const [showDetails, setShowDetails] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [p2pStats, setP2pStats] = useState({
+    totalSold: 0,
+    avgSellPrice: 0,
+    totalBought: 0,
+    avgBuyPrice: 0,
+  });
 
   // Reference DISCOM rates
   const DISCOM_BUY_RATE = 8;    // Rs per kWh (what DISCOM charges consumers)
   const DISCOM_SELLBACK_RATE = 2; // Rs per kWh (what DISCOM pays for surplus)
 
-  // Example P2P trading stats (in real app, these would come from API/orders)
-  // For now, show a placeholder or example values
-  const p2pStats = {
-    totalSold: 120,        // kWh sold via P2P
-    avgSellPrice: 5.50,    // Average price received per kWh
-    totalBought: 80,       // kWh bought via P2P  
-    avgBuyPrice: 6.00,     // Average price paid per kWh
-  };
+  // Fetch real order data on mount
+  useEffect(() => {
+    const fetchOrderStats = async () => {
+      try {
+        // Fetch both buyer and seller orders
+        const [buyerResult, sellerResult] = await Promise.all([
+          buyerApi.getMyOrders().catch(() => ({ orders: [] })),
+          sellerApi.getMyOrders().catch(() => ({ orders: [] })),
+        ]);
+
+        // Filter for confirmed/completed orders only
+        const confirmedBuyerOrders = buyerResult.orders.filter(
+          (o) => o.status === 'CONFIRMED' || o.status === 'COMPLETED'
+        );
+        const confirmedSellerOrders = sellerResult.orders.filter(
+          (o) => o.status === 'CONFIRMED' || o.status === 'COMPLETED'
+        );
+
+        // Calculate buyer stats
+        let totalBought = 0;
+        let totalBuyValue = 0;
+        for (const order of confirmedBuyerOrders) {
+          const qty = order.itemInfo?.quantity || order.quote?.totalQuantity || 0;
+          const price = order.itemInfo?.price_per_kwh || (order.quote?.price?.value && order.quote?.totalQuantity ? order.quote.price.value / order.quote.totalQuantity : 0);
+          totalBought += qty;
+          totalBuyValue += qty * price;
+        }
+
+        // Calculate seller stats
+        let totalSold = 0;
+        let totalSellValue = 0;
+        for (const order of confirmedSellerOrders) {
+          const qty = order.itemInfo?.sold_quantity || order.quote?.totalQuantity || 0;
+          const price = order.itemInfo?.price_per_kwh || (order.quote?.price?.value && order.quote?.totalQuantity ? order.quote.price.value / order.quote.totalQuantity : 0);
+          totalSold += qty;
+          totalSellValue += qty * price;
+        }
+
+        setP2pStats({
+          totalSold,
+          avgSellPrice: totalSold > 0 ? totalSellValue / totalSold : 0,
+          totalBought,
+          avgBuyPrice: totalBought > 0 ? totalBuyValue / totalBought : 0,
+        });
+      } catch (err) {
+        console.error('Failed to fetch order stats:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrderStats();
+  }, []);
 
   // Calculate value gained from P2P
   const sellerGain = p2pStats.totalSold * (p2pStats.avgSellPrice - DISCOM_SELLBACK_RATE);
   const buyerSavings = p2pStats.totalBought * (DISCOM_BUY_RATE - p2pStats.avgBuyPrice);
   const totalValue = sellerGain + buyerSavings;
 
-  // If no trading activity, don't show the component
+  // Don't show if loading or no trading activity
+  if (isLoading) return null;
   if (p2pStats.totalSold === 0 && p2pStats.totalBought === 0) {
     return null;
   }
@@ -313,14 +366,18 @@ function P2PValueInsight() {
               <span className="font-medium text-[var(--color-text)]">{formatCurrency(DISCOM_SELLBACK_RATE)}/kWh</span>
             </div>
             <div className="border-t border-[var(--color-border)] pt-2 mt-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--color-text-muted)]">Your avg P2P sell price</span>
-                <span className="font-medium text-[var(--color-success)]">{formatCurrency(p2pStats.avgSellPrice)}/kWh</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--color-text-muted)]">Your avg P2P buy price</span>
-                <span className="font-medium text-[var(--color-success)]">{formatCurrency(p2pStats.avgBuyPrice)}/kWh</span>
-              </div>
+              {p2pStats.totalSold > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--color-text-muted)]">Your avg P2P sell ({p2pStats.totalSold} kWh)</span>
+                  <span className="font-medium text-[var(--color-success)]">{formatCurrency(p2pStats.avgSellPrice)}/kWh</span>
+                </div>
+              )}
+              {p2pStats.totalBought > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--color-text-muted)]">Your avg P2P buy ({p2pStats.totalBought} kWh)</span>
+                  <span className="font-medium text-[var(--color-success)]">{formatCurrency(p2pStats.avgBuyPrice)}/kWh</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -366,6 +423,7 @@ export default function ProfilePage() {
     insights: string;
     trustBonus: string | null;
   } | null>(null);
+  const [forceShowUpload, setForceShowUpload] = useState(false);
 
   // Initialize capacity input when user loads
   useEffect(() => {
@@ -620,7 +678,7 @@ export default function ProfilePage() {
             </h3>
           </div>
 
-          {user.meterDataAnalyzed ? (
+          {user.meterDataAnalyzed && !forceShowUpload ? (
             // Already analyzed
             <div className="space-y-3">
               <div className="p-3 rounded-lg bg-[var(--color-success-light)] border border-[var(--color-success)]">
@@ -667,6 +725,7 @@ export default function ProfilePage() {
                       updateUser(updatedUser);
                       setAnalysisResult(null);
                       setAnalysisError(null);
+                      setForceShowUpload(true);
                     } catch (err: any) {
                       setAnalysisError(err.message || 'Failed to reset');
                     }
