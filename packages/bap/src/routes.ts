@@ -614,17 +614,35 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     },
   };
   
+  // Determine the correct CDS URL - use external CDS when enabled
+  // External CDS: EXTERNAL_CDS_URL (e.g., .../beckn/catalog) → use .../beckn/discover
+  // Local CDS: CDS_URL (e.g., localhost:4001) → use /discover
+  const getCdsDiscoverUrl = () => {
+    if (config.external.useExternalCds) {
+      const externalUrl = process.env.EXTERNAL_CDS_URL || config.external.cds;
+      // If URL ends with /catalog, replace with /discover for the discover endpoint
+      if (externalUrl.endsWith('/catalog')) {
+        return externalUrl.replace(/\/catalog$/, '/discover');
+      }
+      return `${externalUrl}/discover`;
+    }
+    return `${config.urls.cds}/discover`;
+  };
+  
+  const cdsDiscoverUrl = getCdsDiscoverUrl();
+  
   logger.info('Sending discover request', {
     transaction_id: txnId,
     message_id: context.message_id,
     action: 'discover',
+    cdsUrl: cdsDiscoverUrl,
   });
   
   // Log outbound event
   await logEvent(txnId, context.message_id, 'discover', 'OUTBOUND', JSON.stringify(discoverMessage));
   
   try {
-    const response = await axios.post(`${config.urls.cds}/discover`, discoverMessage);
+    const response = await axios.post(cdsDiscoverUrl, discoverMessage);
     
     // Check if the CDS returned catalog data synchronously in the response
     // External CDS may return data in ack.message.catalogs instead of via callback
