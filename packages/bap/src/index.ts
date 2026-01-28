@@ -187,8 +187,11 @@ async function start() {
 
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
-  } catch (error) {
-    logger.error('Failed to initialize:', error);
+  } catch (error: any) {
+    logger.error('Failed to initialize:', error?.message || error);
+    if (error?.stack) {
+      console.error('Stack trace:', error.stack);
+    }
     process.exit(1);
   }
 }

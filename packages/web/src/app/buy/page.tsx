@@ -317,6 +317,7 @@ export default function BuyPage() {
           providerId={selectedOffer?.providerId}
           providerName={selectedOffer?.providerName || ''}
           initialQuantity={requestedQuantity}
+          availableQuantity={selectedOffer?.availableQty}
           onConfirm={handleConfirmOrder}
           trustWarning={transaction?.trustWarning}
         />

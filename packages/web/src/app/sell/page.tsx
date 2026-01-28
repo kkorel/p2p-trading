@@ -151,8 +151,8 @@ export default function SellPage() {
   return (
     <AppShell title="Sell Energy">
       <div className="flex flex-col gap-4">
-        {/* Stats */}
-        {provider && (
+        {/* Stats - only show when production capacity is set */}
+        {provider && hasProductionCapacity && (
           <div className="grid grid-cols-2 gap-3">
             <Card padding="sm" className="text-center">
               <p className="text-xl font-semibold text-[var(--color-primary)]">{offers.length}</p>

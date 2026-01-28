@@ -42,10 +42,14 @@ export interface MatchingResult {
 
 /**
  * Normalize price score (lower price = higher score)
+ * Uses a floor to ensure even the most expensive offer gets some score (not 0%)
  */
 function calculatePriceScore(offerPrice: number, minPrice: number, maxPrice: number): number {
   if (maxPrice === minPrice) return 1; // All same price, give full score
-  return (maxPrice - offerPrice) / (maxPrice - minPrice);
+  // Calculate base score, but apply a floor so max-priced offer gets 0.3 (30%), not 0%
+  const rawScore = (maxPrice - offerPrice) / (maxPrice - minPrice);
+  // Scale to 0.3-1.0 range instead of 0-1 (so even highest price gets 30%)
+  return 0.3 + rawScore * 0.7;
 }
 
 /**

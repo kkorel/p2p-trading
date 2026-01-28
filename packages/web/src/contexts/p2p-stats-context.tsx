@@ -44,12 +44,13 @@ export function P2PStatsProvider({ children }: { children: ReactNode }) {
         sellerApi.getMyOrders().catch(() => ({ orders: [] })),
       ]);
 
-      // Filter for confirmed/completed orders only
+      // Filter for active/completed orders only (excludes cancelled/pending)
+      // Order statuses: DRAFT -> PENDING -> ACTIVE -> COMPLETED (or CANCELLED)
       const confirmedBuyerOrders = buyerResult.orders.filter(
-        (o) => o.status === 'CONFIRMED' || o.status === 'COMPLETED'
+        (o) => o.status === 'ACTIVE' || o.status === 'COMPLETED'
       );
       const confirmedSellerOrders = sellerResult.orders.filter(
-        (o) => o.status === 'CONFIRMED' || o.status === 'COMPLETED'
+        (o) => o.status === 'ACTIVE' || o.status === 'COMPLETED'
       );
 
       // Calculate buyer stats

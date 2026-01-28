@@ -16,6 +16,7 @@ interface OrderSheetProps {
   providerName: string;
   providerId?: string;
   initialQuantity?: number;
+  availableQuantity?: number; // Actual available quantity (from blockStats)
   onConfirm: (quantity: number) => Promise<Order | null>;
   trustWarning?: {
     score: number;
@@ -31,6 +32,7 @@ export function OrderSheet({
   providerName,
   providerId,
   initialQuantity,
+  availableQuantity,
   onConfirm,
   trustWarning,
 }: OrderSheetProps) {
@@ -41,13 +43,17 @@ export function OrderSheet({
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Use available quantity if provided, otherwise fall back to maxQuantity
+  const effectiveMaxQuantity = availableQuantity ?? offer?.maxQuantity ?? 100;
+
   // Reset quantity when offer changes or sheet opens
   useEffect(() => {
     if (open && offer) {
-      const qty = initialQuantity || Math.min(10, offer.maxQuantity);
-      setQuantity(Math.min(qty, offer.maxQuantity));
+      const maxQty = availableQuantity ?? offer.maxQuantity;
+      const qty = initialQuantity || Math.min(10, maxQty);
+      setQuantity(Math.min(qty, maxQty));
     }
-  }, [open, offer, initialQuantity]);
+  }, [open, offer, initialQuantity, availableQuantity]);
 
   const totalPrice = offer ? offer.price.value * quantity : 0;
   const fee = Math.round(totalPrice * 0.025 * 100) / 100; // 2.5% platform fee
@@ -153,21 +159,21 @@ export function OrderSheet({
               <Input
                 type="number"
                 value={quantity}
-                onChange={(e) => setQuantity(Math.min(offer.maxQuantity, Math.max(1, parseInt(e.target.value) || 1)))}
+                onChange={(e) => setQuantity(Math.min(effectiveMaxQuantity, Math.max(1, parseInt(e.target.value) || 1)))}
                 className="text-center font-medium"
                 min={1}
-                max={offer.maxQuantity}
+                max={effectiveMaxQuantity}
               />
               <button
                 type="button"
-                onClick={() => setQuantity(Math.min(offer.maxQuantity, quantity + 5))}
+                onClick={() => setQuantity(Math.min(effectiveMaxQuantity, quantity + 5))}
                 className="w-11 h-11 rounded-[12px] border border-[var(--color-border)] flex items-center justify-center text-lg font-medium text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors"
               >
                 +
               </button>
             </div>
             <p className="text-xs text-[var(--color-text-muted)] mt-1">
-              Max available: {offer.maxQuantity} kWh
+              Max available: {effectiveMaxQuantity} kWh
             </p>
           </div>
 

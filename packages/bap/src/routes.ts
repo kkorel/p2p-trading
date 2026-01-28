@@ -36,6 +36,7 @@ import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
 import { optionalAuthMiddleware, authMiddleware } from './middleware/auth';
 import { prisma } from '@p2p/shared';
+import { getAvailableBlockCount, getOfferById } from './seller-catalog';
 
 const router = Router();
 const logger = createLogger('BAP');
@@ -750,6 +751,32 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         });
       }
       
+      // Refresh local offer availability from actual block counts
+      // This ensures discovery reflects the true current availability, not stale CDS data
+      for (const providerCatalog of filteredProviders) {
+        for (const item of providerCatalog.items || []) {
+          for (const offer of item.offers || []) {
+            // Check if this is a local offer (exists in our database)
+            const localOffer = await getOfferById(offer.id);
+            if (localOffer) {
+              // Get real-time block availability
+              const availableBlocks = await getAvailableBlockCount(offer.id);
+              offer.maxQuantity = availableBlocks;
+              
+              logger.debug(`Refreshed local offer availability: ${offer.id} = ${availableBlocks} blocks`, {
+                transaction_id: txnId,
+              });
+            }
+          }
+          // Filter out offers with 0 availability
+          item.offers = (item.offers || []).filter((o: any) => o.maxQuantity > 0);
+        }
+        // Filter out items with no offers
+        providerCatalog.items = (providerCatalog.items || []).filter((i: any) => i.offers && i.offers.length > 0);
+      }
+      // Filter out providers with no items
+      filteredProviders = filteredProviders.filter(p => p.items && p.items.length > 0);
+      
       // Extract providers and offers for matching
       const providers = new Map<string, Provider>();
       const allOffers: CatalogOffer[] = [];
@@ -946,8 +973,14 @@ router.post('/api/select', async (req: Request, res: Response) => {
   
   await logEvent(transaction_id, context.message_id, 'select', 'OUTBOUND', JSON.stringify(selectMessage));
   
-  // Update state - store both the offer and the quantity the buyer wants
-  await updateTransaction(transaction_id, { selectedOffer, selectedQuantity: quantity });
+  // Update state - store the offer and quantity, and CLEAR the old order to allow a new one
+  // This is critical for allowing multiple purchases from the same discovery
+  await updateTransaction(transaction_id, { 
+    selectedOffer, 
+    selectedQuantity: quantity,
+    order: undefined, // Clear old order so new one can be created
+    error: undefined, // Clear any previous error
+  });
   
   try {
     // Route to the correct BPP based on offer's bpp_uri
@@ -1869,6 +1902,22 @@ router.post('/api/db/reset', async (req: Request, res: Response) => {
     // 13. Reset demo accounts
     initializeDemoAccounts();
     
+    // 14. Clean up uploaded meter PDF files
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'meter-pdfs');
+      if (fs.existsSync(uploadsDir)) {
+        const files = fs.readdirSync(uploadsDir);
+        for (const file of files) {
+          fs.unlinkSync(path.join(uploadsDir, file));
+        }
+        logger.info(`Cleared ${files.length} meter PDF files from uploads`);
+      }
+    } catch (cleanupErr: any) {
+      logger.warn(`Could not clean meter PDFs: ${cleanupErr.message}`);
+    }
+    
     logger.info('=== DATABASE RESET COMPLETE ===', deleteCounts);
     
     res.json({
@@ -2296,9 +2345,17 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
       });
     }
 
+    // Calculate cancellation penalty and seller compensation
+    const orderTotal = order.totalPrice || 0;
+    const cancellationPenaltyRate = 0.10; // 10% cancellation penalty
+    const sellerCompensationRate = 0.05; // 5% goes to seller
+    const cancellationPenalty = Math.round(orderTotal * cancellationPenaltyRate * 100) / 100;
+    const sellerCompensation = Math.round(orderTotal * sellerCompensationRate * 100) / 100;
+    const buyerRefund = orderTotal - cancellationPenalty; // Buyer gets 90% back
+
     // Start cancellation transaction
     await prisma.$transaction(async (tx) => {
-      // 1. Update order status to CANCELLED
+      // 1. Update order status to CANCELLED with penalty info
       await tx.order.update({
         where: { id: order.id },
         data: {
@@ -2306,18 +2363,27 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
           cancelledAt: new Date(),
           cancelledBy: buyerId,
           cancelReason: reason || 'Buyer cancelled',
+          cancelPenalty: cancellationPenalty,
         },
       });
 
-      // 2. Refund escrowed amount to buyer (if payment was escrowed)
+      // 2. Handle payment refund with penalty
       if (order.paymentStatus === 'ESCROWED') {
         const escrowPayment = order.payments.find((p: any) => p.type === 'ESCROW');
         if (escrowPayment) {
-          // Refund to buyer
+          // Refund 90% to buyer (minus cancellation penalty)
           await tx.user.update({
             where: { id: buyerId },
-            data: { balance: { increment: escrowPayment.totalAmount } },
+            data: { balance: { increment: buyerRefund } },
           });
+
+          // Pay seller 5% compensation for the cancelled order
+          if (escrowPayment.sellerId) {
+            await tx.user.update({
+              where: { id: escrowPayment.sellerId },
+              data: { balance: { increment: sellerCompensation } },
+            });
+          }
 
           // Update payment status
           await tx.paymentRecord.update({
@@ -2325,22 +2391,40 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
             data: { status: 'REFUNDED' },
           });
 
-          // Create refund record
+          // Create refund record for buyer
           await tx.paymentRecord.create({
             data: {
               type: 'REFUND',
               orderId: order.id,
               buyerId,
               sellerId: escrowPayment.sellerId,
-              totalAmount: escrowPayment.totalAmount,
-              platformFee: 0, // No fee on refund
+              totalAmount: buyerRefund,
+              platformFee: cancellationPenalty - sellerCompensation, // Platform keeps 5%
               status: 'COMPLETED',
               completedAt: new Date(),
             },
           });
 
-          logger.info(`Refunded ${escrowPayment.totalAmount} to buyer ${buyerId}`, {
+          // Create compensation record for seller
+          if (escrowPayment.sellerId) {
+            await tx.paymentRecord.create({
+              data: {
+                type: 'CANCEL_COMPENSATION',
+                orderId: order.id,
+                buyerId,
+                sellerId: escrowPayment.sellerId,
+                totalAmount: sellerCompensation,
+                platformFee: 0,
+                status: 'COMPLETED',
+                completedAt: new Date(),
+              },
+            });
+          }
+
+          logger.info(`Cancellation processed: buyer refund ${buyerRefund}, seller compensation ${sellerCompensation}`, {
             orderId: order.id,
+            totalAmount: orderTotal,
+            penalty: cancellationPenalty,
           });
         }
 
@@ -2348,6 +2432,46 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
         await tx.order.update({
           where: { id: order.id },
           data: { paymentStatus: 'REFUNDED' },
+        });
+      }
+
+      // 3. Update buyer trust score (penalty for cancellation)
+      const buyer = await tx.user.findUnique({ where: { id: buyerId } });
+      if (buyer) {
+        const cancelledQty = order.totalQty || 0;
+        const trustPenalty = Math.min(0.05, cancelledQty * 0.002); // 0.2% per kWh, max 5%
+        const newTrustScore = Math.max(0.1, buyer.trustScore - trustPenalty);
+        const newTradeLimit = Math.max(5, Math.round(buyer.allowedTradeLimit * 0.95)); // Reduce by 5%
+
+        await tx.user.update({
+          where: { id: buyerId },
+          data: {
+            trustScore: newTrustScore,
+            allowedTradeLimit: newTradeLimit,
+          },
+        });
+
+        // Record trust history
+        await tx.trustScoreHistory.create({
+          data: {
+            userId: buyerId,
+            previousScore: buyer.trustScore,
+            newScore: newTrustScore,
+            previousLimit: buyer.allowedTradeLimit,
+            newLimit: newTradeLimit,
+            reason: 'BUYER_CANCEL',
+            orderId: order.id,
+            metadata: JSON.stringify({
+              cancelledQty,
+              trustPenalty,
+              refundAmount: buyerRefund,
+            }),
+          },
+        });
+
+        logger.info(`Buyer trust updated after cancellation: ${buyer.trustScore.toFixed(3)} → ${newTrustScore.toFixed(3)}`, {
+          buyerId,
+          orderId: order.id,
         });
       }
 
