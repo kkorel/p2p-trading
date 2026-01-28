@@ -35,10 +35,11 @@ interface UnifiedOrder {
   // For cancelled orders
   cancellation?: {
     cancelledAt?: string;
+    cancelledBy?: string;
     reason?: string;
-    penalty?: number;
-    refund?: number;
-    compensation?: number; // 5% seller gets
+    penalty?: number | null;
+    refund?: number | null;
+    compensation?: number | null; // 5% seller gets when buyer cancels
   };
   // Trust impact
   trustImpact?: {
@@ -246,6 +247,46 @@ export default function OrdersPage() {
     }
   };
 
+  const handleSellerCancelOrder = async (order: UnifiedOrder) => {
+    if (cancellingOrderId) return;
+
+    const confirmed = await confirm({
+      title: 'Cancel Order as Seller?',
+      message: `Cancelling this order will refund the buyer in full and charge you a 5% platform penalty.\n\nOrder: ${order.quantity} kWh\nPenalty: 5% of the order total`,
+      confirmText: 'Cancel Order',
+      cancelText: 'Keep Order',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      const result = await sellerApi.cancelOrder(order.id, 'Seller requested cancellation');
+      const refundTotal = result.refundTotal ?? 0;
+      const sellerPenalty = result.sellerPenalty ?? 0;
+
+      showToast({
+        type: 'success',
+        title: 'Order Cancelled',
+        message: refundTotal > 0 || sellerPenalty > 0
+          ? `Buyer refunded ${formatCurrency(refundTotal)}. Penalty charged: ${formatCurrency(sellerPenalty)}.`
+          : 'Order cancelled successfully.',
+        duration: 6000,
+      });
+
+      await Promise.all([loadOrders(), refreshUser()]);
+    } catch (err: any) {
+      showToast({
+        type: 'error',
+        title: 'Cancellation Failed',
+        message: err.message || 'Failed to cancel order. Please try again.',
+      });
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
   if (isLoading || authLoading) {
     return (
       <AppShell title="My Orders">
@@ -419,12 +460,14 @@ export default function OrdersPage() {
                               {formatCurrency(order.totalPrice + fee)}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center text-sm mb-1">
-                            <span className="text-[var(--color-text-muted)]">Penalty (10%)</span>
-                            <span className="text-[var(--color-danger)]">
-                              -{formatCurrency(order.cancellation.penalty || 0)}
-                            </span>
-                          </div>
+                          {typeof order.cancellation.penalty === 'number' && (
+                            <div className="flex justify-between items-center text-sm mb-1">
+                              <span className="text-[var(--color-text-muted)]">Penalty</span>
+                              <span className="text-[var(--color-danger)]">
+                                -{formatCurrency(order.cancellation.penalty || 0)}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-medium text-[var(--color-text)]">Refunded</span>
                             <span className="text-base font-semibold text-[var(--color-success)]">
@@ -458,13 +501,22 @@ export default function OrdersPage() {
                     ) : (
                       // Seller view
                       order.status === 'CANCELLED' && order.cancellation ? (
-                        // Cancelled - show compensation
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-[var(--color-text)]">Compensation (5%)</span>
-                          <span className="text-base font-semibold text-[var(--color-success)]">
-                            +{formatCurrency(order.cancellation.compensation || 0)}
-                          </span>
-                        </div>
+                        // Cancelled - show compensation (buyer cancel) or penalty (seller cancel)
+                        (order.cancellation.cancelledBy?.startsWith('SELLER:') ? (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-[var(--color-text)]">Penalty (5%)</span>
+                            <span className="text-base font-semibold text-[var(--color-danger)]">
+                              -{formatCurrency(order.cancellation.penalty || 0)}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-[var(--color-text)]">Compensation (5%)</span>
+                            <span className="text-base font-semibold text-[var(--color-success)]">
+                              +{formatCurrency(order.cancellation.compensation || 0)}
+                            </span>
+                          </div>
+                        ))
                       ) : order.paymentStatus === 'RELEASED' ? (
                         // Payment released after delivery
                         <div className="flex justify-between items-center">
@@ -556,9 +608,8 @@ export default function OrdersPage() {
 
                   {/* Cancel Button for active bought orders - hide if within 30 min of delivery */}
                   {(() => {
-                    if (!isBought || (order.status !== 'ACTIVE' && order.status !== 'PENDING')) {
-                      return null;
-                    }
+                    const isCancelableStatus = order.status === 'ACTIVE' || order.status === 'PENDING';
+                    if (!isCancelableStatus) return null;
 
                     // Check if we're at least 30 min before delivery start
                     const deliveryStart = order.deliveryTime?.start ? new Date(order.deliveryTime.start) : null;
@@ -585,7 +636,7 @@ export default function OrdersPage() {
                           variant="danger"
                           size="sm"
                           fullWidth
-                          onClick={() => handleCancelOrder(order)}
+                          onClick={() => isBought ? handleCancelOrder(order) : handleSellerCancelOrder(order)}
                           loading={cancellingOrderId === order.id}
                           disabled={!!cancellingOrderId}
                         >

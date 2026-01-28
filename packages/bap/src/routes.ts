@@ -2258,6 +2258,14 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
           totalQuantity: totalQty,
         } :
                              undefined,
+        paymentStatus: order.paymentStatus || 'PENDING',
+        cancellation: order.status === 'CANCELLED' ? {
+          cancelledAt: order.cancelledAt?.toISOString(),
+          cancelledBy: order.cancelledBy,
+          reason: order.cancelReason,
+          penalty: order.cancelledBy?.startsWith('SELLER:') ? null : order.cancelPenalty,
+          refund: order.cancelRefund,
+        } : undefined,
         provider: order.provider ? {
           id: order.provider.id,
           name: order.provider.name,
@@ -2364,6 +2372,7 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
           cancelledBy: `BUYER:${buyerId}`,
           cancelReason: reason || 'Buyer cancelled',
           cancelPenalty: cancellationPenalty,
+          cancelRefund: buyerRefund,
         },
       });
 

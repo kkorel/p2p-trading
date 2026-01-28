@@ -310,6 +310,15 @@ export const sellerApi = {
 
   deleteOffer: (id: string) =>
     request<{ status: string }>(`/seller/offers/${id}`, { method: 'DELETE' }),
+
+  cancelOrder: (orderId: string, reason?: string) =>
+    request<{ status: string; orderId: string; refundTotal?: number; sellerPenalty?: number }>(
+      `/seller/orders/${orderId}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }
+    ),
 };
 
 // Types
@@ -367,6 +376,7 @@ export interface Offer {
 export interface Order {
   id: string;
   status: string;
+  paymentStatus?: string;
   quote?: { price: { value: number }; totalQuantity: number };
   created_at: string;
   itemInfo?: {
@@ -375,6 +385,14 @@ export interface Order {
     sold_quantity: number;
     source_type?: string;
     price_per_kwh?: number;
+  };
+  cancellation?: {
+    cancelledAt?: string;
+    cancelledBy?: string;
+    reason?: string;
+    penalty?: number | null;
+    refund?: number | null;
+    compensation?: number | null;
   };
   // DISCOM fulfillment verification
   fulfillment?: {
@@ -392,6 +410,7 @@ export interface BuyerOrder {
   id: string;
   status: string;
   created_at: string;
+  paymentStatus?: string;
   quote?: { price: { value: number }; totalQuantity: number };
   provider?: { id: string; name: string };
   itemInfo: {
@@ -401,10 +420,13 @@ export interface BuyerOrder {
     price_per_kwh: number;
     quantity: number;
   };
-  // Cancellation fields
-  cancelledAt?: string;
-  cancelledBy?: string;
-  cancelReason?: string;
+  cancellation?: {
+    cancelledAt?: string;
+    cancelledBy?: string;
+    reason?: string;
+    penalty?: number | null;
+    refund?: number | null;
+  };
 }
 
 export interface DiscoverParams {

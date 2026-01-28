@@ -1210,9 +1210,12 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
             end: offer.timeWindowEnd?.toISOString(),
           } : undefined;
 
-          // Get cancellation compensation for seller (5% of total)
-          const cancellationCompensation = order.status === 'CANCELLED' && order.cancelPenalty
-            ? order.cancelPenalty * 0.5 // 5% of 10% penalty goes to seller
+          const cancelledBy = order.cancelledBy;
+          const sellerCancelled = cancelledBy?.startsWith('SELLER:');
+
+          // If buyer cancels, seller receives 5% compensation (half of 10% penalty)
+          const cancellationCompensation = order.status === 'CANCELLED' && order.cancelPenalty && !sellerCancelled
+            ? order.cancelPenalty * 0.5
             : null;
 
           return {
@@ -1230,6 +1233,10 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
             // Cancellation info for seller
             cancellation: order.status === 'CANCELLED' ? {
               cancelledAt: order.cancelledAt,
+              cancelledBy: order.cancelledBy,
+              reason: order.cancelReason,
+              penalty: sellerCancelled ? order.cancelPenalty : null,
+              refund: sellerCancelled ? order.cancelRefund : null,
               compensation: cancellationCompensation,
             } : undefined,
             // DISCOM verification results

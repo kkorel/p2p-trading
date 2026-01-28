@@ -27,6 +27,7 @@ export default function SellPage() {
   const [provider, setProvider] = useState<Provider | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
 
   const [showAddOffer, setShowAddOffer] = useState(false);
   const [quotaStats, setQuotaStats] = useState<{
@@ -132,6 +133,43 @@ export default function SellPage() {
       showToast({ type: 'success', title: 'Offer deleted successfully' });
     } catch (error: any) {
       showToast({ type: 'error', title: error.message || 'Failed to delete offer' });
+    }
+  };
+
+  const handleCancelOrder = async (order: Order) => {
+    if (cancellingOrderId) return;
+
+    const quantity = order.itemInfo?.sold_quantity || order.quote?.totalQuantity || 0;
+    const confirmed = await confirm({
+      title: 'Cancel Order as Seller?',
+      message: `Cancelling this order will refund the buyer in full and charge you a 5% platform penalty.\n\nOrder: ${quantity} kWh\nPenalty: 5% of the order total`,
+      confirmText: 'Cancel Order',
+      cancelText: 'Keep Order',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      const result = await sellerApi.cancelOrder(order.id, 'Seller requested cancellation');
+      const refundTotal = result.refundTotal ?? 0;
+      const sellerPenalty = result.sellerPenalty ?? 0;
+
+      showToast({
+        type: 'success',
+        title: 'Order Cancelled',
+        message: refundTotal > 0 || sellerPenalty > 0
+          ? `Buyer refunded ${formatCurrency(refundTotal)}. Penalty charged: ${formatCurrency(sellerPenalty)}.`
+          : 'Order cancelled successfully.',
+        duration: 6000,
+      });
+
+      await loadData();
+    } catch (error: any) {
+      showToast({ type: 'error', title: error.message || 'Failed to cancel order' });
+    } finally {
+      setCancellingOrderId(null);
     }
   };
 
@@ -402,13 +440,22 @@ export default function SellPage() {
                     {/* Payment Info - Differs by status */}
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--color-border)]">
                       {order.status === 'CANCELLED' && (order as any).cancellation ? (
-                        // Cancelled - show compensation
-                        <>
-                          <span className="text-sm text-[var(--color-text-muted)]">Compensation (5%)</span>
-                          <span className="text-base font-semibold text-[var(--color-success)]">
-                            +{formatCurrency((order as any).cancellation.compensation || 0)}
-                          </span>
-                        </>
+                        // Cancelled - show compensation (buyer cancel) or penalty (seller cancel)
+                        (String((order as any).cancellation.cancelledBy || '').startsWith('SELLER:') ? (
+                          <>
+                            <span className="text-sm text-[var(--color-text-muted)]">Penalty (5%)</span>
+                            <span className="text-base font-semibold text-[var(--color-danger)]">
+                              -{formatCurrency((order as any).cancellation.penalty || 0)}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-sm text-[var(--color-text-muted)]">Compensation (5%)</span>
+                            <span className="text-base font-semibold text-[var(--color-success)]">
+                              +{formatCurrency((order as any).cancellation.compensation || 0)}
+                            </span>
+                          </>
+                        ))
                       ) : (order as any).paymentStatus === 'RELEASED' ? (
                         // Payment released after delivery
                         <>
@@ -427,6 +474,47 @@ export default function SellPage() {
                         </>
                       ) : null}
                     </div>
+
+                    {/* Seller Cancel Button */}
+                    {(() => {
+                      const isCancelableStatus = order.status === 'ACTIVE' || order.status === 'PENDING';
+                      if (!isCancelableStatus) return null;
+
+                      const deliveryStart = (order as any).deliveryTime?.start
+                        ? new Date((order as any).deliveryTime.start)
+                        : null;
+                      const now = new Date();
+                      const minCancelBuffer = 30 * 60 * 1000;
+                      const canCancel = !deliveryStart || (deliveryStart.getTime() - now.getTime() >= minCancelBuffer);
+                      const minutesRemaining = deliveryStart
+                        ? Math.max(0, Math.floor((deliveryStart.getTime() - now.getTime()) / 60000))
+                        : null;
+
+                      if (!canCancel) {
+                        return (
+                          <div className="mt-3 p-2 bg-[var(--color-warning-light)] rounded-lg">
+                            <p className="text-xs text-[var(--color-warning)] text-center">
+                              Cannot cancel within 30 min of delivery ({minutesRemaining} min remaining)
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="mt-3">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            fullWidth
+                            onClick={() => handleCancelOrder(order)}
+                            loading={cancellingOrderId === order.id}
+                            disabled={!!cancellingOrderId}
+                          >
+                            Cancel Order
+                          </Button>
+                        </div>
+                      );
+                    })()}
 
                     {/* Fulfillment Status (DISCOM Verification) */}
                     {order.fulfillment && (
