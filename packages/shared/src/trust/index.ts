@@ -10,6 +10,7 @@ export {
     calculateDeliveryPenalty,
     updateTrustAfterDiscom,
     updateTrustAfterCancel,
+    updateTrustAfterSellerCancel,
     updateTrustAfterMeterAnalysis,
     getTrustTierDescription,
     getNextTierProgress,

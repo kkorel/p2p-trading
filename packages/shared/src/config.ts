@@ -101,6 +101,7 @@ export const config = {
   fees: {
     platformRate: parseFloat(process.env.PLATFORM_FEE_RATE || '0.025'),
     cancellationPenalty: parseFloat(process.env.CANCELLATION_PENALTY_RATE || '0.10'),
+    sellerCancellationPenalty: parseFloat(process.env.SELLER_CANCEL_PENALTY_RATE || '0.05'),
   },
 
   // DISCOM configuration

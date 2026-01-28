@@ -17,6 +17,8 @@ export interface TrustConfig {
 
     // Cancellation penalty for buyers
     cancelPenalty: number;
+    // Cancellation penalty for sellers (stricter)
+    sellerCancelPenalty: number;
 
     // Limits mapping (trustScore ranges to allowed %)
     limitTiers: { minScore: number; maxLimit: number }[];
@@ -31,6 +33,7 @@ export function getTrustConfig(): TrustConfig {
         failurePenalty: parseFloat(process.env.TRUST_FAILURE_PENALTY || '0.10'),
         meterAnalysisBonus: parseFloat(process.env.TRUST_METER_BONUS || '0.2'),
         cancelPenalty: parseFloat(process.env.TRUST_CANCEL_PENALTY || '0.03'),
+        sellerCancelPenalty: parseFloat(process.env.TRUST_SELLER_CANCEL_PENALTY || '0.05'),
         limitTiers: [
             { minScore: 0.0, maxLimit: 10 },   // 0-30% trust → 10% limit
             { minScore: 0.3, maxLimit: 20 },   // 30-50% trust → 20% limit
@@ -171,6 +174,38 @@ export function updateTrustAfterCancel(
     // Proportional penalty based on cancelled quantity
     const ratio = totalOrderQty > 0 ? cancelledQty / totalOrderQty : 1;
     const trustImpact = -cfg.cancelPenalty * ratio;
+
+    const newScore = clampTrustScore(currentScore + trustImpact);
+    const newLimit = calculateAllowedLimit(newScore, cfg);
+
+    return { newScore, newLimit, trustImpact };
+}
+
+/**
+ * Update trust score after seller cancellation
+ * Penalty is proportional to cancelled quantity, stricter than buyer penalty
+ */
+export function updateTrustAfterSellerCancel(
+    currentScore: number,
+    cancelledQty: number,
+    totalOrderQty: number,
+    isWithinWindow: boolean,
+    config?: TrustConfig
+): { newScore: number; newLimit: number; trustImpact: number } {
+    const cfg = config || getTrustConfig();
+
+    // No penalty if cancelled outside window (system should block this anyway)
+    if (!isWithinWindow) {
+        return {
+            newScore: currentScore,
+            newLimit: calculateAllowedLimit(currentScore, cfg),
+            trustImpact: 0
+        };
+    }
+
+    // Proportional penalty based on cancelled quantity
+    const ratio = totalOrderQty > 0 ? cancelledQty / totalOrderQty : 1;
+    const trustImpact = -cfg.sellerCancelPenalty * ratio;
 
     const newScore = clampTrustScore(currentScore + trustImpact);
     const newLimit = calculateAllowedLimit(newScore, cfg);

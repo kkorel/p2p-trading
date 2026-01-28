@@ -23,6 +23,7 @@ import {
   ErrorCodes,
   OrderItem,
   Quote,
+  updateTrustAfterSellerCancel,
   withOrderLock,
   withTransactionLock,
   InsufficientBlocksError,
@@ -912,13 +913,15 @@ router.post('/cancel', async (req: Request, res: Response) => {
           return;
         }
 
+        const buyerIdForCancel = await getBuyerIdFromTransaction(context.transaction_id);
+
         // 1. Update order status to CANCELLED
         await prisma.order.update({
           where: { id: order.id },
           data: {
             status: 'CANCELLED',
             cancelledAt: new Date(),
-            cancelledBy: 'BUYER',
+            cancelledBy: buyerIdForCancel ? `BUYER:${buyerIdForCancel}` : 'BUYER',
             cancelReason: content.reason,
           },
         });
@@ -1792,6 +1795,267 @@ router.get('/seller/orders', async (req: Request, res: Response) => {
   }));
 
   res.json({ orders: enrichedOrders });
+});
+
+/**
+ * POST /seller/orders/:orderId/cancel - Seller-initiated cancellation
+ * - Full refund to buyer (order total + platform fee)
+ * - Seller pays 5% penalty to platform
+ * - Seller trust penalized (stricter than buyer)
+ */
+router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body as { reason?: string };
+    const providerId = req.user!.providerId;
+    const sellerUserId = req.user!.id;
+
+    if (!providerId) {
+      return res.status(400).json({ error: 'No seller profile found' });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payments: true },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (order.providerId !== providerId) {
+      return res.status(403).json({ error: 'You can only cancel orders for your provider' });
+    }
+
+    const cancelableStatuses = ['ACTIVE', 'PENDING', 'INITIALIZED'];
+    if (!cancelableStatuses.includes(order.status)) {
+      return res.status(400).json({
+        error: `Cannot cancel order with status: ${order.status}. Only ACTIVE, PENDING, or INITIALIZED orders can be cancelled.`,
+      });
+    }
+
+    const cancelWindowMinutes = config.cancellation.windowMinutes;
+    const cancelWindowMs = cancelWindowMinutes * 60 * 1000;
+    const orderAge = Date.now() - new Date(order.createdAt).getTime();
+
+    if (orderAge > cancelWindowMs) {
+      return res.status(400).json({
+        error: `Cancellation window (${cancelWindowMinutes} minutes) has expired. Order cannot be cancelled.`,
+      });
+    }
+
+    let cancellationStatus: 'cancelled' | 'already_cancelled' | 'not_cancelable' = 'cancelled';
+    let refundTotal = 0;
+    let sellerPenalty = 0;
+
+    await withOrderLock(order.id, async () => {
+      const currentOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { payments: true },
+      });
+
+      if (!currentOrder) {
+        throw new Error('Order not found during cancellation');
+      }
+
+      if (currentOrder.status === 'CANCELLED') {
+        cancellationStatus = 'already_cancelled';
+        return;
+      }
+
+      if (!cancelableStatuses.includes(currentOrder.status)) {
+        cancellationStatus = 'not_cancelable';
+        return;
+      }
+
+      const orderTotal = currentOrder.totalPrice || 0;
+      const platformFee = Math.round(orderTotal * config.fees.platformRate * 100) / 100;
+      const escrowPayment = currentOrder.payments.find((payment) => payment.type === 'ESCROW');
+      refundTotal = escrowPayment?.totalAmount ?? orderTotal + platformFee;
+      sellerPenalty = Math.round(orderTotal * config.fees.sellerCancellationPenalty * 100) / 100;
+
+      const buyerId = currentOrder.buyerId || await getBuyerIdFromTransaction(currentOrder.transactionId);
+
+      await prisma.$transaction(async (tx) => {
+        // 1. Update order status to CANCELLED with refund/penalty info
+        await tx.order.update({
+          where: { id: currentOrder.id },
+          data: {
+            status: 'CANCELLED',
+            cancelledAt: new Date(),
+            cancelledBy: `SELLER:${sellerUserId}`,
+            cancelReason: reason || 'Seller cancelled',
+            cancelPenalty: sellerPenalty,
+            cancelRefund: refundTotal,
+          },
+        });
+
+        // 2. Refund buyer fully if payment was escrowed
+        if (currentOrder.paymentStatus === 'ESCROWED' && buyerId && refundTotal > 0) {
+          await tx.user.update({
+            where: { id: buyerId },
+            data: { balance: { increment: refundTotal } },
+          });
+
+          if (escrowPayment) {
+            await tx.paymentRecord.update({
+              where: { id: escrowPayment.id },
+              data: { status: 'REFUNDED' },
+            });
+          }
+
+          await tx.order.update({
+            where: { id: currentOrder.id },
+            data: { paymentStatus: 'REFUNDED' },
+          });
+
+          await tx.paymentRecord.create({
+            data: {
+              type: 'SELLER_CANCEL_REFUND',
+              orderId: currentOrder.id,
+              buyerId,
+              sellerId: sellerUserId,
+              totalAmount: refundTotal,
+              platformFee: 0,
+              status: 'COMPLETED',
+              completedAt: new Date(),
+            },
+          });
+        }
+
+        // 3. Deduct seller penalty (platform fee)
+        if (sellerPenalty > 0) {
+          await tx.user.update({
+            where: { id: sellerUserId },
+            data: { balance: { decrement: sellerPenalty } },
+          });
+
+          await tx.paymentRecord.create({
+            data: {
+              type: 'SELLER_CANCEL_PENALTY',
+              orderId: currentOrder.id,
+              buyerId: buyerId || undefined,
+              sellerId: sellerUserId,
+              totalAmount: sellerPenalty,
+              platformFee: sellerPenalty,
+              status: 'COMPLETED',
+              completedAt: new Date(),
+            },
+          });
+        }
+
+        // 4. Update seller trust score (stricter penalty)
+        const seller = await tx.user.findUnique({ where: { id: sellerUserId } });
+        if (seller) {
+          const cancelledQty = currentOrder.totalQty || 0;
+          const { newScore, newLimit, trustImpact } = updateTrustAfterSellerCancel(
+            seller.trustScore,
+            cancelledQty,
+            cancelledQty,
+            true
+          );
+
+          await tx.user.update({
+            where: { id: sellerUserId },
+            data: {
+              trustScore: newScore,
+              allowedTradeLimit: newLimit,
+            },
+          });
+
+          await tx.trustScoreHistory.create({
+            data: {
+              userId: sellerUserId,
+              previousScore: seller.trustScore,
+              newScore,
+              previousLimit: seller.allowedTradeLimit,
+              newLimit,
+              reason: 'SELLER_CANCEL',
+              orderId: currentOrder.id,
+              metadata: JSON.stringify({
+                cancelledQty,
+                trustImpact,
+                cancelReason: reason,
+              }),
+            },
+          });
+        }
+      });
+    });
+
+    if (cancellationStatus === 'already_cancelled') {
+      return res.json({ status: 'already_cancelled', orderId });
+    }
+
+    if (cancellationStatus === 'not_cancelable') {
+      return res.status(409).json({ error: 'Order status changed; cancellation not allowed' });
+    }
+
+    // Release reserved blocks back to AVAILABLE
+    const releasedCount = await releaseBlocksByOrderId(order.id);
+    logger.info(`Released ${releasedCount} blocks for seller-cancelled order ${order.id}`);
+
+    // Republish catalog to CDS with increased availability
+    if (isExternalCDSEnabled()) {
+      try {
+        const providerInfo = await getProvider(providerId);
+        const providerName = providerInfo?.name || 'Energy Provider';
+        const allItems = await getProviderItems(providerId);
+        const allOffers = await getProviderOffers(providerId);
+
+        const syncItems = allItems.map(item => ({
+          id: item.id,
+          provider_id: item.provider_id,
+          source_type: item.source_type,
+          delivery_mode: item.delivery_mode,
+          available_qty: item.available_qty,
+          production_windows: item.production_windows,
+          meter_id: item.meter_id,
+        }));
+
+        const syncOffers = await Promise.all(allOffers.map(async (offer) => {
+          const availableBlocks = await getAvailableBlockCount(offer.id);
+          return {
+            id: offer.id,
+            item_id: offer.item_id,
+            provider_id: offer.provider_id,
+            price_value: offer.price.value,
+            currency: offer.price.currency,
+            max_qty: availableBlocks,
+            time_window: offer.timeWindow,
+            pricing_model: offer.offerAttributes.pricingModel,
+            settlement_type: offer.offerAttributes.settlementType,
+          };
+        }));
+
+        const activeOffers = syncOffers.filter(o => o.max_qty > 0);
+
+        await publishCatalogToCDS(
+          { id: providerId, name: providerName },
+          syncItems,
+          activeOffers,
+          activeOffers.length > 0
+        );
+
+        logger.info(`Catalog republished to CDS after seller cancellation`, {
+          providerId,
+          releasedBlocks: releasedCount,
+        });
+      } catch (syncError: any) {
+        logger.error(`Failed to republish catalog after seller cancellation: ${syncError.message}`);
+      }
+    }
+
+    return res.json({
+      status: 'cancelled',
+      orderId,
+      refundTotal,
+      sellerPenalty,
+    });
+  } catch (error: any) {
+    logger.error(`Failed to cancel order as seller: ${error.message}`);
+    return res.status(500).json({ error: 'Failed to cancel order' });
+  }
 });
 
 /**

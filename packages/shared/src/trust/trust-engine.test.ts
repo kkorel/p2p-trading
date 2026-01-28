@@ -8,6 +8,7 @@ import {
     calculateDeliveryPenalty,
     updateTrustAfterDiscom,
     updateTrustAfterCancel,
+    updateTrustAfterSellerCancel,
     updateTrustAfterMeterAnalysis,
     getTrustTierDescription,
     getNextTierProgress,
@@ -22,6 +23,7 @@ describe('Trust Engine', () => {
             expect(config.defaultLimit).toBe(10);
             expect(config.successBonus).toBe(0.02);
             expect(config.failurePenalty).toBe(0.10);
+            expect(config.sellerCancelPenalty).toBe(0.05);
         });
     });
 
@@ -154,6 +156,26 @@ describe('Trust Engine', () => {
             const result = updateTrustAfterCancel(0.5, 5, 10, true);
             const expectedPenalty = 0.03 * (5 / 10); // Half quantity = half penalty
             expect(result.trustImpact).toBeCloseTo(-expectedPenalty, 3);
+        });
+    });
+
+    describe('updateTrustAfterSellerCancel', () => {
+        it('should penalize seller more strictly than buyer', () => {
+            const sellerResult = updateTrustAfterSellerCancel(0.5, 5, 5, true);
+            const buyerResult = updateTrustAfterCancel(0.5, 5, 5, true);
+            expect(sellerResult.trustImpact).toBeLessThan(buyerResult.trustImpact);
+        });
+
+        it('should apply proportional penalty based on cancelled quantity', () => {
+            const result = updateTrustAfterSellerCancel(0.6, 2, 10, true);
+            const expectedPenalty = 0.05 * (2 / 10); // Default seller penalty
+            expect(result.trustImpact).toBeCloseTo(-expectedPenalty, 3);
+        });
+
+        it('should not penalize seller outside cancellation window', () => {
+            const result = updateTrustAfterSellerCancel(0.6, 5, 5, false);
+            expect(result.newScore).toBe(0.6);
+            expect(result.trustImpact).toBe(0);
         });
     });
 

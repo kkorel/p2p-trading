@@ -2361,7 +2361,7 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
         data: {
           status: 'CANCELLED',
           cancelledAt: new Date(),
-          cancelledBy: buyerId,
+          cancelledBy: `BUYER:${buyerId}`,
           cancelReason: reason || 'Buyer cancelled',
           cancelPenalty: cancellationPenalty,
         },

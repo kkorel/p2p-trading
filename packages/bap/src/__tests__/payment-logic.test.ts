@@ -298,4 +298,34 @@ describe('Cancellation Rules', () => {
       expect(result.buyerRefund).toBe(9000);
     });
   });
+
+  describe('Seller Cancellation Penalty', () => {
+    /**
+     * Seller cancellation rules:
+     * - Buyer refunded 100% (order total + platform fee)
+     * - Seller pays 5% penalty to platform
+     */
+    function calculateSellerCancellation(
+      orderTotal: number,
+      platformFeeRate: number = 0.025,
+      sellerPenaltyRate: number = 0.05
+    ): { buyerRefund: number; sellerPenalty: number; platformFee: number } {
+      const platformFee = orderTotal * platformFeeRate;
+      const buyerRefund = orderTotal + platformFee;
+      const sellerPenalty = orderTotal * sellerPenaltyRate;
+
+      return { buyerRefund, sellerPenalty, platformFee };
+    }
+
+    it('should refund buyer fully including platform fee', () => {
+      const result = calculateSellerCancellation(1000);
+      expect(result.buyerRefund).toBe(1025);
+      expect(result.platformFee).toBe(25);
+    });
+
+    it('should charge seller a 5% penalty', () => {
+      const result = calculateSellerCancellation(1000);
+      expect(result.sellerPenalty).toBe(50);
+    });
+  });
 });
