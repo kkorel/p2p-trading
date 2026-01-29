@@ -895,8 +895,8 @@ router.post('/cancel', async (req: Request, res: Response) => {
   // Get delivery start time from order items
   if (order.items && order.items.length > 0) {
     const firstItem = order.items[0];
-    if (firstItem.time_window?.start) {
-      deliveryStartTime = new Date(firstItem.time_window.start);
+    if (firstItem.timeWindow?.startTime) {
+      deliveryStartTime = new Date(firstItem.timeWindow.startTime);
     }
   }
 

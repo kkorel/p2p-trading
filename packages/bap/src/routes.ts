@@ -31,6 +31,8 @@ import {
   validateProviderMatch,
   // Secure client for signed Beckn requests
   secureAxios,
+  // CDS utilities
+  isExternalCDSEnabled,
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
@@ -661,6 +663,118 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     },
   };
   
+  // Check if we should use local catalog instead of external CDS
+  if (!isExternalCDSEnabled()) {
+    logger.info('Using LOCAL catalog (external CDS disabled)', { transaction_id: txnId });
+    
+    // Query local offers from database with available blocks
+    const localOffers = await prisma.catalogOffer.findMany({
+      where: {
+        // Apply source type filter if specified
+        ...(sourceType ? { item: { sourceType: sourceType } } : {}),
+        // Exclude user's own provider
+        ...(excludeProviderId ? { providerId: { not: excludeProviderId } } : {}),
+        // Only offers with available blocks
+        blocks: {
+          some: { status: 'AVAILABLE' },
+        },
+      },
+      include: {
+        item: true,
+        provider: true,
+        blocks: {
+          where: { status: 'AVAILABLE' },
+        },
+      },
+    });
+    
+    // Filter by minimum quantity (available blocks)
+    const filteredOffers = localOffers.filter(offer => {
+      const availableQty = offer.blocks.length;
+      return !minQuantity || availableQty >= minQuantity;
+    });
+    
+    // Transform to catalog format (matching the format expected by frontend)
+    const providerMap = new Map<string, any>();
+    for (const offer of filteredOffers) {
+      if (!providerMap.has(offer.providerId)) {
+        const providerName = offer.provider?.name || 'Unknown Provider';
+        providerMap.set(offer.providerId, {
+          id: offer.providerId,
+          descriptor: {
+            name: providerName,
+          },
+          items: [],
+        });
+      }
+      
+      const provider = providerMap.get(offer.providerId)!;
+      
+      // Find or create item entry
+      let itemEntry = provider.items.find((i: any) => i.id === offer.itemId);
+      if (!itemEntry) {
+        itemEntry = {
+          id: offer.itemId,
+          descriptor: {
+            name: `${offer.item?.sourceType || 'Energy'} from ${offer.provider?.name || 'Provider'}`,
+          },
+          itemAttributes: {
+            sourceType: offer.item?.sourceType || 'MIXED',
+            deliveryMode: offer.item?.deliveryMode || 'INJECTION',
+            availableQuantity: offer.blocks.length,
+          },
+          source_type: offer.item?.sourceType || 'MIXED',
+          delivery_mode: offer.item?.deliveryMode || 'INJECTION',
+          offers: [],
+        };
+        provider.items.push(itemEntry);
+      }
+      
+      // Add offer
+      itemEntry.offers.push({
+        id: offer.id,
+        price: {
+          value: offer.priceValue,
+          currency: offer.currency || 'INR',
+        },
+        quantity: {
+          available: offer.blocks.length,
+          maximum: offer.maxQty,
+        },
+        time_window: {
+          start: offer.timeWindowStart?.toISOString(),
+          end: offer.timeWindowEnd?.toISOString(),
+        },
+      });
+    }
+    
+    const catalog = { providers: Array.from(providerMap.values()) };
+    
+    // Store in transaction state
+    await updateTransaction(txnId, { catalog });
+    
+    // Calculate totals
+    const totalProviders = catalog.providers.length;
+    const totalItems = catalog.providers.reduce((sum, p) => sum + p.items.length, 0);
+    const totalOffers = catalog.providers.reduce((sum, p) => 
+      sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
+    
+    logger.info('Local catalog discovery complete', {
+      transaction_id: txnId,
+      providers: totalProviders,
+      items: totalItems,
+      offers: totalOffers,
+    });
+    
+    return res.json({
+      transaction_id: txnId,
+      status: 'success',
+      catalog,
+      source: 'local',
+    });
+  }
+  
+  // External CDS is enabled - proceed with network discovery
   // Get the CDS discover URL from external CDS configuration
   // EXTERNAL_CDS_URL (e.g., .../beckn/catalog) → use .../beckn/discover
   const getCdsDiscoverUrl = () => {
@@ -674,7 +788,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   
   const cdsDiscoverUrl = getCdsDiscoverUrl();
   
-  logger.info('Sending discover request', {
+  logger.info('Sending discover request to external CDS', {
     transaction_id: txnId,
     message_id: context.message_id,
     action: 'discover',
