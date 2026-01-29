@@ -40,6 +40,7 @@ function createValidVC(overrides: Partial<VerifiableCredential> = {}): Verifiabl
     proof: {
       type: 'Ed25519Signature2020',
       created: '2024-01-01T00:00:00Z',
+      proofPurpose: 'assertionMethod',
       verificationMethod: 'did:example:issuer123#key-1',
       proofValue: 'base64encodedproof',
     },

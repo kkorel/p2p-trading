@@ -40,8 +40,69 @@ describe('Seller Routes', () => {
     app = express();
     app.use(express.json());
 
-    // Mock authentication middleware with provider check
+    // Register as seller (create provider) - NO provider check required
+    app.post('/api/seller/register', async (req, res) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      const token = authHeader.replace('Bearer ', '');
+      const session = await getSession(token);
+      
+      if (!session) {
+        return res.status(401).json({ error: 'Invalid session' });
+      }
+      
+      const user = await prisma.user.findUnique({ where: { id: session.userId } });
+      
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      
+      if (user.providerId) {
+        return res.status(400).json({ error: 'Already registered as seller', code: 'ALREADY_SELLER' });
+      }
+      
+      try {
+        const { providerName, meterNumber, capacityKW, sourceType } = req.body;
+        
+        if (!providerName || providerName.length < 2) {
+          return res.status(400).json({ error: 'Provider name required', code: 'INVALID_NAME' });
+        }
+        
+        if (!capacityKW || capacityKW <= 0) {
+          return res.status(400).json({ error: 'Capacity required', code: 'INVALID_CAPACITY' });
+        }
+        
+        const provider = await prisma.provider.create({
+          data: {
+            name: providerName,
+            meterNumber,
+            capacityKW,
+            sourceType,
+            trustScore: 0.5, // Default trust score
+          },
+        });
+        
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { providerId: provider.id },
+        });
+        
+        res.status(201).json({ success: true, provider });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to register as seller' });
+      }
+    });
+
+    // Mock authentication middleware with provider check - applies to other seller endpoints
     app.use('/api/seller', async (req, res, next) => {
+      // Skip if already handled (register endpoint)
+      if (req.path === '/register') {
+        return next();
+      }
+      
       const authHeader = req.headers.authorization;
       if (!authHeader) {
         return res.status(401).json({ error: 'Authentication required', code: 'AUTH_REQUIRED' });
@@ -262,62 +323,6 @@ describe('Seller Routes', () => {
         res.json({ success: true, order: updated });
       } catch (error) {
         res.status(500).json({ error: 'Failed to update order' });
-      }
-    });
-
-    // Register as seller (create provider)
-    app.post('/api/seller/register', async (req, res) => {
-      const authHeader = req.headers.authorization;
-      if (!authHeader) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-      
-      const token = authHeader.replace('Bearer ', '');
-      const session = await getSession(token);
-      
-      if (!session) {
-        return res.status(401).json({ error: 'Invalid session' });
-      }
-      
-      const user = await prisma.user.findUnique({ where: { id: session.userId } });
-      
-      if (!user) {
-        return res.status(401).json({ error: 'User not found' });
-      }
-      
-      if (user.providerId) {
-        return res.status(400).json({ error: 'Already registered as seller', code: 'ALREADY_SELLER' });
-      }
-      
-      try {
-        const { providerName, meterNumber, capacityKW, sourceType } = req.body;
-        
-        if (!providerName || providerName.length < 2) {
-          return res.status(400).json({ error: 'Provider name required', code: 'INVALID_NAME' });
-        }
-        
-        if (!capacityKW || capacityKW <= 0) {
-          return res.status(400).json({ error: 'Capacity required', code: 'INVALID_CAPACITY' });
-        }
-        
-        const provider = await prisma.provider.create({
-          data: {
-            name: providerName,
-            meterNumber,
-            capacityKW,
-            sourceType,
-            trustScore: 0.5, // Default trust score
-          },
-        });
-        
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { providerId: provider.id },
-        });
-        
-        res.status(201).json({ success: true, provider });
-      } catch (error) {
-        res.status(500).json({ error: 'Failed to register as seller' });
       }
     });
 

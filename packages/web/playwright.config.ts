@@ -56,19 +56,23 @@ export default defineConfig({
   },
 
   // Configure projects for different browsers and viewports
+  // Note: Only chromium is enabled by default. Install other browsers with:
+  // npx playwright install webkit firefox
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Mobile Chrome emulation (uses chromium)
     {
       name: 'mobile-chrome',
       use: { ...devices['Pixel 5'] },
     },
-    {
-      name: 'mobile-safari',
-      use: { ...devices['iPhone 13'] },
-    },
+    // Uncomment to enable Safari tests (requires: npx playwright install webkit)
+    // {
+    //   name: 'mobile-safari',
+    //   use: { ...devices['iPhone 13'] },
+    // },
   ],
 
   // Run local dev server before starting the tests

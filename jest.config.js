@@ -4,9 +4,13 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/packages'],
   testMatch: [
-    '**/__tests__/**/*.ts',
+    '**/__tests__/**/*.test.ts',
     '**/*.test.ts',
-    '**/*.spec.ts',
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/packages/web/e2e/',  // Playwright E2E tests - use npx playwright test
+    '/packages/web/src/__tests__/',  // Frontend tests - use npm test -w @p2p/web
   ],
   moduleNameMapper: {
     '^@p2p/shared$': '<rootDir>/packages/shared/src/index.ts',

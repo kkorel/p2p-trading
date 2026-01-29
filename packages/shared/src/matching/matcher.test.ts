@@ -13,6 +13,10 @@ function createTestOffer(overrides: Partial<CatalogOffer> = {}): CatalogOffer {
     id: `offer-${Date.now()}-${Math.random()}`,
     item_id: 'item-1',
     provider_id: 'provider-1',
+    offerAttributes: {
+      pricingModel: 'PER_KWH',
+      settlementType: 'INSTANT',
+    },
     price: { value: 6, currency: 'INR' },
     maxQuantity: 100,
     timeWindow: {

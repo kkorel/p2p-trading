@@ -33,8 +33,9 @@ jest.mock('@p2p/shared', () => ({
 const mockedConfig = config as jest.Mocked<typeof config>;
 
 describe('DEG Ledger Integration', () => {
-  const mockOrder: Order = {
+  const mockOrder = {
     id: 'order-123',
+    transaction_id: 'txn-123',
     status: 'ACTIVE',
     providerId: 'provider-456',
     items: [
@@ -52,9 +53,9 @@ describe('DEG Ledger Integration', () => {
       price: { value: 60, currency: 'INR' },
       totalQuantity: 10,
     },
-    createdAt: '2026-01-29T07:00:00Z',
-    updatedAt: '2026-01-29T07:00:00Z',
-  } as Order;
+    created_at: '2026-01-29T07:00:00Z',
+    updated_at: '2026-01-29T07:00:00Z',
+  } as unknown as Order;
 
   beforeEach(() => {
     jest.clearAllMocks();

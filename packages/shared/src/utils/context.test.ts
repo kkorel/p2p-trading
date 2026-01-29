@@ -123,8 +123,8 @@ describe('Context Utilities', () => {
 
     it('should use provided location', () => {
       const customLocation = {
-        country: { code: 'IND' },
-        city: { code: 'MUM' },
+        country: { code: 'IND', name: 'India' },
+        city: { code: 'MUM', name: 'Mumbai' },
       };
       const context = createContext({
         ...baseOptions,
@@ -186,7 +186,7 @@ describe('Context Utilities', () => {
       bpp_id: 'original-bpp',
       bpp_uri: 'https://original-bpp.example.com',
       ttl: 'PT30S',
-      location: { country: { code: 'IND' } },
+      location: { country: { code: 'IND', name: 'India' }, city: { code: 'BLR', name: 'Bangalore' } },
       schema_context: BECKN_SCHEMA_CONTEXT,
     };
 
@@ -303,6 +303,7 @@ describe('Context Utilities', () => {
         bap_id: 'bap-id',
         bap_uri: 'https://bap.example.com',
         ttl: 'PT30S',
+        location: { country: { code: 'IND', name: 'India' }, city: { code: 'BLR', name: 'Bangalore' } },
         schema_context: BECKN_SCHEMA_CONTEXT,
       };
 
