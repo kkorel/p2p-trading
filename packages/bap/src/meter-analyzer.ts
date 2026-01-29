@@ -29,18 +29,36 @@ export interface MeterAnalysisResult {
 /**
  * Extract text from PDF buffer using pdf-parse library
  */
-async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
+async function extractPdfText(pdfBuffer: Buffer): Promise<{ text: string; error?: string }> {
     try {
         const data = await pdfParse(pdfBuffer);
         const fullText = data.text || '';
         
         logger.debug(`Extracted PDF text, length: ${fullText.length}`);
         logger.debug(`Text preview: ${fullText.substring(0, 300)}`);
-        return fullText;
+        
+        if (!fullText || fullText.trim().length < 20) {
+            return { 
+                text: '', 
+                error: 'PDF appears to be empty or contains only images. Please upload a text-based PDF.' 
+            };
+        }
+        
+        return { text: fullText };
     } catch (error: any) {
         logger.error(`PDF text extraction failed: ${error.message}`);
-        // Fallback - return error message
-        return `[PDF content could not be extracted. Error: ${error.message}]`;
+        
+        // Provide user-friendly error messages
+        let userError = 'Could not read PDF file.';
+        if (error.message.includes('XRef') || error.message.includes('xref')) {
+            userError = 'PDF file appears to be corrupted. Please try re-saving it or use a different file.';
+        } else if (error.message.includes('password')) {
+            userError = 'PDF is password protected. Please upload an unprotected PDF.';
+        } else if (error.message.includes('encrypt')) {
+            userError = 'PDF is encrypted. Please upload an unencrypted PDF.';
+        }
+        
+        return { text: '', error: userError };
     }
 }
 
@@ -65,7 +83,22 @@ export async function analyzeMeterPdf(
 
     try {
         // Extract text from PDF first
-        const pdfText = await extractPdfText(pdfBuffer);
+        const extractResult = await extractPdfText(pdfBuffer);
+        
+        // If PDF extraction failed with an error, return early with user-friendly message
+        if (extractResult.error) {
+            logger.warn(`PDF extraction error: ${extractResult.error}`);
+            return {
+                success: false,
+                extractedCapacity: null,
+                quality: 'LOW',
+                matchesDeclaration: false,
+                insights: extractResult.error,
+                error: extractResult.error
+            };
+        }
+        
+        const pdfText = extractResult.text;
         
         if (!pdfText || pdfText.length < 50) {
             logger.warn('PDF text extraction returned minimal content');
