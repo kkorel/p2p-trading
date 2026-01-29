@@ -6,7 +6,6 @@
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
-import pdfParse from 'pdf-parse';
 import { createLogger } from '@p2p/shared';
 
 const logger = createLogger('MeterAnalyzer');
@@ -27,12 +26,42 @@ export interface MeterAnalysisResult {
 }
 
 /**
- * Extract text from PDF buffer using pdf-parse library
+ * Extract text from PDF buffer using pdfjs-dist library
  */
 async function extractPdfText(pdfBuffer: Buffer): Promise<{ text: string; error?: string }> {
     try {
-        const data = await pdfParse(pdfBuffer);
-        const fullText = data.text || '';
+        // Dynamic import of pdfjs-dist legacy build (more compatible with various PDFs)
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        
+        // Convert Buffer to Uint8Array
+        const uint8Array = new Uint8Array(pdfBuffer);
+        
+        // Load the PDF document with server-friendly options
+        const loadingTask = pdfjsLib.getDocument({
+            data: uint8Array,
+            useSystemFonts: true,
+            disableFontFace: true,  // Required for server-side (no DOM)
+            verbosity: 0,           // Suppress warnings
+            stopAtErrors: false,    // Continue even if there are minor errors
+        });
+        
+        const pdfDoc = await loadingTask.promise;
+        let fullText = '';
+        
+        // Extract text from each page
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+            try {
+                const page = await pdfDoc.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items
+                    .map((item: any) => item.str || '')
+                    .join(' ');
+                fullText += pageText + '\n';
+            } catch (pageError: any) {
+                logger.warn(`Could not extract text from page ${i}: ${pageError.message}`);
+                // Continue with other pages
+            }
+        }
         
         logger.debug(`Extracted PDF text, length: ${fullText.length}`);
         logger.debug(`Text preview: ${fullText.substring(0, 300)}`);
@@ -40,7 +69,7 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<{ text: string; error?
         if (!fullText || fullText.trim().length < 20) {
             return { 
                 text: '', 
-                error: 'PDF appears to be empty or contains only images. Please upload a text-based PDF.' 
+                error: 'PDF appears to be empty or contains only images. Please upload a text-based PDF (not a scanned document).' 
             };
         }
         
@@ -49,13 +78,15 @@ async function extractPdfText(pdfBuffer: Buffer): Promise<{ text: string; error?
         logger.error(`PDF text extraction failed: ${error.message}`);
         
         // Provide user-friendly error messages
-        let userError = 'Could not read PDF file.';
-        if (error.message.includes('XRef') || error.message.includes('xref')) {
-            userError = 'PDF file appears to be corrupted. Please try re-saving it or use a different file.';
-        } else if (error.message.includes('password')) {
+        let userError = 'Could not read PDF file. Please try a different PDF.';
+        if (error.message.includes('password') || error.message.includes('Password')) {
             userError = 'PDF is password protected. Please upload an unprotected PDF.';
-        } else if (error.message.includes('encrypt')) {
+        } else if (error.message.includes('encrypt') || error.message.includes('Encrypt')) {
             userError = 'PDF is encrypted. Please upload an unencrypted PDF.';
+        } else if (error.message.includes('Invalid') || error.message.includes('invalid')) {
+            userError = 'PDF file format is invalid. Please try a different file.';
+        } else if (error.message.includes('XRef') || error.message.includes('xref')) {
+            userError = 'PDF structure is damaged. Please try opening the PDF in Adobe Reader, then use "Save As" to create a new copy.';
         }
         
         return { text: '', error: userError };
