@@ -6,6 +6,7 @@
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+import pdfParse from 'pdf-parse';
 import { createLogger } from '@p2p/shared';
 
 const logger = createLogger('MeterAnalyzer');
@@ -26,28 +27,12 @@ export interface MeterAnalysisResult {
 }
 
 /**
- * Extract text from PDF buffer using pdfjs-dist library
+ * Extract text from PDF buffer using pdf-parse library
  */
 async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
     try {
-        // Use dynamic import for ES module
-        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-        
-        const uint8Array = new Uint8Array(pdfBuffer);
-        const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
-        const pdfDoc = await loadingTask.promise;
-        
-        let fullText = '';
-        
-        // Extract text from each page
-        for (let i = 1; i <= pdfDoc.numPages; i++) {
-            const page = await pdfDoc.getPage(i);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items
-                .map((item: any) => item.str)
-                .join(' ');
-            fullText += pageText + '\n';
-        }
+        const data = await pdfParse(pdfBuffer);
+        const fullText = data.text || '';
         
         logger.debug(`Extracted PDF text, length: ${fullText.length}`);
         logger.debug(`Text preview: ${fullText.substring(0, 300)}`);
