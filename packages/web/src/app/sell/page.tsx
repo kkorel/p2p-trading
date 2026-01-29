@@ -19,7 +19,7 @@ const sourceIcons: Record<string, typeof Sun> = {
 type Tab = 'offers' | 'orders';
 
 export default function SellPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<Tab>('offers');
@@ -165,7 +165,7 @@ export default function SellPage() {
         duration: 6000,
       });
 
-      await loadData();
+      await Promise.all([loadData(), refreshUser()]);
     } catch (error: any) {
       showToast({ type: 'error', title: error.message || 'Failed to cancel order' });
     } finally {

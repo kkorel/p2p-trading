@@ -1817,10 +1817,6 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
     const providerId = req.user!.providerId;
     const sellerUserId = req.user!.id;
 
-    if (!providerId) {
-      return res.status(400).json({ error: 'No seller profile found' });
-    }
-
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: { payments: true },
@@ -1830,7 +1826,11 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    if (order.providerId !== providerId) {
+    // Check ownership: either providerId matches OR seller has a payment record for this order
+    const isOwnerByProvider = providerId && order.providerId === providerId;
+    const isOwnerByPayment = order.payments.some((p) => p.sellerId === sellerUserId);
+    
+    if (!isOwnerByProvider && !isOwnerByPayment) {
       return res.status(403).json({ error: 'You can only cancel orders for your provider' });
     }
 
