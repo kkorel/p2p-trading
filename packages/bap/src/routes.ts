@@ -2353,6 +2353,44 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
       });
     }
 
+    // Check if we're within 30 minutes of delivery start time
+    // Get delivery start time from the selected offer
+    let deliveryStartTime: Date | null = null;
+    if (order.selectedOfferId) {
+      const selectedOffer = await prisma.catalogOffer.findUnique({
+        where: { id: order.selectedOfferId },
+        select: { timeWindowStart: true },
+      });
+      deliveryStartTime = selectedOffer?.timeWindowStart || null;
+    }
+
+    // If no selectedOfferId, try to get from order items
+    if (!deliveryStartTime) {
+      try {
+        const items = JSON.parse(order.itemsJson || '[]');
+        const firstItem = items[0];
+        if (firstItem?.time_window?.start) {
+          deliveryStartTime = new Date(firstItem.time_window.start);
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
+    // Prevent cancellation within 30 minutes of delivery start
+    if (deliveryStartTime) {
+      const minCancelBufferMs = 30 * 60 * 1000; // 30 minutes
+      const timeUntilDelivery = deliveryStartTime.getTime() - Date.now();
+
+      if (timeUntilDelivery < minCancelBufferMs && timeUntilDelivery > 0) {
+        const minutesRemaining = Math.max(0, Math.floor(timeUntilDelivery / 60000));
+        return res.status(400).json({
+          status: 'error',
+          error: `Cancellation not allowed within 30 minutes of delivery start. Only ${minutesRemaining} minutes remaining until delivery.`,
+        });
+      }
+    }
+
     // Calculate cancellation penalty and seller compensation
     const orderTotal = order.totalPrice || 0;
     const cancellationPenaltyRate = 0.10; // 10% cancellation penalty

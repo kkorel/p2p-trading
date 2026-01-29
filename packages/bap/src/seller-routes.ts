@@ -889,16 +889,29 @@ router.post('/cancel', async (req: Request, res: Response) => {
     }));
   }
 
-  // Check cancellation window
-  const cancelWindowMinutes = parseInt(process.env.CANCEL_WINDOW_MINUTES || '30');
-  const cancelWindowMs = cancelWindowMinutes * 60 * 1000;
-  const orderAge = Date.now() - new Date(order.created_at).getTime();
+  // Check if we're within 30 minutes of delivery start time
+  let deliveryStartTime: Date | null = null;
+  
+  // Get delivery start time from order items
+  if (order.items && order.items.length > 0) {
+    const firstItem = order.items[0];
+    if (firstItem.time_window?.start) {
+      deliveryStartTime = new Date(firstItem.time_window.start);
+    }
+  }
 
-  if (orderAge > cancelWindowMs) {
-    return res.json(createNack(context, {
-      code: 'CANCEL_WINDOW_EXPIRED',
-      message: `Cancellation window (${cancelWindowMinutes} minutes) has expired. Order cannot be cancelled.`,
-    }));
+  // Prevent cancellation within 30 minutes of delivery start
+  if (deliveryStartTime) {
+    const minCancelBufferMs = 30 * 60 * 1000; // 30 minutes
+    const timeUntilDelivery = deliveryStartTime.getTime() - Date.now();
+
+    if (timeUntilDelivery < minCancelBufferMs && timeUntilDelivery > 0) {
+      const minutesRemaining = Math.max(0, Math.floor(timeUntilDelivery / 60000));
+      return res.json(createNack(context, {
+        code: 'CANCEL_WINDOW_EXPIRED',
+        message: `Cancellation not allowed within 30 minutes of delivery start. Only ${minutesRemaining} minutes remaining until delivery.`,
+      }));
+    }
   }
 
   res.json(createAck(context));

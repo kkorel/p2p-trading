@@ -170,6 +170,17 @@ export default function OrdersPage() {
     }
   }, [loadOrders, authLoading]);
 
+  // Poll for order updates every 30 seconds to catch seller cancellations
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+
+    const pollInterval = setInterval(() => {
+      loadOrders();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [isAuthenticated, authLoading, loadOrders]);
+
   const filteredOrders = orders.filter(order => {
     if (filter === 'all') return true;
     return order.type === filter;
