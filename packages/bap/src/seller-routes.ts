@@ -1851,11 +1851,7 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
       });
     }
 
-    let cancellationStatus: 'cancelled' | 'already_cancelled' | 'not_cancelable' = 'cancelled';
-    let refundTotal = 0;
-    let sellerPenalty = 0;
-
-    await withOrderLock(order.id, async () => {
+    const cancellationResult = await withOrderLock(order.id, async () => {
       const currentOrder = await prisma.order.findUnique({
         where: { id: orderId },
         include: { payments: true },
@@ -1866,20 +1862,18 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
       }
 
       if (currentOrder.status === 'CANCELLED') {
-        cancellationStatus = 'already_cancelled';
-        return;
+        return { status: 'already_cancelled' as const, refundTotal: 0, sellerPenalty: 0 };
       }
 
       if (!cancelableStatuses.includes(currentOrder.status)) {
-        cancellationStatus = 'not_cancelable';
-        return;
+        return { status: 'not_cancelable' as const, refundTotal: 0, sellerPenalty: 0 };
       }
 
       const orderTotal = currentOrder.totalPrice || 0;
       const platformFee = Math.round(orderTotal * config.fees.platformRate * 100) / 100;
       const escrowPayment = currentOrder.payments.find((payment) => payment.type === 'ESCROW');
-      refundTotal = escrowPayment?.totalAmount ?? orderTotal + platformFee;
-      sellerPenalty = Math.round(orderTotal * config.fees.sellerCancellationPenalty * 100) / 100;
+      const refundTotal = escrowPayment?.totalAmount ?? orderTotal + platformFee;
+      const sellerPenalty = Math.round(orderTotal * config.fees.sellerCancellationPenalty * 100) / 100;
 
       const buyerId = currentOrder.buyerId || await getBuyerIdFromTransaction(currentOrder.transactionId);
 
@@ -1988,13 +1982,15 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
           });
         }
       });
+
+      return { status: 'cancelled' as const, refundTotal, sellerPenalty };
     });
 
-    if (cancellationStatus === 'already_cancelled') {
+    if (cancellationResult.status === 'already_cancelled') {
       return res.json({ status: 'already_cancelled', orderId });
     }
 
-    if (cancellationStatus === 'not_cancelable') {
+    if (cancellationResult.status === 'not_cancelable') {
       return res.status(409).json({ error: 'Order status changed; cancellation not allowed' });
     }
 
@@ -2056,8 +2052,8 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
     return res.json({
       status: 'cancelled',
       orderId,
-      refundTotal,
-      sellerPenalty,
+      refundTotal: cancellationResult.refundTotal,
+      sellerPenalty: cancellationResult.sellerPenalty,
     });
   } catch (error: any) {
     logger.error(`Failed to cancel order as seller: ${error.message}`);
