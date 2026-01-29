@@ -43,7 +43,8 @@ applySecurityMiddleware(app, {
 });
 
 // JSON body parser with size limit
-app.use(express.json({ limit: '5mb' }));
+// Note: 10mb limit needed because 5MB PDF files become ~6.67MB after base64 encoding
+app.use(express.json({ limit: '10mb' }));
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../public')));
