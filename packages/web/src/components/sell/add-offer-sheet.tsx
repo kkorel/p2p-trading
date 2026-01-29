@@ -53,13 +53,23 @@ export function AddOfferSheet({ open, onClose, onSubmit }: AddOfferSheetProps) {
     setError(null);
     
     try {
+      const startTime = new Date(data.startTime);
+      const endTime = new Date(data.endTime);
+      
+      // Validate that end time is after start time
+      if (endTime <= startTime) {
+        setError('"Available Until" must be after "Available From"');
+        setIsLoading(false);
+        return;
+      }
+      
       await onSubmit({
         source_type: data.source_type,
         price_per_kwh: parseFloat(data.price_per_kwh),
         max_qty: parseInt(data.max_qty, 10),
         time_window: {
-          startTime: new Date(data.startTime).toISOString(),
-          endTime: new Date(data.endTime).toISOString(),
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
         },
       });
       reset();

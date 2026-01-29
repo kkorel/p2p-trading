@@ -107,6 +107,8 @@ export default function SellPage() {
     try {
       await sellerApi.addOfferDirect(data);
       await loadData();
+      // Switch to offers tab so user can see their new offer
+      setActiveTab('offers');
       showToast({ type: 'success', title: 'Offer created successfully!' });
     } catch (error: any) {
       // Extract error message from API response

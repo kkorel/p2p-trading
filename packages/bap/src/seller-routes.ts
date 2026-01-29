@@ -37,6 +37,7 @@ import {
   publishOfferToCDS,
   publishCatalogToCDS,
   isExternalCDSEnabled,
+  isValidTimeWindow,
 } from '@p2p/shared';
 import {
   getOfferById,
@@ -1582,6 +1583,13 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
   if (!source_type || !price_per_kwh || !max_qty || !time_window) {
     return res.status(400).json({
       error: 'source_type, price_per_kwh, max_qty, and time_window are required'
+    });
+  }
+
+  // Validate time window (startTime must be before endTime)
+  if (!isValidTimeWindow(time_window)) {
+    return res.status(400).json({
+      error: 'Invalid time window: "Available Until" must be after "Available From"'
     });
   }
 
