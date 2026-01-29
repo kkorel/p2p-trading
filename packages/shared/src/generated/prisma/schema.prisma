@@ -312,7 +312,7 @@ model DiscomFeedback {
 // Payment records for tracking money flow
 model PaymentRecord {
   id       String  @id @default(uuid())
-  type     String // 'ESCROW' | 'RELEASE' | 'CANCEL_PENALTY' | 'REFUND'
+  type     String // 'ESCROW' | 'RELEASE' | 'CANCEL_PENALTY' | 'REFUND' | 'SELLER_CANCEL_REFUND' | 'SELLER_CANCEL_PENALTY'
   orderId  String  @map("order_id")
   buyerId  String? @map("buyer_id")
   sellerId String? @map("seller_id")
