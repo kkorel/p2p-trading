@@ -7,6 +7,7 @@ import { Card, Badge, EmptyState, SkeletonList, Button, useToast, useConfirm } f
 import { buyerApi, sellerApi, ApiError } from '@/lib/api';
 import { formatCurrency, formatDateTime, formatTime, truncateId } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
+import { useDataUpdate, useDataUpdateActions } from '@/contexts/data-update-context';
 
 const sourceIcons: Record<string, typeof Sun> = {
   SOLAR: Sun,
@@ -66,6 +67,8 @@ export default function OrdersPage() {
   const { isAuthenticated, isLoading: authLoading, user, refreshUser } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const { ordersVersion } = useDataUpdate();
+  const { triggerOrderUpdate } = useDataUpdateActions();
   const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState<UnifiedOrder[]>([]);
   const [filter, setFilter] = useState<'all' | 'bought' | 'sold'>('all');
@@ -178,16 +181,13 @@ export default function OrdersPage() {
     }
   }, [loadOrders, authLoading]);
 
-  // Poll for order updates every 30 seconds to catch seller cancellations
+  // Refresh orders when triggered by other components (e.g., seller cancels an order)
   useEffect(() => {
-    if (!isAuthenticated || authLoading) return;
-
-    const pollInterval = setInterval(() => {
+    // Skip on initial mount (version starts at 0)
+    if (ordersVersion > 0) {
       loadOrders();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [isAuthenticated, authLoading, loadOrders]);
+    }
+  }, [ordersVersion, loadOrders]);
 
   const filteredOrders = orders.filter(order => {
     if (filter === 'all') return true;
@@ -255,6 +255,8 @@ export default function OrdersPage() {
 
       // Reload orders and refresh user balance
       await Promise.all([loadOrders(), refreshUser()]);
+      // Notify other components (e.g., seller's page) that orders have changed
+      triggerOrderUpdate();
     } catch (err: any) {
       showToast({
         type: 'error',
@@ -295,6 +297,8 @@ export default function OrdersPage() {
       });
 
       await Promise.all([loadOrders(), refreshUser()]);
+      // Notify other components (e.g., buyer's page) that orders have changed
+      triggerOrderUpdate();
     } catch (err: any) {
       showToast({
         type: 'error',

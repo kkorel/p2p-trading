@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/contexts/auth-context';
 import { BalanceProvider } from '@/contexts/balance-context';
 import { P2PStatsProvider } from '@/contexts/p2p-stats-context';
+import { DataUpdateProvider } from '@/contexts/data-update-context';
 import { ToastProvider, ConfirmProvider } from '@/components/ui';
 import './globals.css';
 
@@ -44,11 +45,13 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <AuthProvider>
           <BalanceProvider>
-            <P2PStatsProvider>
-              <ToastProvider>
-                <ConfirmProvider>{children}</ConfirmProvider>
-              </ToastProvider>
-            </P2PStatsProvider>
+            <DataUpdateProvider>
+              <P2PStatsProvider>
+                <ToastProvider>
+                  <ConfirmProvider>{children}</ConfirmProvider>
+                </ToastProvider>
+              </P2PStatsProvider>
+            </DataUpdateProvider>
           </BalanceProvider>
         </AuthProvider>
       </body>

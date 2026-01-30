@@ -8,6 +8,7 @@ import { OfferCard } from '@/components/buy/offer-card';
 import { OrderSheet } from '@/components/buy/order-sheet';
 import { EmptyState, SkeletonList, Badge, Button } from '@/components/ui';
 import { buyerApi, type Offer, type TransactionState } from '@/lib/api';
+import { useDataUpdateActions } from '@/contexts/data-update-context';
 
 interface DiscoveredOffer {
   offer: Offer;
@@ -29,6 +30,7 @@ interface DiscoveredOffer {
 const ITEMS_PER_PAGE = 10;
 
 export default function BuyPage() {
+  const { triggerOrderUpdate, triggerOfferUpdate } = useDataUpdateActions();
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [transaction, setTransaction] = useState<TransactionState | null>(null);
   const [offers, setOffers] = useState<DiscoveredOffer[]>([]);
@@ -223,6 +225,10 @@ export default function BuyPage() {
           }
           return o;
         }).filter(o => o.availableQty > 0)); // Remove sold-out offers
+        
+        // Notify other components (seller's page, orders page) that an order was created
+        triggerOrderUpdate();
+        triggerOfferUpdate();
       }
       
       return txState.order || null;

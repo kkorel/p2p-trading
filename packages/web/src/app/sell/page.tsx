@@ -8,6 +8,7 @@ import { AddOfferSheet } from '@/components/sell/add-offer-sheet';
 import { Card, Button, Badge, EmptyState, SkeletonList, useToast, useConfirm } from '@/components/ui';
 import { sellerApi, type Offer, type Order, type Provider } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
+import { useDataUpdate, useDataUpdateActions } from '@/contexts/data-update-context';
 import { formatCurrency, formatTime, formatDateTime, truncateId, cn } from '@/lib/utils';
 
 const sourceIcons: Record<string, typeof Sun> = {
@@ -22,6 +23,8 @@ export default function SellPage() {
   const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const { ordersVersion, offersVersion } = useDataUpdate();
+  const { triggerOfferUpdate, triggerOrderUpdate } = useDataUpdateActions();
   const [activeTab, setActiveTab] = useState<Tab>('offers');
   const [isLoading, setIsLoading] = useState(true);
   const [provider, setProvider] = useState<Provider | null>(null);
@@ -98,14 +101,13 @@ export default function SellPage() {
     loadData();
   }, [loadData]);
 
-  // Auto-refresh orders every 10 seconds to catch new purchases
+  // Refresh data when triggered by other components (e.g., buyer accepts an offer)
   useEffect(() => {
-    const pollInterval = setInterval(() => {
+    // Skip on initial mount (version starts at 0)
+    if (ordersVersion > 0 || offersVersion > 0) {
       loadData();
-    }, 10000); // 10 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [loadData]);
+    }
+  }, [ordersVersion, offersVersion, loadData]);
 
   const handleAddOffer = async (data: {
     source_type: string;
@@ -119,6 +121,8 @@ export default function SellPage() {
       // Switch to offers tab so user can see their new offer
       setActiveTab('offers');
       showToast({ type: 'success', title: 'Offer created successfully!' });
+      // Notify other components (e.g., buy page) that offers have changed
+      triggerOfferUpdate();
     } catch (error: any) {
       // Extract error message from API response
       const message = error.message || 'Failed to create offer';
@@ -142,6 +146,8 @@ export default function SellPage() {
       await sellerApi.deleteOffer(offerId);
       await loadData();
       showToast({ type: 'success', title: 'Offer deleted successfully' });
+      // Notify other components that offers have changed
+      triggerOfferUpdate();
     } catch (error: any) {
       showToast({ type: 'error', title: error.message || 'Failed to delete offer' });
     }
@@ -177,6 +183,8 @@ export default function SellPage() {
       });
 
       await Promise.all([loadData(), refreshUser()]);
+      // Notify other components (e.g., buyer's orders page) that orders have changed
+      triggerOrderUpdate();
     } catch (error: any) {
       showToast({ type: 'error', title: error.message || 'Failed to cancel order' });
     } finally {

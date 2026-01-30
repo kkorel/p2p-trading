@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { buyerApi, sellerApi } from '@/lib/api';
 import { useAuth } from './auth-context';
+import { useDataUpdate } from './data-update-context';
 
 interface P2PStats {
   totalSold: number;
@@ -22,6 +23,7 @@ const DISCOM_SELLBACK_RATE = 2; // Rs per kWh (what DISCOM pays for surplus)
 
 export function P2PStatsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { statsVersion } = useDataUpdate();
   const [stats, setStats] = useState({
     totalSold: 0,
     avgSellPrice: 0,
@@ -90,16 +92,13 @@ export function P2PStatsProvider({ children }: { children: ReactNode }) {
     fetchStats();
   }, [user]);
 
-  // Auto-refresh stats every 15 seconds to catch order fulfillments
+  // Refresh stats when triggered by other components (e.g., after order completion)
   useEffect(() => {
-    if (!user) return;
-
-    const pollInterval = setInterval(() => {
+    // Skip on initial mount (version starts at 0)
+    if (statsVersion > 0) {
       fetchStats();
-    }, 15000); // 15 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [user]);
+    }
+  }, [statsVersion]);
 
   // Calculate total value
   const sellerGain = stats.totalSold * (stats.avgSellPrice - DISCOM_SELLBACK_RATE);
