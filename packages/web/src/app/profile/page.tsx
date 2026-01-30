@@ -460,7 +460,9 @@ export default function ProfilePage() {
               {/* Trust Level Bar - Integrated */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-white/60">Trust Level</span>
+                  <span className="text-white/60">
+                    Trust Score: <span className="text-white font-bold text-sm">{Math.round((user.trustScore ?? 0.3) * 100)}%</span>
+                  </span>
                   <span className="text-white font-medium">
                     Trade Limit: {user.allowedTradeLimit ?? 10}%
                     {user.productionCapacity != null && user.productionCapacity > 0 && (
@@ -646,35 +648,18 @@ export default function ProfilePage() {
               <p className="text-xs text-[var(--color-text-muted)]">
                 Your trust score has been boosted based on your meter verification.
               </p>
-              {/* Reset option with warning */}
+              {/* Option to upload another document */}
               <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
                 <p className="text-xs text-[var(--color-text-muted)] mb-2">
-                  Want to update your meter reading? Uploading a new document will <strong>temporarily remove the +10% trust bonus</strong> until the new document is verified.
+                  Want to update your meter reading? You can upload a new document to update your production capacity.
                 </p>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={async () => {
-                    const confirmed = await confirm({
-                      title: 'Reset Meter Verification?',
-                      message: 'Uploading a new document will reset your meter verification and remove the +10% trust bonus until re-verified.',
-                      confirmText: 'Reset & Upload New',
-                      cancelText: 'Cancel',
-                      variant: 'warning',
-                    });
-                    if (!confirmed) return;
-
-                    try {
-                      await authApi.resetMeter();
-                      // Refresh user data
-                      const { user: updatedUser } = await authApi.getMe();
-                      updateUser(updatedUser);
-                      setAnalysisResult(null);
-                      setAnalysisError(null);
-                      setForceShowUpload(true);
-                    } catch (err: any) {
-                      setAnalysisError(err.message || 'Failed to reset');
-                    }
+                  onClick={() => {
+                    setAnalysisResult(null);
+                    setAnalysisError(null);
+                    setForceShowUpload(true);
                   }}
                 >
                   Upload Different Document
@@ -714,6 +699,16 @@ export default function ProfilePage() {
                   <p className="text-xs text-[var(--color-text-muted)] mt-1">
                     {analysisResult.insights}
                   </p>
+                  {/* Allow uploading another document */}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setAnalysisResult(null)}
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    Upload Another Document
+                  </Button>
                 </div>
               )}
 

@@ -98,6 +98,15 @@ export default function SellPage() {
     loadData();
   }, [loadData]);
 
+  // Auto-refresh orders every 10 seconds to catch new purchases
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      loadData();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [loadData]);
+
   const handleAddOffer = async (data: {
     source_type: string;
     price_per_kwh: number;

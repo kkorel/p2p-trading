@@ -86,6 +86,10 @@ export default function OrdersPage() {
         const buyerData = await buyerApi.getMyOrders();
         for (const order of buyerData.orders) {
           const o = order as any;
+          const quantity = order.itemInfo?.quantity || order.quote?.totalQuantity || 0;
+          const totalPrice = order.quote?.price?.value || 0;
+          // Calculate pricePerKwh: prefer itemInfo, fallback to totalPrice/quantity
+          const pricePerKwh = order.itemInfo?.price_per_kwh || (quantity > 0 ? totalPrice / quantity : 0);
           allOrders.push({
             id: order.id,
             transactionId: o.transaction_id || order.id,
@@ -94,9 +98,9 @@ export default function OrdersPage() {
             paymentStatus: o.paymentStatus || 'PENDING',
             sourceType: order.itemInfo?.source_type || 'MIXED',
             providerName: order.provider?.name || 'Provider',
-            quantity: order.itemInfo?.quantity || order.quote?.totalQuantity || 0,
-            pricePerKwh: order.itemInfo?.price_per_kwh || 0,
-            totalPrice: order.quote?.price?.value || 0,
+            quantity,
+            pricePerKwh,
+            totalPrice,
             createdAt: order.created_at,
             deliveryTime: o.deliveryTime ? {
               start: o.deliveryTime.start,
@@ -122,6 +126,10 @@ export default function OrdersPage() {
             if (!allOrders.find(o => o.id === order.id)) {
               const o = order as any;
               const itemInfo = o.itemInfo;
+              const quantity = itemInfo?.sold_quantity || order.quote?.totalQuantity || 0;
+              const totalPrice = order.quote?.price?.value || 0;
+              // Calculate pricePerKwh: prefer itemInfo, fallback to totalPrice/quantity
+              const pricePerKwh = itemInfo?.price_per_kwh || (quantity > 0 ? totalPrice / quantity : 0);
               allOrders.push({
                 id: order.id,
                 transactionId: o.transaction_id || order.id,
@@ -130,9 +138,9 @@ export default function OrdersPage() {
                 paymentStatus: o.paymentStatus || 'PENDING',
                 sourceType: itemInfo?.source_type || 'MIXED',
                 providerName: undefined, // It's the user's own listing
-                quantity: itemInfo?.sold_quantity || order.quote?.totalQuantity || 0,
-                pricePerKwh: itemInfo?.price_per_kwh || 0,
-                totalPrice: order.quote?.price?.value || 0,
+                quantity,
+                pricePerKwh,
+                totalPrice,
                 createdAt: order.created_at,
                 deliveryTime: o.deliveryTime ? {
                   start: o.deliveryTime.start,

@@ -90,6 +90,17 @@ export function P2PStatsProvider({ children }: { children: ReactNode }) {
     fetchStats();
   }, [user]);
 
+  // Auto-refresh stats every 15 seconds to catch order fulfillments
+  useEffect(() => {
+    if (!user) return;
+
+    const pollInterval = setInterval(() => {
+      fetchStats();
+    }, 15000); // 15 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [user]);
+
   // Calculate total value
   const sellerGain = stats.totalSold * (stats.avgSellPrice - DISCOM_SELLBACK_RATE);
   const buyerSavings = stats.totalBought * (DISCOM_BUY_RATE - stats.avgBuyPrice);

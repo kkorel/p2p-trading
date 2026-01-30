@@ -34,6 +34,7 @@ export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<DiscoverFormInput>({
     defaultValues: {
@@ -42,6 +43,9 @@ export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
       endTime: getDefaultEndTime(),
     },
   });
+
+  // Watch startTime to validate endTime
+  const startTimeValue = watch('startTime');
 
   const onSubmit = async (data: DiscoverFormInput) => {
     const qty = parseInt(data.minQuantity, 10);
@@ -110,7 +114,18 @@ export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
           <Input
             label="End Time"
             type="datetime-local"
-            {...register('endTime', { required: 'Required' })}
+            {...register('endTime', {
+              required: 'Required',
+              validate: (value) => {
+                if (!startTimeValue || !value) return true;
+                const start = new Date(startTimeValue);
+                const end = new Date(value);
+                if (end <= start) {
+                  return 'End time must be after start time';
+                }
+                return true;
+              },
+            })}
             error={errors.endTime?.message}
           />
         </div>

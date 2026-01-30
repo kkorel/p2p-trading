@@ -589,6 +589,18 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   
   const txnId = transaction_id || uuidv4();
   
+  // Validate time window: end time must be after start time
+  if (timeWindow?.startTime && timeWindow?.endTime) {
+    const startDate = new Date(timeWindow.startTime);
+    const endDate = new Date(timeWindow.endTime);
+    if (endDate <= startDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'End time must be after start time',
+      });
+    }
+  }
+  
   // Get user's provider ID to exclude their own offers
   const excludeProviderId = req.user?.providerId || null;
   // Get user's ID for order association

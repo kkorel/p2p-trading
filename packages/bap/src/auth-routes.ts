@@ -515,18 +515,21 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
       });
     }
 
-    // Check if user already has verified meter data (can only verify once)
+    // Get current user data for reference
     const currentUser = await prisma.user.findUnique({
       where: { id: req.user!.id },
       select: { meterDataAnalyzed: true, trustScore: true, productionCapacity: true },
     });
 
-    if (currentUser?.meterDataAnalyzed) {
-      return res.status(400).json({
-        success: false,
-        error: 'Meter data has already been analyzed. You can only verify once.',
-      });
-    }
+    // Check if user has EVER received the meter verification trust bonus
+    // This is the definitive check - even if meterDataAnalyzed gets reset, we don't give bonus twice
+    const existingMeterBonus = await prisma.trustScoreHistory.findFirst({
+      where: {
+        userId: req.user!.id,
+        reason: 'METER_VERIFIED',
+      },
+    });
+    const hasAlreadyReceivedMeterBonus = existingMeterBonus !== null;
 
     // Import the analyzer
     const { analyzeMeterPdf, saveMeterPdf } = await import('./meter-analyzer');
@@ -543,9 +546,11 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
     // Analyze the PDF using OpenRouter
     const analysisResult = await analyzeMeterPdf(pdfBuffer, declaredCapacity);
 
+    // Only give trust bonus if user has NEVER received it before (check history, not just flag)
+    const isFirstVerification = !hasAlreadyReceivedMeterBonus;
+
     // Update user based on analysis result
     const updateData: any = {
-      meterDataAnalyzed: true,
       meterPdfUrl: pdfPath, // Store the PDF path
     };
 
@@ -556,29 +561,38 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
     if (analysisResult.success && analysisResult.extractedCapacity) {
       extractedCapacity = analysisResult.extractedCapacity;
 
+      // Always mark as analyzed on successful verification
+      updateData.meterDataAnalyzed = true;
+
       // Store the extracted capacity as verified
       updateData.meterVerifiedCapacity = extractedCapacity;
 
       // AUTO-SET production capacity from the meter reading!
       updateData.productionCapacity = extractedCapacity;
 
-      if (declaredCapacity > 0 && analysisResult.matchesDeclaration) {
-        // Had existing capacity and it matches - give full 10% trust bonus
-        trustBonus = 0.10;
-        message = `Great! Your meter reading (${extractedCapacity} kWh) matches your declaration. Production capacity confirmed. +10% trust bonus!`;
-      } else if (declaredCapacity > 0 && analysisResult.quality === 'MEDIUM') {
-        // Had existing capacity, partial match - give 7% bonus
-        trustBonus = 0.07;
-        message = `Meter shows ${extractedCapacity} kWh/month. Production capacity updated. +7% trust bonus!`;
+      // Only give trust bonus on FIRST successful verification
+      if (isFirstVerification) {
+        if (declaredCapacity > 0 && analysisResult.matchesDeclaration) {
+          // Had existing capacity and it matches - give full 10% trust bonus
+          trustBonus = 0.10;
+          message = `Great! Your meter reading (${extractedCapacity} kWh) matches your declaration. Production capacity confirmed. +10% trust bonus!`;
+        } else if (declaredCapacity > 0 && analysisResult.quality === 'MEDIUM') {
+          // Had existing capacity, partial match - give 7% bonus
+          trustBonus = 0.07;
+          message = `Meter shows ${extractedCapacity} kWh/month. Production capacity updated. +7% trust bonus!`;
+        } else {
+          // No prior declaration OR new extraction - give full 10% for verified meter data
+          trustBonus = 0.10;
+          message = `Production capacity auto-set to ${extractedCapacity} kWh/month from your meter reading. +10% trust bonus!`;
+        }
       } else {
-        // No prior declaration OR new extraction - give full 10% for verified meter data
-        trustBonus = 0.10;
-        message = `Production capacity auto-set to ${extractedCapacity} kWh/month from your meter reading. +10% trust bonus!`;
+        // Subsequent uploads - just update capacity, no trust bonus
+        trustBonus = 0;
+        message = `Production capacity updated to ${extractedCapacity} kWh/month from your meter reading.`;
       }
     } else {
-      // Analysis failed - NO trust bonus if we couldn't extract capacity
+      // Analysis failed - NO trust bonus, and do NOT change meterDataAnalyzed flag
       trustBonus = 0;
-      updateData.meterDataAnalyzed = false; // Don't mark as analyzed if failed
 
       // Log the actual error for debugging
       logger.debug(`[MeterAnalyzer] API analysis failed: ${analysisResult.error}`);
