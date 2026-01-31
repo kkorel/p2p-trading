@@ -306,12 +306,19 @@ function SuccessStep({
               <ProfileRow icon={UserIcon} label="Name" value={profile.fullName} />
             )}
             {profile.capacityKW != null && (
-              <ProfileRow
-                icon={BatteryCharging}
-                label="Capacity"
-                value={`${profile.capacityKW} kW`}
-                highlight
-              />
+              <>
+                <ProfileRow
+                  icon={BatteryCharging}
+                  label="Installed Capacity"
+                  value={`${profile.capacityKW} kW`}
+                  highlight
+                />
+                <ProfileRow
+                  icon={BatteryCharging}
+                  label="Est. Monthly Production"
+                  value={`${Math.round(profile.capacityKW * 4.5 * 30)} kWh/month`}
+                />
+              </>
             )}
             {profile.sourceType && (
               <ProfileRow icon={Sun} label="Source" value={profile.sourceType} />

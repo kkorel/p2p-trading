@@ -809,6 +809,13 @@ router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response
       });
     }
 
+    // Convert installed capacity (kW peak) to estimated monthly production (kWh/month)
+    // Formula: kWh/month = capacityKW × avg_peak_sun_hours/day × 30 days
+    // Using 4.5 peak sun hours/day (average for India)
+    const AVG_PEAK_SUN_HOURS = 4.5;
+    const DAYS_PER_MONTH = 30;
+    const estimatedMonthlyKWh = capacityKW * AVG_PEAK_SUN_HOURS * DAYS_PER_MONTH;
+
     // Get current user for trust score
     const currentUser = await prisma.user.findUnique({
       where: { id: req.user!.id },
@@ -818,11 +825,11 @@ router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response
     const trustScore = currentUser?.trustScore || 0.3;
     const allowedLimit = calculateAllowedLimit(trustScore);
 
-    // Update user: set capacity, mark profile complete
+    // Update user: set capacity (kWh/month), mark profile complete
     const updatedUser = await prisma.user.update({
       where: { id: req.user!.id },
       data: {
-        productionCapacity: capacityKW,
+        productionCapacity: estimatedMonthlyKWh,
         allowedTradeLimit: allowedLimit,
         profileComplete: true,
       },
@@ -833,7 +840,7 @@ router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response
       },
     });
 
-    logger.info(`User ${req.user!.id} completed onboarding via VC: capacityKW=${capacityKW}, method=${extractionMethod}`);
+    logger.info(`User ${req.user!.id} completed onboarding via VC: capacityKW=${capacityKW}, estimatedMonthlyKWh=${estimatedMonthlyKWh}, method=${extractionMethod}`);
 
     res.json({
       success: true,
