@@ -184,6 +184,101 @@ export interface GenerationProfileSubject {
 export type GenerationProfileVC = VerifiableCredential<GenerationProfileSubject>;
 
 // =============================================================================
+// Beckn DEG Energy Credentials — Utility Customer
+// =============================================================================
+
+export interface UtilityCustomerSubject {
+  id?: string;
+  type?: string;
+  consumerNumber?: string;
+  fullName?: string;
+  maskedIdNumber?: string;
+  meterNumber?: string;
+  serviceConnectionDate?: string;
+  installationAddress?: string | {
+    fullAddress?: string;
+    city?: string;
+    district?: string;
+    stateProvince?: string;
+    postalCode?: string;
+    country?: string;
+  };
+  [key: string]: unknown;
+}
+
+export type UtilityCustomerVC = VerifiableCredential<UtilityCustomerSubject>;
+
+// =============================================================================
+// Beckn DEG Energy Credentials — Consumption Profile
+// =============================================================================
+
+export interface ConsumptionProfileSubject {
+  id?: string;
+  type?: string;
+  consumerNumber?: string;
+  fullName?: string;
+  premisesType?: string;    // Residential/Commercial/Industrial/Agricultural
+  connectionType?: string;  // Single-phase/Three-phase
+  sanctionedLoadKW?: string | number;
+  tariffCategoryCode?: string;
+  meterNumber?: string;
+  [key: string]: unknown;
+}
+
+export type ConsumptionProfileVC = VerifiableCredential<ConsumptionProfileSubject>;
+
+// =============================================================================
+// Beckn DEG Energy Credentials — Storage Profile
+// =============================================================================
+
+export interface StorageProfileSubject {
+  id?: string;
+  type?: string;
+  consumerNumber?: string;
+  fullName?: string;
+  meterNumber?: string;
+  assetId?: string;
+  storageCapacityKWh?: string | number;
+  powerRatingKW?: string | number;
+  commissioningDate?: string;
+  storageType?: string;     // LithiumIon/LeadAcid/FlowBattery/Other
+  manufacturer?: string;
+  modelNumber?: string;
+  [key: string]: unknown;
+}
+
+export type StorageProfileVC = VerifiableCredential<StorageProfileSubject>;
+
+// =============================================================================
+// Beckn DEG Energy Credentials — Program Enrollment
+// =============================================================================
+
+export interface ProgramEnrollmentSubject {
+  id?: string;
+  type?: string;
+  consumerNumber?: string;
+  fullName?: string;
+  programName?: string;
+  programCode?: string;
+  enrollmentDate?: string;
+  validUntil?: string;
+  [key: string]: unknown;
+}
+
+export type ProgramEnrollmentVC = VerifiableCredential<ProgramEnrollmentSubject>;
+
+// =============================================================================
+// DEG Credential Type Union
+// =============================================================================
+
+export type DEGCredentialType =
+  | 'UtilityCustomerCredential'
+  | 'ConsumptionProfileCredential'
+  | 'GenerationProfileCredential'
+  | 'StorageProfileCredential'
+  | 'UtilityProgramEnrollmentCredential';
+
+// =============================================================================
 // IES Energy Credentials - Grid Connection
 // =============================================================================
 

@@ -39,6 +39,13 @@ export {
   extractFullName,
   extractNormalizedGenerationClaims,
   validateProviderMatch,
+
+  // Multi-credential detection & extraction (Beckn DEG)
+  detectCredentialType,
+  extractNormalizedUtilityCustomerClaims,
+  extractNormalizedConsumptionProfileClaims,
+  extractNormalizedStorageProfileClaims,
+  extractNormalizedProgramEnrollmentClaims,
 } from './verifier';
 
 // Export portal client

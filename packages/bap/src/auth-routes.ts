@@ -880,6 +880,295 @@ router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response
   }
 });
 
+// =============================================================================
+// Multi-Credential Onboarding Endpoints (Beckn DEG)
+// =============================================================================
+
+/**
+ * POST /auth/verify-credential
+ * Generic endpoint: accepts any of the 5 DEG credential types,
+ * auto-detects the type, verifies, extracts claims, and stores.
+ */
+router.post('/verify-credential', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { pdfBase64, credential: jsonCredential } = req.body;
+
+    if (!pdfBase64 && !jsonCredential) {
+      return res.status(400).json({
+        success: false,
+        error: 'Either a PDF file (base64) or a JSON credential is required',
+      });
+    }
+
+    let credential: Record<string, any>;
+    let extractionMethod: 'json' | 'llm' | 'direct' = 'direct';
+
+    if (jsonCredential && typeof jsonCredential === 'object') {
+      credential = jsonCredential;
+    } else if (pdfBase64 && typeof pdfBase64 === 'string') {
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+      const { extractVCFromPdf } = await import('./vc-pdf-analyzer');
+      const extraction = await extractVCFromPdf(pdfBuffer);
+      if (!extraction.success || !extraction.credential) {
+        return res.status(400).json({
+          success: false,
+          error: extraction.error || 'Could not extract a VC from this PDF.',
+        });
+      }
+      credential = extraction.credential;
+      extractionMethod = extraction.extractionMethod;
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid input.' });
+    }
+
+    const {
+      verifyCredential: vcVerify,
+      detectCredentialType,
+      extractNormalizedGenerationClaims,
+      extractNormalizedUtilityCustomerClaims,
+      extractNormalizedConsumptionProfileClaims,
+      extractNormalizedStorageProfileClaims,
+      extractNormalizedProgramEnrollmentClaims,
+      extractCapacity,
+      getIssuerId,
+      getIssuanceDate,
+      calculateAllowedLimit,
+    } = await import('@p2p/shared');
+
+    // Auto-detect credential type
+    const credType = detectCredentialType(credential as any);
+    if (!credType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not detect credential type. Supported: UtilityCustomerCredential, ConsumptionProfileCredential, GenerationProfileCredential, StorageProfileCredential, UtilityProgramEnrollmentCredential',
+      });
+    }
+
+    // Run generic verification pipeline
+    const verificationResult = await vcVerify(credential);
+
+    // Map DEG type to Prisma enum
+    const PRISMA_TYPE_MAP: Record<string, string> = {
+      'UtilityCustomerCredential': 'UTILITY_CUSTOMER',
+      'ConsumptionProfileCredential': 'CONSUMPTION_PROFILE',
+      'GenerationProfileCredential': 'GENERATION_PROFILE',
+      'StorageProfileCredential': 'STORAGE_PROFILE',
+      'UtilityProgramEnrollmentCredential': 'PROGRAM_ENROLLMENT',
+    };
+    const prismaCredType = PRISMA_TYPE_MAP[credType];
+
+    // Extract claims and build User update based on credential type
+    let claims: Record<string, any> = {};
+    const userUpdate: Record<string, any> = {};
+
+    switch (credType) {
+      case 'UtilityCustomerCredential': {
+        claims = extractNormalizedUtilityCustomerClaims(credential as any);
+        if (claims.fullName) userUpdate.name = claims.fullName;
+        if (claims.consumerNumber) userUpdate.consumerNumber = claims.consumerNumber;
+        if (claims.meterNumber) userUpdate.meterNumber = claims.meterNumber;
+        if (claims.installationAddress) userUpdate.installationAddress = claims.installationAddress;
+        if (claims.serviceConnectionDate) {
+          userUpdate.serviceConnectionDate = new Date(claims.serviceConnectionDate);
+        }
+        break;
+      }
+      case 'ConsumptionProfileCredential': {
+        claims = extractNormalizedConsumptionProfileClaims(credential as any);
+        if (claims.premisesType) userUpdate.premisesType = claims.premisesType;
+        if (claims.connectionType) userUpdate.connectionType = claims.connectionType;
+        if (claims.sanctionedLoadKW) userUpdate.sanctionedLoadKW = claims.sanctionedLoadKW;
+        if (claims.tariffCategoryCode) userUpdate.tariffCategoryCode = claims.tariffCategoryCode;
+        break;
+      }
+      case 'GenerationProfileCredential': {
+        claims = extractNormalizedGenerationClaims(credential as any);
+        const capacityKW = extractCapacity(credential as any);
+        if (capacityKW && capacityKW > 0) {
+          const AVG_PEAK_SUN_HOURS = 4.5;
+          const DAYS_PER_MONTH = 30;
+          userUpdate.productionCapacity = capacityKW * AVG_PEAK_SUN_HOURS * DAYS_PER_MONTH;
+        }
+        break;
+      }
+      case 'StorageProfileCredential': {
+        claims = extractNormalizedStorageProfileClaims(credential as any);
+        if (claims.storageCapacityKWh) userUpdate.storageCapacityKWh = claims.storageCapacityKWh;
+        if (claims.powerRatingKW) userUpdate.storagePowerRatingKW = claims.powerRatingKW;
+        if (claims.storageType) userUpdate.storageType = claims.storageType;
+        break;
+      }
+      case 'UtilityProgramEnrollmentCredential': {
+        claims = extractNormalizedProgramEnrollmentClaims(credential as any);
+        if (claims.programName) userUpdate.programName = claims.programName;
+        if (claims.programCode) userUpdate.programCode = claims.programCode;
+        if (claims.enrollmentDate) {
+          userUpdate.programEnrollmentDate = new Date(claims.enrollmentDate);
+        }
+        if (claims.validUntil) {
+          userUpdate.programValidUntil = new Date(claims.validUntil);
+        }
+        break;
+      }
+    }
+
+    // Upsert UserCredential record
+    const issuerId = getIssuerId(credential.issuer || '');
+    const issuanceDateStr = getIssuanceDate(credential as any);
+
+    await prisma.userCredential.upsert({
+      where: {
+        userId_credentialType: {
+          userId: req.user!.id,
+          credentialType: prismaCredType as any,
+        },
+      },
+      create: {
+        userId: req.user!.id,
+        credentialType: prismaCredType as any,
+        rawJson: JSON.stringify(credential),
+        verified: verificationResult.verified,
+        verifiedAt: verificationResult.verified ? new Date() : null,
+        extractedClaims: JSON.stringify(claims),
+        issuerId: issuerId || null,
+        issuanceDate: issuanceDateStr ? new Date(issuanceDateStr) : null,
+      },
+      update: {
+        rawJson: JSON.stringify(credential),
+        verified: verificationResult.verified,
+        verifiedAt: verificationResult.verified ? new Date() : null,
+        extractedClaims: JSON.stringify(claims),
+        issuerId: issuerId || null,
+        issuanceDate: issuanceDateStr ? new Date(issuanceDateStr) : null,
+      },
+    });
+
+    // Update User fields
+    if (Object.keys(userUpdate).length > 0) {
+      await prisma.user.update({
+        where: { id: req.user!.id },
+        data: userUpdate,
+      });
+    }
+
+    // Fetch updated user + all credentials
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      include: {
+        provider: { select: { id: true, name: true, trustScore: true } },
+        credentials: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+
+    logger.info(`User ${req.user!.id} verified ${credType}: method=${extractionMethod}, verified=${verificationResult.verified}`);
+
+    res.json({
+      success: true,
+      credentialType: credType,
+      verification: {
+        verified: verificationResult.verified,
+        checks: verificationResult.checks,
+        extractionMethod,
+      },
+      extractedClaims: claims,
+      user: {
+        id: updatedUser!.id,
+        phone: updatedUser!.phone,
+        name: updatedUser!.name,
+        profileComplete: updatedUser!.profileComplete,
+        balance: updatedUser!.balance,
+        providerId: updatedUser!.providerId,
+        provider: updatedUser!.provider,
+        trustScore: updatedUser!.trustScore,
+        allowedTradeLimit: updatedUser!.allowedTradeLimit,
+        productionCapacity: updatedUser!.productionCapacity,
+      },
+      credentials: updatedUser!.credentials.map((c: any) => ({
+        type: c.credentialType,
+        verified: c.verified,
+        verifiedAt: c.verifiedAt,
+      })),
+    });
+  } catch (error: any) {
+    logger.error(`Verify credential error: ${error}`);
+    res.status(500).json({ success: false, error: 'Failed to verify credential.' });
+  }
+});
+
+/**
+ * POST /auth/complete-onboarding
+ * Mark profile as complete after credential uploads.
+ * Requires a verified UTILITY_CUSTOMER credential.
+ */
+router.post('/complete-onboarding', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    // Check for mandatory Utility Customer credential
+    const utilityCustomer = await prisma.userCredential.findUnique({
+      where: {
+        userId_credentialType: {
+          userId: req.user!.id,
+          credentialType: 'UTILITY_CUSTOMER',
+        },
+      },
+    });
+
+    if (!utilityCustomer) {
+      return res.status(400).json({
+        success: false,
+        error: 'A Utility Customer credential is required to complete onboarding.',
+      });
+    }
+
+    // Recalculate trade limit
+    const { calculateAllowedLimit } = await import('@p2p/shared');
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { trustScore: true },
+    });
+    const trustScore = currentUser?.trustScore || 0.3;
+    const allowedLimit = calculateAllowedLimit(trustScore);
+
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: {
+        profileComplete: true,
+        allowedTradeLimit: allowedLimit,
+      },
+      include: {
+        provider: { select: { id: true, name: true, trustScore: true } },
+        credentials: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+
+    const credCount = updatedUser.credentials.length;
+    logger.info(`User ${req.user!.id} completed onboarding with ${credCount} credential(s)`);
+
+    res.json({
+      success: true,
+      user: {
+        id: updatedUser.id,
+        phone: updatedUser.phone,
+        name: updatedUser.name,
+        profileComplete: updatedUser.profileComplete,
+        balance: updatedUser.balance,
+        providerId: updatedUser.providerId,
+        provider: updatedUser.provider,
+        trustScore: updatedUser.trustScore,
+        allowedTradeLimit: updatedUser.allowedTradeLimit,
+        productionCapacity: updatedUser.productionCapacity,
+      },
+      credentials: updatedUser.credentials.map((c: any) => ({
+        type: c.credentialType,
+        verified: c.verified,
+        verifiedAt: c.verifiedAt,
+      })),
+    });
+  } catch (error: any) {
+    logger.error(`Complete onboarding error: ${error}`);
+    res.status(500).json({ success: false, error: 'Failed to complete onboarding.' });
+  }
+});
+
 /**
  * POST /auth/vc/verify
  * Verify a Verifiable Credential (VC)

@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp } from 'lucide-react';
+import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp, ShieldCheck, Sun, Battery, BarChart2, Award, CheckCircle2 } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
 import { useP2PStats } from '@/contexts/p2p-stats-context';
-import { authApi } from '@/lib/api';
+import { authApi, type CredentialInfo } from '@/lib/api';
 import { Card, Button, Input, Badge, useConfirm } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 
@@ -188,6 +188,64 @@ function P2PValueInsight() {
 }
 
 
+const CREDENTIAL_META: Record<string, { icon: any; label: string }> = {
+  UTILITY_CUSTOMER: { icon: User, label: 'Utility Customer' },
+  CONSUMPTION_PROFILE: { icon: BarChart2, label: 'Consumption Profile' },
+  GENERATION_PROFILE: { icon: Sun, label: 'Generation Profile' },
+  STORAGE_PROFILE: { icon: Battery, label: 'Storage Profile' },
+  PROGRAM_ENROLLMENT: { icon: Award, label: 'Program Enrollment' },
+};
+
+function MyCredentialsCard() {
+  const [credentials, setCredentials] = useState<CredentialInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    authApi
+      .getCredentialsList()
+      .then((res) => setCredentials(res.credentials))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return null;
+  if (credentials.length === 0) return null;
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-[var(--color-primary)]" />
+          My Credentials
+        </h3>
+        <Badge variant="default" size="sm">
+          {credentials.filter((c) => c.verified).length} verified
+        </Badge>
+      </div>
+      <div className="flex flex-col divide-y divide-[var(--color-border)]">
+        {credentials.map((cred) => {
+          const meta = CREDENTIAL_META[cred.type] || { icon: FileText, label: cred.type };
+          const Icon = meta.icon;
+          return (
+            <div key={cred.type} className="flex items-center gap-3 py-2.5">
+              <Icon className="h-4 w-4 text-[var(--color-text-muted)] flex-shrink-0" />
+              <span className="text-sm text-[var(--color-text)] flex-1">{meta.label}</span>
+              {cred.verified ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-success)]">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Verified
+                </span>
+              ) : (
+                <Badge variant="warning" size="sm">Pending</Badge>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 export default function ProfilePage() {
   const { user, logout, updateUser } = useAuth();
   const { balance, setBalance } = useBalance();
@@ -321,6 +379,8 @@ export default function ProfilePage() {
         {/* P2P Value Insight Card */}
         <P2PValueInsight />
 
+        {/* My Credentials Card */}
+        <MyCredentialsCard />
 
         {/* Production Capacity Card */}
         <Card>

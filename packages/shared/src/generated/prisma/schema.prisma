@@ -36,18 +36,40 @@ model User {
   meterVerifiedCapacity Float?  @map("meter_verified_capacity") // Verified from meter PDF
   meterPdfUrl           String? @map("meter_pdf_url") // Uploaded meter PDF path
 
+  // Multi-credential onboarding fields
+  // From UtilityCustomerCredential
+  consumerNumber        String?   @map("consumer_number")
+  meterNumber           String?   @map("meter_number")
+  installationAddress   String?   @map("installation_address")
+  serviceConnectionDate DateTime? @map("service_connection_date")
+
+  // From ConsumptionProfileCredential
+  premisesType       String? @map("premises_type") // Residential/Commercial/Industrial/Agricultural
+  connectionType     String? @map("connection_type") // Single-phase/Three-phase
+  sanctionedLoadKW   Float?  @map("sanctioned_load_kw")
+  tariffCategoryCode String? @map("tariff_category_code")
+
+  // From StorageProfileCredential
+  storageCapacityKWh   Float?  @map("storage_capacity_kwh")
+  storagePowerRatingKW Float?  @map("storage_power_rating_kw")
+  storageType          String? @map("storage_type") // LithiumIon/LeadAcid/FlowBattery/Other
+
+  // From UtilityProgramEnrollmentCredential
+  programName           String?   @map("program_name")
+  programCode           String?   @map("program_code")
+  programEnrollmentDate DateTime? @map("program_enrollment_date")
+  programValidUntil     DateTime? @map("program_valid_until")
+
   // Prosumer can be both provider and consumer
   provider   Provider? @relation(fields: [providerId], references: [id])
   providerId String?   @unique @map("provider_id")
 
   // User's orders as buyer
   orders         Order[]
-  // Sessions
   sessions       Session[]
-  // Trust history
+  credentials    UserCredential[]
   trustHistory   TrustScoreHistory[]
   discomFeedback DiscomFeedback[]
-  // Payment records
   buyerPayments  PaymentRecord[]     @relation("BuyerPayments")
   sellerPayments PaymentRecord[]     @relation("SellerPayments")
 
@@ -70,6 +92,37 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+// ============================================
+// Verifiable Credentials
+// ============================================
+
+enum CredentialType {
+  UTILITY_CUSTOMER
+  CONSUMPTION_PROFILE
+  GENERATION_PROFILE
+  STORAGE_PROFILE
+  PROGRAM_ENROLLMENT
+}
+
+model UserCredential {
+  id              String         @id @default(uuid())
+  userId          String         @map("user_id")
+  credentialType  CredentialType @map("credential_type")
+  rawJson         String         @map("raw_json")
+  verified        Boolean        @default(false)
+  verifiedAt      DateTime?      @map("verified_at")
+  extractedClaims String?        @map("extracted_claims")
+  issuerId        String?        @map("issuer_id")
+  issuanceDate    DateTime?      @map("issuance_date")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, credentialType])
+  @@index([userId])
+  @@map("user_credentials")
 }
 
 // ============================================

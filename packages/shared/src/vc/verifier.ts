@@ -12,6 +12,11 @@ import {
   VCProof,
   GenerationProfileSubject,
   GridConnectionSubject,
+  UtilityCustomerSubject,
+  ConsumptionProfileSubject,
+  StorageProfileSubject,
+  ProgramEnrollmentSubject,
+  DEGCredentialType,
 } from './types';
 
 // =============================================================================
@@ -951,6 +956,111 @@ export function extractNormalizedGenerationClaims(vc: VerifiableCredential): {
     meterNumber: subject.meterNumber || subject.meterId,
     consumerNumber: subject.consumerNumber || subject.providerId,
     commissioningDate: subject.commissioningDate,
+    issuer: getIssuerId(vc.issuer),
+  };
+}
+
+// =============================================================================
+// Multi-Credential Detection & Extraction (Beckn DEG)
+// =============================================================================
+
+/**
+ * Detect which DEG credential type a VC represents by inspecting its `type` array.
+ */
+export function detectCredentialType(vc: VerifiableCredential): DEGCredentialType | null {
+  const types = vc.type || [];
+  if (types.includes('UtilityCustomerCredential')) return 'UtilityCustomerCredential';
+  if (types.includes('ConsumptionProfileCredential')) return 'ConsumptionProfileCredential';
+  if (types.includes('GenerationProfileCredential')) return 'GenerationProfileCredential';
+  if (types.includes('StorageProfileCredential')) return 'StorageProfileCredential';
+  if (types.includes('UtilityProgramEnrollmentCredential')) return 'UtilityProgramEnrollmentCredential';
+
+  // Fallback: check credentialSubject.type (IES Portal format)
+  const subjectType = (vc.credentialSubject as any)?.type;
+  if (typeof subjectType === 'string') {
+    if (subjectType.includes('UtilityCustomer')) return 'UtilityCustomerCredential';
+    if (subjectType.includes('ConsumptionProfile')) return 'ConsumptionProfileCredential';
+    if (subjectType.includes('GenerationProfile')) return 'GenerationProfileCredential';
+    if (subjectType.includes('StorageProfile')) return 'StorageProfileCredential';
+    if (subjectType.includes('ProgramEnrollment')) return 'UtilityProgramEnrollmentCredential';
+  }
+  return null;
+}
+
+/**
+ * Extract normalized claims from a UtilityCustomerCredential
+ */
+export function extractNormalizedUtilityCustomerClaims(vc: VerifiableCredential) {
+  const s = vc.credentialSubject as UtilityCustomerSubject;
+  let address: string | undefined;
+  if (typeof s.installationAddress === 'string') {
+    address = s.installationAddress;
+  } else if (s.installationAddress && typeof s.installationAddress === 'object') {
+    const a = s.installationAddress;
+    address = [a.fullAddress, a.city, a.district, a.stateProvince, a.postalCode, a.country]
+      .filter(Boolean)
+      .join(', ');
+  }
+  return {
+    fullName: s.fullName,
+    consumerNumber: s.consumerNumber,
+    meterNumber: s.meterNumber,
+    installationAddress: address,
+    serviceConnectionDate: s.serviceConnectionDate,
+    maskedIdNumber: s.maskedIdNumber,
+    issuer: getIssuerId(vc.issuer),
+  };
+}
+
+/**
+ * Extract normalized claims from a ConsumptionProfileCredential
+ */
+export function extractNormalizedConsumptionProfileClaims(vc: VerifiableCredential) {
+  const s = vc.credentialSubject as ConsumptionProfileSubject;
+  return {
+    fullName: s.fullName,
+    consumerNumber: s.consumerNumber,
+    meterNumber: s.meterNumber,
+    premisesType: s.premisesType,
+    connectionType: s.connectionType,
+    sanctionedLoadKW: s.sanctionedLoadKW != null
+      ? (typeof s.sanctionedLoadKW === 'string' ? parseFloat(s.sanctionedLoadKW) : s.sanctionedLoadKW)
+      : undefined,
+    tariffCategoryCode: s.tariffCategoryCode,
+    issuer: getIssuerId(vc.issuer),
+  };
+}
+
+/**
+ * Extract normalized claims from a StorageProfileCredential
+ */
+export function extractNormalizedStorageProfileClaims(vc: VerifiableCredential) {
+  const s = vc.credentialSubject as StorageProfileSubject;
+  return {
+    storageCapacityKWh: s.storageCapacityKWh != null
+      ? (typeof s.storageCapacityKWh === 'string' ? parseFloat(s.storageCapacityKWh) : s.storageCapacityKWh)
+      : undefined,
+    powerRatingKW: s.powerRatingKW != null
+      ? (typeof s.powerRatingKW === 'string' ? parseFloat(s.powerRatingKW) : s.powerRatingKW)
+      : undefined,
+    storageType: s.storageType,
+    commissioningDate: s.commissioningDate,
+    assetId: s.assetId,
+    issuer: getIssuerId(vc.issuer),
+  };
+}
+
+/**
+ * Extract normalized claims from a UtilityProgramEnrollmentCredential
+ */
+export function extractNormalizedProgramEnrollmentClaims(vc: VerifiableCredential) {
+  const s = vc.credentialSubject as ProgramEnrollmentSubject;
+  return {
+    programName: s.programName,
+    programCode: s.programCode,
+    enrollmentDate: s.enrollmentDate,
+    validUntil: s.validUntil,
+    consumerNumber: s.consumerNumber,
     issuer: getIssuerId(vc.issuer),
   };
 }

@@ -207,6 +207,26 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(params),
     }),
+
+  // Multi-credential onboarding (Beckn DEG)
+  verifyCredential: (params: { credential?: object; pdfBase64?: string }) =>
+    request<VerifyCredentialResponse>('/auth/verify-credential', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
+  completeOnboarding: () =>
+    request<CompleteOnboardingResponse>('/auth/complete-onboarding', {
+      method: 'POST',
+    }),
+
+  getCredentialsList: () =>
+    request<{
+      success: boolean;
+      credentials: CredentialInfo[];
+      totalVerified: number;
+      totalPending: number;
+    }>('/auth/me/credentials'),
 };
 
 // Buyer APIs
@@ -646,4 +666,37 @@ export interface VCCheck {
   check: string;
   status: 'passed' | 'failed' | 'skipped';
   message?: string;
+}
+
+// Multi-credential onboarding types (Beckn DEG)
+export type DEGCredentialType =
+  | 'UtilityCustomerCredential'
+  | 'ConsumptionProfileCredential'
+  | 'GenerationProfileCredential'
+  | 'StorageProfileCredential'
+  | 'UtilityProgramEnrollmentCredential';
+
+export interface CredentialInfo {
+  type: string;
+  verified: boolean;
+  verifiedAt: string | null;
+}
+
+export interface VerifyCredentialResponse {
+  success: boolean;
+  credentialType: DEGCredentialType;
+  verification: {
+    verified: boolean;
+    checks: VCCheck[];
+    extractionMethod: 'json' | 'llm' | 'direct';
+  };
+  extractedClaims: Record<string, any>;
+  user: User;
+  credentials: CredentialInfo[];
+}
+
+export interface CompleteOnboardingResponse {
+  success: boolean;
+  user: User;
+  credentials: CredentialInfo[];
 }
