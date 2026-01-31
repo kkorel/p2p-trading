@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Header } from './header';
 import { BottomNav } from './bottom-nav';
 import { LoginScreen } from '@/components/auth/login-screen';
+import { OnboardingScreen } from '@/components/auth/onboarding-screen';
 import { Skeleton } from '@/components/ui';
 
 interface AppShellProps {
@@ -14,7 +15,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, title, hideNav = false }: AppShellProps) {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
 
   // Loading state
   if (isLoading) {
@@ -33,6 +34,11 @@ export function AppShell({ children, title, hideNav = false }: AppShellProps) {
   // Not authenticated - show login
   if (!isAuthenticated) {
     return <LoginScreen />;
+  }
+
+  // Authenticated but profile not complete - show VC onboarding
+  if (!user?.profileComplete) {
+    return <OnboardingScreen />;
   }
 
   return (

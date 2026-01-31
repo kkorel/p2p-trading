@@ -150,6 +150,27 @@ export const authApi = {
       totalPending: number;
     }>('/auth/me/credentials'),
 
+  verifyVcPdf: (pdfBase64: string) =>
+    request<{
+      success: boolean;
+      verification: {
+        verified: boolean;
+        checks: VCCheck[];
+        extractionMethod: 'json' | 'llm';
+      };
+      generationProfile: {
+        fullName?: string;
+        capacityKW?: number;
+        sourceType?: string;
+        meterNumber?: string;
+        consumerNumber?: string;
+      };
+      user: User;
+    }>('/auth/verify-vc-pdf', {
+      method: 'POST',
+      body: JSON.stringify({ pdfBase64 }),
+    }),
+
   verifyVC: (params: { credential?: object; vcId?: string; options?: object }) =>
     request<{
       success: boolean;

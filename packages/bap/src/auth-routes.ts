@@ -739,6 +739,129 @@ router.post('/reset-meter', devModeOnly, authMiddleware, async (req: Request, re
 // =============================================================================
 
 /**
+ * POST /auth/verify-vc-pdf
+ * Upload a PDF containing a Verifiable Credential, extract and verify it,
+ * then set the user's production capacity and trade limit from the VC.
+ * This is the mandatory onboarding step after login.
+ */
+router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { pdfBase64 } = req.body;
+
+    if (!pdfBase64 || typeof pdfBase64 !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'PDF file is required (base64 encoded)',
+      });
+    }
+
+    // Decode base64 PDF
+    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+
+    // Extract VC from PDF
+    const { extractVCFromPdf } = await import('./vc-pdf-analyzer');
+    const extraction = await extractVCFromPdf(pdfBuffer);
+
+    if (!extraction.success || !extraction.credential) {
+      return res.status(400).json({
+        success: false,
+        error: extraction.error || 'Could not extract a Verifiable Credential from this PDF.',
+      });
+    }
+
+    const credential = extraction.credential;
+
+    // Verify the VC using shared verifier
+    const {
+      verifyGenerationProfile,
+      extractCapacity,
+      extractNormalizedGenerationClaims,
+      calculateAllowedLimit,
+    } = await import('@p2p/shared');
+
+    const verificationResult = await verifyGenerationProfile(credential);
+
+    // Extract capacity and normalized claims regardless of strict verification
+    // (LLM-extracted VCs won't have valid proofs but the data is still useful)
+    const capacityKW = extractCapacity(credential as any);
+    const claims = extractNormalizedGenerationClaims(credential as any);
+
+    if (!capacityKW || capacityKW <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not extract a valid production capacity (capacityKW) from the credential.',
+        verification: {
+          verified: verificationResult.verified,
+          checks: verificationResult.checks,
+        },
+      });
+    }
+
+    // Get current user for trust score
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { trustScore: true },
+    });
+
+    const trustScore = currentUser?.trustScore || 0.3;
+    const allowedLimit = calculateAllowedLimit(trustScore);
+
+    // Update user: set capacity, mark profile complete
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: {
+        productionCapacity: capacityKW,
+        allowedTradeLimit: allowedLimit,
+        profileComplete: true,
+      },
+      include: {
+        provider: {
+          select: { id: true, name: true, trustScore: true },
+        },
+      },
+    });
+
+    logger.info(`User ${req.user!.id} completed onboarding via VC PDF: capacityKW=${capacityKW}, method=${extraction.extractionMethod}`);
+
+    res.json({
+      success: true,
+      verification: {
+        verified: verificationResult.verified,
+        checks: verificationResult.checks,
+        extractionMethod: extraction.extractionMethod,
+      },
+      generationProfile: {
+        fullName: claims.fullName,
+        capacityKW: claims.capacityKW,
+        sourceType: claims.sourceType,
+        meterNumber: claims.meterNumber,
+        consumerNumber: claims.consumerNumber,
+      },
+      user: {
+        id: updatedUser.id,
+        phone: updatedUser.phone,
+        name: updatedUser.name,
+        profileComplete: updatedUser.profileComplete,
+        balance: updatedUser.balance,
+        providerId: updatedUser.providerId,
+        provider: updatedUser.provider,
+        trustScore: updatedUser.trustScore,
+        allowedTradeLimit: updatedUser.allowedTradeLimit,
+        productionCapacity: updatedUser.productionCapacity,
+        meterVerifiedCapacity: updatedUser.meterVerifiedCapacity,
+        meterDataAnalyzed: updatedUser.meterDataAnalyzed,
+      },
+    });
+  } catch (error: any) {
+    logger.error(`VC PDF verification error: ${error}`);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process VC PDF. Please try again.',
+    });
+  }
+});
+
+/**
  * POST /auth/vc/verify
  * Verify a Verifiable Credential (VC)
  * Accepts both JSON object or VC ID string
