@@ -229,6 +229,36 @@ export const authApi = {
     }>('/auth/me/credentials'),
 };
 
+// Chat APIs (Oorja agent)
+export const chatApi = {
+  send: (message: string, sessionId?: string) =>
+    request<{
+      success: boolean;
+      sessionId: string;
+      messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
+    }>('/chat/send', {
+      method: 'POST',
+      body: JSON.stringify({ message, sessionId }),
+    }),
+
+  upload: (pdfBase64: string, sessionId?: string, fileName?: string) =>
+    request<{
+      success: boolean;
+      sessionId: string;
+      messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
+    }>('/chat/upload', {
+      method: 'POST',
+      body: JSON.stringify({ pdfBase64, sessionId, fileName }),
+    }),
+
+  getHistory: (sessionId?: string) =>
+    request<{
+      success: boolean;
+      messages: Array<{ role: 'agent' | 'user'; content: string; buttons?: Array<{ text: string; callbackData?: string }>; createdAt: string }>;
+      state: string | null;
+    }>(`/chat/history${sessionId ? `?sessionId=${sessionId}` : ''}`),
+};
+
 // Buyer APIs
 export const buyerApi = {
   discover: (params: DiscoverParams) =>

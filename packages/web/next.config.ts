@@ -29,6 +29,10 @@ const nextConfig: NextConfig = {
           source: '/callbacks/:path*',
           destination: `${apiUrl}/callbacks/:path*`,
         },
+        {
+          source: '/chat/:path*',
+          destination: `${apiUrl}/chat/:path*`,
+        },
       ];
     }
     

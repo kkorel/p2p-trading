@@ -389,3 +389,57 @@ model PaymentRecord {
   @@index([type])
   @@map("payment_records")
 }
+
+// ============================================
+// Chat / Oorja Agent
+// ============================================
+
+enum ChatPlatform {
+  TELEGRAM
+  WEB
+}
+
+enum ChatState {
+  GREETING
+  WAITING_PHONE
+  WAITING_OTP
+  WAITING_NAME
+  OTP_VERIFIED
+  EXPLAIN_VC
+  WAITING_VC_UPLOAD
+  VC_VERIFIED
+  CONFIRM_TRADING
+  TRADING_ACTIVE
+  GENERAL_CHAT
+}
+
+model ChatSession {
+  id          String        @id @default(uuid())
+  userId      String?       @map("user_id")
+  platform    ChatPlatform
+  platformId  String?       @map("platform_id")
+  state       ChatState     @default(GREETING)
+  contextJson String        @default("{}") @map("context_json")
+  authToken   String?       @map("auth_token")
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  messages    ChatMessage[]
+
+  @@unique([platform, platformId])
+  @@index([userId])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id           String      @id @default(uuid())
+  sessionId    String      @map("session_id")
+  role         String
+  content      String
+  metadataJson String?     @map("metadata_json")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  session      ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}

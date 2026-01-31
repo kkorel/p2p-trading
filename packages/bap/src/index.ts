@@ -26,8 +26,10 @@ import routes from './routes';
 import callbacks from './callbacks';
 import sellerRoutes from './seller-routes';
 import authRoutes from './auth-routes';
+import chatRoutes from './chat-routes';
 import { initDb, closeDb, checkDbHealth } from './db';
 import { startDiscomMockService, stopDiscomMockService } from './discom-mock';
+import { startTelegramBot, stopTelegramBot } from './chat/telegram';
 
 const app = express();
 const logger = createLogger('PROSUMER');
@@ -51,6 +53,9 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Authentication routes (public - no auth required for login/OTP)
 app.use('/auth', authRoutes);
+
+// Chat routes (Oorja agent — web chat interface)
+app.use('/chat', chatRoutes);
 
 // Consumer API routes (BAP)
 app.use('/', routes);
@@ -90,6 +95,7 @@ app.get('/health', async (req, res) => {
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/callbacks') ||
     req.path.startsWith('/auth') || req.path.startsWith('/seller') ||
+    req.path.startsWith('/chat') ||
     req.path.startsWith('/select') || req.path.startsWith('/init') ||
     req.path.startsWith('/confirm') || req.path.startsWith('/status') ||
     req.path === '/health') {
@@ -161,6 +167,9 @@ async function start() {
 
       // Start DISCOM mock service for trust score verification
       startDiscomMockService();
+
+      // Start Telegram bot (only if token is configured)
+      startTelegramBot();
     });
 
     // Graceful shutdown handler
@@ -170,6 +179,7 @@ async function start() {
       server.close(async () => {
         try {
           stopDiscomMockService();
+          stopTelegramBot();
           await closeDb();
           logger.info('Database connections closed');
           process.exit(0);

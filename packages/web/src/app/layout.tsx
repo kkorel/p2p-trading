@@ -5,6 +5,7 @@ import { BalanceProvider } from '@/contexts/balance-context';
 import { P2PStatsProvider } from '@/contexts/p2p-stats-context';
 import { DataUpdateProvider } from '@/contexts/data-update-context';
 import { ToastProvider, ConfirmProvider } from '@/components/ui';
+import { ChatBubble } from '@/components/chat/chat-bubble';
 import './globals.css';
 
 const inter = Inter({
@@ -48,7 +49,10 @@ export default function RootLayout({
             <DataUpdateProvider>
               <P2PStatsProvider>
                 <ToastProvider>
-                  <ConfirmProvider>{children}</ConfirmProvider>
+                  <ConfirmProvider>
+                    {children}
+                    <ChatBubble />
+                  </ConfirmProvider>
                 </ToastProvider>
               </P2PStatsProvider>
             </DataUpdateProvider>
