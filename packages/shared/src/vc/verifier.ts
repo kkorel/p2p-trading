@@ -434,8 +434,12 @@ export function checkCredentialTypes(
 // Uses Node.js built-in crypto + jsonld for canonicalization
 // =============================================================================
 
-// Configurable RCW identity service URL for DID resolution
-const RCW_IDENTITY_URL = process.env.RCW_IDENTITY_URL || 'https://ulp-bff.tekdinext.com';
+// Configurable DID resolution service URL
+// Set RCW_IDENTITY_URL env var to point to your Sunbird RC identity service
+const RCW_IDENTITY_URL = process.env.RCW_IDENTITY_URL || '';
+
+// Universal DID Resolver (public, supports many DID methods but not did:rcw)
+const UNIVERSAL_RESOLVER_URL = 'https://dev.uniresolver.io/1.0/identifiers';
 
 /**
  * Decode a multibase base58-btc encoded string (z-prefix) to bytes.
@@ -470,52 +474,73 @@ function decodeMultibase(encoded: string): Buffer {
 }
 
 /**
+ * Fetch with a timeout. Returns null on failure.
+ */
+async function fetchWithTimeout(url: string, timeoutMs = 8000): Promise<any | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+/**
+ * Extract public key from a DID document's verificationMethod array.
+ */
+function extractKeyFromDidDoc(didDoc: any, verificationMethod: string): Buffer | null {
+  const methods =
+    didDoc.verificationMethod ||
+    didDoc.didDocument?.verificationMethod ||
+    [];
+
+  const keyFragment = verificationMethod.split('#')[1] || '';
+
+  for (const method of methods) {
+    const methodId = method.id || '';
+    if (
+      methodId === verificationMethod ||
+      (keyFragment && methodId.endsWith(keyFragment))
+    ) {
+      if (method.publicKeyMultibase) {
+        return decodeMultibase(method.publicKeyMultibase);
+      }
+      if (method.publicKeyBase58) {
+        return decodeMultibase('z' + method.publicKeyBase58);
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Try to resolve a DID document and extract the public key.
- * Supports did:rcw method via configurable RCW identity service.
+ * Attempts configured RCW identity service first, then Universal DID Resolver.
  */
 async function resolvePublicKey(verificationMethod: string): Promise<Buffer | null> {
   try {
-    // Extract DID from verificationMethod (e.g., "did:rcw:xxx#key-0" → "did:rcw:xxx")
     const did = verificationMethod.split('#')[0];
-
     if (!did.startsWith('did:')) return null;
 
-    // Try RCW identity service
-    const resolveUrl = `${RCW_IDENTITY_URL}/did/resolve/${encodeURIComponent(did)}`;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    try {
-      const response = await fetch(resolveUrl, { signal: controller.signal });
-      clearTimeout(timeout);
-
-      if (!response.ok) return null;
-
-      const didDoc: any = await response.json();
-      // Look for the verification method in the DID document
-      const methods =
-        didDoc.verificationMethod ||
-        didDoc.didDocument?.verificationMethod ||
-        [];
-
-      for (const method of methods) {
-        const methodId = method.id || '';
-        if (
-          methodId === verificationMethod ||
-          methodId.endsWith(verificationMethod.split('#')[1] || '')
-        ) {
-          // Extract public key bytes
-          if (method.publicKeyMultibase) {
-            return decodeMultibase(method.publicKeyMultibase);
-          }
-          if (method.publicKeyBase58) {
-            return decodeMultibase('z' + method.publicKeyBase58);
-          }
-        }
+    // 1. Try configured RCW identity service (if set)
+    if (RCW_IDENTITY_URL) {
+      const rcwDoc = await fetchWithTimeout(`${RCW_IDENTITY_URL}/did/resolve/${did}`);
+      if (rcwDoc) {
+        const key = extractKeyFromDidDoc(rcwDoc, verificationMethod);
+        if (key) return key;
       }
-    } catch {
-      // Network error, timeout — fall through
+    }
+
+    // 2. Try Universal DID Resolver (works for did:web, did:key, etc. — not did:rcw)
+    const uniDoc = await fetchWithTimeout(`${UNIVERSAL_RESOLVER_URL}/${did}`);
+    if (uniDoc) {
+      const key = extractKeyFromDidDoc(uniDoc, verificationMethod);
+      if (key) return key;
     }
 
     return null;
@@ -541,13 +566,16 @@ async function verifyEd25519Proof(
   // 1. Resolve the public key
   const publicKeyBytes = await resolvePublicKey(proofObj.verificationMethod);
   if (!publicKeyBytes) {
+    const did = proofObj.verificationMethod.split('#')[0];
+    const didMethod = did.split(':')[1] || 'unknown';
     return {
       check: 'proofVerification',
       status: 'warning',
-      message: 'Could not resolve public key from DID — cryptographic verification skipped',
+      message: `Could not resolve DID (did:${didMethod}) — set RCW_IDENTITY_URL env var to enable cryptographic verification`,
       details: {
         verificationMethod: proofObj.verificationMethod,
-        reason: 'DID resolution failed or public key not found',
+        did,
+        reason: `No resolver available for did:${didMethod}. Configure RCW_IDENTITY_URL to point to your Sunbird RC identity service.`,
       },
     };
   }

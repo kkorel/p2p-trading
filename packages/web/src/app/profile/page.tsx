@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, KeyRound, ExternalLink, Zap, Info, TrendingUp } from 'lucide-react';
+import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
 import { useP2PStats } from '@/contexts/p2p-stats-context';
-import { authApi, type VCCredential } from '@/lib/api';
+import { authApi } from '@/lib/api';
 import { Card, Button, Input, Badge, useConfirm } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 
@@ -18,161 +18,6 @@ const profileSchema = z.object({
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
-
-// VC Status badge variant helper
-function getVCStatusBadgeVariant(status: VCCredential['status']): 'success' | 'warning' | 'default' {
-  if (status === 'verified') return 'success';
-  if (status === 'pending') return 'warning';
-  return 'default';
-}
-
-// Verifiable Credentials Card Component
-function VerifiableCredentialsCard() {
-  const [credentials, setCredentials] = useState<VCCredential[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [vcIdInput, setVcIdInput] = useState('');
-  const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [verifySuccess, setVerifySuccess] = useState<string | null>(null);
-
-  // Fetch user's credentials on mount
-  useEffect(() => {
-    const fetchCredentials = async () => {
-      try {
-        const result = await authApi.getCredentials();
-        if (result.success) {
-          setCredentials(result.credentials);
-        }
-      } catch (err) {
-        console.error('Failed to fetch credentials:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchCredentials();
-  }, []);
-
-  const handleVerifyVC = async () => {
-    if (!vcIdInput.trim()) {
-      setVerifyError('Please enter a VC ID or paste VC JSON');
-      return;
-    }
-
-    setIsVerifying(true);
-    setVerifyError(null);
-    setVerifySuccess(null);
-
-    try {
-      // Check if input is JSON (starts with { or [)
-      const trimmedInput = vcIdInput.trim();
-      let params: { credential?: object; vcId?: string } = {};
-
-      if (trimmedInput.startsWith('{') || trimmedInput.startsWith('[')) {
-        // Try to parse as JSON
-        try {
-          const parsed = JSON.parse(trimmedInput);
-          params = { credential: parsed };
-        } catch {
-          setVerifyError('Invalid JSON format');
-          setIsVerifying(false);
-          return;
-        }
-      } else {
-        // Treat as VC ID
-        params = { vcId: trimmedInput };
-      }
-
-      const result = await authApi.verifyVC(params);
-
-      if (result.verified) {
-        setVerifySuccess(`✓ Credential verified! Type: ${result.credentialType?.join(', ') || 'Unknown'}`);
-        setVcIdInput('');
-        // Refresh credentials list
-        const refreshed = await authApi.getCredentials();
-        if (refreshed.success) {
-          setCredentials(refreshed.credentials);
-        }
-      } else {
-        setVerifyError(result.error || 'Verification failed');
-      }
-    } catch (err: any) {
-      setVerifyError(err.message || 'Verification failed');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  return (
-    <Card>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
-          <KeyRound className="w-4 h-4 text-[var(--color-primary)]" />
-          Verifiable Credentials
-        </h3>
-      </div>
-
-      {/* Credentials List */}
-      <div className="space-y-2 mb-4">
-        {isLoading ? (
-          <div className="text-sm text-[var(--color-text-muted)]">Loading credentials...</div>
-        ) : credentials.length === 0 ? (
-          <div className="text-sm text-[var(--color-text-muted)]">No credentials found</div>
-        ) : (
-          credentials.map((cred, idx) => (
-            <div key={idx} className="flex items-center justify-between py-2 border-b border-[var(--color-border)] last:border-0">
-              <div>
-                <span className="text-sm font-medium text-[var(--color-text)]">{cred.type}</span>
-                <p className="text-xs text-[var(--color-text-muted)]">{cred.description}</p>
-              </div>
-              <Badge variant={getVCStatusBadgeVariant(cred.status)} size="sm">
-                {cred.status === 'verified' && <Check className="w-3 h-3 mr-1" />}
-                {cred.status}
-              </Badge>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Verify New Credential */}
-      <div className="border-t border-[var(--color-border)] pt-3">
-        <p className="text-sm font-medium text-[var(--color-text)] mb-2">Verify a Credential</p>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Enter VC ID from portal"
-            value={vcIdInput}
-            onChange={(e) => {
-              setVcIdInput(e.target.value);
-              setVerifyError(null);
-              setVerifySuccess(null);
-            }}
-            className="flex-1"
-          />
-          <Button
-            onClick={handleVerifyVC}
-            loading={isVerifying}
-            disabled={!vcIdInput.trim()}
-          >
-            Verify
-          </Button>
-        </div>
-
-        {verifyError && (
-          <div className="flex items-center gap-2 mt-2 text-sm text-[var(--color-danger)]">
-            <AlertCircle className="w-4 h-4" />
-            {verifyError}
-          </div>
-        )}
-
-        {verifySuccess && (
-          <div className="flex items-center gap-2 mt-2 text-sm text-[var(--color-success)]">
-            <Check className="w-4 h-4" />
-            {verifySuccess}
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
 
 // Trust score helper functions
 function getTrustTierName(score?: number): string {
@@ -476,8 +321,6 @@ export default function ProfilePage() {
         {/* P2P Value Insight Card */}
         <P2PValueInsight />
 
-        {/* Verifiable Credentials Card */}
-        <VerifiableCredentialsCard />
 
         {/* Production Capacity Card */}
         <Card>
