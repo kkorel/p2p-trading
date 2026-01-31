@@ -156,7 +156,7 @@ export const authApi = {
       verification: {
         verified: boolean;
         checks: VCCheck[];
-        extractionMethod: 'json' | 'llm';
+        extractionMethod: 'json' | 'llm' | 'direct';
       };
       generationProfile: {
         fullName?: string;
@@ -169,6 +169,27 @@ export const authApi = {
     }>('/auth/verify-vc-pdf', {
       method: 'POST',
       body: JSON.stringify({ pdfBase64 }),
+    }),
+
+  verifyVcJson: (credential: object) =>
+    request<{
+      success: boolean;
+      verification: {
+        verified: boolean;
+        checks: VCCheck[];
+        extractionMethod: 'json' | 'llm' | 'direct';
+      };
+      generationProfile: {
+        fullName?: string;
+        capacityKW?: number;
+        sourceType?: string;
+        meterNumber?: string;
+        consumerNumber?: string;
+      };
+      user: User;
+    }>('/auth/verify-vc-pdf', {
+      method: 'POST',
+      body: JSON.stringify({ credential }),
     }),
 
   verifyVC: (params: { credential?: object; vcId?: string; options?: object }) =>

@@ -746,30 +746,42 @@ router.post('/reset-meter', devModeOnly, authMiddleware, async (req: Request, re
  */
 router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { pdfBase64 } = req.body;
+    const { pdfBase64, credential: jsonCredential } = req.body;
 
-    if (!pdfBase64 || typeof pdfBase64 !== 'string') {
+    if (!pdfBase64 && !jsonCredential) {
       return res.status(400).json({
         success: false,
-        error: 'PDF file is required (base64 encoded)',
+        error: 'Either a PDF file (base64) or a JSON credential is required',
       });
     }
 
-    // Decode base64 PDF
-    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+    let credential: Record<string, any>;
+    let extractionMethod: 'json' | 'llm' | 'direct' = 'direct';
 
-    // Extract VC from PDF
-    const { extractVCFromPdf } = await import('./vc-pdf-analyzer');
-    const extraction = await extractVCFromPdf(pdfBuffer);
+    if (jsonCredential && typeof jsonCredential === 'object') {
+      // Direct JSON credential provided
+      credential = jsonCredential;
+    } else if (pdfBase64 && typeof pdfBase64 === 'string') {
+      // PDF provided - extract VC from it
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+      const { extractVCFromPdf } = await import('./vc-pdf-analyzer');
+      const extraction = await extractVCFromPdf(pdfBuffer);
 
-    if (!extraction.success || !extraction.credential) {
+      if (!extraction.success || !extraction.credential) {
+        return res.status(400).json({
+          success: false,
+          error: extraction.error || 'Could not extract a Verifiable Credential from this PDF.',
+        });
+      }
+
+      credential = extraction.credential;
+      extractionMethod = extraction.extractionMethod;
+    } else {
       return res.status(400).json({
         success: false,
-        error: extraction.error || 'Could not extract a Verifiable Credential from this PDF.',
+        error: 'Invalid input. Provide pdfBase64 (string) or credential (object).',
       });
     }
-
-    const credential = extraction.credential;
 
     // Verify the VC using shared verifier
     const {
@@ -821,14 +833,14 @@ router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response
       },
     });
 
-    logger.info(`User ${req.user!.id} completed onboarding via VC PDF: capacityKW=${capacityKW}, method=${extraction.extractionMethod}`);
+    logger.info(`User ${req.user!.id} completed onboarding via VC: capacityKW=${capacityKW}, method=${extractionMethod}`);
 
     res.json({
       success: true,
       verification: {
         verified: verificationResult.verified,
         checks: verificationResult.checks,
-        extractionMethod: extraction.extractionMethod,
+        extractionMethod,
       },
       generationProfile: {
         fullName: claims.fullName,

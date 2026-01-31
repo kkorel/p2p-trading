@@ -24,7 +24,7 @@ type OnboardingStep = 'upload' | 'analyzing' | 'success' | 'error';
 interface VerificationResult {
   verified: boolean;
   checks: VCCheck[];
-  extractionMethod: 'json' | 'llm';
+  extractionMethod: 'json' | 'llm' | 'direct';
 }
 
 interface GenerationProfile {
@@ -49,8 +49,11 @@ export function OnboardingScreen() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      setError('Please select a PDF file.');
+    const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+    const isJson = file.type === 'application/json' || file.name.endsWith('.json');
+
+    if (!isPdf && !isJson) {
+      setError('Please select a PDF or JSON file.');
       return;
     }
 
@@ -64,8 +67,15 @@ export function OnboardingScreen() {
     setStep('analyzing');
 
     try {
-      const base64 = await fileToBase64(file);
-      const result = await authApi.verifyVcPdf(base64);
+      let result;
+      if (isJson) {
+        const text = await file.text();
+        const credential = JSON.parse(text);
+        result = await authApi.verifyVcJson(credential);
+      } else {
+        const base64 = await fileToBase64(file);
+        result = await authApi.verifyVcPdf(base64);
+      }
 
       setVerification(result.verification);
       setProfile(result.generationProfile);
@@ -128,7 +138,7 @@ export function OnboardingScreen() {
             Verify Your Credential
           </h1>
           <p className="text-sm text-[var(--color-text-muted)] text-center max-w-[320px]">
-            Upload your Generation Profile credential as a PDF to start trading energy.
+            Upload your Generation Profile credential (PDF or JSON) to start trading energy.
           </p>
         </div>
 
@@ -222,7 +232,7 @@ function UploadStep({
         </div>
         <div className="text-center">
           <p className="text-sm font-medium text-[var(--color-text)]">
-            Tap to upload PDF
+            Tap to upload PDF or JSON
           </p>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
             or drag and drop (max 5MB)
@@ -231,7 +241,7 @@ function UploadStep({
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf"
+          accept="application/pdf,application/json,.json,.pdf"
           onChange={onFileSelect}
           className="hidden"
         />
@@ -372,7 +382,7 @@ function ErrorStep({
           Verification Failed
         </h2>
         <p className="text-sm text-[var(--color-text-muted)]">
-          {error || 'Could not verify your credential. Please try again with a different PDF.'}
+          {error || 'Could not verify your credential. Please try again with a different file.'}
         </p>
       </div>
       <button
