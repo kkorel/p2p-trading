@@ -12,9 +12,8 @@ declare global {
     interface Request {
       user?: {
         id: string;
-        email: string;
+        phone: string;
         name: string | null;
-        picture: string | null;
         profileComplete: boolean;
         providerId: string | null;
         provider?: {
@@ -109,9 +108,8 @@ export async function authMiddleware(
     // Attach user to request
     req.user = {
       id: user.id,
-      email: user.email,
+      phone: user.phone,
       name: user.name,
-      picture: user.picture,
       profileComplete: user.profileComplete,
       providerId: user.providerId,
       provider: user.provider,
@@ -121,10 +119,10 @@ export async function authMiddleware(
     next();
   } catch (error: any) {
     console.error('Auth middleware error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Authentication error',
-      code: 'AUTH_ERROR' 
+      code: 'AUTH_ERROR'
     });
   }
 }
@@ -167,9 +165,8 @@ export async function optionalAuthMiddleware(
       if (user) {
         req.user = {
           id: user.id,
-          email: user.email,
+          phone: user.phone,
           name: user.name,
-          picture: user.picture,
           profileComplete: user.profileComplete,
           providerId: user.providerId,
           provider: user.provider,

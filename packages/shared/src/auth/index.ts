@@ -2,14 +2,14 @@
  * Authentication Module Exports
  */
 
-// Google OAuth
+// Phone + OTP Authentication
 export {
-  GOOGLE_CONFIG,
-  verifyGoogleToken,
-  authenticateWithGoogle,
-  type GoogleUserInfo,
-  type GoogleAuthResult,
-} from './google';
+  validatePhoneNumber,
+  normalizePhone,
+  sendOtp,
+  verifyOtpAndAuthenticate,
+  type PhoneAuthResult,
+} from './phone';
 
 // Session management
 export {

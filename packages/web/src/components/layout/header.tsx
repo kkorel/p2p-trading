@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
 import { useP2PStats } from '@/contexts/p2p-stats-context';
 import { Zap, Wallet, TrendingUp } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 
@@ -60,25 +59,15 @@ export function Header({ title }: HeaderProps) {
             </Link>
 
             {/* Profile avatar */}
-            <Link 
-              href="/profile" 
+            <Link
+              href="/profile"
               className="flex items-center gap-2 rounded-full transition-opacity hover:opacity-80"
             >
-              {user.picture ? (
-                <Image
-                  src={user.picture}
-                  alt={user.name || 'Avatar'}
-                  width={32}
-                  height={32}
-                  className="rounded-full"
-                />
-              ) : (
-                <div className="w-8 h-8 bg-[var(--color-primary-light)] rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-[var(--color-primary)]">
-                    {user.name?.[0] || user.email[0].toUpperCase()}
-                  </span>
-                </div>
-              )}
+              <div className="w-8 h-8 bg-[var(--color-primary-light)] rounded-full flex items-center justify-center">
+                <span className="text-sm font-medium text-[var(--color-primary)]">
+                  {user.name?.[0]?.toUpperCase() || '#'}
+                </span>
+              </div>
             </Link>
           </div>
         )}

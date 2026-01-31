@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Mail, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, KeyRound, ExternalLink, Zap, Info, TrendingUp } from 'lucide-react';
-import Image from 'next/image';
+import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, KeyRound, ExternalLink, Zap, Info, TrendingUp } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
@@ -427,21 +426,11 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4">
             {/* Avatar */}
             <div className="relative">
-              {user.picture ? (
-                <Image
-                  src={user.picture}
-                  alt={user.name || 'Avatar'}
-                  width={56}
-                  height={56}
-                  className="rounded-full ring-2 ring-white/40"
-                />
-              ) : (
-                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center ring-2 ring-white/40">
-                  <span className="text-xl font-semibold text-white">
-                    {user.name?.[0] || user.email[0].toUpperCase()}
-                  </span>
-                </div>
-              )}
+              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center ring-2 ring-white/40">
+                <span className="text-xl font-semibold text-white">
+                  {user.name?.[0]?.toUpperCase() || '#'}
+                </span>
+              </div>
             </div>
 
             {/* Profile Info + Trust */}
@@ -455,7 +444,7 @@ export default function ProfilePage() {
                   {getTrustTierName(user.trustScore)}
                 </span>
               </div>
-              <p className="text-sm text-white/70 truncate mb-3">{user.email}</p>
+              <p className="text-sm text-white/70 truncate mb-3">{user.phone}</p>
 
               {/* Trust Level Bar - Integrated */}
               <div className="space-y-1.5">
@@ -924,10 +913,10 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div className="flex items-center gap-3 py-2 border-t border-[var(--color-border)]">
-                <Mail className="h-4 w-4 text-[var(--color-text-muted)]" />
+                <Phone className="h-4 w-4 text-[var(--color-text-muted)]" />
                 <div className="flex-1">
-                  <p className="text-xs text-[var(--color-text-muted)]">Email</p>
-                  <p className="text-sm text-[var(--color-text)]">{user.email}</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">Phone</p>
+                  <p className="text-sm text-[var(--color-text)]">{user.phone}</p>
                 </div>
                 <Badge variant="success" size="sm">Verified</Badge>
               </div>

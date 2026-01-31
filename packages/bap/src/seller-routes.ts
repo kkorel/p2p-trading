@@ -1106,7 +1106,7 @@ router.get('/seller/my-profile', authMiddleware, async (req: Request, res: Respo
 
     // If user doesn't have a provider, create one
     if (!providerId) {
-      const providerName = req.user!.name || req.user!.email?.split('@')[0] || 'My Energy';
+      const providerName = req.user!.name || 'My Energy';
       provider = await registerProvider(providerName);
       providerId = provider.id;
 

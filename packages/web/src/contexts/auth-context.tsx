@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (idToken: string) => Promise<void>;
+  login: (phone: string, otp: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
   refreshUser: () => Promise<void>;
@@ -56,8 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('auth:logout', handleLogout);
   }, [checkAuth]);
 
-  const login = async (idToken: string) => {
-    const result = await authApi.loginWithGoogle(idToken);
+  const login = async (phone: string, otp: string, name?: string) => {
+    const result = await authApi.verifyOtp(phone, otp, name);
     localStorage.setItem('authToken', result.token);
     setUser(result.user);
   };
@@ -70,11 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.removeItem('authToken');
     setUser(null);
-
-    // Disable Google auto-select
-    if (typeof window !== 'undefined' && window.google?.accounts?.id) {
-      window.google.accounts.id.disableAutoSelect();
-    }
 
     // Redirect to home page (which will show login)
     router.push('/');
@@ -121,18 +116,3 @@ export function useAuth() {
   return context;
 }
 
-// Type declarations for Google Identity Services
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: any) => void;
-          renderButton: (element: HTMLElement, config: any) => void;
-          prompt: (callback?: (notification: any) => void) => void;
-          disableAutoSelect: () => void;
-        };
-      };
-    };
-  }
-}

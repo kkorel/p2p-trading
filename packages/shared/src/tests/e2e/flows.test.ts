@@ -360,8 +360,8 @@ describe('End-to-End Trading Flows', () => {
       
       await prisma.user.createMany({
         data: [
-          { id: buyerId, email: `buyer-flow-${Date.now()}@test.com`, balance: 1000 },
-          { id: sellerId, email: `seller-flow-${Date.now()}@test.com`, balance: 0 },
+          { id: buyerId, phone: `+9197${Date.now().toString().slice(-8)}`, balance: 1000 },
+          { id: sellerId, phone: `+9196${Date.now().toString().slice(-8)}`, balance: 0 },
         ],
       });
 
@@ -402,7 +402,7 @@ describe('End-to-End Trading Flows', () => {
       await prisma.user.create({
         data: {
           id: buyerId,
-          email: `poor-buyer-${Date.now()}@test.com`,
+          phone: `+9195${Date.now().toString().slice(-8)}`,
           balance: 500, // Less than required
         },
       });

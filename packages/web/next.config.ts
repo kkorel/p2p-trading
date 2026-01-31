@@ -5,20 +5,6 @@ const nextConfig: NextConfig = {
   // Disabled for Vercel deployment
   // output: 'standalone',
   
-  // Allow images from Google (profile pictures)
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.googleusercontent.com',
-      },
-    ],
-  },
-  
   // Proxy API requests to the backend
   // Note: In production, these are handled by vercel.json rewrites
   async rewrites() {

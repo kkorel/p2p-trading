@@ -424,19 +424,19 @@ describe('API Integration Tests', () => {
   describe('User and Balance Management', () => {
     it('should create a user with default balance', async () => {
       const userId = uuidv4();
-      const email = `test-${Date.now()}@example.com`;
+      const phone = `+9199${Date.now().toString().slice(-8)}`;
 
       const user = await prisma.user.create({
         data: {
           id: userId,
-          email,
+          phone,
           name: 'Test User',
           balance: 10000,
         },
       });
 
       expect(user.balance).toBe(10000);
-      expect(user.email).toBe(email);
+      expect(user.phone).toBe(phone);
     });
 
     it('should update user balance', async () => {
@@ -445,7 +445,7 @@ describe('API Integration Tests', () => {
       await prisma.user.create({
         data: {
           id: userId,
-          email: `balance-${Date.now()}@example.com`,
+          phone: `+9198${Date.now().toString().slice(-8)}`,
           balance: 10000,
         },
       });
@@ -469,8 +469,8 @@ describe('API Integration Tests', () => {
       // Create users
       await prisma.user.createMany({
         data: [
-          { id: buyerId, email: `buyer-${Date.now()}@example.com`, balance: 1000 },
-          { id: sellerId, email: `seller-${Date.now()}@example.com`, balance: 500 },
+          { id: buyerId, phone: `+9197${Date.now().toString().slice(-8)}`, balance: 1000 },
+          { id: sellerId, phone: `+9196${Date.now().toString().slice(-8)}`, balance: 500 },
         ],
       });
 

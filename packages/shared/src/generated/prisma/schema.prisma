@@ -17,10 +17,8 @@ datasource db {
 
 model User {
   id              String    @id @default(uuid())
-  email           String    @unique
+  phone           String    @unique
   name            String?
-  picture         String? // Google profile picture URL
-  googleId        String?   @unique @map("google_id")
   profileComplete Boolean   @default(false) @map("profile_complete")
   balance         Float     @default(10000) // Account balance in INR
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -53,8 +51,7 @@ model User {
   buyerPayments  PaymentRecord[]     @relation("BuyerPayments")
   sellerPayments PaymentRecord[]     @relation("SellerPayments")
 
-  @@index([email])
-  @@index([googleId])
+  @@index([phone])
   @@map("users")
 }
 

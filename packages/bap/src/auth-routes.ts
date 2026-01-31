@@ -1,16 +1,16 @@
 /**
  * Authentication Routes
- * Handles Google OAuth authentication
+ * Handles phone + OTP authentication
  */
 
 import { Router, Request, Response } from 'express';
 import {
   prisma,
-  authenticateWithGoogle,
+  sendOtp,
+  verifyOtpAndAuthenticate,
   createSession,
   deleteSession,
   deleteAllUserSessions,
-  GOOGLE_CONFIG,
   createLogger,
 } from '@p2p/shared';
 import { authMiddleware, devModeOnly } from './middleware';
@@ -20,32 +20,55 @@ const logger = createLogger('Auth');
 const router = Router();
 
 /**
- * GET /auth/config
- * Get client-side auth configuration (Google Client ID)
+ * POST /auth/send-otp
+ * Send OTP to phone number
  */
-router.get('/config', (req: Request, res: Response) => {
-  res.json({
-    googleClientId: GOOGLE_CONFIG.clientId,
-  });
-});
-
-/**
- * POST /auth/google
- * Authenticate with Google ID token
- */
-router.post('/google', async (req: Request, res: Response) => {
+router.post('/send-otp', async (req: Request, res: Response) => {
   try {
-    const { idToken } = req.body;
+    const { phone } = req.body;
 
-    if (!idToken) {
+    if (!phone) {
       return res.status(400).json({
         success: false,
-        error: 'Google ID token is required',
+        error: 'Phone number is required',
       });
     }
 
-    // Authenticate with Google
-    const result = await authenticateWithGoogle(idToken);
+    const result = await sendOtp(phone);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.message,
+      });
+    }
+
+    res.json({ success: true, message: result.message });
+  } catch (error: any) {
+    logger.error(`Send OTP error: ${error}`);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send OTP. Please try again.',
+    });
+  }
+});
+
+/**
+ * POST /auth/verify-otp
+ * Verify OTP and authenticate user
+ */
+router.post('/verify-otp', async (req: Request, res: Response) => {
+  try {
+    const { phone, otp, name } = req.body;
+
+    if (!phone || !otp) {
+      return res.status(400).json({
+        success: false,
+        error: 'Phone number and OTP are required',
+      });
+    }
+
+    const result = await verifyOtpAndAuthenticate(phone, otp, name);
 
     if (!result.success) {
       return res.status(401).json({
@@ -83,24 +106,21 @@ router.post('/google', async (req: Request, res: Response) => {
       isNewUser: result.isNewUser,
       user: {
         id: user!.id,
-        email: user!.email,
+        phone: user!.phone,
         name: user!.name,
-        picture: user!.picture,
         profileComplete: user!.profileComplete,
         balance: user!.balance,
         providerId: user!.providerId,
         provider: user!.provider,
-        // Trust score fields
         trustScore: user!.trustScore,
         allowedTradeLimit: user!.allowedTradeLimit,
         meterDataAnalyzed: user!.meterDataAnalyzed,
-        // Production capacity fields
         productionCapacity: user!.productionCapacity,
         meterVerifiedCapacity: user!.meterVerifiedCapacity,
       },
     });
   } catch (error: any) {
-    logger.error(`Google auth error: ${error}`);
+    logger.error(`Verify OTP error: ${error}`);
     res.status(500).json({
       success: false,
       error: 'Authentication failed. Please try again.',
@@ -185,20 +205,17 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
       success: true,
       user: {
         id: user.id,
-        email: user.email,
+        phone: user.phone,
         name: user.name,
-        picture: user.picture,
         profileComplete: user.profileComplete,
         balance: user.balance,
         providerId: user.providerId,
         provider: user.provider,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
-        // Trust score fields
         trustScore: user.trustScore,
         allowedTradeLimit: user.allowedTradeLimit,
         meterDataAnalyzed: user.meterDataAnalyzed,
-        // Production capacity fields
         productionCapacity: user.productionCapacity,
         meterVerifiedCapacity: user.meterVerifiedCapacity,
       },
@@ -259,14 +276,12 @@ router.put('/profile', authMiddleware, async (req: Request, res: Response) => {
       message: 'Profile updated successfully',
       user: {
         id: user.id,
-        email: user.email,
+        phone: user.phone,
         name: user.name,
-        picture: user.picture,
         profileComplete: user.profileComplete,
         balance: user.balance,
         providerId: user.providerId,
         provider: user.provider,
-        // Trust and capacity fields
         trustScore: user.trustScore,
         allowedTradeLimit: user.allowedTradeLimit,
         productionCapacity: user.productionCapacity,
@@ -668,9 +683,8 @@ router.post('/analyze-meter', authMiddleware, async (req: Request, res: Response
       trustBonus: trustBonus > 0 ? `+${(trustBonus * 100).toFixed(0)}%` : null,
       user: {
         id: updatedUser.id,
-        email: updatedUser.email,
+        phone: updatedUser.phone,
         name: updatedUser.name,
-        picture: updatedUser.picture,
         profileComplete: updatedUser.profileComplete,
         balance: updatedUser.balance,
         providerId: updatedUser.providerId,
@@ -812,7 +826,7 @@ router.get('/me/credentials', authMiddleware, async (req: Request, res: Response
       where: { id: req.user!.id },
       select: {
         id: true,
-        email: true,
+        phone: true,
         meterDataAnalyzed: true,
         meterVerifiedCapacity: true,
         meterPdfUrl: true,

@@ -23,17 +23,17 @@ interface PaymentResult {
  */
 async function createTestUser(balance: number = 10000): Promise<{
   id: string;
-  email: string;
+  phone: string;
   balance: number;
 }> {
   const id = uuidv4();
-  const email = `test-${Date.now()}-${Math.random().toString(36).substring(7)}@test.com`;
-  
+  const phone = `+9199${Date.now().toString().slice(-8)}${Math.random().toString(36).substring(7)}`;
+
   const user = await prisma.user.create({
-    data: { id, email, balance },
+    data: { id, phone, balance },
   });
-  
-  return { id: user.id, email: user.email, balance: user.balance };
+
+  return { id: user.id, phone: user.phone, balance: user.balance };
 }
 
 /**
@@ -122,7 +122,7 @@ describe('Balance Concurrency Tests', () => {
     await cleanupTestData();
     // Clean up test users
     await prisma.user.deleteMany({
-      where: { email: { contains: 'test-' } },
+      where: { phone: { contains: '+9199' } },
     });
     // Clean up payment locks
     const lockKeys = await redis.keys('payment:*');

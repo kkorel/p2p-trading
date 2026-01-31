@@ -63,17 +63,21 @@ async function request<T>(
 
 // Auth APIs
 export const authApi = {
-  getConfig: () => request<{ googleClientId: string }>('/auth/config'),
+  sendOtp: (phone: string) =>
+    request<{ success: boolean; message: string }>('/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    }),
 
-  loginWithGoogle: (idToken: string) =>
+  verifyOtp: (phone: string, otp: string, name?: string) =>
     request<{
       success: boolean;
       token: string;
       user: User;
       isNewUser: boolean;
-    }>('/auth/google', {
+    }>('/auth/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ phone, otp, name }),
     }),
 
   getMe: () =>
@@ -324,19 +328,16 @@ export const sellerApi = {
 // Types
 export interface User {
   id: string;
-  email: string;
+  phone: string;
   name: string | null;
-  picture: string | null;
   profileComplete: boolean;
   balance: number;
   providerId: string | null;
-  // Trust score fields
   trustScore?: number;
   allowedTradeLimit?: number;
   meterDataAnalyzed?: boolean;
-  // Production capacity fields
-  productionCapacity?: number | null;      // kWh per month (user-declared)
-  meterVerifiedCapacity?: number | null;   // kWh per month (from PDF analysis)
+  productionCapacity?: number | null;
+  meterVerifiedCapacity?: number | null;
 }
 
 export interface Provider {
