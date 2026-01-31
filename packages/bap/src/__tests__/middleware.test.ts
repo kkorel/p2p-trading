@@ -61,9 +61,8 @@ describe('Authentication Middleware', () => {
       (getSession as jest.Mock).mockResolvedValue({ userId: 'user-1' });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test User',
-        picture: null,
         profileComplete: true,
         providerId: null,
         provider: null,
@@ -84,9 +83,8 @@ describe('Authentication Middleware', () => {
       (getSession as jest.Mock).mockResolvedValue({ userId: 'user-1' });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test User',
-        picture: null,
         profileComplete: true,
         providerId: null,
         provider: null,
@@ -150,9 +148,8 @@ describe('Authentication Middleware', () => {
 
       const mockUser = {
         id: 'user-123',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test User',
-        picture: 'https://example.com/pic.jpg',
         profileComplete: true,
         providerId: 'provider-456',
         provider: {
@@ -169,9 +166,8 @@ describe('Authentication Middleware', () => {
 
       expect(req.user).toEqual({
         id: 'user-123',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test User',
-        picture: 'https://example.com/pic.jpg',
         profileComplete: true,
         providerId: 'provider-456',
         provider: {
@@ -249,9 +245,8 @@ describe('Authentication Middleware', () => {
       (getSession as jest.Mock).mockResolvedValue({ userId: 'user-1' });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test',
-        picture: null,
         profileComplete: true,
         providerId: null,
         provider: null,
@@ -296,9 +291,8 @@ describe('Authentication Middleware', () => {
       (getSession as jest.Mock).mockResolvedValue({ userId: 'user-1' });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
-        email: 'seller@example.com',
+        phone: '+919876543210',
         name: 'Seller',
-        picture: null,
         profileComplete: true,
         providerId: 'prov-1',
         provider: {
@@ -340,9 +334,8 @@ describe('Authentication Middleware', () => {
       (getSession as jest.Mock).mockResolvedValue({ userId: 'user-1' });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test',
-        picture: null,
         profileComplete: true,
         providerId: null,
         provider: null,
@@ -413,9 +406,8 @@ describe('Authentication Middleware', () => {
       const req = createMockRequest();
       req.user = {
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: null,
-        picture: null,
         profileComplete: false,
         providerId: null,
         provider: null,
@@ -438,9 +430,8 @@ describe('Authentication Middleware', () => {
       const req = createMockRequest();
       req.user = {
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test User',
-        picture: null,
         profileComplete: true,
         providerId: null,
         provider: null,
@@ -475,9 +466,8 @@ describe('Authentication Middleware', () => {
       const req = createMockRequest();
       req.user = {
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test',
-        picture: null,
         profileComplete: true,
         providerId: null,
         provider: null,
@@ -499,9 +489,8 @@ describe('Authentication Middleware', () => {
       const req = createMockRequest();
       req.user = {
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test',
-        picture: null,
         profileComplete: true,
         providerId: 'prov-1', // Has providerId but no provider object
         provider: null,
@@ -518,9 +507,8 @@ describe('Authentication Middleware', () => {
       const req = createMockRequest();
       req.user = {
         id: 'user-1',
-        email: 'test@example.com',
+        phone: '+919876543210',
         name: 'Test',
-        picture: null,
         profileComplete: true,
         providerId: 'prov-1',
         provider: {

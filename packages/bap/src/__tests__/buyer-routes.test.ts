@@ -281,7 +281,7 @@ describe('Buyer Routes', () => {
   describe('POST /api/discover', () => {
     const authUser = {
       id: 'user-123',
-      email: 'buyer@example.com',
+      phone: '+919876543210',
       name: 'Test Buyer',
       profileComplete: true,
       balance: 1000,
