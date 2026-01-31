@@ -108,7 +108,7 @@ export async function verifyOtpAndAuthenticate(
       data: {
         phone: normalized,
         name: name.trim(),
-        profileComplete: true,
+        profileComplete: false,
       },
     });
   } else {
