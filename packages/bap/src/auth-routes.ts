@@ -54,6 +54,45 @@ router.post('/send-otp', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /auth/check-phone/:phone
+ * Check if a phone number is already registered (for returning user UX)
+ */
+router.get('/check-phone/:phone', async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.params;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Phone number is required',
+      });
+    }
+
+    // Normalize phone number (strip spaces/dashes)
+    const normalized = phone.replace(/[\s-]/g, '');
+
+    // Check if user exists
+    const user = await prisma.user.findFirst({
+      where: { phone: normalized },
+      select: { id: true, name: true, profileComplete: true },
+    });
+
+    res.json({
+      success: true,
+      exists: !!user,
+      name: user?.name || null,
+      profileComplete: user?.profileComplete || false,
+    });
+  } catch (error: any) {
+    logger.error(`Check phone error: ${error}`);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check phone number',
+    });
+  }
+});
+
+/**
  * POST /auth/verify-otp
  * Verify OTP and authenticate user
  */

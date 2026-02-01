@@ -27,6 +27,8 @@ import {
   MapPin,
   Check,
   SkipForward,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
 
 // --- Credential type metadata ---
@@ -73,6 +75,19 @@ const CREDENTIAL_LABELS: Record<DEGCredentialType, string> = {
   UtilityProgramEnrollmentCredential: 'Program Enrollment',
 };
 
+const CREDENTIAL_HELP_TEXT: Record<DEGCredentialType, string> = {
+  UtilityCustomerCredential:
+    'A digital certificate from your electricity utility that proves you are a registered customer. This is required to participate in energy trading and ensures all traders are legitimate grid-connected users.',
+  ConsumptionProfileCredential:
+    'Details about your electricity consumption patterns, sanctioned load, and tariff category. This helps match you with suitable energy offers.',
+  GenerationProfileCredential:
+    'Information about your solar, wind, or other renewable energy generation capacity. This credential allows you to sell excess energy on the platform.',
+  StorageProfileCredential:
+    'Battery storage capacity and specifications. Useful if you have home battery systems for energy storage and trading.',
+  UtilityProgramEnrollmentCredential:
+    'Proof of enrollment in net metering or other utility programs. This may unlock additional trading features.',
+};
+
 // --- Interfaces ---
 
 interface VerifiedCredential {
@@ -81,14 +96,14 @@ interface VerifiedCredential {
   checks: VCCheck[];
 }
 
-type WizardPhase = 'utility' | 'select' | 'optional' | 'complete';
+type WizardPhase = 'welcome' | 'utility' | 'select' | 'optional' | 'complete';
 type UploadState = 'idle' | 'verifying' | 'success' | 'error';
 
 // --- Main Component ---
 
 export function OnboardingScreen() {
   const { updateUser } = useAuth();
-  const [phase, setPhase] = useState<WizardPhase>('utility');
+  const [phase, setPhase] = useState<WizardPhase>('welcome');
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -97,6 +112,10 @@ export function OnboardingScreen() {
   const [selectedTypes, setSelectedTypes] = useState<OptionalCredentialType[]>([]);
   const [currentOptionalIndex, setCurrentOptionalIndex] = useState(0);
   const [completing, setCompleting] = useState(false);
+  const [typeMismatch, setTypeMismatch] = useState<{
+    expected: DEGCredentialType;
+    actual: DEGCredentialType;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentCredentialType: DEGCredentialType =
@@ -138,6 +157,17 @@ export function OnboardingScreen() {
 
       const result = await authApi.verifyCredential(params);
       setCurrentResult(result);
+      
+      // Check for credential type mismatch
+      if (result.credentialType !== currentCredentialType) {
+        setTypeMismatch({
+          expected: currentCredentialType,
+          actual: result.credentialType,
+        });
+      } else {
+        setTypeMismatch(null);
+      }
+      
       setUploadState('success');
     } catch (err: any) {
       setError(err.message || 'Failed to verify credential. Please try again.');
@@ -185,6 +215,7 @@ export function OnboardingScreen() {
     setError(null);
     setFileName(null);
     setCurrentResult(null);
+    setTypeMismatch(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -195,6 +226,7 @@ export function OnboardingScreen() {
     setError(null);
     setFileName(null);
     setCurrentResult(null);
+    setTypeMismatch(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -227,7 +259,7 @@ export function OnboardingScreen() {
   };
 
   const phaseIndex =
-    phase === 'utility' ? 0 : phase === 'select' ? 1 : phase === 'optional' ? 2 : 3;
+    phase === 'welcome' ? 0 : phase === 'utility' ? 1 : phase === 'select' ? 2 : phase === 'optional' ? 3 : 4;
 
   return (
     <div className="min-h-screen bg-[var(--color-surface)] flex flex-col items-center">
@@ -238,19 +270,21 @@ export function OnboardingScreen() {
             <ShieldCheck className="h-7 w-7 text-[var(--color-primary)]" />
           </div>
           <h1 className="text-xl font-semibold text-[var(--color-text)] mb-1">
-            Verify Your Credentials
+            {phase === 'welcome' ? 'Welcome to EnergyTrade' : 'Verify Your Credentials'}
           </h1>
           <p className="text-sm text-[var(--color-text-muted)] text-center max-w-[320px]">
-            Upload your energy credentials to start trading on the platform.
+            {phase === 'welcome' 
+              ? "Let's get you set up to trade renewable energy"
+              : 'Upload your energy credentials to start trading on the platform.'}
           </p>
         </div>
 
         {/* Progress bar */}
         <div className="flex items-center justify-center gap-1.5 pb-6">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className={`h-1.5 w-8 rounded-full transition-colors ${
+              className={`h-1.5 w-6 rounded-full transition-colors ${
                 i <= phaseIndex
                   ? 'bg-[var(--color-primary)]'
                   : 'bg-[var(--color-border)]'
@@ -261,15 +295,21 @@ export function OnboardingScreen() {
 
         {/* Content */}
         <div className="flex-1 flex flex-col">
+          {phase === 'welcome' && (
+            <WelcomePhase onContinue={() => setPhase('utility')} />
+          )}
+
           {phase === 'utility' && (
             <CredentialUploadPhase
               title="Utility Customer Credential"
               subtitle="This is your base identity credential from your electricity utility. Required for all users."
               mandatory
+              credentialType="UtilityCustomerCredential"
               uploadState={uploadState}
               fileName={fileName}
               error={error}
               result={currentResult}
+              typeMismatch={typeMismatch}
               fileInputRef={fileInputRef}
               onFileSelect={handleFileSelect}
               onAccept={handleAcceptCredential}
@@ -294,10 +334,12 @@ export function OnboardingScreen() {
               }
               mandatory={false}
               progress={`${currentOptionalIndex + 1} of ${selectedTypes.length}`}
+              credentialType={currentCredentialType}
               uploadState={uploadState}
               fileName={fileName}
               error={error}
               result={currentResult}
+              typeMismatch={typeMismatch}
               fileInputRef={fileInputRef}
               onFileSelect={handleFileSelect}
               onAccept={handleAcceptCredential}
@@ -330,15 +372,98 @@ export function OnboardingScreen() {
 
 // --- Phase Components ---
 
+function WelcomePhase({ onContinue }: { onContinue: () => void }) {
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* Introduction cards */}
+      <div className="flex-1 flex flex-col gap-4 px-1">
+        {/* What are VCs */}
+        <div className="p-4 rounded-[14px] bg-[var(--color-surface)] border border-[var(--color-border-subtle)]">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-[10px] bg-[var(--color-primary-light)] flex items-center justify-center flex-shrink-0">
+              <ShieldCheck className="h-5 w-5 text-[var(--color-primary)]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--color-text)] mb-1">
+                What are Verifiable Credentials?
+              </h3>
+              <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                Digital certificates that prove your identity and energy profile. They're issued by your electricity utility or approved authorities.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Why we need them */}
+        <div className="p-4 rounded-[14px] bg-[var(--color-surface)] border border-[var(--color-border-subtle)]">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-[10px] bg-[var(--color-success-light)] flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="h-5 w-5 text-[var(--color-success)]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--color-text)] mb-1">
+                Why do we need them?
+              </h3>
+              <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                To ensure all traders are legitimate grid-connected users. This protects both buyers and sellers in the energy marketplace.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* What you'll need */}
+        <div className="p-4 rounded-[14px] bg-[var(--color-surface)] border border-[var(--color-border-subtle)]">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-[10px] bg-[var(--color-warning-light)] flex items-center justify-center flex-shrink-0">
+              <FileText className="h-5 w-5 text-[var(--color-warning)]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--color-text)] mb-1">
+                What you'll need
+              </h3>
+              <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                Your <strong>Utility Customer Credential</strong> (required) — a PDF or JSON file from your electricity provider. Optional credentials unlock more trading features.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Privacy note */}
+        <div className="p-3 rounded-[12px] bg-[var(--color-info-light)] border border-[var(--color-info)]/20">
+          <div className="flex items-start gap-2">
+            <Info className="h-4 w-4 text-[var(--color-info)] mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-[var(--color-text-muted)]">
+              <span className="font-medium text-[var(--color-text)]">Your data is secure.</span> We only extract relevant information and store it encrypted. Your credentials never leave your control.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Continue button */}
+      <div className="pt-6 pb-2">
+        <button
+          onClick={onContinue}
+          className="h-[44px] w-full rounded-[12px] bg-[var(--color-primary)] text-white text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+        >
+          Get Started
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CredentialUploadPhase({
   title,
   subtitle,
   mandatory,
   progress,
+  credentialType,
   uploadState,
   fileName,
   error,
   result,
+  typeMismatch,
   fileInputRef,
   onFileSelect,
   onAccept,
@@ -349,16 +474,21 @@ function CredentialUploadPhase({
   subtitle: string;
   mandatory: boolean;
   progress?: string;
+  credentialType: DEGCredentialType;
   uploadState: UploadState;
   fileName: string | null;
   error: string | null;
   result: VerifyCredentialResponse | null;
+  typeMismatch: { expected: DEGCredentialType; actual: DEGCredentialType } | null;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onAccept: () => void;
   onRetry: () => void;
   onSkip?: () => void;
 }) {
+  const [showHelp, setShowHelp] = useState(false);
+  const helpText = CREDENTIAL_HELP_TEXT[credentialType];
+  
   const handleDropZoneClick = () => fileInputRef.current?.click();
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -398,6 +528,26 @@ function CredentialUploadPhase({
       <p className="text-xs text-[var(--color-text-muted)] leading-relaxed -mt-2">
         {subtitle}
       </p>
+
+      {/* Collapsible help section */}
+      {helpText && (
+        <div className="-mt-2">
+          <button
+            onClick={() => setShowHelp(!showHelp)}
+            className="inline-flex items-center gap-1 text-xs text-[var(--color-primary)] hover:underline"
+          >
+            <Info className="h-3.5 w-3.5" />
+            {showHelp ? 'Hide details' : 'What is this?'}
+          </button>
+          {showHelp && (
+            <div className="mt-2 p-3 rounded-[10px] bg-[var(--color-primary-light)]/50 border border-[var(--color-primary)]/20">
+              <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                {helpText}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {uploadState === 'idle' && (
         <>
@@ -465,6 +615,8 @@ function CredentialUploadPhase({
       {uploadState === 'success' && result && (
         <CredentialResultCard
           result={result}
+          typeMismatch={typeMismatch}
+          mandatory={mandatory}
           onAccept={onAccept}
           onRetry={onRetry}
         />
@@ -503,10 +655,14 @@ function CredentialUploadPhase({
 
 function CredentialResultCard({
   result,
+  typeMismatch,
+  mandatory,
   onAccept,
   onRetry,
 }: {
   result: VerifyCredentialResponse;
+  typeMismatch: { expected: DEGCredentialType; actual: DEGCredentialType } | null;
+  mandatory: boolean;
   onAccept: () => void;
   onRetry: () => void;
 }) {
@@ -514,11 +670,42 @@ function CredentialResultCard({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Type mismatch warning */}
+      {typeMismatch && (
+        <div className="p-3 rounded-[12px] bg-[var(--color-warning-light)] border border-[var(--color-warning)]/30">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-[var(--color-warning)] flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-[var(--color-warning)]">
+                Credential Type Mismatch
+              </p>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                You uploaded a <span className="font-medium">{CREDENTIAL_LABELS[typeMismatch.actual]}</span> but 
+                we need a <span className="font-medium">{CREDENTIAL_LABELS[typeMismatch.expected]}</span>.
+                {mandatory 
+                  ? ' Please upload the correct credential type.'
+                  : ' You can continue anyway or upload the correct file.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Verified badge */}
       <div className="flex items-center justify-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--color-success-light)] text-[var(--color-success)]">
-          <CheckCircle2 className="h-4 w-4" />
-          <span className="text-sm font-medium">Credential Verified</span>
+        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
+          typeMismatch 
+            ? 'bg-[var(--color-warning-light)] text-[var(--color-warning)]'
+            : 'bg-[var(--color-success-light)] text-[var(--color-success)]'
+        }`}>
+          {typeMismatch ? (
+            <AlertTriangle className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
+          <span className="text-sm font-medium">
+            {typeMismatch ? 'Wrong Credential Type' : 'Credential Verified'}
+          </span>
         </div>
       </div>
 
@@ -573,19 +760,31 @@ function CredentialResultCard({
 
       {/* Actions */}
       <div className="flex gap-2 mt-1">
-        <button
-          onClick={onAccept}
-          className="h-[48px] flex-1 rounded-[12px] bg-[var(--color-primary)] text-white text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
-        >
-          Continue
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        {/* Only show Continue if no mismatch OR if not mandatory */}
+        {(!typeMismatch || !mandatory) && (
+          <button
+            onClick={onAccept}
+            className={`h-[48px] flex-1 rounded-[12px] text-sm font-medium flex items-center justify-center gap-2 transition-opacity ${
+              typeMismatch
+                ? 'bg-[var(--color-warning)] text-white hover:opacity-90'
+                : 'bg-[var(--color-primary)] text-white hover:opacity-90'
+            }`}
+          >
+            {typeMismatch ? 'Continue Anyway' : 'Continue'}
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
         <button
           onClick={onRetry}
-          className="h-[48px] w-[48px] rounded-[12px] bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center hover:bg-[var(--color-primary-light)] transition-colors"
+          className={`h-[48px] rounded-[12px] bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center hover:bg-[var(--color-primary-light)] transition-colors ${
+            typeMismatch && mandatory ? 'flex-1 gap-2' : 'w-[48px]'
+          }`}
           title="Upload different file"
         >
           <RefreshCw className="h-4 w-4 text-[var(--color-text-muted)]" />
+          {typeMismatch && mandatory && (
+            <span className="text-sm font-medium text-[var(--color-text)]">Upload Correct File</span>
+          )}
         </button>
       </div>
     </div>

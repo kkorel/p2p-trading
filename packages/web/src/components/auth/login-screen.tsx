@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { authApi } from '@/lib/api';
-import { Zap, Sun, Leaf, TrendingUp, Loader2, ArrowLeft, Phone } from 'lucide-react';
+import { Zap, Sun, Leaf, TrendingUp, Loader2, ArrowLeft } from 'lucide-react';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 const features = [
   {
@@ -28,15 +29,60 @@ export function LoginScreen() {
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [fullPhone, setFullPhone] = useState(''); // Full number with country code
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // New state for returning user detection
+  const [isReturningUser, setIsReturningUser] = useState(false);
+  const [returningUserName, setReturningUserName] = useState<string | null>(null);
+  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
+
+  // Check if phone number belongs to existing user
+  const checkPhoneNumber = async (phoneNum: string) => {
+    if (!phoneNum.trim() || phoneNum.length < 8) return;
+    
+    setIsCheckingPhone(true);
+    try {
+      const result = await authApi.checkPhone(phoneNum.trim());
+      if (result.exists && result.name) {
+        setIsReturningUser(true);
+        setReturningUserName(result.name);
+        setName(result.name); // Pre-fill name for backend
+      } else {
+        setIsReturningUser(false);
+        setReturningUserName(null);
+      }
+    } catch (err) {
+      // Silently ignore - user can still proceed
+      setIsReturningUser(false);
+      setReturningUserName(null);
+    } finally {
+      setIsCheckingPhone(false);
+    }
+  };
+
+  const handlePhoneChange = (displayValue: string, fullNumber: string) => {
+    setPhone(displayValue);
+    setFullPhone(fullNumber);
+    // Reset returning user state when phone changes
+    if (isReturningUser) {
+      setIsReturningUser(false);
+      setReturningUserName(null);
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    // Use full phone number for checking
+    checkPhoneNumber(fullPhone || phone);
+  };
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!name.trim() || name.trim().length < 2) {
+    // Only require name for new users
+    if (!isReturningUser && (!name.trim() || name.trim().length < 2)) {
       setError('Please enter your name (at least 2 characters)');
       return;
     }
@@ -48,7 +94,8 @@ export function LoginScreen() {
 
     setIsLoading(true);
     try {
-      await authApi.sendOtp(phone.trim());
+      // Use fullPhone for API call (includes country code)
+      await authApi.sendOtp((fullPhone || phone).trim());
       setStep('otp');
     } catch (err: any) {
       setError(err.message || 'Failed to send OTP');
@@ -68,7 +115,10 @@ export function LoginScreen() {
 
     setIsLoading(true);
     try {
-      await login(phone.trim(), otp.trim(), name.trim());
+      // For returning users, pass their existing name
+      const nameToUse = isReturningUser ? returningUserName || '' : name.trim();
+      const phoneToUse = (fullPhone || phone).trim();
+      await login(phoneToUse, otp.trim(), nameToUse);
     } catch (err: any) {
       setError(err.message || 'Verification failed');
       setIsLoading(false);
@@ -133,38 +183,54 @@ export function LoginScreen() {
 
           {step === 'phone' && (
             <form onSubmit={handleSendOtp} className="flex flex-col gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-1.5">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your name"
-                  className="w-full h-[44px] px-3 rounded-[12px] bg-[var(--color-surface)] border border-[var(--color-border)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  disabled={isLoading}
-                />
-              </div>
+              {/* Phone Number - Always shown first */}
               <div>
                 <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-1.5">
                   Phone Number
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-text-muted)]" />
-                  <input
-                    type="tel"
+                  <PhoneInput
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full h-[44px] pl-10 pr-3 rounded-[12px] bg-[var(--color-surface)] border border-[var(--color-border)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                    onChange={handlePhoneChange}
+                    onBlur={handlePhoneBlur}
+                    disabled={isLoading}
+                    placeholder="7911 123456"
+                  />
+                  {isCheckingPhone && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-text-muted)] animate-spin" />
+                  )}
+                </div>
+              </div>
+
+              {/* Returning user banner OR Name input */}
+              {isReturningUser && returningUserName ? (
+                <div className="p-3 rounded-[12px] bg-[var(--color-success-light)] border border-[var(--color-success)]/30">
+                  <p className="text-sm text-[var(--color-success)] font-medium">
+                    Welcome back, {returningUserName}!
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                    Enter OTP to continue to your account
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-1.5">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full h-[44px] px-3 rounded-[12px] bg-[var(--color-surface)] border border-[var(--color-border)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
                     disabled={isLoading}
                   />
                 </div>
-              </div>
+              )}
+
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isCheckingPhone}
                 className="h-[44px] w-full rounded-[12px] bg-[var(--color-primary)] text-white text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {isLoading ? (
@@ -172,6 +238,8 @@ export function LoginScreen() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Sending OTP...
                   </>
+                ) : isReturningUser ? (
+                  'Welcome Back - Send OTP'
                 ) : (
                   'Send OTP'
                 )}

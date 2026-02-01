@@ -63,6 +63,14 @@ async function request<T>(
 
 // Auth APIs
 export const authApi = {
+  checkPhone: (phone: string) =>
+    request<{
+      success: boolean;
+      exists: boolean;
+      name: string | null;
+      profileComplete: boolean;
+    }>(`/auth/check-phone/${encodeURIComponent(phone)}`),
+
   sendOtp: (phone: string) =>
     request<{ success: boolean; message: string }>('/auth/send-otp', {
       method: 'POST',
