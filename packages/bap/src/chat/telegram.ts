@@ -3,7 +3,7 @@
  * Uses Telegraf for bot framework. Only starts if TELEGRAM_BOT_TOKEN is set.
  */
 
-import { createLogger } from '@p2p/shared';
+import { createLogger, prisma } from '@p2p/shared';
 import { processMessage, FileData } from './agent';
 
 const logger = createLogger('TelegramBot');
@@ -43,6 +43,27 @@ export async function startTelegramBot(): Promise<void> {
       }
     });
 
+    // /reset command — deletes the session so the user starts fresh
+    bot.command('reset', async (ctx: any) => {
+      try {
+        const chatId = String(ctx.chat.id);
+
+        const session = await prisma.chatSession.findUnique({
+          where: { platform_platformId: { platform: 'TELEGRAM', platformId: chatId } },
+        });
+
+        if (session) {
+          await prisma.chatMessage.deleteMany({ where: { sessionId: session.id } });
+          await prisma.chatSession.delete({ where: { id: session.id } });
+        }
+
+        await ctx.reply('Session reset! Send /start to begin again.');
+      } catch (err: any) {
+        logger.error(`Telegram /reset error: ${err.message}`);
+        await ctx.reply('Something went wrong. Please try again.');
+      }
+    });
+
     // Text messages
     bot.on('text', async (ctx: any) => {
       try {
@@ -58,14 +79,19 @@ export async function startTelegramBot(): Promise<void> {
       }
     });
 
-    // Document uploads (PDF)
+    // Document uploads (PDF and JSON)
     bot.on('document', async (ctx: any) => {
       try {
         const chatId = String(ctx.chat.id);
         const doc = ctx.message.document;
+        const fileName = doc.file_name || '';
+        const mimeType = doc.mime_type || '';
 
-        if (!doc.mime_type?.includes('pdf')) {
-          await ctx.reply('Please upload a PDF document.');
+        const isPdf = mimeType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
+        const isJson = mimeType.includes('json') || fileName.toLowerCase().endsWith('.json');
+
+        if (!isPdf && !isJson) {
+          await ctx.reply('Please upload a PDF or JSON credential file.');
           return;
         }
 
@@ -75,15 +101,17 @@ export async function startTelegramBot(): Promise<void> {
         const fileResponse = await axios.get(fileLink.href, { responseType: 'arraybuffer' });
         const buffer = Buffer.from(fileResponse.data);
 
+        const resolvedMime = isJson ? 'application/json' : 'application/pdf';
         const fileData: FileData = {
           buffer,
-          mimeType: doc.mime_type || 'application/pdf',
-          fileName: doc.file_name || 'upload.pdf',
+          mimeType: resolvedMime,
+          fileName: fileName || (isJson ? 'upload.json' : 'upload.pdf'),
         };
 
+        const label = isJson ? '[JSON credential uploaded]' : '[PDF uploaded]';
         await ctx.reply('Processing your document...');
 
-        const response = await processMessage('TELEGRAM', chatId, '[PDF uploaded]', fileData);
+        const response = await processMessage('TELEGRAM', chatId, label, fileData);
         for (const msg of response.messages) {
           await sendTelegramMessage(ctx, msg.text, msg.buttons);
         }
