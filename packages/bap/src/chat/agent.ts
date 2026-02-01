@@ -780,8 +780,8 @@ const states: Record<ChatState, StateHandler> = {
         messages: [
           {
             text: h(ctx,
-              `${verifiedText}Want to add more credentials? This helps improve your trust score.`,
-              `${verifiedText}Aur credentials add karna chahte ho? Isse aapka trust score badhega.`
+              `${verifiedText}Want to add more credentials? This helps verify your profile for better trading.`,
+              `${verifiedText}Aur credentials add karna chahte ho? Isse aapka profile verify hoga aur trading aur achi hogi.`
             ),
             buttons,
           },
@@ -1079,38 +1079,51 @@ const states: Record<ChatState, StateHandler> = {
       // --- Smart data queries ---
 
       // Listings / offers count
-      if (lower.includes('listing') || lower.includes('offer') && (lower.includes('my') || lower.includes('mere') || lower.includes('kitne') || lower.includes('how many'))) {
+      if (
+        (lower.includes('listing') || lower.includes('offer')) &&
+        (lower.includes('my') || lower.includes('mere') || lower.includes('mera') ||
+         lower.includes('kitna') || lower.includes('kitne') || lower.includes('how many') ||
+         lower.includes('show') || lower.includes('dikha') || lower.includes('dikhao') ||
+         lower.includes('abhi') || lower.includes('active'))
+      ) {
         if (ctx.userId) {
-          const summary = await mockTradingAgent.getActiveListings(ctx.userId);
+          const summary = await mockTradingAgent.getActiveListings(ctx.userId, ctx.language);
           return { messages: [{ text: summary }] };
         }
       }
 
       // Sales by time period (check BEFORE general earnings to catch "sold today" etc.)
-      if (ctx.userId && (lower.includes('sold') || lower.includes('becha') || lower.includes('sale') || lower.includes('bikri'))) {
+      if (ctx.userId && (lower.includes('sold') || lower.includes('becha') || lower.includes('sale') || lower.includes('bikri') || lower.includes('biki'))) {
         const period = parseTimePeriod(message);
         if (period) {
-          const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label);
+          const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, ctx.language);
           return { messages: [{ text: summary }] };
         }
       }
 
       // Earnings (total)
-      if (lower.includes('earn') || lower.includes('kamaayi') || lower.includes('kamayi') || lower.includes('income') || lower.includes('kamaya') || lower.includes('how much did')) {
+      if (
+        lower.includes('earn') || lower.includes('kamaayi') || lower.includes('kamayi') ||
+        lower.includes('income') || lower.includes('kamaya') || lower.includes('how much did') ||
+        lower.includes('banaya') || lower.includes('banae') || lower.includes('banaye') ||
+        lower.includes('kamai') || lower.includes('revenue') || lower.includes('munafa')
+      ) {
         if (ctx.userId) {
-          // Check if a specific period is mentioned
           const period = parseTimePeriod(message);
           if (period) {
-            const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label);
+            const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, ctx.language);
             return { messages: [{ text: summary }] };
           }
-          const summary = await mockTradingAgent.getEarningsSummary(ctx.userId);
+          const summary = await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language);
           return { messages: [{ text: summary }] };
         }
       }
 
       // Balance / wallet
-      if (lower.includes('balance') || lower.includes('wallet') || (lower.includes('paisa') && !lower.includes('kamaya'))) {
+      if (
+        lower.includes('balance') || lower.includes('wallet') || lower.includes('khata') ||
+        lower.includes('account') || lower.includes('paise') || lower.includes('paisa')
+      ) {
         if (ctx.userId) {
           const user = await prisma.user.findUnique({
             where: { id: ctx.userId },
@@ -1118,7 +1131,7 @@ const states: Record<ChatState, StateHandler> = {
           });
           if (user) {
             return {
-              messages: [{ text: h(ctx, `Your balance: Rs ${user.balance.toFixed(2)}`, `Aapka balance: Rs ${user.balance.toFixed(2)}`) }],
+              messages: [{ text: h(ctx, `Your wallet balance: Rs ${user.balance.toFixed(2)}`, `Aapka wallet balance: Rs ${user.balance.toFixed(2)}`) }],
             };
           }
         }
@@ -1127,9 +1140,43 @@ const states: Record<ChatState, StateHandler> = {
       // Orders
       if (lower.includes('order') || lower.includes('status') || lower.includes('trade')) {
         if (ctx.userId) {
-          const summary = await mockTradingAgent.getOrdersSummary(ctx.userId);
+          const summary = await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language);
           return { messages: [{ text: summary }] };
         }
+      }
+
+      // DISCOM rate query (mock)
+      if (
+        ((lower.includes('discom') || lower.includes('bijli')) &&
+         (lower.includes('rate') || lower.includes('price') || lower.includes('cost') || lower.includes('kitna') || lower.includes('dar') || lower.includes('daam') || lower.includes('charge'))) ||
+        lower.includes('electricity rate') || lower.includes('electricity price') || lower.includes('tariff')
+      ) {
+        const discomName = ctx.discom || h(ctx, 'your DISCOM', 'aapka DISCOM');
+        return {
+          messages: [{
+            text: h(ctx,
+              `Current ${discomName} rates (approx.):\n- Normal: Rs 5.50/unit\n- Peak hours (6PM-10PM): Rs 7.50/unit\n\nP2P trading rate: Rs 6.00/unit — often cheaper than DISCOM peak rates!`,
+              `${discomName} ke rate (lagbhag):\n- Normal: Rs 5.50/unit\n- Peak hours (shaam 6-10): Rs 7.50/unit\n\nP2P trading rate: Rs 6.00/unit — aksar DISCOM peak rate se sasta!`
+            ),
+          }],
+        };
+      }
+
+      // Recommendation engine (mock)
+      if (
+        ((lower.includes('improve') || lower.includes('increase') || lower.includes('badha') || lower.includes('badhao') || lower.includes('zyada')) &&
+         (lower.includes('profit') || lower.includes('earn') || lower.includes('income') || lower.includes('kamai') || lower.includes('kamayi') || lower.includes('munafa') || lower.includes('fayda') || lower.includes('paise'))) ||
+        (lower.includes('tip') && (lower.includes('trad') || lower.includes('sell') || lower.includes('earn') || lower.includes('profit'))) ||
+        (lower.includes('kaise') && (lower.includes('zyada') || lower.includes('badha')))
+      ) {
+        return {
+          messages: [{
+            text: h(ctx,
+              `Tips to improve your earnings:\n\n1. Trade regularly — more trades build trust, attracting more buyers\n2. Keep solar panels clean for maximum generation\n3. List energy during peak hours (6PM-10PM) for higher prices\n4. Price slightly below DISCOM rates for faster sales\n5. Upload all credentials — verified profiles get more buyers`,
+              `Kamayi badhane ke tips:\n\n1. Regular trade karte raho — jitna zyada trade, utna acha trust score, utne zyada buyers milenge\n2. Solar panels saaf rakho aur maintenance karo — zyada bijli banegi\n3. Peak hours (shaam 6-10) mein energy list karo — zyada price milega\n4. DISCOM rate se thoda kam rate rakho — jaldi bikri hogi\n5. Saare credentials upload karo — verified profile pe zyada buyers aate hain`
+            ),
+          }],
+        };
       }
 
       // Create new offer
@@ -1153,6 +1200,14 @@ const states: Record<ChatState, StateHandler> = {
       // --- Knowledge base ---
       const kbAnswer = knowledgeBase.findAnswer(message);
       if (kbAnswer) {
+        // For Hinglish users, rephrase KB answer via LLM
+        if (ctx.language === 'hinglish') {
+          const hinglishKB = await askLLM(
+            message,
+            `Answer in Hinglish (Roman Hindi script, NOT Devanagari). Keep it short and farmer-friendly. Here is the factual answer: "${kbAnswer}". Rephrase in Hinglish. Just give the rephrased answer, nothing else.`
+          );
+          if (hinglishKB) return { messages: [{ text: hinglishKB }] };
+        }
         return { messages: [{ text: kbAnswer }] };
       }
 

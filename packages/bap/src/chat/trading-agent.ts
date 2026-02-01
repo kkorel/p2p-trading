@@ -1,11 +1,17 @@
 /**
  * Trading Agent — Creates offers and reports earnings/listings for sellers.
+ * Supports language-aware responses (English / Hinglish).
  */
 
 import { prisma, createLogger, publishOfferToCDS, isExternalCDSEnabled } from '@p2p/shared';
 import { registerProvider, addCatalogItem, addOffer } from '../seller-catalog';
 
 const logger = createLogger('TradingAgent');
+
+type LangOption = string | undefined;
+function ht(lang: LangOption, en: string, hi: string): string {
+  return lang === 'hinglish' ? hi : en;
+}
 
 export const mockTradingAgent = {
   /**
@@ -113,14 +119,17 @@ export const mockTradingAgent = {
   /**
    * Get earnings summary for a user.
    */
-  async getEarningsSummary(userId: string): Promise<string> {
+  async getEarningsSummary(userId: string, lang?: string): Promise<string> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { providerId: true, balance: true, name: true },
     });
 
     if (!user?.providerId) {
-      return 'You have not started selling yet. Would you like me to set up trading for you?';
+      return ht(lang,
+        'You have not started selling yet. Would you like me to set up trading for you?',
+        'Aapne abhi tak selling shuru nahi ki. Kya main trading set up kar dun?'
+      );
     }
 
     const completedOrders = await prisma.order.findMany({
@@ -133,18 +142,25 @@ export const mockTradingAgent = {
 
     const totalEarnings = completedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
     const totalKwh = completedOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+    const name = user.name || ht(lang, 'friend', 'dost');
 
     if (completedOrders.length === 0) {
-      return `No sales yet, ${user.name || 'friend'}. Your offers are live and waiting for buyers! Wallet: Rs ${user.balance.toFixed(2)}.`;
+      return ht(lang,
+        `No sales yet, ${name}. Your offers are live and waiting for buyers! Wallet: Rs ${user.balance.toFixed(2)}.`,
+        `Abhi tak koi sale nahi hui, ${name}. Aapke offers live hain, buyers ka wait kar rahe hain! Wallet: Rs ${user.balance.toFixed(2)}.`
+      );
     }
 
-    return `Your earnings, ${user.name || 'friend'}:\n- Orders: ${completedOrders.length}\n- Energy sold: ${totalKwh.toFixed(1)} kWh\n- Earnings: Rs ${totalEarnings.toFixed(2)}\n- Wallet: Rs ${user.balance.toFixed(2)}`;
+    return ht(lang,
+      `Your earnings, ${name}:\n- Orders: ${completedOrders.length}\n- Energy sold: ${totalKwh.toFixed(1)} kWh\n- Earnings: Rs ${totalEarnings.toFixed(2)}\n- Wallet: Rs ${user.balance.toFixed(2)}`,
+      `Aapki kamayi, ${name}:\n- Orders: ${completedOrders.length}\n- Energy bechi: ${totalKwh.toFixed(1)} kWh\n- Kamayi: Rs ${totalEarnings.toFixed(2)}\n- Wallet: Rs ${user.balance.toFixed(2)}`
+    );
   },
 
   /**
    * Get order status summary.
    */
-  async getOrdersSummary(userId: string): Promise<string> {
+  async getOrdersSummary(userId: string, lang?: string): Promise<string> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { providerId: true, name: true, id: true },
@@ -164,7 +180,10 @@ export const mockTradingAgent = {
           (o, i) =>
             `${i + 1}. ${o.totalQty || 0} kWh — Rs ${(o.totalPrice || 0).toFixed(2)} — ${o.status}`
         );
-        return `Your recent orders (as seller):\n${lines.join('\n')}`;
+        return ht(lang,
+          `Your recent orders (as seller):\n${lines.join('\n')}`,
+          `Aapke recent orders (seller):\n${lines.join('\n')}`
+        );
       }
     }
 
@@ -181,23 +200,33 @@ export const mockTradingAgent = {
         (o, i) =>
           `${i + 1}. ${o.totalQty || 0} kWh — Rs ${(o.totalPrice || 0).toFixed(2)} — ${o.status}`
       );
-      return `Your recent orders (as buyer):\n${lines.join('\n')}`;
+      return ht(lang,
+        `Your recent orders (as buyer):\n${lines.join('\n')}`,
+        `Aapke recent orders (buyer):\n${lines.join('\n')}`
+      );
     }
 
-    return 'No orders yet. Your offers are live — buyers will find them soon!';
+    return ht(lang,
+      'No orders yet. Your offers are live — buyers will find them soon!',
+      'Abhi tak koi order nahi. Aapke offers live hain — jaldi buyers aayenge!'
+    );
   },
 
   /**
    * Get active listings (catalog offers) for a seller.
+   * Also shows total listed vs sold summary.
    */
-  async getActiveListings(userId: string): Promise<string> {
+  async getActiveListings(userId: string, lang?: string): Promise<string> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { providerId: true, name: true },
     });
 
     if (!user?.providerId) {
-      return 'You have no listings yet. Would you like me to create one?';
+      return ht(lang,
+        'You have no listings yet. Would you like me to create one?',
+        'Aapki koi listing nahi hai. Kya main ek bana dun?'
+      );
     }
 
     const offers = await prisma.catalogOffer.findMany({
@@ -214,10 +243,24 @@ export const mockTradingAgent = {
       },
     });
 
+    // Get total sold from orders
+    const orders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+      },
+      select: { totalQty: true },
+    });
+    const totalSold = orders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+
     if (offers.length === 0) {
-      return 'No active listings. Would you like me to create an offer?';
+      return ht(lang,
+        'No active listings. Would you like me to create an offer?',
+        'Koi active listing nahi. Kya main ek offer bana dun?'
+      );
     }
 
+    const totalListed = offers.reduce((sum, o) => sum + o.maxQty, 0);
     const lines = offers.map((o, i) => {
       const start = new Date(o.timeWindowStart).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
       const startTime = new Date(o.timeWindowStart).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -225,20 +268,26 @@ export const mockTradingAgent = {
       return `${i + 1}. ${o.maxQty} kWh @ Rs ${o.priceValue}/unit — ${start} ${startTime}-${endTime}`;
     });
 
-    return `Your listings (${offers.length}):\n${lines.join('\n')}`;
+    return ht(lang,
+      `Your listings (${offers.length}):\nTotal listed: ${totalListed} kWh | Sold: ${totalSold} kWh\n\n${lines.join('\n')}`,
+      `Aapki listings (${offers.length}):\nKul listed: ${totalListed} kWh | Bika: ${totalSold} kWh\n\n${lines.join('\n')}`
+    );
   },
 
   /**
    * Get sales summary for a specific time period.
    */
-  async getSalesByPeriod(userId: string, startDate: Date, endDate: Date, periodLabel: string): Promise<string> {
+  async getSalesByPeriod(userId: string, startDate: Date, endDate: Date, periodLabel: string, lang?: string): Promise<string> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { providerId: true, name: true },
     });
 
     if (!user?.providerId) {
-      return 'You have not started selling yet.';
+      return ht(lang,
+        'You have not started selling yet.',
+        'Aapne abhi tak selling shuru nahi ki.'
+      );
     }
 
     const orders = await prisma.order.findMany({
@@ -254,10 +303,16 @@ export const mockTradingAgent = {
     const totalKwh = orders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
 
     if (orders.length === 0) {
-      return `No sales ${periodLabel}.`;
+      return ht(lang,
+        `No sales ${periodLabel}.`,
+        `${periodLabel} mein koi sale nahi hui.`
+      );
     }
 
-    return `Sales ${periodLabel}:\n- ${orders.length} order(s)\n- ${totalKwh.toFixed(1)} kWh sold\n- Rs ${totalEarnings.toFixed(2)} earned`;
+    return ht(lang,
+      `Sales ${periodLabel}:\n- ${orders.length} order(s)\n- ${totalKwh.toFixed(1)} kWh sold\n- Rs ${totalEarnings.toFixed(2)} earned`,
+      `${periodLabel} ki sales:\n- ${orders.length} order\n- ${totalKwh.toFixed(1)} kWh biki\n- Rs ${totalEarnings.toFixed(2)} kamayi`
+    );
   },
 };
 
