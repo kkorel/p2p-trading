@@ -78,7 +78,9 @@ type ChatState =
   | 'WAITING_PHONE'
   | 'WAITING_OTP'
   | 'AUTHENTICATED'
+  | 'ASK_DISCOM'
   | 'WAITING_UTILITY_CRED'
+  | 'ASK_INTENT'
   | 'OFFER_OPTIONAL_CREDS'
   | 'WAITING_OPTIONAL_CRED'
   | 'CONFIRM_TRADING'
@@ -254,7 +256,10 @@ async function getVerifiedCredentials(userId: string): Promise<string[]> {
   return creds.map((c) => c.credentialType);
 }
 
-function getOptionalCredButtons(verifiedCreds: string[]): Array<{ text: string; callbackData: string }> {
+function getOptionalCredButtons(
+  verifiedCreds: string[],
+  intent?: 'sell' | 'buy' | 'learn'
+): Array<{ text: string; callbackData: string }> {
   const dbTypeToCallback: Record<string, { text: string; cb: string }> = {
     GENERATION_PROFILE: { text: 'Generation (Solar)', cb: 'cred:generation' },
     CONSUMPTION_PROFILE: { text: 'Consumption', cb: 'cred:consumption' },
@@ -262,9 +267,18 @@ function getOptionalCredButtons(verifiedCreds: string[]): Array<{ text: string; 
     PROGRAM_ENROLLMENT: { text: 'Program Enrollment', cb: 'cred:program' },
   };
 
+  // Filter by intent
+  const intentFilter: Record<string, string[]> = {
+    sell: ['GENERATION_PROFILE', 'STORAGE_PROFILE', 'PROGRAM_ENROLLMENT'],
+    buy: ['CONSUMPTION_PROFILE', 'PROGRAM_ENROLLMENT'],
+  };
+  const allowedTypes = intent && intentFilter[intent]
+    ? intentFilter[intent]
+    : Object.keys(dbTypeToCallback);
+
   const buttons: Array<{ text: string; callbackData: string }> = [];
   for (const [dbType, info] of Object.entries(dbTypeToCallback)) {
-    if (!verifiedCreds.includes(dbType)) {
+    if (allowedTypes.includes(dbType) && !verifiedCreds.includes(dbType)) {
       buttons.push({ text: info.text, callbackData: info.cb });
     }
   }
@@ -289,6 +303,30 @@ const LANG_BUTTONS = [
   { text: 'తెలుగు', callbackData: 'lang:te-IN' },
   { text: 'ಕನ್ನಡ', callbackData: 'lang:kn-IN' },
 ];
+
+const DISCOM_LIST = [
+  { text: 'BSES Rajdhani', callbackData: 'discom:bses_rajdhani' },
+  { text: 'BSES Yamuna', callbackData: 'discom:bses_yamuna' },
+  { text: 'Tata Power Delhi', callbackData: 'discom:tata_power_delhi' },
+  { text: 'BESCOM (Bangalore)', callbackData: 'discom:bescom' },
+  { text: 'MSEDCL (Maharashtra)', callbackData: 'discom:msedcl' },
+  { text: 'UPPCL (UP)', callbackData: 'discom:uppcl' },
+  { text: 'TANGEDCO (TN)', callbackData: 'discom:tangedco' },
+  { text: 'WBSEDCL (WB)', callbackData: 'discom:wbsedcl' },
+  { text: 'Other', callbackData: 'discom:other' },
+];
+
+const DISCOM_CRED_LINKS: Record<string, string> = {
+  bses_rajdhani: 'https://creds.bsesdelhi.com/rajdhani',
+  bses_yamuna: 'https://creds.bsesdelhi.com/yamuna',
+  tata_power_delhi: 'https://creds.tatapower.com/delhi',
+  bescom: 'https://creds.bescom.karnataka.gov.in',
+  msedcl: 'https://creds.mahadiscom.in/credentials',
+  uppcl: 'https://creds.uppcl.org',
+  tangedco: 'https://creds.tangedco.tn.gov.in',
+  wbsedcl: 'https://creds.wbsedcl.in',
+  other: 'https://open-vcs.up.railway.app',
+};
 
 const states: Record<ChatState, StateHandler> = {
   GREETING: {
@@ -455,7 +493,7 @@ const states: Record<ChatState, StateHandler> = {
       if (!ctx.userId) {
         return {
           messages: [{ text: h(ctx, `Welcome, ${name}!`, `Swagat hai, ${name}!`) }],
-          newState: 'WAITING_UTILITY_CRED',
+          newState: 'ASK_DISCOM',
         };
       }
 
@@ -482,7 +520,7 @@ const states: Record<ChatState, StateHandler> = {
 
       return {
         messages: [{ text: h(ctx, `Welcome, ${name}!`, `Swagat hai, ${name}!`) }],
-        newState: 'WAITING_UTILITY_CRED',
+        newState: 'ASK_DISCOM',
         contextUpdate: { verifiedCreds },
       };
     },
@@ -491,14 +529,86 @@ const states: Record<ChatState, StateHandler> = {
     },
   },
 
-  WAITING_UTILITY_CRED: {
+  ASK_DISCOM: {
     async onEnter(ctx) {
       return {
         messages: [
           {
             text: h(ctx,
-              'To start trading, I need your Utility Customer Credential. This is a digital document from your DISCOM.\n\nUpload it now (PDF or JSON).\n\nDon\'t have one? Get sample credentials:\nhttps://open-vcs.up.railway.app',
-              'Trading shuru karne ke liye aapka Utility Customer Credential chahiye. Ye aapke DISCOM ka digital document hai.\n\nAbhi upload karo (PDF ya JSON).\n\nNahi hai? Sample yahan se lo:\nhttps://open-vcs.up.railway.app'
+              'Which DISCOM (electricity provider) are you with?',
+              'Aap kaunse DISCOM (bijli company) mein ho?'
+            ),
+            buttons: DISCOM_LIST,
+          },
+        ],
+      };
+    },
+    async onMessage(ctx, message) {
+      if (message.startsWith('discom:')) {
+        const discomKey = message.replace('discom:', '');
+
+        if (discomKey === 'other') {
+          return {
+            messages: [
+              {
+                text: h(ctx,
+                  'Please type your DISCOM name:',
+                  'Apne DISCOM ka naam likho:'
+                ),
+              },
+            ],
+            contextUpdate: { askedDiscom: true },
+          };
+        }
+
+        const discomEntry = DISCOM_LIST.find(d => d.callbackData === message);
+        const discomName = discomEntry?.text || discomKey;
+        return {
+          messages: [],
+          newState: 'WAITING_UTILITY_CRED',
+          contextUpdate: { discom: discomName },
+        };
+      }
+
+      // Free text — treat as manual DISCOM name entry
+      const typed = message.trim();
+      if (typed.length < 2) {
+        return {
+          messages: [
+            {
+              text: h(ctx,
+                'Please select your DISCOM or type the name:',
+                'DISCOM chuno ya naam likho:'
+              ),
+              buttons: DISCOM_LIST,
+            },
+          ],
+        };
+      }
+
+      return {
+        messages: [],
+        newState: 'WAITING_UTILITY_CRED',
+        contextUpdate: { discom: typed },
+      };
+    },
+  },
+
+  WAITING_UTILITY_CRED: {
+    async onEnter(ctx) {
+      const discomLabel = ctx.discom || 'your DISCOM';
+      // Look up DISCOM-specific credential link
+      const discomKey = Object.keys(DISCOM_CRED_LINKS).find(
+        key => DISCOM_LIST.find(d => d.callbackData === `discom:${key}`)?.text === ctx.discom
+      ) || 'other';
+      const credLink = DISCOM_CRED_LINKS[discomKey] || DISCOM_CRED_LINKS['other'];
+
+      return {
+        messages: [
+          {
+            text: h(ctx,
+              `To start trading, I need your Utility Customer Credential from ${discomLabel}.\n\nUpload it now (PDF or JSON).\n\nDon't have one? Get it here:\n${credLink}`,
+              `Trading shuru karne ke liye ${discomLabel} ka Utility Customer Credential chahiye.\n\nAbhi upload karo (PDF ya JSON).\n\nNahi hai? Yahan se lo:\n${credLink}`
             ),
           },
         ],
@@ -545,7 +655,7 @@ const states: Record<ChatState, StateHandler> = {
 
         return {
           messages: [{ text: h(ctx, `Verified! ${result.summary}`, `Verify ho gaya! ${result.summary}`) }],
-          newState: 'OFFER_OPTIONAL_CREDS',
+          newState: 'ASK_INTENT',
           contextUpdate: {
             verifiedCreds: [...(ctx.verifiedCreds || []), 'UTILITY_CUSTOMER'],
           },
@@ -559,10 +669,90 @@ const states: Record<ChatState, StateHandler> = {
     },
   },
 
+  ASK_INTENT: {
+    async onEnter(ctx) {
+      return {
+        messages: [
+          {
+            text: h(ctx,
+              'What would you like to do?\n\n- Sell: Upload generation (solar) / storage (battery) credentials\n- Buy: Upload consumption credentials\n- Skip: Go straight to trading',
+              'Aap kya karna chahte ho?\n\n- Bechna: Generation (solar) / storage (battery) credentials upload karo\n- Khareedna: Consumption credentials upload karo\n- Skip: Seedha trading pe chalo'
+            ),
+            buttons: [
+              { text: h(ctx, 'Sell energy', 'Energy bechna'), callbackData: 'intent:sell' },
+              { text: h(ctx, 'Buy energy', 'Energy khareedna'), callbackData: 'intent:buy' },
+              { text: h(ctx, 'Skip for now', 'Abhi skip karo'), callbackData: 'intent:skip' },
+            ],
+          },
+        ],
+      };
+    },
+    async onMessage(ctx, message) {
+      if (message.startsWith('intent:')) {
+        const intent = message.replace('intent:', '');
+
+        if (intent === 'skip') {
+          return {
+            messages: [],
+            newState: 'CONFIRM_TRADING',
+          };
+        }
+
+        if (intent === 'sell' || intent === 'buy') {
+          return {
+            messages: [],
+            newState: 'OFFER_OPTIONAL_CREDS',
+            contextUpdate: { intent: intent as 'sell' | 'buy' },
+          };
+        }
+      }
+
+      // Free text — try to detect intent
+      const lower = message.toLowerCase();
+      if (lower.includes('sell') || lower.includes('bech') || lower.includes('solar')) {
+        return {
+          messages: [],
+          newState: 'OFFER_OPTIONAL_CREDS',
+          contextUpdate: { intent: 'sell' },
+        };
+      }
+      if (lower.includes('buy') || lower.includes('khareed') || lower.includes('kharid')) {
+        return {
+          messages: [],
+          newState: 'OFFER_OPTIONAL_CREDS',
+          contextUpdate: { intent: 'buy' },
+        };
+      }
+      if (lower.includes('skip') || lower.includes('nahi') || lower.includes('no') || lower.includes('aage')) {
+        return {
+          messages: [],
+          newState: 'CONFIRM_TRADING',
+        };
+      }
+
+      // Re-prompt
+      return {
+        messages: [
+          {
+            text: h(ctx,
+              'Please choose: Sell, Buy, or Skip.',
+              'Choose karo: Bechna, Khareedna, ya Skip.'
+            ),
+            buttons: [
+              { text: h(ctx, 'Sell energy', 'Energy bechna'), callbackData: 'intent:sell' },
+              { text: h(ctx, 'Buy energy', 'Energy khareedna'), callbackData: 'intent:buy' },
+              { text: h(ctx, 'Skip for now', 'Abhi skip karo'), callbackData: 'intent:skip' },
+            ],
+          },
+        ],
+      };
+    },
+  },
+
   OFFER_OPTIONAL_CREDS: {
     async onEnter(ctx) {
       const verifiedCreds = ctx.verifiedCreds || [];
-      const buttons = getOptionalCredButtons(verifiedCreds);
+      const buttons = getOptionalCredButtons(verifiedCreds, ctx.intent);
 
       if (buttons.length === 1) {
         return {
@@ -650,7 +840,7 @@ const states: Record<ChatState, StateHandler> = {
       // Free text — try KB, then re-show options
       const kbAnswer = knowledgeBase.findAnswer(message);
       if (kbAnswer) {
-        const buttons = getOptionalCredButtons(ctx.verifiedCreds || []);
+        const buttons = getOptionalCredButtons(ctx.verifiedCreds || [], ctx.intent);
         return {
           messages: [
             { text: kbAnswer },
@@ -659,7 +849,7 @@ const states: Record<ChatState, StateHandler> = {
         };
       }
 
-      const buttons = getOptionalCredButtons(ctx.verifiedCreds || []);
+      const buttons = getOptionalCredButtons(ctx.verifiedCreds || [], ctx.intent);
       return {
         messages: [
           { text: h(ctx, 'Choose a credential to add, or tap "Done" to continue.', 'Credential choose karo ya "Done" pe tap karo.'), buttons },

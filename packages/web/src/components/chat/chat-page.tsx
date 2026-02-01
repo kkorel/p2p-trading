@@ -1,14 +1,21 @@
 'use client';
 
 import { useRef } from 'react';
-import { Send, Paperclip, RotateCcw, LayoutGrid } from 'lucide-react';
+import { Send, Paperclip, RotateCcw, LayoutGrid, TrendingUp, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { MessageList } from './message-list';
 import { useChatEngine } from '@/hooks/use-chat-engine';
+import { useAuth } from '@/contexts/auth-context';
+import { useBalance } from '@/contexts/balance-context';
+import { useP2PStats } from '@/contexts/p2p-stats-context';
+import { formatCurrency } from '@/lib/utils';
 
 export function ChatPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const { balance } = useBalance();
+  const { totalValue, isLoading: statsLoading } = useP2PStats();
   const {
     messages,
     input,
@@ -25,26 +32,49 @@ export function ChatPage() {
   return (
     <div className="flex justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen bg-white">
-        {/* Header */}
-        <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-teal-600 text-white safe-top">
+        {/* Header — sticky */}
+        <div className="sticky top-0 z-30 flex items-center gap-2 px-3.5 py-2.5 bg-teal-600 text-white safe-top">
           {/* Logo */}
-          <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
             <span className="text-lg font-bold">O</span>
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold leading-tight">Oorja</h1>
             <p className="text-[11px] text-teal-200">Energy trading assistant</p>
           </div>
+
+          {/* Balance info — shown only when logged in */}
+          {user && (
+            <>
+              {!statsLoading && totalValue > 0 && (
+                <div
+                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-xs font-medium shrink-0"
+                  title="P2P Trading Value"
+                >
+                  <TrendingUp size={12} />
+                  <span>+{formatCurrency(totalValue)}</span>
+                </div>
+              )}
+              <div
+                className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-xs font-medium shrink-0"
+                title="Wallet Balance"
+              >
+                <Wallet size={12} />
+                <span>{formatCurrency(balance)}</span>
+              </div>
+            </>
+          )}
+
           <button
             onClick={handleReset}
-            className="p-1.5 rounded-full hover:bg-teal-500/80 transition-colors"
+            className="p-1.5 rounded-full hover:bg-teal-500/80 transition-colors shrink-0"
             title="New chat"
           >
             <RotateCcw size={16} />
           </button>
           <button
             onClick={() => router.push('/buy')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium shrink-0"
             title="Open App"
           >
             <LayoutGrid size={14} />
