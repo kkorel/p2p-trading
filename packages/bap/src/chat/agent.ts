@@ -52,6 +52,14 @@ export interface AgentResponse {
   authToken?: string;
 }
 
+interface PendingListing {
+  pricePerKwh?: number;
+  quantity?: number;
+  timeDesc?: string;
+  energyType?: string;
+  awaitingField?: 'energy_type' | 'quantity' | 'price' | 'timeframe' | 'confirm';
+}
+
 interface SessionContext {
   phone?: string;
   name?: string;
@@ -70,6 +78,7 @@ interface SessionContext {
   langPicked?: boolean;
   expectedCredType?: string;
   verifiedCreds?: string[];
+  pendingListing?: PendingListing;
 }
 
 type ChatState =
@@ -253,6 +262,274 @@ async function getVerifiedCredentials(userId: string): Promise<string[]> {
 // Returns Hinglish text when language is 'hinglish', otherwise English
 function h(ctx: SessionContext, en: string, hi: string): string {
   return ctx.language === 'hinglish' ? hi : en;
+}
+
+// --- Listing creation helpers (multi-turn detail gathering) ---
+
+/**
+ * Check which listing detail is missing and ask the user for it.
+ * Returns an AgentResponse if something is missing, or null if all details are present.
+ */
+function askNextListingDetail(ctx: SessionContext, pending: PendingListing): AgentResponse | null {
+  if (!pending.energyType) {
+    return {
+      messages: [{
+        text: h(ctx,
+          'What type of energy do you want to sell?',
+          'Aap konsi energy bechna chahte ho?'
+        ),
+        buttons: [
+          { text: h(ctx, 'Solar', 'Solar'), callbackData: 'listing_type:SOLAR' },
+          { text: h(ctx, 'Wind', 'Wind'), callbackData: 'listing_type:WIND' },
+          { text: h(ctx, 'Hydro', 'Hydro'), callbackData: 'listing_type:HYDRO' },
+        ],
+      }],
+      contextUpdate: { pendingListing: { ...pending, awaitingField: 'energy_type' } },
+    };
+  }
+
+  if (pending.quantity == null) {
+    return {
+      messages: [{
+        text: h(ctx,
+          'How many kWh (units) do you want to sell?',
+          'Kitne kWh (unit) bechna chahte ho?'
+        ),
+      }],
+      contextUpdate: { pendingListing: { ...pending, awaitingField: 'quantity' } },
+    };
+  }
+
+  if (pending.pricePerKwh == null) {
+    return {
+      messages: [{
+        text: h(ctx,
+          'What price per unit (kWh) in Rs? DISCOM rates are around Rs 5-8/unit.',
+          'Per unit (kWh) kitne Rs mein bechoge? DISCOM rate Rs 5-8/unit ke aas-paas hai.'
+        ),
+        buttons: [
+          { text: 'Rs 5/unit', callbackData: 'listing_price:5' },
+          { text: 'Rs 6/unit', callbackData: 'listing_price:6' },
+          { text: 'Rs 7/unit', callbackData: 'listing_price:7' },
+        ],
+      }],
+      contextUpdate: { pendingListing: { ...pending, awaitingField: 'price' } },
+    };
+  }
+
+  if (!pending.timeDesc) {
+    return {
+      messages: [{
+        text: h(ctx,
+          'When do you want to sell? (e.g. "tomorrow 6AM-6PM", "today")',
+          'Kab bechna chahte ho? (jaise "kal subah 6 se shaam 6", "aaj")'
+        ),
+        buttons: [
+          { text: h(ctx, 'Tomorrow 6AM-6PM', 'Kal subah 6-shaam 6'), callbackData: 'listing_time:tomorrow' },
+          { text: h(ctx, 'Today', 'Aaj'), callbackData: 'listing_time:today' },
+        ],
+      }],
+      contextUpdate: { pendingListing: { ...pending, awaitingField: 'timeframe' } },
+    };
+  }
+
+  // All details present — ask for confirmation
+  const typeLabel = pending.energyType || 'Solar';
+  const timeLabel = pending.timeDesc || 'tomorrow';
+  return {
+    messages: [{
+      text: h(ctx,
+        `Here's your listing:\n• ${pending.quantity} kWh of ${typeLabel} energy\n• Rs ${pending.pricePerKwh}/unit\n• Time: ${timeLabel}\n\nShall I create it?`,
+        `Aapki listing:\n• ${pending.quantity} kWh ${typeLabel} energy\n• Rs ${pending.pricePerKwh}/unit\n• Time: ${timeLabel}\n\nBana dun?`
+      ),
+      buttons: [
+        { text: h(ctx, 'Yes, create it!', 'Haan, bana do!'), callbackData: 'listing_confirm:yes' },
+        { text: h(ctx, 'No, cancel', 'Nahi, cancel karo'), callbackData: 'listing_confirm:no' },
+      ],
+    }],
+    contextUpdate: { pendingListing: { ...pending, awaitingField: 'confirm' } },
+  };
+}
+
+/**
+ * Handle user input for a pending listing (multi-turn).
+ * Returns AgentResponse if handled, null if not a pending-listing input.
+ */
+async function handlePendingListingInput(ctx: SessionContext, message: string): Promise<AgentResponse | null> {
+  const pending = ctx.pendingListing;
+  if (!pending?.awaitingField) return null;
+
+  const lower = message.toLowerCase().trim();
+
+  // Allow cancellation at any point
+  if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop') {
+    return {
+      messages: [{ text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.') }],
+      contextUpdate: { pendingListing: undefined },
+    };
+  }
+
+  switch (pending.awaitingField) {
+    case 'energy_type': {
+      let energyType: string | undefined;
+      if (message.startsWith('listing_type:')) {
+        energyType = message.replace('listing_type:', '');
+      } else if (lower.includes('solar')) {
+        energyType = 'SOLAR';
+      } else if (lower.includes('wind')) {
+        energyType = 'WIND';
+      } else if (lower.includes('hydro')) {
+        energyType = 'HYDRO';
+      } else if (lower.includes('mix')) {
+        energyType = 'MIXED';
+      }
+
+      if (!energyType) {
+        return {
+          messages: [{
+            text: h(ctx, 'Please select an energy type:', 'Energy type chuno:'),
+            buttons: [
+              { text: 'Solar', callbackData: 'listing_type:SOLAR' },
+              { text: 'Wind', callbackData: 'listing_type:WIND' },
+              { text: 'Hydro', callbackData: 'listing_type:HYDRO' },
+            ],
+          }],
+        };
+      }
+
+      const updated = { ...pending, energyType, awaitingField: undefined as any };
+      const next = askNextListingDetail(ctx, updated);
+      return next || { messages: [], contextUpdate: { pendingListing: updated } };
+    }
+
+    case 'quantity': {
+      const num = parseFloat(message.replace(/[^\d.]/g, ''));
+      if (!num || num <= 0) {
+        return {
+          messages: [{ text: h(ctx, 'Please enter a valid number of kWh.', 'Sahi kWh number daalo.') }],
+        };
+      }
+      const updated = { ...pending, quantity: Math.round(num), awaitingField: undefined as any };
+      const next = askNextListingDetail(ctx, updated);
+      return next || { messages: [], contextUpdate: { pendingListing: updated } };
+    }
+
+    case 'price': {
+      let price: number | undefined;
+      if (message.startsWith('listing_price:')) {
+        price = parseFloat(message.replace('listing_price:', ''));
+      } else {
+        price = parseFloat(message.replace(/[^\d.]/g, ''));
+      }
+
+      if (!price || price <= 0) {
+        return {
+          messages: [{ text: h(ctx, 'Please enter a valid price in Rs.', 'Sahi price daalo (Rs mein).') }],
+        };
+      }
+      const updated = { ...pending, pricePerKwh: price, awaitingField: undefined as any };
+      const next = askNextListingDetail(ctx, updated);
+      return next || { messages: [], contextUpdate: { pendingListing: updated } };
+    }
+
+    case 'timeframe': {
+      let timeDesc: string | undefined;
+      if (message.startsWith('listing_time:')) {
+        timeDesc = message.replace('listing_time:', '');
+      } else {
+        timeDesc = message.trim();
+      }
+
+      if (!timeDesc || timeDesc.length < 2) {
+        return {
+          messages: [{ text: h(ctx, 'Please tell me when you want to sell (e.g. "tomorrow", "today").', 'Kab bechna hai batao (jaise "kal", "aaj").') }],
+        };
+      }
+      const updated = { ...pending, timeDesc, awaitingField: undefined as any };
+      const next = askNextListingDetail(ctx, updated);
+      return next || { messages: [], contextUpdate: { pendingListing: updated } };
+    }
+
+    case 'confirm': {
+      if (message.startsWith('listing_confirm:')) {
+        const answer = message.replace('listing_confirm:', '');
+        if (answer === 'no') {
+          return {
+            messages: [{ text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.') }],
+            contextUpdate: { pendingListing: undefined },
+          };
+        }
+      }
+
+      const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'create', 'bana', 'listing_confirm:yes'].includes(lower)
+        || message === 'listing_confirm:yes';
+      const isNo = ['no', 'n', 'nahi', 'nope', 'cancel', 'listing_confirm:no'].includes(lower)
+        || message === 'listing_confirm:no';
+
+      if (isNo) {
+        return {
+          messages: [{ text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.') }],
+          contextUpdate: { pendingListing: undefined },
+        };
+      }
+
+      if (isYes) {
+        // Create the listing
+        return await createListingFromPending(ctx, pending);
+      }
+
+      // Re-prompt
+      return {
+        messages: [{
+          text: h(ctx, 'Create this listing?', 'Ye listing banaun?'),
+          buttons: [
+            { text: h(ctx, 'Yes', 'Haan'), callbackData: 'listing_confirm:yes' },
+            { text: h(ctx, 'No', 'Nahi'), callbackData: 'listing_confirm:no' },
+          ],
+        }],
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Create a listing from the completed pending listing details.
+ */
+async function createListingFromPending(ctx: SessionContext, pending: PendingListing): Promise<AgentResponse> {
+  if (!ctx.userId || !pending.pricePerKwh || !pending.quantity) {
+    return {
+      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+      contextUpdate: { pendingListing: undefined },
+    };
+  }
+
+  const result = await mockTradingAgent.createCustomOffer(ctx.userId, {
+    pricePerKwh: pending.pricePerKwh,
+    quantity: pending.quantity,
+    timeDesc: pending.timeDesc,
+  });
+
+  if (result.success && result.offer) {
+    const o = result.offer;
+    const start = new Date(o.startTime);
+    const end = new Date(o.endTime);
+    return {
+      messages: [{
+        text: h(ctx,
+          `Done! Your listing is live:\n• ${o.quantity} kWh at Rs ${o.pricePerKwh}/unit\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} to ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}\n\nBuyers can now see and buy your energy!`,
+          `Ho gaya! Aapki listing live hai:\n• ${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} se ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} tak\n\nBuyers ab aapki energy khareed sakte hain!`
+        ),
+      }],
+      contextUpdate: { pendingListing: undefined },
+    };
+  }
+
+  return {
+    messages: [{ text: h(ctx, `Could not create the listing: ${result.error || 'Unknown error'}. Please try again.`, `Listing nahi ban payi: ${result.error || 'Unknown error'}. Dobara try karo.`) }],
+    contextUpdate: { pendingListing: undefined },
+  };
 }
 
 // --- State Handlers ---
@@ -1073,27 +1350,32 @@ const states: Record<ChatState, StateHandler> = {
       return { messages: [] };
     },
     async onMessage(ctx, message) {
+      const verifiedCreds = ctx.verifiedCreds || (ctx.userId ? await getVerifiedCredentials(ctx.userId) : []);
+
+      // --- Build user profile context so LLM knows credentials are already verified ---
+      let userProfileContext = '';
+      if (verifiedCreds.length > 0) {
+        const DB_TYPE_TO_DISPLAY: Record<string, string> = {
+          UTILITY_CUSTOMER: 'Utility Customer',
+          GENERATION_PROFILE: 'Generation Profile (Solar)',
+          CONSUMPTION_PROFILE: 'Consumption Profile',
+          STORAGE_PROFILE: 'Storage Profile (Battery)',
+          PROGRAM_ENROLLMENT: 'Program Enrollment',
+        };
+        const credNames = verifiedCreds.map(c => DB_TYPE_TO_DISPLAY[c] || c).join(', ');
+        userProfileContext = `User profile: Already onboarded and verified. Verified credentials: ${credNames}. Do NOT ask the user to upload or provide any credentials — they have already completed onboarding.`;
+      }
+
+      // --- Handle pending listing flow (multi-turn detail gathering) ---
+      if (ctx.pendingListing?.awaitingField) {
+        const result = await handlePendingListingInput(ctx, message);
+        if (result) return result;
+      }
+
       // --- Step 1: Classify intent with LLM ---
       const intent = await classifyIntent(message);
       let dataContext = '';
       let fallbackText = '';
-
-      // --- Build user profile context so LLM knows credentials are already verified ---
-      let userProfileContext = '';
-      if (ctx.userId) {
-        const verifiedCreds = ctx.verifiedCreds || await getVerifiedCredentials(ctx.userId);
-        if (verifiedCreds.length > 0) {
-          const DB_TYPE_TO_DISPLAY: Record<string, string> = {
-            UTILITY_CUSTOMER: 'Utility Customer',
-            GENERATION_PROFILE: 'Generation Profile (Solar)',
-            CONSUMPTION_PROFILE: 'Consumption Profile',
-            STORAGE_PROFILE: 'Storage Profile (Battery)',
-            PROGRAM_ENROLLMENT: 'Program Enrollment',
-          };
-          const credNames = verifiedCreds.map(c => DB_TYPE_TO_DISPLAY[c] || c).join(', ');
-          userProfileContext = `User profile: Already onboarded and verified. Verified credentials: ${credNames}. Do NOT ask the user to upload or provide any credentials — they have already completed onboarding.`;
-        }
-      }
 
       // --- Step 2: Execute action and gather data ---
       if (ctx.userId && intent) {
@@ -1149,26 +1431,37 @@ const states: Record<ChatState, StateHandler> = {
           }
 
           case 'create_listing': {
-            const result = await mockTradingAgent.createCustomOffer(ctx.userId, {
+            // --- Credential gate: must have Generation Profile to sell ---
+            if (!verifiedCreds.includes('GENERATION_PROFILE')) {
+              return {
+                messages: [
+                  {
+                    text: h(ctx,
+                      'To sell energy, I need your solar generation credential first. This proves your solar panel capacity.\n\nYou can get it from your DISCOM or download a sample from the credential portal.',
+                      'Energy bechne ke liye pehle aapka solar generation ka credential chahiye. Ye aapke solar panel ki capacity prove karta hai.\n\nYe aapko apni DISCOM se ya credential portal se mil jaayega.'
+                    ),
+                    buttons: [
+                      { text: h(ctx, 'Upload credential', 'Credential upload karo'), callbackData: 'upload_gen_cred' },
+                    ],
+                  },
+                ],
+                newState: 'OFFER_OPTIONAL_CREDS',
+                contextUpdate: { expectedCredType: 'GenerationProfileCredential' },
+              };
+            }
+
+            // --- Gather missing details interactively ---
+            const pending: PendingListing = {
               pricePerKwh: intent.params?.price_per_kwh,
               quantity: intent.params?.quantity_kwh,
               timeDesc: intent.params?.time_description,
-            });
+            };
 
-            if (result.success && result.offer) {
-              const o = result.offer;
-              const start = new Date(o.startTime);
-              const end = new Date(o.endTime);
-              dataContext = `Successfully created new listing: ${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} to ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}. Buyers can now see and buy this energy.`;
-              fallbackText = h(ctx,
-                `Done! ${o.quantity} kWh listed at Rs ${o.pricePerKwh}/unit.`,
-                `Ho gaya! ${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe list ho gaya.`
-              );
-            } else {
-              dataContext = `Failed to create listing: ${result.error || 'Unknown error'}`;
-              fallbackText = h(ctx, 'Could not create the listing. Try again.', 'Listing nahi ban payi. Dobara try karo.');
-            }
-            break;
+            const askResult = askNextListingDetail(ctx, pending);
+            if (askResult) return askResult;
+
+            // All details provided — create the listing
+            return await createListingFromPending(ctx, pending);
           }
 
           case 'discom_rates': {
@@ -1234,16 +1527,30 @@ const states: Record<ChatState, StateHandler> = {
         if (lower.includes('order') || lower.includes('status')) {
           return { messages: [{ text: await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language) }] };
         }
-        if ((lower.includes('new') || lower.includes('create') || lower.includes('naya') || lower.includes('daal') || lower.includes('bana')) &&
-            (lower.includes('offer') || lower.includes('listing'))) {
-          const result = await mockTradingAgent.createDefaultOffer(ctx.userId);
-          if (result.success && result.offer) {
-            return { messages: [{ text: h(ctx,
-              `New offer created: ${result.offer.quantity} kWh at Rs ${result.offer.pricePerKwh}/unit, tomorrow 6AM-6PM.`,
-              `Naya offer ban gaya: ${result.offer.quantity} kWh Rs ${result.offer.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.`
-            ) }] };
+        if ((lower.includes('new') || lower.includes('create') || lower.includes('naya') || lower.includes('daal') || lower.includes('bana') || lower.includes('sell') || lower.includes('bech')) &&
+            (lower.includes('offer') || lower.includes('listing') || lower.includes('energy') || lower.includes('bijli'))) {
+          // Credential gate for keyword fallback too
+          if (!verifiedCreds.includes('GENERATION_PROFILE')) {
+            return {
+              messages: [
+                {
+                  text: h(ctx,
+                    'To sell energy, I need your solar generation credential first. This proves your solar panel capacity.',
+                    'Energy bechne ke liye pehle aapka solar generation ka credential chahiye.'
+                  ),
+                  buttons: [
+                    { text: h(ctx, 'Upload credential', 'Credential upload karo'), callbackData: 'upload_gen_cred' },
+                  ],
+                },
+              ],
+              newState: 'OFFER_OPTIONAL_CREDS',
+              contextUpdate: { expectedCredType: 'GenerationProfileCredential' },
+            };
           }
-          return { messages: [{ text: result.error || h(ctx, 'Could not create offer.', 'Offer nahi ban paya.') }] };
+          // Start interactive listing creation
+          const pending: PendingListing = {};
+          const askResult = askNextListingDetail(ctx, pending);
+          if (askResult) return askResult;
         }
       }
 
@@ -1256,7 +1563,7 @@ const states: Record<ChatState, StateHandler> = {
               { text: h(ctx, 'My earnings', 'Meri kamayi'), callbackData: 'show my earnings' },
               { text: h(ctx, 'My listings', 'Mere listings'), callbackData: 'show my listings' },
               { text: h(ctx, 'My orders', 'Mere orders'), callbackData: 'show my orders' },
-              { text: h(ctx, 'New listing', 'Naya listing'), callbackData: 'create new listing' },
+              { text: h(ctx, 'Sell energy', 'Energy bechna'), callbackData: 'I want to sell energy' },
             ],
           },
         ],
