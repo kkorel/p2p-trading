@@ -1,11 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { MessageCircle } from 'lucide-react';
 import { ChatOverlay } from './chat-overlay';
 
 export function ChatBubble() {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Hide on home page — home page has its own full-screen chat
+  if (pathname === '/') return null;
 
   if (isOpen) {
     return <ChatOverlay onClose={() => setIsOpen(false)} />;

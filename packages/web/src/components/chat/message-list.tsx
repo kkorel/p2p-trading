@@ -2,12 +2,9 @@
 
 import { useEffect, useRef } from 'react';
 import { Bot, User } from 'lucide-react';
+import type { ChatMessageData } from '@/hooks/use-chat-engine';
 
-export interface ChatMessageData {
-  role: 'agent' | 'user';
-  content: string;
-  buttons?: Array<{ text: string; callbackData?: string }>;
-}
+export type { ChatMessageData };
 
 interface MessageListProps {
   messages: ChatMessageData[];

@@ -411,6 +411,11 @@ enum ChatState {
   CONFIRM_TRADING
   TRADING_ACTIVE
   GENERAL_CHAT
+  // New states for 5-credential flow
+  AUTHENTICATED
+  WAITING_UTILITY_CRED
+  OFFER_OPTIONAL_CREDS
+  WAITING_OPTIONAL_CRED
 }
 
 model ChatSession {
