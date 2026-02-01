@@ -65,6 +65,7 @@ services:
       - DISCOM_RATE_PER_KWH=${DISCOM_RATE_PER_KWH:-10}
       - DISCOM_CHECK_INTERVAL_MS=${DISCOM_CHECK_INTERVAL_MS:-60000}
       - DISCOM_SUCCESS_RATE=${DISCOM_SUCCESS_RATE:-0.85}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
     volumes:
       - uploads_data:/app/packages/bap/uploads
     depends_on:
