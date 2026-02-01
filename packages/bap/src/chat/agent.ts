@@ -19,6 +19,7 @@ import {
 import { knowledgeBase } from './knowledge-base';
 import { mockTradingAgent } from './trading-agent';
 import { askLLM } from './llm-fallback';
+import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
 
 const logger = createLogger('OorjaAgent');
@@ -56,6 +57,7 @@ interface SessionContext {
   tradeLimit?: number;
   discom?: string;
   askedDiscom?: boolean;
+  language?: SarvamLangCode;
 }
 
 type ChatState =
@@ -682,6 +684,40 @@ const states: Record<ChatState, StateHandler> = {
   },
 };
 
+// --- Translation helpers ---
+
+/**
+ * Translate all agent message texts (and button labels) to the target language.
+ * Preserves callbackData in English for state machine matching.
+ */
+async function translateResponse(
+  response: AgentResponse,
+  targetLang: SarvamLangCode
+): Promise<AgentResponse> {
+  if (targetLang === 'en-IN' || !isTranslationAvailable()) return response;
+
+  const translatedMessages: AgentMessage[] = [];
+  for (const msg of response.messages) {
+    const translatedText = await translateFromEnglish(msg.text, targetLang);
+    let translatedButtons = msg.buttons;
+    if (msg.buttons && msg.buttons.length > 0) {
+      translatedButtons = await Promise.all(
+        msg.buttons.map(async (btn) => ({
+          text: await translateFromEnglish(btn.text, targetLang),
+          callbackData: btn.callbackData, // Keep English for matching
+        }))
+      );
+    }
+    translatedMessages.push({
+      ...msg,
+      text: translatedText,
+      buttons: translatedButtons,
+    });
+  }
+
+  return { ...response, messages: translatedMessages };
+}
+
 // --- Main Entry Point ---
 
 export async function processMessage(
@@ -700,19 +736,29 @@ export async function processMessage(
       data: { platform, platformId, state: 'GREETING', contextJson: '{}' },
     });
 
+    // Detect language from first message
+    const detectedLang = detectLanguage(userMessage);
+
     // Store user message
     await storeMessage(session.id, 'user', userMessage);
 
+    // Translate user message to English if needed
+    let processedMessage = userMessage;
+    if (detectedLang !== 'en-IN') {
+      processedMessage = await translateToEnglish(userMessage, detectedLang);
+      logger.info(`Language detected: ${detectedLang}, translated input: "${processedMessage}"`);
+    }
+
     // Run GREETING onEnter + onMessage
-    const ctx = {} as SessionContext;
+    const ctx: SessionContext = { language: detectedLang };
     const enterResp = await states.GREETING.onEnter(ctx);
     await storeAgentMessages(session.id, enterResp.messages);
 
-    const msgResp = await states.GREETING.onMessage(ctx, userMessage, fileData);
+    const msgResp = await states.GREETING.onMessage(ctx, processedMessage, fileData);
 
     if (msgResp.newState) {
-      const newCtx = { ...ctx, ...msgResp.contextUpdate };
-      await transitionState(session.id, msgResp.newState, msgResp.contextUpdate);
+      const newCtx = { ...ctx, ...msgResp.contextUpdate, language: detectedLang };
+      await transitionState(session.id, msgResp.newState, { ...msgResp.contextUpdate, language: detectedLang });
       const newEnter = await states[msgResp.newState as ChatState].onEnter(newCtx);
       await storeAgentMessages(session.id, newEnter.messages);
 
@@ -733,10 +779,11 @@ export async function processMessage(
         Object.assign(newEnter, nextEnter);
       }
 
-      return { messages: allMessages };
+      const result: AgentResponse = { messages: allMessages };
+      return translateResponse(result, detectedLang);
     }
 
-    return { messages: enterResp.messages };
+    return translateResponse({ messages: enterResp.messages }, detectedLang);
   }
 
   // Existing session
@@ -750,7 +797,30 @@ export async function processMessage(
     return { messages: [{ text: 'Something went wrong. Please try again.' }] };
   }
 
-  const response = await stateHandler.onMessage(ctx, userMessage, fileData);
+  // Detect/update language from user input
+  const detectedLang = detectLanguage(userMessage);
+  const userLang: SarvamLangCode = (detectedLang !== 'en-IN')
+    ? detectedLang
+    : (ctx.language || 'en-IN');
+
+  // Translate user message to English if needed (skip for pure numbers, short button callbacks)
+  let processedMessage = userMessage;
+  const isStructuredInput = /^\d+$/.test(userMessage.trim()) || userMessage.trim().length <= 3;
+  if (detectedLang !== 'en-IN' && !isStructuredInput) {
+    processedMessage = await translateToEnglish(userMessage, detectedLang);
+    logger.info(`Translated [${detectedLang} → en-IN]: "${userMessage}" → "${processedMessage}"`);
+  }
+
+  // Update language in context if changed
+  if (userLang !== ctx.language) {
+    ctx.language = userLang;
+    await prisma.chatSession.update({
+      where: { id: session.id },
+      data: { contextJson: JSON.stringify(ctx) },
+    });
+  }
+
+  const response = await stateHandler.onMessage(ctx, processedMessage, fileData);
   await storeAgentMessages(session.id, response.messages);
 
   // Handle state transition
@@ -776,7 +846,7 @@ export async function processMessage(
       allMessages = [...allMessages, ...nextResp.messages];
     }
 
-    return { messages: allMessages };
+    return translateResponse({ messages: allMessages }, userLang);
   }
 
   // No state transition — just update context if needed
@@ -788,7 +858,7 @@ export async function processMessage(
     });
   }
 
-  return response;
+  return translateResponse(response, userLang);
 }
 
 // --- Helpers ---
