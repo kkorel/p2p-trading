@@ -475,9 +475,10 @@ const states: Record<ChatState, StateHandler> = {
 
         // Compose a welcome-back summary with LLM
         const summaryData = await getWelcomeBackData(ctx.userId);
+        const credContext = 'User profile: Already onboarded and verified. Do NOT ask for credentials — they have already completed onboarding.';
         const composed = await composeResponse(
           'welcome back, give me a summary of my activity',
-          summaryData,
+          `${credContext}\n\n${summaryData}`,
           ctx.language,
           n
         );
@@ -1077,6 +1078,23 @@ const states: Record<ChatState, StateHandler> = {
       let dataContext = '';
       let fallbackText = '';
 
+      // --- Build user profile context so LLM knows credentials are already verified ---
+      let userProfileContext = '';
+      if (ctx.userId) {
+        const verifiedCreds = ctx.verifiedCreds || await getVerifiedCredentials(ctx.userId);
+        if (verifiedCreds.length > 0) {
+          const DB_TYPE_TO_DISPLAY: Record<string, string> = {
+            UTILITY_CUSTOMER: 'Utility Customer',
+            GENERATION_PROFILE: 'Generation Profile (Solar)',
+            CONSUMPTION_PROFILE: 'Consumption Profile',
+            STORAGE_PROFILE: 'Storage Profile (Battery)',
+            PROGRAM_ENROLLMENT: 'Program Enrollment',
+          };
+          const credNames = verifiedCreds.map(c => DB_TYPE_TO_DISPLAY[c] || c).join(', ');
+          userProfileContext = `User profile: Already onboarded and verified. Verified credentials: ${credNames}. Do NOT ask the user to upload or provide any credentials — they have already completed onboarding.`;
+        }
+      }
+
       // --- Step 2: Execute action and gather data ---
       if (ctx.userId && intent) {
         switch (intent.intent) {
@@ -1182,9 +1200,13 @@ const states: Record<ChatState, StateHandler> = {
 
       // --- Step 3: Compose natural response with LLM ---
       if (dataContext || intent?.intent === 'general_qa' || !intent) {
+        const fullContext = [
+          userProfileContext,
+          dataContext || 'No specific data available. Answer based on general knowledge about Oorja P2P energy trading platform.',
+        ].filter(Boolean).join('\n\n');
         const composed = await composeResponse(
           message,
-          dataContext || 'No specific data available. Answer based on general knowledge about Oorja P2P energy trading platform.',
+          fullContext,
           ctx.language,
           ctx.name
         );
@@ -1369,9 +1391,10 @@ export async function processMessage(
 
         // Compose a welcome-back summary using LLM
         const summaryData = await getWelcomeBackData(user.id);
+        const credContext = 'User profile: Already onboarded and verified. Do NOT ask for credentials — they have already completed onboarding.';
         const welcomeMsg = await composeResponse(
           'welcome back, give me a summary of my activity',
-          summaryData,
+          `${credContext}\n\n${summaryData}`,
           undefined, // language unknown yet — default English
           user.name || undefined
         );
