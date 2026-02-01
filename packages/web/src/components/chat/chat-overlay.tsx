@@ -5,15 +5,41 @@ import { X, Send, Paperclip, Bot, RotateCcw } from 'lucide-react';
 import { MessageList, ChatMessageData } from './message-list';
 import { chatApi } from '@/lib/api';
 
+const SESSION_KEY = 'oorja_chat_session';
+
 interface ChatOverlayProps {
   onClose: () => void;
+}
+
+function getStoredSessionId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(SESSION_KEY);
+}
+
+function storeSessionId(id: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(SESSION_KEY, id);
+  }
+}
+
+function clearStoredSession() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(SESSION_KEY);
+  }
+}
+
+/** When the agent authenticates the user via OTP, store the token and notify the app. */
+function handleAuthToken(token: string) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('authToken', token);
+  window.dispatchEvent(new CustomEvent('auth:login'));
 }
 
 export function ChatOverlay({ onClose }: ChatOverlayProps) {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(getStoredSessionId);
   const [initialized, setInitialized] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +51,8 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
 
     (async () => {
       try {
-        const history = await chatApi.getHistory();
+        const stored = getStoredSessionId();
+        const history = await chatApi.getHistory(stored || undefined);
         if (history.messages && history.messages.length > 0) {
           setMessages(
             history.messages.map((m: any) => ({
@@ -56,7 +83,15 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
 
       try {
         const res = await chatApi.send(text, sessionId || undefined);
-        if (res.sessionId) setSessionId(res.sessionId);
+        if (res.sessionId) {
+          setSessionId(res.sessionId);
+          storeSessionId(res.sessionId);
+        }
+
+        // Handle auth token from agent (user authenticated via chat OTP)
+        if (res.authToken) {
+          handleAuthToken(res.authToken);
+        }
 
         // Append agent responses
         if (res.messages && res.messages.length > 0) {
@@ -114,6 +149,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
     } catch { /* ignore */ }
     setMessages([]);
     setSessionId(null);
+    clearStoredSession();
     setInitialized(false);
   }, [sessionId]);
 
@@ -136,7 +172,15 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
       try {
         const base64 = await fileToBase64(file);
         const res = await chatApi.upload(base64, sessionId || undefined, file.name);
-        if (res.sessionId) setSessionId(res.sessionId);
+        if (res.sessionId) {
+          setSessionId(res.sessionId);
+          storeSessionId(res.sessionId);
+        }
+
+        // Handle auth token from agent
+        if (res.authToken) {
+          handleAuthToken(res.authToken);
+        }
 
         if (res.messages && res.messages.length > 0) {
           setMessages((prev) => [

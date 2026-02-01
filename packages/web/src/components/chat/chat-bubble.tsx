@@ -2,15 +2,10 @@
 
 import { useState } from 'react';
 import { MessageCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
 import { ChatOverlay } from './chat-overlay';
 
 export function ChatBubble() {
-  const { isAuthenticated, user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-
-  // Only show for authenticated users who have completed onboarding
-  if (!isAuthenticated || !user?.profileComplete) return null;
 
   if (isOpen) {
     return <ChatOverlay onClose={() => setIsOpen(false)} />;

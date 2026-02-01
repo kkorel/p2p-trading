@@ -48,12 +48,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     checkAuth();
 
+    // Listen for login events (from chat agent OTP auth)
+    const handleLogin = () => {
+      checkAuth();
+    };
+    window.addEventListener('auth:login', handleLogin);
+
     // Listen for logout events (from API 401)
     const handleLogout = () => {
       setUser(null);
     };
     window.addEventListener('auth:logout', handleLogout);
-    return () => window.removeEventListener('auth:logout', handleLogout);
+    return () => {
+      window.removeEventListener('auth:login', handleLogin);
+      window.removeEventListener('auth:logout', handleLogout);
+    };
   }, [checkAuth]);
 
   const login = async (phone: string, otp: string, name?: string) => {

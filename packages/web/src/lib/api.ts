@@ -236,6 +236,7 @@ export const chatApi = {
       success: boolean;
       sessionId: string;
       messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
+      authToken?: string;
     }>('/chat/send', {
       method: 'POST',
       body: JSON.stringify({ message, sessionId }),
@@ -246,6 +247,7 @@ export const chatApi = {
       success: boolean;
       sessionId: string;
       messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
+      authToken?: string;
     }>('/chat/upload', {
       method: 'POST',
       body: JSON.stringify({ pdfBase64, sessionId, fileName }),

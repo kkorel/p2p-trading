@@ -4,6 +4,7 @@
  * POST /chat/send      — Send a text message, get agent reply
  * POST /chat/upload    — Upload a PDF (base64), get agent reply
  * GET  /chat/history   — Get message history for a session
+ * POST /chat/reset     — Delete session and start fresh
  */
 
 import { Router, Request, Response } from 'express';
@@ -21,12 +22,13 @@ router.use(optionalAuthMiddleware);
 
 /**
  * Resolve the web platform ID for this request.
- * Authenticated users: "web-{userId}"
- * Anonymous users: uses sessionId from body, or generates a new one.
+ * Priority: sessionId (for continuity after in-chat auth) > auth token > generate new.
  */
 function resolvePlatformId(req: Request, sessionId?: string): string {
+  // Prioritize sessionId for session continuity (user may have authenticated mid-chat)
+  if (sessionId) return sessionId;
   if (req.user) return `web-${req.user.id}`;
-  return sessionId || `anon-${uuidv4()}`;
+  return `anon-${uuidv4()}`;
 }
 
 /**
@@ -51,7 +53,12 @@ router.post('/send', async (req: Request, res: Response) => {
       buttons: m.buttons || undefined,
     }));
 
-    res.json({ success: true, sessionId: platformId, messages });
+    res.json({
+      success: true,
+      sessionId: platformId,
+      messages,
+      authToken: response.authToken || undefined,
+    });
   } catch (error: any) {
     logger.error(`Chat send error: ${error.message}`);
     res.status(500).json({ success: false, error: 'Failed to process message' });
@@ -87,7 +94,12 @@ router.post('/upload', async (req: Request, res: Response) => {
       buttons: m.buttons || undefined,
     }));
 
-    res.json({ success: true, sessionId: platformId, messages });
+    res.json({
+      success: true,
+      sessionId: platformId,
+      messages,
+      authToken: response.authToken || undefined,
+    });
   } catch (error: any) {
     logger.error(`Chat upload error: ${error.message}`);
     res.status(500).json({ success: false, error: 'Failed to process upload' });
@@ -147,7 +159,6 @@ router.post('/reset', async (req: Request, res: Response) => {
     });
 
     if (session) {
-      // Delete messages first, then session (cascade may handle this but be explicit)
       await prisma.chatMessage.deleteMany({ where: { sessionId: session.id } });
       await prisma.chatSession.delete({ where: { id: session.id } });
     }

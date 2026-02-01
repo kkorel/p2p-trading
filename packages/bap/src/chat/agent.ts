@@ -1,6 +1,7 @@
 /**
  * Oorja Agent — Core conversational state machine.
  * Handles onboarding (OTP → VC → trading) and general Q&A.
+ * Messages are kept short and farmer-friendly.
  */
 
 import {
@@ -42,6 +43,7 @@ export interface AgentResponse {
   messages: AgentMessage[];
   newState?: string;
   contextUpdate?: Partial<SessionContext>;
+  authToken?: string; // Set when user authenticates through chat
 }
 
 interface SessionContext {
@@ -58,6 +60,8 @@ interface SessionContext {
   discom?: string;
   askedDiscom?: boolean;
   language?: SarvamLangCode;
+  intent?: 'sell' | 'buy' | 'learn';
+  langPicked?: boolean;
 }
 
 type ChatState =
@@ -80,60 +84,119 @@ interface StateHandler {
 
 // --- State Handlers ---
 
+const LANG_BUTTONS = [
+  { text: 'English', callbackData: 'lang:en-IN' },
+  { text: 'हिंदी', callbackData: 'lang:hi-IN' },
+  { text: 'বাংলা', callbackData: 'lang:bn-IN' },
+  { text: 'தமிழ்', callbackData: 'lang:ta-IN' },
+  { text: 'తెలుగు', callbackData: 'lang:te-IN' },
+  { text: 'ಕನ್ನಡ', callbackData: 'lang:kn-IN' },
+];
+
+const INTENT_BUTTONS = [
+  { text: 'Sell my energy ⚡', callbackData: 'intent:sell' },
+  { text: 'Buy energy 🔌', callbackData: 'intent:buy' },
+  { text: 'Learn more 📖', callbackData: 'intent:learn' },
+];
+
 const states: Record<ChatState, StateHandler> = {
   GREETING: {
     async onEnter() {
       return {
         messages: [
+          { text: 'Namaste! I am Oorja.' },
           {
-            text: 'Namaste! I am Oorja, your energy trading helper.\n\nI will help you sell your extra solar energy to your neighbors and earn money.',
-          },
-          {
-            text: 'Which language would you like to chat in?',
-            buttons: [
-              { text: 'English', callbackData: 'lang:en-IN' },
-              { text: 'हिंदी', callbackData: 'lang:hi-IN' },
-              { text: 'বাংলা', callbackData: 'lang:bn-IN' },
-              { text: 'தமிழ்', callbackData: 'lang:ta-IN' },
-              { text: 'తెలుగు', callbackData: 'lang:te-IN' },
-              { text: 'ಕನ್ನಡ', callbackData: 'lang:kn-IN' },
-            ],
-            delay: 500,
+            text: 'Choose your language:',
+            buttons: LANG_BUTTONS,
+            delay: 300,
           },
         ],
       };
     },
-    async onMessage(_ctx, message) {
-      // Handle language selection from button
+    async onMessage(ctx, message) {
+      // Language selection from button
       if (message.startsWith('lang:')) {
         const lang = message.replace('lang:', '') as SarvamLangCode;
         return {
-          messages: [],
-          newState: 'WAITING_PHONE',
-          contextUpdate: { language: lang },
+          messages: [
+            {
+              text: 'What would you like to do?',
+              buttons: INTENT_BUTTONS,
+            },
+          ],
+          contextUpdate: { language: lang, langPicked: true },
         };
       }
-      // Free-text reply — detect language from script, stay in GREETING if ambiguous
-      const detected = detectLanguage(message);
-      if (detected !== 'en-IN') {
+
+      // Intent selection from button
+      if (message.startsWith('intent:')) {
+        const intent = message.replace('intent:', '') as 'sell' | 'buy' | 'learn';
+        if (intent === 'learn') {
+          return {
+            messages: [
+              {
+                text: 'With P2P trading, you sell your extra solar power directly to neighbors. You earn Rs 5-8 per unit instead of Rs 2 from the grid.',
+                buttons: [
+                  { text: 'Start selling', callbackData: 'intent:sell' },
+                  { text: 'Start buying', callbackData: 'intent:buy' },
+                ],
+              },
+            ],
+            contextUpdate: { intent },
+          };
+        }
         return {
           messages: [],
           newState: 'WAITING_PHONE',
-          contextUpdate: { language: detected },
+          contextUpdate: { intent },
         };
       }
-      // English text or "hi" — no language detected, stay in GREETING to let user pick
-      return { messages: [] };
+
+      // If language was already picked and user sends free text, show intent buttons
+      if (ctx.langPicked) {
+        return {
+          messages: [
+            {
+              text: 'What would you like to do?',
+              buttons: INTENT_BUTTONS,
+            },
+          ],
+        };
+      }
+
+      // Free-text reply — detect language from script
+      const detected = detectLanguage(message);
+      if (detected !== 'en-IN') {
+        return {
+          messages: [
+            {
+              text: 'What would you like to do?',
+              buttons: INTENT_BUTTONS,
+            },
+          ],
+          contextUpdate: { language: detected, langPicked: true },
+        };
+      }
+
+      // English text — default to English, show intent
+      return {
+        messages: [
+          {
+            text: 'What would you like to do?',
+            buttons: INTENT_BUTTONS,
+          },
+        ],
+        contextUpdate: { language: 'en-IN' as SarvamLangCode, langPicked: true },
+      };
     },
   },
 
   WAITING_PHONE: {
-    async onEnter() {
+    async onEnter(ctx) {
+      const intentText = ctx.intent === 'buy' ? 'buy energy' : 'sell energy';
       return {
         messages: [
-          {
-            text: 'Great! Let us begin.\n\nPlease share your phone number (the one linked to your electricity meter).\nFor example: 9876543210',
-          },
+          { text: `Let's get you started to ${intentText}.\n\nYour phone number?` },
         ],
       };
     },
@@ -142,11 +205,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!validatePhoneNumber(phone)) {
         return {
-          messages: [
-            {
-              text: 'That does not look like a valid phone number. Please enter a 10-digit phone number.\nFor example: 9876543210',
-            },
-          ],
+          messages: [{ text: 'Please enter a valid 10-digit phone number.' }],
         };
       }
 
@@ -155,7 +214,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!result.success) {
         return {
-          messages: [{ text: `Could not send OTP: ${result.message}. Please try again.` }],
+          messages: [{ text: 'Could not send OTP. Please try again.' }],
         };
       }
 
@@ -171,9 +230,7 @@ const states: Record<ChatState, StateHandler> = {
     async onEnter(ctx) {
       return {
         messages: [
-          {
-            text: `I have sent a verification code to ${ctx.phone}.\n\nPlease enter the 6-digit code you received.`,
-          },
+          { text: `Code sent to ${ctx.phone}. Enter it:` },
         ],
       };
     },
@@ -183,7 +240,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!/^\d{4,6}$/.test(otp)) {
         return {
-          messages: [{ text: 'Please enter the 6-digit verification code. Only numbers.' }],
+          messages: [{ text: 'Enter the 6-digit code.' }],
           contextUpdate: { otpAttempts: attempts },
         };
       }
@@ -193,20 +250,18 @@ const states: Record<ChatState, StateHandler> = {
       if (!result.success) {
         if (attempts >= 3) {
           return {
-            messages: [{ text: 'Too many wrong attempts. Let us try again with your phone number.' }],
+            messages: [{ text: 'Too many wrong attempts. Let\'s try again.' }],
             newState: 'WAITING_PHONE',
             contextUpdate: { otpAttempts: 0 },
           };
         }
         return {
-          messages: [
-            { text: `That code is not correct. You have ${3 - attempts} attempt(s) left. Please try again.` },
-          ],
+          messages: [{ text: `Wrong code. ${3 - attempts} attempt(s) left.` }],
           contextUpdate: { otpAttempts: attempts },
         };
       }
 
-      // Create session token for the agent
+      // Create session token
       const authSession = await createSession({
         userId: result.userId!,
         deviceInfo: 'Oorja-Agent',
@@ -221,6 +276,7 @@ const states: Record<ChatState, StateHandler> = {
             authToken: authSession.token,
             otpAttempts: 0,
           },
+          authToken: authSession.token,
         };
       }
 
@@ -228,7 +284,7 @@ const states: Record<ChatState, StateHandler> = {
       if (result.user?.profileComplete) {
         return {
           messages: [
-            { text: `Welcome back, ${result.user.name || 'friend'}! Your account is already set up.` },
+            { text: `Welcome back, ${result.user.name || 'friend'}!` },
           ],
           newState: 'GENERAL_CHAT',
           contextUpdate: {
@@ -237,6 +293,7 @@ const states: Record<ChatState, StateHandler> = {
             name: result.user.name || undefined,
             otpAttempts: 0,
           },
+          authToken: authSession.token,
         };
       }
 
@@ -249,6 +306,7 @@ const states: Record<ChatState, StateHandler> = {
           name: result.user?.name || undefined,
           otpAttempts: 0,
         },
+        authToken: authSession.token,
       };
     },
   },
@@ -256,20 +314,17 @@ const states: Record<ChatState, StateHandler> = {
   WAITING_NAME: {
     async onEnter() {
       return {
-        messages: [
-          { text: 'Welcome! Since this is your first time, please tell me your name.' },
-        ],
+        messages: [{ text: 'What is your name?' }],
       };
     },
     async onMessage(ctx, message) {
       const name = message.trim();
       if (name.length < 2) {
         return {
-          messages: [{ text: 'Please enter your full name (at least 2 characters).' }],
+          messages: [{ text: 'Please enter your name.' }],
         };
       }
 
-      // Update user name in DB
       if (ctx.userId) {
         await prisma.user.update({
           where: { id: ctx.userId },
@@ -287,11 +342,26 @@ const states: Record<ChatState, StateHandler> = {
 
   OTP_VERIFIED: {
     async onEnter(ctx) {
+      const greeting = `Welcome, ${ctx.name || 'friend'}!`;
+
+      // Buyer intent — skip VC, go to general chat
+      if (ctx.intent === 'buy') {
+        await prisma.user.update({
+          where: { id: ctx.userId! },
+          data: { profileComplete: true },
+        });
+        return {
+          messages: [
+            { text: `${greeting} You can now browse and buy energy from the Buy tab.` },
+          ],
+          newState: 'GENERAL_CHAT',
+        };
+      }
+
+      // Seller intent — need VC verification
       return {
         messages: [
-          {
-            text: `Verified! Welcome, ${ctx.name || 'friend'}!\n\nNow I need to verify your solar panel credentials so we can calculate how much energy you can sell.`,
-          },
+          { text: `${greeting} Let's verify your solar panel to start selling.` },
         ],
         newState: 'EXPLAIN_VC',
       };
@@ -308,23 +378,18 @@ const states: Record<ChatState, StateHandler> = {
         return {
           messages: [
             {
-              text: `To start selling energy, I need your Generation Profile Credential. Think of it as an ID card for your solar panel.\n\nYour ${ctx.discom} office should have given you this document as a PDF. If you do not have it yet, you can download a sample here:\nhttps://open-vcs.up.railway.app`,
-            },
-            {
-              text: 'Please upload the PDF document here.',
-              buttons: [{ text: 'I have it ready', callbackData: 'ready' }],
-              delay: 500,
+              text: `Upload your solar credential PDF from ${ctx.discom}.\n\nDon't have it? Download sample: https://open-vcs.up.railway.app`,
+              buttons: [{ text: 'I have it', callbackData: 'ready' }],
             },
           ],
           newState: 'WAITING_VC_UPLOAD',
         };
       }
 
-      // First ask which DISCOM the user belongs to
       return {
         messages: [
           {
-            text: 'Before we set up trading, I need to verify your solar panel details.\n\nWhich electricity company (DISCOM) provides power in your area?',
+            text: 'Which electricity company (DISCOM) is in your area?',
             buttons: [
               { text: 'BSES Rajdhani', callbackData: 'discom:BSES Rajdhani' },
               { text: 'BSES Yamuna', callbackData: 'discom:BSES Yamuna' },
@@ -336,22 +401,21 @@ const states: Record<ChatState, StateHandler> = {
       };
     },
     async onMessage(ctx, message) {
-      // Common DISCOM names mapping
       const KNOWN_DISCOMS: Record<string, string> = {
         'bses rajdhani': 'BSES Rajdhani',
         'bses yamuna': 'BSES Yamuna',
         'tata power': 'Tata Power Delhi',
         'tata': 'Tata Power',
-        'msedcl': 'MSEDCL (Maharashtra)',
-        'bescom': 'BESCOM (Karnataka)',
-        'cesc': 'CESC (Kolkata)',
-        'tangedco': 'TANGEDCO (Tamil Nadu)',
-        'uhbvn': 'UHBVN (Haryana)',
-        'dhbvn': 'DHBVN (Haryana)',
-        'pspcl': 'PSPCL (Punjab)',
-        'jvvnl': 'JVVNL (Rajasthan)',
-        'uppcl': 'UPPCL (UP)',
-        'other': 'your local DISCOM',
+        'msedcl': 'MSEDCL',
+        'bescom': 'BESCOM',
+        'cesc': 'CESC',
+        'tangedco': 'TANGEDCO',
+        'uhbvn': 'UHBVN',
+        'dhbvn': 'DHBVN',
+        'pspcl': 'PSPCL',
+        'jvvnl': 'JVVNL',
+        'uppcl': 'UPPCL',
+        'other': 'your DISCOM',
       };
 
       const DISCOM_BUTTONS = [
@@ -380,11 +444,7 @@ const states: Record<ChatState, StateHandler> = {
         return {
           messages: [
             { text: kbAnswer },
-            {
-              text: 'Which DISCOM provides electricity in your area?',
-              buttons: DISCOM_BUTTONS,
-              delay: 300,
-            },
+            { text: 'Which DISCOM is in your area?', buttons: DISCOM_BUTTONS, delay: 300 },
           ],
         };
       }
@@ -396,12 +456,8 @@ const states: Record<ChatState, StateHandler> = {
         return {
           messages: [
             {
-              text: `Got it — ${discom}!\n\nTo sell energy on our platform, you need a Generation Profile Credential from ${discom}. This is a digital certificate that proves you own a solar panel and how much energy it can produce.\n\nYou can get this document from your ${discom} office. If you do not have it yet, you can download a sample from:\nhttps://open-vcs.up.railway.app`,
-            },
-            {
-              text: 'Please upload the PDF document whenever you have it ready.',
-              buttons: [{ text: 'I have it ready', callbackData: 'ready' }],
-              delay: 500,
+              text: `Got it — ${discom}!\n\nUpload your solar credential PDF from ${discom}.\n\nDon't have it? Download sample:\nhttps://open-vcs.up.railway.app`,
+              buttons: [{ text: 'I have it', callbackData: 'ready' }],
             },
           ],
           newState: 'WAITING_VC_UPLOAD',
@@ -415,39 +471,37 @@ const states: Record<ChatState, StateHandler> = {
     async onEnter() {
       return {
         messages: [
-          { text: 'Go ahead and upload the PDF whenever you are ready. If you have any questions about the process, just ask!' },
+          { text: 'Upload the PDF when ready. Ask me anything meanwhile!' },
         ],
       };
     },
     async onMessage(ctx, message, fileData) {
       if (!fileData) {
-        // Try knowledge base first
         const kbAnswer = knowledgeBase.findAnswer(message);
         if (kbAnswer) {
           return {
             messages: [
               { text: kbAnswer },
-              { text: 'Please upload your credential PDF whenever you are ready.', delay: 300 },
+              { text: 'Upload your credential PDF when ready.', delay: 300 },
             ],
           };
         }
 
-        // Try LLM fallback for questions
         const isQuestion = message.includes('?') || message.length > 15;
         if (isQuestion) {
-          const llmAnswer = await askLLM(message, `User is uploading their Generation Profile credential from ${ctx.discom || 'their DISCOM'}. They may have questions about the process.`);
+          const llmAnswer = await askLLM(message, `User is uploading their solar credential from ${ctx.discom || 'their DISCOM'}.`);
           if (llmAnswer) {
             return {
               messages: [
                 { text: llmAnswer },
-                { text: 'Whenever you are ready, just upload the PDF.', delay: 300 },
+                { text: 'Upload the PDF when ready.', delay: 300 },
               ],
             };
           }
         }
 
         return {
-          messages: [{ text: 'I am waiting for your PDF document. Please upload it as a file attachment.\n\nIf you have any questions, feel free to ask!' }],
+          messages: [{ text: 'Please upload your credential as a PDF file.' }],
         };
       }
 
@@ -457,28 +511,17 @@ const states: Record<ChatState, StateHandler> = {
 
         if (!extraction.success || !extraction.credential) {
           return {
-            messages: [
-              {
-                text: 'I could not read the credential from this PDF. Please make sure it is the correct document and try again.',
-              },
-            ],
+            messages: [{ text: 'Could not read this PDF. Please check and try again.' }],
           };
         }
 
-        // Verify the credential structure
         const credential = extraction.credential;
         const verificationResult = await verifyVCStructure(credential);
-
-        // Extract capacity
         const capacityKW = extractCapacity(credential as any);
 
         if (!capacityKW || capacityKW <= 0) {
           return {
-            messages: [
-              {
-                text: 'I could not find a valid production capacity in this document. Please check the file and try again.',
-              },
-            ],
+            messages: [{ text: 'No valid capacity found in this document. Please try again.' }],
           };
         }
 
@@ -486,7 +529,6 @@ const states: Record<ChatState, StateHandler> = {
         const DAYS_PER_MONTH = 30;
         const monthlyKWh = Math.round(capacityKW * AVG_PEAK_SUN_HOURS * DAYS_PER_MONTH);
 
-        // Update user in DB
         const user = await prisma.user.findUnique({ where: { id: ctx.userId! } });
         const trustScore = user?.trustScore || 0.3;
         const allowedLimit = calculateAllowedLimit(trustScore);
@@ -512,9 +554,7 @@ const states: Record<ChatState, StateHandler> = {
       } catch (error: any) {
         logger.error(`VC verification failed in chat: ${error.message}`);
         return {
-          messages: [
-            { text: 'Something went wrong while verifying your document. Please try uploading again.' },
-          ],
+          messages: [{ text: 'Something went wrong. Please try uploading again.' }],
         };
       }
     },
@@ -525,9 +565,9 @@ const states: Record<ChatState, StateHandler> = {
       return {
         messages: [
           {
-            text: `Excellent! Your credentials are verified!\n\nHere is what I found:\n- Monthly Production: ${ctx.productionCapacity} kWh\n- Trade Limit: ${ctx.tradeLimit} kWh\n\nWould you like me to start trading your extra energy from tomorrow? I will create a sell offer at a fair market rate.`,
+            text: `Verified! Your panel produces ~${ctx.productionCapacity} kWh/month. You can trade up to ${ctx.tradeLimit} kWh.\n\nShall I start selling your extra energy?`,
             buttons: [
-              { text: 'Yes, start trading!', callbackData: 'yes' },
+              { text: 'Yes, start!', callbackData: 'yes' },
               { text: 'Not now', callbackData: 'no' },
             ],
           },
@@ -546,11 +586,10 @@ const states: Record<ChatState, StateHandler> = {
     },
     async onMessage(ctx, message) {
       const lower = message.toLowerCase().trim();
-      const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'start', 'yes, start trading!'].includes(lower);
+      const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'start', 'yes, start!'].includes(lower);
       const isNo = ['no', 'n', 'nahi', 'nope', 'not now', 'later', 'baad mein'].includes(lower);
 
       if (isYes) {
-        // Set profileComplete and create offer
         await prisma.user.update({
           where: { id: ctx.userId! },
           data: { profileComplete: true },
@@ -562,9 +601,7 @@ const states: Record<ChatState, StateHandler> = {
           const o = offerResult.offer;
           return {
             messages: [
-              {
-                text: `Setting up your seller profile and creating your first offer...\n\nDone! Here is what I set up:\n- Offer: ${o.quantity} kWh at Rs ${o.pricePerKwh}/kWh\n- Available: Tomorrow 6:00 AM to 6:00 PM\n\nYour offer is now live! Buyers can see it and purchase your energy.\n\nI will keep you updated on any orders. You can ask me anything about trading anytime.`,
-              },
+              { text: `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy. I'll keep you updated!` },
             ],
             newState: 'GENERAL_CHAT',
             contextUpdate: { tradingActive: true },
@@ -573,9 +610,7 @@ const states: Record<ChatState, StateHandler> = {
 
         return {
           messages: [
-            {
-              text: 'Your profile is set up! I had a small issue creating the first offer, but you can create one from the Sell tab in the app.\n\nYou can ask me anything about trading anytime.',
-            },
+            { text: 'Profile set up! You can create offers from the Sell tab.' },
           ],
           newState: 'GENERAL_CHAT',
           contextUpdate: { tradingActive: true },
@@ -590,22 +625,20 @@ const states: Record<ChatState, StateHandler> = {
 
         return {
           messages: [
-            {
-              text: 'No problem! Your credentials are verified and your profile is ready. You can start trading anytime from the Sell tab or just ask me here.\n\nFeel free to ask me any questions about energy trading!',
-            },
+            { text: 'No problem. You can start selling anytime from the Sell tab or ask me here.' },
           ],
           newState: 'GENERAL_CHAT',
         };
       }
 
-      // Not a clear yes/no — ask again
+      // Not a clear yes/no
       const kbAnswer = knowledgeBase.findAnswer(message);
       if (kbAnswer) {
         return {
           messages: [
             { text: kbAnswer },
             {
-              text: 'So, would you like me to start trading for you?',
+              text: 'Start selling your energy?',
               buttons: [
                 { text: 'Yes', callbackData: 'yes' },
                 { text: 'No', callbackData: 'no' },
@@ -619,7 +652,7 @@ const states: Record<ChatState, StateHandler> = {
       return {
         messages: [
           {
-            text: 'Please reply "yes" to start trading or "no" to skip for now.',
+            text: 'Start selling?',
             buttons: [
               { text: 'Yes', callbackData: 'yes' },
               { text: 'No', callbackData: 'no' },
@@ -663,9 +696,7 @@ const states: Record<ChatState, StateHandler> = {
           });
           if (user) {
             return {
-              messages: [
-                { text: `Your wallet balance is Rs ${user.balance.toFixed(2)}, ${user.name || 'friend'}.` },
-              ],
+              messages: [{ text: `Your balance: Rs ${user.balance.toFixed(2)}` }],
             };
           }
         }
@@ -686,13 +717,11 @@ const states: Record<ChatState, StateHandler> = {
           if (result.success && result.offer) {
             return {
               messages: [
-                {
-                  text: `Done! I created a new sell offer:\n- ${result.offer.quantity} kWh at Rs ${result.offer.pricePerKwh}/kWh\n- Available tomorrow 6 AM to 6 PM`,
-                },
+                { text: `New offer created: ${result.offer.quantity} kWh at Rs ${result.offer.pricePerKwh}/unit, tomorrow 6AM-6PM.` },
               ],
             };
           }
-          return { messages: [{ text: result.error || 'Could not create offer right now. Please try again.' }] };
+          return { messages: [{ text: result.error || 'Could not create offer. Try again.' }] };
         }
       }
 
@@ -702,21 +731,22 @@ const states: Record<ChatState, StateHandler> = {
         return { messages: [{ text: kbAnswer }] };
       }
 
-      // LLM fallback — handles arbitrary questions naturally
-      const llmAnswer = await askLLM(message, `User "${ctx.name || 'seller'}" is an active seller on the Oorja P2P energy trading platform.`);
+      // LLM fallback
+      const llmAnswer = await askLLM(message, `User "${ctx.name || 'seller'}" on the Oorja P2P energy trading platform.`);
       if (llmAnswer) {
         return { messages: [{ text: llmAnswer }] };
       }
 
-      // Last resort fallback
+      // Last resort
       return {
         messages: [
           {
-            text: 'I can help you with:\n- "How much did I earn?" — Check earnings\n- "What is my balance?" — Check wallet\n- "Show my orders" — See recent orders\n- "Create new offer" — List energy for sale\n- "What is P2P trading?" — Learn about trading',
+            text: 'I can help with:',
             buttons: [
               { text: 'My earnings', callbackData: 'how much did I earn' },
               { text: 'My balance', callbackData: 'what is my balance' },
               { text: 'My orders', callbackData: 'show my orders' },
+              { text: 'New offer', callbackData: 'create new offer' },
             ],
           },
         ],
@@ -727,10 +757,6 @@ const states: Record<ChatState, StateHandler> = {
 
 // --- Translation helpers ---
 
-/**
- * Translate all agent message texts (and button labels) to the target language.
- * Preserves callbackData in English for state machine matching.
- */
 async function translateResponse(
   response: AgentResponse,
   targetLang: SarvamLangCode
@@ -808,6 +834,7 @@ export async function processMessage(
       let allMessages = [...enterResp.messages, ...msgResp.messages, ...newEnter.messages];
       let currentState = msgResp.newState as ChatState;
       let currentCtx = { ...newCtx, ...newEnter.contextUpdate };
+      let authToken = msgResp.authToken || newEnter.authToken;
 
       while (newEnter.newState && newEnter.newState !== currentState) {
         await transitionState(session.id, newEnter.newState, newEnter.contextUpdate);
@@ -816,16 +843,27 @@ export async function processMessage(
         const nextEnter = await states[currentState].onEnter(currentCtx);
         await storeAgentMessages(session.id, nextEnter.messages);
         allMessages = [...allMessages, ...nextEnter.messages];
+        authToken = authToken || nextEnter.authToken;
         if (!nextEnter.newState || nextEnter.newState === currentState) break;
-        // Continue chain
         Object.assign(newEnter, nextEnter);
       }
 
-      const result: AgentResponse = { messages: allMessages };
+      const result: AgentResponse = { messages: allMessages, authToken };
       return translateResponse(result, effectiveLang);
     }
 
-    return translateResponse({ messages: enterResp.messages }, detectedLang);
+    // No state transition — just show enter messages + onMessage messages
+    const allMessages = [...enterResp.messages, ...msgResp.messages];
+    await storeAgentMessages(session.id, msgResp.messages);
+    if (msgResp.contextUpdate) {
+      const merged = { ...ctx, ...msgResp.contextUpdate };
+      await prisma.chatSession.update({
+        where: { id: session.id },
+        data: { contextJson: JSON.stringify(merged) },
+      });
+    }
+    const effectiveLang = (msgResp.contextUpdate?.language as SarvamLangCode) || detectedLang;
+    return translateResponse({ messages: allMessages }, effectiveLang);
   }
 
   // Existing session
@@ -876,6 +914,7 @@ export async function processMessage(
     let allMessages = [...response.messages, ...enterResp.messages];
     let chainState = response.newState as ChatState;
     let chainCtx = { ...mergedCtx, ...enterResp.contextUpdate };
+    let authToken = response.authToken || enterResp.authToken;
 
     // Follow auto-transition chains
     let nextResp = enterResp;
@@ -886,11 +925,12 @@ export async function processMessage(
       nextResp = await states[chainState].onEnter(chainCtx);
       await storeAgentMessages(session.id, nextResp.messages);
       allMessages = [...allMessages, ...nextResp.messages];
+      authToken = authToken || nextResp.authToken;
     }
 
     // Use language from contextUpdate if the user just selected it
     const effectiveLang = (response.contextUpdate?.language as SarvamLangCode) || userLang;
-    return translateResponse({ messages: allMessages }, effectiveLang);
+    return translateResponse({ messages: allMessages, authToken }, effectiveLang);
   }
 
   // No state transition — just update context if needed
