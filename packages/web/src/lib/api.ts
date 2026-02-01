@@ -257,6 +257,12 @@ export const chatApi = {
       messages: Array<{ role: 'agent' | 'user'; content: string; buttons?: Array<{ text: string; callbackData?: string }>; createdAt: string }>;
       state: string | null;
     }>(`/chat/history${sessionId ? `?sessionId=${sessionId}` : ''}`),
+
+  reset: (sessionId?: string) =>
+    request<{ success: boolean }>('/chat/reset', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    }),
 };
 
 // Buyer APIs

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Send, Paperclip, Bot } from 'lucide-react';
+import { X, Send, Paperclip, Bot, RotateCcw } from 'lucide-react';
 import { MessageList, ChatMessageData } from './message-list';
 import { chatApi } from '@/lib/api';
 
@@ -108,6 +108,15 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
     [isLoading, sendMessageToAgent]
   );
 
+  const handleReset = useCallback(async () => {
+    try {
+      await chatApi.reset(sessionId || undefined);
+    } catch { /* ignore */ }
+    setMessages([]);
+    setSessionId(null);
+    setInitialized(false);
+  }, [sessionId]);
+
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -158,14 +167,11 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
 
-      {/* Card container — centered in 480px, anchored to bottom above nav */}
-      <div className="relative w-full max-w-[480px] flex flex-col justify-end pb-24 px-3 pointer-events-none">
-        <div
-          className="pointer-events-auto flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200/60"
-          style={{ maxHeight: 'min(65vh, 520px)' }}
-        >
+      {/* Card — fills from below top bar to above bottom nav */}
+      <div className="relative w-full max-w-[480px] flex flex-col pt-2 pb-[72px] pointer-events-none">
+        <div className="pointer-events-auto flex-1 flex flex-col bg-white shadow-2xl overflow-hidden rounded-b-2xl">
           {/* Header */}
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-teal-600 text-white rounded-t-2xl">
+          <div className="flex items-center gap-2.5 px-3.5 py-2 bg-teal-600 text-white">
             <div className="w-8 h-8 rounded-full bg-teal-500/80 flex items-center justify-center">
               <Bot size={18} />
             </div>
@@ -173,6 +179,13 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
               <h2 className="text-sm font-semibold leading-tight">Oorja</h2>
               <p className="text-[11px] text-teal-200">Energy trading assistant</p>
             </div>
+            <button
+              onClick={handleReset}
+              className="p-1.5 rounded-full hover:bg-teal-500/80 transition-colors"
+              title="New chat"
+            >
+              <RotateCcw size={16} />
+            </button>
             <button
               onClick={onClose}
               className="p-1.5 rounded-full hover:bg-teal-500/80 transition-colors"

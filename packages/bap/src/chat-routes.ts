@@ -134,4 +134,29 @@ router.get('/history', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /chat/reset
+ * Deletes the current session so the user starts fresh.
+ */
+router.post('/reset', async (req: Request, res: Response) => {
+  try {
+    const platformId = resolvePlatformId(req, req.body?.sessionId);
+
+    const session = await prisma.chatSession.findUnique({
+      where: { platform_platformId: { platform: 'WEB', platformId } },
+    });
+
+    if (session) {
+      // Delete messages first, then session (cascade may handle this but be explicit)
+      await prisma.chatMessage.deleteMany({ where: { sessionId: session.id } });
+      await prisma.chatSession.delete({ where: { id: session.id } });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error(`Chat reset error: ${error.message}`);
+    res.status(500).json({ success: false, error: 'Failed to reset chat' });
+  }
+});
+
 export default router;

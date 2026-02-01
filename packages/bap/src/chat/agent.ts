@@ -326,39 +326,16 @@ const states: Record<ChatState, StateHandler> = {
           {
             text: 'Before we set up trading, I need to verify your solar panel details.\n\nWhich electricity company (DISCOM) provides power in your area?',
             buttons: [
-              { text: 'BSES Rajdhani', callbackData: 'BSES Rajdhani' },
-              { text: 'BSES Yamuna', callbackData: 'BSES Yamuna' },
-              { text: 'Tata Power', callbackData: 'Tata Power' },
-              { text: 'Other', callbackData: 'other' },
+              { text: 'BSES Rajdhani', callbackData: 'discom:BSES Rajdhani' },
+              { text: 'BSES Yamuna', callbackData: 'discom:BSES Yamuna' },
+              { text: 'Tata Power', callbackData: 'discom:Tata Power' },
+              { text: 'Other', callbackData: 'discom:other' },
             ],
           },
         ],
       };
     },
     async onMessage(ctx, message) {
-      // First check if it is a question
-      const kbAnswer = knowledgeBase.findAnswer(message);
-      if (kbAnswer) {
-        return {
-          messages: [
-            { text: kbAnswer },
-            {
-              text: 'Which DISCOM provides electricity in your area?',
-              buttons: [
-                { text: 'BSES Rajdhani', callbackData: 'BSES Rajdhani' },
-                { text: 'BSES Yamuna', callbackData: 'BSES Yamuna' },
-                { text: 'Tata Power', callbackData: 'Tata Power' },
-                { text: 'Other', callbackData: 'other' },
-              ],
-              delay: 300,
-            },
-          ],
-        };
-      }
-
-      // Process DISCOM answer
-      const discomName = message.trim();
-
       // Common DISCOM names mapping
       const KNOWN_DISCOMS: Record<string, string> = {
         'bses rajdhani': 'BSES Rajdhani',
@@ -377,22 +354,60 @@ const states: Record<ChatState, StateHandler> = {
         'other': 'your local DISCOM',
       };
 
-      const resolvedDiscom = KNOWN_DISCOMS[discomName.toLowerCase()] || discomName;
+      const DISCOM_BUTTONS = [
+        { text: 'BSES Rajdhani', callbackData: 'discom:BSES Rajdhani' },
+        { text: 'BSES Yamuna', callbackData: 'discom:BSES Yamuna' },
+        { text: 'Tata Power', callbackData: 'discom:Tata Power' },
+        { text: 'Other', callbackData: 'discom:other' },
+      ];
 
-      return {
-        messages: [
-          {
-            text: `Got it — ${resolvedDiscom}!\n\nTo sell energy on our platform, you need a Generation Profile Credential from ${resolvedDiscom}. This is a digital certificate that proves you own a solar panel and how much energy it can produce.\n\nYou can get this document from your ${resolvedDiscom} office. If you do not have it yet, you can download a sample from:\nhttps://open-vcs.up.railway.app`,
-          },
-          {
-            text: 'Please upload the PDF document whenever you have it ready.',
-            buttons: [{ text: 'I have it ready', callbackData: 'ready' }],
-            delay: 500,
-          },
-        ],
-        newState: 'WAITING_VC_UPLOAD',
-        contextUpdate: { discom: resolvedDiscom, askedDiscom: true },
-      };
+      // 1. Handle DISCOM selection from button (prefixed callback)
+      if (message.startsWith('discom:')) {
+        const raw = message.replace('discom:', '').trim();
+        const resolvedDiscom = KNOWN_DISCOMS[raw.toLowerCase()] || raw;
+        return makeDiscomResponse(resolvedDiscom);
+      }
+
+      // 2. Handle typed DISCOM name (check known names before KB)
+      const lower = message.trim().toLowerCase();
+      if (KNOWN_DISCOMS[lower]) {
+        return makeDiscomResponse(KNOWN_DISCOMS[lower]);
+      }
+
+      // 3. Check knowledge base for questions
+      const kbAnswer = knowledgeBase.findAnswer(message);
+      if (kbAnswer) {
+        return {
+          messages: [
+            { text: kbAnswer },
+            {
+              text: 'Which DISCOM provides electricity in your area?',
+              buttons: DISCOM_BUTTONS,
+              delay: 300,
+            },
+          ],
+        };
+      }
+
+      // 4. Default: treat unknown input as a DISCOM name
+      return makeDiscomResponse(message.trim());
+
+      function makeDiscomResponse(discom: string): AgentResponse {
+        return {
+          messages: [
+            {
+              text: `Got it — ${discom}!\n\nTo sell energy on our platform, you need a Generation Profile Credential from ${discom}. This is a digital certificate that proves you own a solar panel and how much energy it can produce.\n\nYou can get this document from your ${discom} office. If you do not have it yet, you can download a sample from:\nhttps://open-vcs.up.railway.app`,
+            },
+            {
+              text: 'Please upload the PDF document whenever you have it ready.',
+              buttons: [{ text: 'I have it ready', callbackData: 'ready' }],
+              delay: 500,
+            },
+          ],
+          newState: 'WAITING_VC_UPLOAD',
+          contextUpdate: { discom, askedDiscom: true },
+        };
+      }
     },
   },
 
