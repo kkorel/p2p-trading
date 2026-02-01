@@ -86,18 +86,44 @@ const states: Record<ChatState, StateHandler> = {
       return {
         messages: [
           {
-            text: 'Namaste! I am Oorja, your energy trading helper.\n\nI will help you sell your extra solar energy to your neighbors and earn money. It is very simple!',
+            text: 'Namaste! I am Oorja, your energy trading helper.\n\nI will help you sell your extra solar energy to your neighbors and earn money.',
           },
           {
-            text: 'Shall we start setting up your account? Just reply with anything to begin.',
-            buttons: [{ text: 'Yes, let us start!', callbackData: 'yes' }],
+            text: 'Which language would you like to chat in?',
+            buttons: [
+              { text: 'English', callbackData: 'lang:en-IN' },
+              { text: 'हिंदी', callbackData: 'lang:hi-IN' },
+              { text: 'বাংলা', callbackData: 'lang:bn-IN' },
+              { text: 'தமிழ்', callbackData: 'lang:ta-IN' },
+              { text: 'తెలుగు', callbackData: 'lang:te-IN' },
+              { text: 'ಕನ್ನಡ', callbackData: 'lang:kn-IN' },
+            ],
             delay: 500,
           },
         ],
       };
     },
-    async onMessage() {
-      return { messages: [], newState: 'WAITING_PHONE' };
+    async onMessage(_ctx, message) {
+      // Handle language selection from button
+      if (message.startsWith('lang:')) {
+        const lang = message.replace('lang:', '') as SarvamLangCode;
+        return {
+          messages: [],
+          newState: 'WAITING_PHONE',
+          contextUpdate: { language: lang },
+        };
+      }
+      // Free-text reply — detect language from script, stay in GREETING if ambiguous
+      const detected = detectLanguage(message);
+      if (detected !== 'en-IN') {
+        return {
+          messages: [],
+          newState: 'WAITING_PHONE',
+          contextUpdate: { language: detected },
+        };
+      }
+      // English text or "hi" — no language detected, stay in GREETING to let user pick
+      return { messages: [] };
     },
   },
 
@@ -757,8 +783,9 @@ export async function processMessage(
     const msgResp = await states.GREETING.onMessage(ctx, processedMessage, fileData);
 
     if (msgResp.newState) {
-      const newCtx = { ...ctx, ...msgResp.contextUpdate, language: detectedLang };
-      await transitionState(session.id, msgResp.newState, { ...msgResp.contextUpdate, language: detectedLang });
+      const effectiveLang = (msgResp.contextUpdate?.language as SarvamLangCode) || detectedLang;
+      const newCtx = { ...ctx, ...msgResp.contextUpdate, language: effectiveLang };
+      await transitionState(session.id, msgResp.newState, { ...msgResp.contextUpdate, language: effectiveLang });
       const newEnter = await states[msgResp.newState as ChatState].onEnter(newCtx);
       await storeAgentMessages(session.id, newEnter.messages);
 
@@ -780,7 +807,7 @@ export async function processMessage(
       }
 
       const result: AgentResponse = { messages: allMessages };
-      return translateResponse(result, detectedLang);
+      return translateResponse(result, effectiveLang);
     }
 
     return translateResponse({ messages: enterResp.messages }, detectedLang);
@@ -846,7 +873,9 @@ export async function processMessage(
       allMessages = [...allMessages, ...nextResp.messages];
     }
 
-    return translateResponse({ messages: allMessages }, userLang);
+    // Use language from contextUpdate if the user just selected it
+    const effectiveLang = (response.contextUpdate?.language as SarvamLangCode) || userLang;
+    return translateResponse({ messages: allMessages }, effectiveLang);
   }
 
   // No state transition — just update context if needed
@@ -858,7 +887,8 @@ export async function processMessage(
     });
   }
 
-  return translateResponse(response, userLang);
+  const effectiveLang = (response.contextUpdate?.language as SarvamLangCode) || userLang;
+  return translateResponse(response, effectiveLang);
 }
 
 // --- Helpers ---

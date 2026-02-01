@@ -11,7 +11,7 @@ export interface ChatMessageData {
 
 interface MessageListProps {
   messages: ChatMessageData[];
-  onButtonClick?: (text: string) => void;
+  onButtonClick?: (callbackData: string, displayText: string) => void;
   isLoading?: boolean;
 }
 
@@ -23,7 +23,7 @@ export function MessageList({ messages, onButtonClick, isLoading }: MessageListP
   }, [messages, isLoading]);
 
   return (
-    <div className="flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-2 p-3">
       {messages.map((msg, i) => (
         <div
           key={i}
@@ -56,7 +56,7 @@ export function MessageList({ messages, onButtonClick, isLoading }: MessageListP
                 {msg.buttons.map((btn, j) => (
                   <button
                     key={j}
-                    onClick={() => onButtonClick?.(btn.callbackData || btn.text)}
+                    onClick={() => onButtonClick?.(btn.callbackData || btn.text, btn.text)}
                     className="px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-full hover:bg-teal-100 transition-colors"
                   >
                     {btn.text}

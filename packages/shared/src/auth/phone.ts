@@ -99,15 +99,11 @@ export async function verifyOtpAndAuthenticate(
   const isNewUser = !user;
 
   if (!user) {
-    // New user — name is required
-    if (!name || name.trim().length < 2) {
-      return { success: false, message: 'Name is required for new users (at least 2 characters)' };
-    }
-
+    // Create user (name can be set later via chat agent or profile)
     user = await prisma.user.create({
       data: {
         phone: normalized,
-        name: name.trim(),
+        name: name?.trim() || null,
         profileComplete: false,
       },
     });
