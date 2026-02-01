@@ -480,15 +480,47 @@ function buildTimeWindow(timeDesc?: string): { startTime: string; endTime: strin
   }
 
   const td = timeDesc.toLowerCase();
-  if (td.includes('today') || td.includes('aaj')) {
-    startTime.setHours(Math.max(now.getHours() + 1, 6), 0, 0, 0);
-    endTime.setHours(23, 59, 59, 0);
-  } else {
+
+  // Parse time-of-day keywords: morning, afternoon, evening, night
+  let startHour: number | null = null;
+  let endHour: number | null = null;
+  if (td.includes('morning') || td.includes('subah') || td.includes('savere')) {
+    startHour = 6; endHour = 12;
+  } else if (td.includes('afternoon') || td.includes('dopahar')) {
+    startHour = 12; endHour = 17;
+  } else if (td.includes('evening') || td.includes('shaam') || td.includes('sham')) {
+    startHour = 17; endHour = 21;
+  } else if (td.includes('night') || td.includes('raat')) {
+    startHour = 21; endHour = 23;
+  }
+
+  const isToday = td.includes('today') || td.includes('aaj');
+  const isTomorrow = td.includes('tomorrow') || td.includes('kal');
+
+  if (isToday) {
+    const dayStart = startHour != null ? startHour : Math.max(now.getHours() + 1, 6);
+    const dayEnd = endHour != null ? endHour : 23;
+    startTime.setHours(dayStart, 0, 0, 0);
+    endTime.setHours(dayEnd, 59, 59, 0);
+    // Guard: if endTime <= startTime (e.g., late at night), fall back to tomorrow
+    if (endTime <= startTime) {
+      startTime.setDate(startTime.getDate() + 1);
+      startTime.setHours(6, 0, 0, 0);
+      endTime.setDate(endTime.getDate() + 1);
+      endTime.setHours(18, 0, 0, 0);
+    }
+  } else if (isTomorrow || !startHour) {
     // Default to tomorrow
     startTime.setDate(startTime.getDate() + 1);
-    startTime.setHours(6, 0, 0, 0);
+    startTime.setHours(startHour ?? 6, 0, 0, 0);
     endTime.setDate(endTime.getDate() + 1);
-    endTime.setHours(18, 0, 0, 0);
+    endTime.setHours(endHour ?? 18, 0, 0, 0);
+  } else {
+    // Only time-of-day given, no day — assume tomorrow
+    startTime.setDate(startTime.getDate() + 1);
+    startTime.setHours(startHour, 0, 0, 0);
+    endTime.setDate(endTime.getDate() + 1);
+    endTime.setHours(endHour, 0, 0, 0);
   }
   return { startTime: startTime.toISOString(), endTime: endTime.toISOString() };
 }

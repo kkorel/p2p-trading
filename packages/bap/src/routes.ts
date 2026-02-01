@@ -742,9 +742,11 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         provider.items.push(itemEntry);
       }
       
-      // Add offer
+      // Add offer (include item_id and provider_id so select flow can route correctly)
       itemEntry.offers.push({
         id: offer.id,
+        item_id: offer.itemId,
+        provider_id: offer.providerId,
         price: {
           value: offer.priceValue,
           currency: offer.currency || 'INR',

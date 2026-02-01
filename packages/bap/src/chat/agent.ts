@@ -596,12 +596,13 @@ function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurchase): A
     return {
       messages: [{
         text: h(ctx,
-          'When do you need the energy? (e.g. "tomorrow", "today")',
-          'Energy kab chahiye? (jaise "kal", "aaj")'
+          'When do you need the energy? Pick a day and time, or type your own (e.g. "tomorrow morning").',
+          'Energy kab chahiye? Din aur time chuno, ya khud likho (jaise "kal subah").'
         ),
         buttons: [
-          { text: h(ctx, 'Tomorrow', 'Kal'), callbackData: 'purchase_time:tomorrow' },
-          { text: h(ctx, 'Today', 'Aaj'), callbackData: 'purchase_time:today' },
+          { text: h(ctx, 'Tomorrow morning', 'Kal subah'), callbackData: 'purchase_time:tomorrow morning' },
+          { text: h(ctx, 'Tomorrow afternoon', 'Kal dopahar'), callbackData: 'purchase_time:tomorrow afternoon' },
+          { text: h(ctx, 'Today evening', 'Aaj shaam'), callbackData: 'purchase_time:today evening' },
         ],
       }],
       contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'timeframe' } },
