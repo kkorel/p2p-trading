@@ -158,10 +158,12 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      if (file.type !== 'application/pdf') {
+      const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+      const isJson = file.type === 'application/json' || file.name.endsWith('.json');
+      if (!isPdf && !isJson) {
         setMessages((prev) => [
           ...prev,
-          { role: 'agent', content: 'Please upload a PDF document.' },
+          { role: 'agent', content: 'Please upload a PDF or JSON file.' },
         ]);
         return;
       }
@@ -256,7 +258,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,application/pdf"
+                accept=".pdf,.json,application/pdf,application/json"
                 onChange={handleFileUpload}
                 className="hidden"
               />

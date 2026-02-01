@@ -378,7 +378,7 @@ const states: Record<ChatState, StateHandler> = {
         return {
           messages: [
             {
-              text: `Upload your solar credential PDF from ${ctx.discom}.\n\nDon't have it? Download sample: https://open-vcs.up.railway.app`,
+              text: `Upload your solar credential (PDF or JSON) from ${ctx.discom}.\n\nDon't have it? Download sample: https://open-vcs.up.railway.app`,
               buttons: [{ text: 'I have it', callbackData: 'ready' }],
             },
           ],
@@ -456,7 +456,7 @@ const states: Record<ChatState, StateHandler> = {
         return {
           messages: [
             {
-              text: `Got it — ${discom}!\n\nUpload your solar credential PDF from ${discom}.\n\nDon't have it? Download sample:\nhttps://open-vcs.up.railway.app`,
+              text: `Got it — ${discom}!\n\nUpload your solar credential (PDF or JSON) from ${discom}.\n\nDon't have it? Download sample:\nhttps://open-vcs.up.railway.app`,
               buttons: [{ text: 'I have it', callbackData: 'ready' }],
             },
           ],
@@ -471,7 +471,7 @@ const states: Record<ChatState, StateHandler> = {
     async onEnter() {
       return {
         messages: [
-          { text: 'Upload the PDF when ready. Ask me anything meanwhile!' },
+          { text: 'Upload the file when ready (PDF or JSON). Ask me anything meanwhile!' },
         ],
       };
     },
@@ -482,7 +482,7 @@ const states: Record<ChatState, StateHandler> = {
           return {
             messages: [
               { text: kbAnswer },
-              { text: 'Upload your credential PDF when ready.', delay: 300 },
+              { text: 'Upload your credential when ready.', delay: 300 },
             ],
           };
         }
@@ -494,28 +494,42 @@ const states: Record<ChatState, StateHandler> = {
             return {
               messages: [
                 { text: llmAnswer },
-                { text: 'Upload the PDF when ready.', delay: 300 },
+                { text: 'Upload the file when ready.', delay: 300 },
               ],
             };
           }
         }
 
         return {
-          messages: [{ text: 'Please upload your credential as a PDF file.' }],
+          messages: [{ text: 'Please upload your credential (PDF or JSON).' }],
         };
       }
 
       // Process the uploaded file
       try {
-        const extraction = await extractVCFromPdf(fileData.buffer);
+        let credential: any;
 
-        if (!extraction.success || !extraction.credential) {
-          return {
-            messages: [{ text: 'Could not read this PDF. Please check and try again.' }],
-          };
+        if (fileData.mimeType === 'application/json') {
+          // JSON credential — parse directly
+          try {
+            const jsonStr = fileData.buffer.toString('utf-8');
+            credential = JSON.parse(jsonStr);
+          } catch {
+            return {
+              messages: [{ text: 'Could not read this JSON file. Please check and try again.' }],
+            };
+          }
+        } else {
+          // PDF — extract credential from PDF
+          const extraction = await extractVCFromPdf(fileData.buffer);
+          if (!extraction.success || !extraction.credential) {
+            return {
+              messages: [{ text: 'Could not read this PDF. Please check and try again.' }],
+            };
+          }
+          credential = extraction.credential;
         }
 
-        const credential = extraction.credential;
         const verificationResult = await verifyVCStructure(credential);
         const capacityKW = extractCapacity(credential as any);
 

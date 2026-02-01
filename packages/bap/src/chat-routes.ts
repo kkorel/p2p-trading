@@ -68,6 +68,7 @@ router.post('/send', async (req: Request, res: Response) => {
 /**
  * POST /chat/upload
  * Body: { pdfBase64: string, sessionId?: string, fileName?: string }
+ * Accepts both PDF and JSON credential files.
  */
 router.post('/upload', async (req: Request, res: Response) => {
   try {
@@ -80,13 +81,19 @@ router.post('/upload', async (req: Request, res: Response) => {
     const platformId = resolvePlatformId(req, sessionId);
     const buffer = Buffer.from(pdfBase64, 'base64');
 
+    // Detect mimeType from file extension
+    const name = fileName || 'upload.pdf';
+    const isJson = name.toLowerCase().endsWith('.json');
+    const mimeType = isJson ? 'application/json' : 'application/pdf';
+
     const fileData: FileData = {
       buffer,
-      mimeType: 'application/pdf',
-      fileName: fileName || 'upload.pdf',
+      mimeType,
+      fileName: name,
     };
 
-    const response = await processMessage('WEB', platformId, '[PDF uploaded]', fileData);
+    const label = isJson ? '[JSON credential uploaded]' : '[PDF uploaded]';
+    const response = await processMessage('WEB', platformId, label, fileData);
 
     const messages = response.messages.map((m) => ({
       role: 'agent' as const,
