@@ -13,7 +13,7 @@ import { formatCurrency } from '@/lib/utils';
 export function ChatPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { balance } = useBalance();
   const { totalValue, isLoading: statsLoading } = useP2PStats();
   const {
@@ -73,7 +73,10 @@ export function ChatPage() {
             <RotateCcw size={16} />
           </button>
           <button
-            onClick={() => router.push('/buy')}
+            onClick={async () => {
+              await refreshUser();
+              router.push('/buy');
+            }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium shrink-0"
             title="Open App"
           >

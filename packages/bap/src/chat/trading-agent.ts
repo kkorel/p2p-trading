@@ -2,7 +2,7 @@
  * Trading Agent — Creates offers and reports earnings/listings for sellers.
  */
 
-import { prisma, createLogger } from '@p2p/shared';
+import { prisma, createLogger, publishOfferToCDS, isExternalCDSEnabled } from '@p2p/shared';
 import { registerProvider, addCatalogItem, addOffer } from '../seller-catalog';
 
 const logger = createLogger('TradingAgent');
@@ -53,7 +53,7 @@ export const mockTradingAgent = {
         ''
       );
 
-      await addOffer(
+      const offer = await addOffer(
         item.id,
         providerId,
         pricePerKwh,
@@ -61,6 +61,37 @@ export const mockTradingAgent = {
         offerQty,
         { startTime: tomorrow.toISOString(), endTime: endTime.toISOString() }
       );
+
+      // Publish to CDS so the offer appears in discovery/buy page
+      if (isExternalCDSEnabled()) {
+        const providerName = user.name ? `${user.name} Energy` : 'Solar Energy';
+        publishOfferToCDS(
+          { id: providerId, name: providerName, trust_score: user.trustScore || 0.5 },
+          {
+            id: item.id,
+            provider_id: item.provider_id,
+            source_type: item.source_type,
+            delivery_mode: item.delivery_mode,
+            available_qty: item.available_qty,
+            production_windows: item.production_windows,
+            meter_id: item.meter_id,
+          },
+          {
+            id: offer.id,
+            item_id: offer.item_id,
+            provider_id: offer.provider_id,
+            price_value: offer.price.value,
+            currency: offer.price.currency,
+            max_qty: offer.maxQuantity,
+            time_window: offer.timeWindow,
+            pricing_model: offer.offerAttributes.pricingModel,
+            settlement_type: offer.offerAttributes.settlementType,
+          }
+        ).then(success => {
+          if (success) logger.info(`Offer published to CDS`, { offerId: offer.id });
+          else logger.warn(`CDS publish returned false`, { offerId: offer.id });
+        }).catch(err => logger.error(`Failed to publish offer to CDS`, { offerId: offer.id, error: err.message }));
+      }
 
       logger.info(`Created default offer for user ${userId}: ${offerQty}kWh at Rs${pricePerKwh}/kWh`);
 
