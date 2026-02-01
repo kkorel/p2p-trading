@@ -18,6 +18,7 @@ import {
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
 import { mockTradingAgent } from './trading-agent';
+import { askLLM } from './llm-fallback';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
 
 const logger = createLogger('OorjaAgent');
@@ -53,6 +54,8 @@ interface SessionContext {
   tradingActive?: boolean;
   productionCapacity?: number;
   tradeLimit?: number;
+  discom?: string;
+  askedDiscom?: boolean;
 }
 
 type ChatState =
@@ -271,34 +274,96 @@ const states: Record<ChatState, StateHandler> = {
   },
 
   EXPLAIN_VC: {
-    async onEnter() {
+    async onEnter(ctx) {
+      // If we already know the DISCOM, skip to upload prompt
+      if (ctx.askedDiscom && ctx.discom) {
+        return {
+          messages: [
+            {
+              text: `To start selling energy, I need your Generation Profile Credential. Think of it as an ID card for your solar panel.\n\nYour ${ctx.discom} office should have given you this document as a PDF. If you do not have it yet, you can download a sample here:\nhttps://open-vcs.up.railway.app`,
+            },
+            {
+              text: 'Please upload the PDF document here.',
+              buttons: [{ text: 'I have it ready', callbackData: 'ready' }],
+              delay: 500,
+            },
+          ],
+          newState: 'WAITING_VC_UPLOAD',
+        };
+      }
+
+      // First ask which DISCOM the user belongs to
       return {
         messages: [
           {
-            text: 'To trade energy, you need a Generation Profile Credential — it is like an ID card for your solar panel.\n\nYour DISCOM office should have given you a PDF document. If you do not have it, you can download a sample from:\nhttps://open-vcs.up.railway.app',
-          },
-          {
-            text: 'Please upload that PDF document here. You can send it as a file attachment.',
-            buttons: [{ text: 'I have it ready', callbackData: 'ready' }],
-            delay: 500,
+            text: 'Before we set up trading, I need to verify your solar panel details.\n\nWhich electricity company (DISCOM) provides power in your area?',
+            buttons: [
+              { text: 'BSES Rajdhani', callbackData: 'BSES Rajdhani' },
+              { text: 'BSES Yamuna', callbackData: 'BSES Yamuna' },
+              { text: 'Tata Power', callbackData: 'Tata Power' },
+              { text: 'Other', callbackData: 'other' },
+            ],
           },
         ],
       };
     },
     async onMessage(ctx, message) {
-      // Check if it is a question
+      // First check if it is a question
       const kbAnswer = knowledgeBase.findAnswer(message);
       if (kbAnswer) {
         return {
           messages: [
             { text: kbAnswer },
-            { text: 'Whenever you are ready, please upload your credential PDF.', delay: 300 },
+            {
+              text: 'Which DISCOM provides electricity in your area?',
+              buttons: [
+                { text: 'BSES Rajdhani', callbackData: 'BSES Rajdhani' },
+                { text: 'BSES Yamuna', callbackData: 'BSES Yamuna' },
+                { text: 'Tata Power', callbackData: 'Tata Power' },
+                { text: 'Other', callbackData: 'other' },
+              ],
+              delay: 300,
+            },
           ],
         };
       }
+
+      // Process DISCOM answer
+      const discomName = message.trim();
+
+      // Common DISCOM names mapping
+      const KNOWN_DISCOMS: Record<string, string> = {
+        'bses rajdhani': 'BSES Rajdhani',
+        'bses yamuna': 'BSES Yamuna',
+        'tata power': 'Tata Power Delhi',
+        'tata': 'Tata Power',
+        'msedcl': 'MSEDCL (Maharashtra)',
+        'bescom': 'BESCOM (Karnataka)',
+        'cesc': 'CESC (Kolkata)',
+        'tangedco': 'TANGEDCO (Tamil Nadu)',
+        'uhbvn': 'UHBVN (Haryana)',
+        'dhbvn': 'DHBVN (Haryana)',
+        'pspcl': 'PSPCL (Punjab)',
+        'jvvnl': 'JVVNL (Rajasthan)',
+        'uppcl': 'UPPCL (UP)',
+        'other': 'your local DISCOM',
+      };
+
+      const resolvedDiscom = KNOWN_DISCOMS[discomName.toLowerCase()] || discomName;
+
       return {
-        messages: [],
+        messages: [
+          {
+            text: `Got it — ${resolvedDiscom}!\n\nTo sell energy on our platform, you need a Generation Profile Credential from ${resolvedDiscom}. This is a digital certificate that proves you own a solar panel and how much energy it can produce.\n\nYou can get this document from your ${resolvedDiscom} office. If you do not have it yet, you can download a sample from:\nhttps://open-vcs.up.railway.app`,
+          },
+          {
+            text: 'Please upload the PDF document whenever you have it ready.',
+            buttons: [{ text: 'I have it ready', callbackData: 'ready' }],
+            delay: 500,
+          },
+        ],
         newState: 'WAITING_VC_UPLOAD',
+        contextUpdate: { discom: resolvedDiscom, askedDiscom: true },
       };
     },
   },
@@ -307,12 +372,13 @@ const states: Record<ChatState, StateHandler> = {
     async onEnter() {
       return {
         messages: [
-          { text: 'I am waiting for your credential PDF. Please upload it whenever you are ready.\n\nIf you have any questions, just ask!' },
+          { text: 'Go ahead and upload the PDF whenever you are ready. If you have any questions about the process, just ask!' },
         ],
       };
     },
     async onMessage(ctx, message, fileData) {
       if (!fileData) {
+        // Try knowledge base first
         const kbAnswer = knowledgeBase.findAnswer(message);
         if (kbAnswer) {
           return {
@@ -322,8 +388,23 @@ const states: Record<ChatState, StateHandler> = {
             ],
           };
         }
+
+        // Try LLM fallback for questions
+        const isQuestion = message.includes('?') || message.length > 15;
+        if (isQuestion) {
+          const llmAnswer = await askLLM(message, `User is uploading their Generation Profile credential from ${ctx.discom || 'their DISCOM'}. They may have questions about the process.`);
+          if (llmAnswer) {
+            return {
+              messages: [
+                { text: llmAnswer },
+                { text: 'Whenever you are ready, just upload the PDF.', delay: 300 },
+              ],
+            };
+          }
+        }
+
         return {
-          messages: [{ text: 'I am waiting for your PDF document. Please upload it as a file.' }],
+          messages: [{ text: 'I am waiting for your PDF document. Please upload it as a file attachment.\n\nIf you have any questions, feel free to ask!' }],
         };
       }
 
@@ -522,7 +603,7 @@ const states: Record<ChatState, StateHandler> = {
     async onMessage(ctx, message) {
       const lower = message.toLowerCase();
 
-      // Dynamic queries
+      // Dynamic queries — earnings
       if (lower.includes('earn') || lower.includes('kamaayi') || lower.includes('income') || lower.includes('how much did')) {
         if (ctx.userId) {
           const summary = await mockTradingAgent.getEarningsSummary(ctx.userId);
@@ -530,6 +611,7 @@ const states: Record<ChatState, StateHandler> = {
         }
       }
 
+      // Dynamic queries — balance
       if (lower.includes('balance') || lower.includes('wallet') || lower.includes('paisa')) {
         if (ctx.userId) {
           const user = await prisma.user.findUnique({
@@ -546,10 +628,28 @@ const states: Record<ChatState, StateHandler> = {
         }
       }
 
+      // Dynamic queries — orders
       if (lower.includes('order') || lower.includes('status') || lower.includes('trade')) {
         if (ctx.userId) {
           const summary = await mockTradingAgent.getOrdersSummary(ctx.userId);
           return { messages: [{ text: summary }] };
+        }
+      }
+
+      // Dynamic queries — create new offer
+      if (lower.includes('new offer') || lower.includes('create offer') || lower.includes('sell more') || lower.includes('naya offer')) {
+        if (ctx.userId) {
+          const result = await mockTradingAgent.createDefaultOffer(ctx.userId);
+          if (result.success && result.offer) {
+            return {
+              messages: [
+                {
+                  text: `Done! I created a new sell offer:\n- ${result.offer.quantity} kWh at Rs ${result.offer.pricePerKwh}/kWh\n- Available tomorrow 6 AM to 6 PM`,
+                },
+              ],
+            };
+          }
+          return { messages: [{ text: result.error || 'Could not create offer right now. Please try again.' }] };
         }
       }
 
@@ -559,11 +659,22 @@ const states: Record<ChatState, StateHandler> = {
         return { messages: [{ text: kbAnswer }] };
       }
 
-      // Fallback
+      // LLM fallback — handles arbitrary questions naturally
+      const llmAnswer = await askLLM(message, `User "${ctx.name || 'seller'}" is an active seller on the Oorja P2P energy trading platform.`);
+      if (llmAnswer) {
+        return { messages: [{ text: llmAnswer }] };
+      }
+
+      // Last resort fallback
       return {
         messages: [
           {
-            text: 'I am not sure about that. Here are some things I can help with:\n- "How much did I earn?" — Check earnings\n- "What is my balance?" — Check wallet\n- "Show my orders" — See recent orders\n- "What is P2P trading?" — Learn about trading\n- "Help" — See all options',
+            text: 'I can help you with:\n- "How much did I earn?" — Check earnings\n- "What is my balance?" — Check wallet\n- "Show my orders" — See recent orders\n- "Create new offer" — List energy for sale\n- "What is P2P trading?" — Learn about trading',
+            buttons: [
+              { text: 'My earnings', callbackData: 'how much did I earn' },
+              { text: 'My balance', callbackData: 'what is my balance' },
+              { text: 'My orders', callbackData: 'show my orders' },
+            ],
           },
         ],
       };

@@ -68,6 +68,56 @@ const entries: KBEntry[] = [
     answer:
       'Solar panels on your rooftop generate electricity from sunlight. Any electricity you generate beyond what you use at home is your surplus energy. You can sell this surplus to your neighbors through P2P trading and earn extra income!',
   },
+  {
+    keywords: ['where to get vc', 'where to get credential', 'kahan se milega', 'download vc', 'get certificate', 'where credential'],
+    answer:
+      'You can get your Generation Profile Credential from your local DISCOM office — they issue this digital certificate for solar panel owners.\n\nIf you want to try the platform first, you can download a sample credential from:\nhttps://open-vcs.up.railway.app',
+  },
+  {
+    keywords: ['why vc', 'why credential', 'why need', 'kyun chahiye', 'purpose of vc', 'why upload'],
+    answer:
+      'The credential proves that you actually own a solar panel and how much energy it can produce. Without it, anyone could pretend to be a seller! It protects buyers and makes the marketplace trustworthy.\n\nThink of it like a driving license — you need it to prove you can drive.',
+  },
+  {
+    keywords: ['bses', 'bses rajdhani', 'bses yamuna'],
+    answer:
+      'BSES (both Rajdhani and Yamuna) serves parts of Delhi. If you are a BSES customer with solar panels, you can get your Generation Profile Credential from your nearest BSES office or their online portal.',
+  },
+  {
+    keywords: ['tata power'],
+    answer:
+      'Tata Power serves parts of Delhi and Mumbai. If you are a Tata Power customer with solar panels, visit your nearest Tata Power office or their online portal to get your Generation Profile Credential.',
+  },
+  {
+    keywords: ['net metering', 'feed in', 'grid sell'],
+    answer:
+      'Net metering lets you sell excess solar energy back to the grid, but the rate is only about Rs 2/kWh. With P2P trading on Oorja, you can sell at Rs 5-8/kWh — that is 2-4 times more earnings! Both can work together.',
+  },
+  {
+    keywords: ['safe', 'is it safe', 'kya safe hai', 'fraud', 'dhoka', 'scam'],
+    answer:
+      'Yes, it is completely safe! Here is why:\n- Your credentials are verified digitally\n- Buyer payments are held in escrow (locked) until DISCOM confirms delivery\n- DISCOM independently verifies energy was actually delivered\n- You get paid automatically after verification\n\nNo one can cheat the system.',
+  },
+  {
+    keywords: ['how long', 'kitna time', 'when payment', 'kab milega', 'when will i get paid'],
+    answer:
+      'After a buyer purchases your energy, DISCOM verifies the delivery (usually within a few hours). Once verified, the payment is automatically released to your wallet. You can see your balance anytime by asking me!',
+  },
+  {
+    keywords: ['offer', 'sell offer', 'create offer', 'new offer', 'bechna'],
+    answer:
+      'A sell offer is your listing on the marketplace. It says how much energy you want to sell, at what price, and during which hours. I can create offers for you automatically! Just say "create new offer" and I will set one up.',
+  },
+  {
+    keywords: ['surplus', 'extra energy', 'extra bijli', 'zyada bijli'],
+    answer:
+      'Surplus energy is the electricity your solar panels produce that you do not use at home. For example, if your panels produce 10 kWh and you use 6 kWh, you have 4 kWh surplus to sell. This surplus is what earns you money through P2P trading!',
+  },
+  {
+    keywords: ['kwh', 'unit', 'kilo watt', 'kilowatt'],
+    answer:
+      'kWh (kilowatt-hour) is a unit of energy — it is the same as one "unit" on your electricity bill. One kWh can power a fan for about 20 hours or a TV for about 10 hours. When you sell energy, you sell it in kWh units.',
+  },
 ];
 
 export const knowledgeBase = {
