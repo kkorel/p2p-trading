@@ -117,6 +117,126 @@ export const mockTradingAgent = {
   },
 
   /**
+   * Create a custom sell offer with user-specified parameters.
+   * Falls back to defaults for any missing values.
+   */
+  async createCustomOffer(
+    userId: string,
+    options: { pricePerKwh?: number; quantity?: number; timeDesc?: string }
+  ): Promise<{
+    success: boolean;
+    offer?: { quantity: number; pricePerKwh: number; startTime: string; endTime: string };
+    error?: string;
+  }> {
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) return { success: false, error: 'User not found' };
+
+      let providerId = user.providerId;
+      if (!providerId) {
+        const providerName = `${user.name || 'Solar'} Energy`;
+        const provider = await registerProvider(providerName);
+        providerId = provider.id;
+        await prisma.user.update({
+          where: { id: userId },
+          data: { providerId },
+        });
+      }
+
+      const capacity = user.productionCapacity || 100;
+      const tradeLimit = (capacity * (user.allowedTradeLimit || 10)) / 100;
+      const maxQty = Math.max(1, Math.floor(tradeLimit));
+      const offerQty = options.quantity ? Math.min(options.quantity, maxQty) : Math.max(1, Math.floor(tradeLimit * 0.5));
+      const pricePerKwh = options.pricePerKwh || 6.0;
+
+      // Parse time — default to tomorrow 6AM-6PM
+      const startTime = new Date();
+      startTime.setDate(startTime.getDate() + 1);
+      startTime.setHours(6, 0, 0, 0);
+      const endTime = new Date(startTime);
+      endTime.setHours(18, 0, 0, 0);
+
+      // Adjust if user specified a time like "today"
+      if (options.timeDesc) {
+        const td = options.timeDesc.toLowerCase();
+        if (td.includes('today') || td.includes('aaj')) {
+          const now = new Date();
+          startTime.setDate(now.getDate());
+          endTime.setDate(now.getDate());
+          // If already past 6AM, start from next hour
+          if (now.getHours() >= 6) {
+            startTime.setHours(now.getHours() + 1, 0, 0, 0);
+          }
+        }
+      }
+
+      const item = await addCatalogItem(
+        providerId,
+        'SOLAR',
+        'SCHEDULED',
+        offerQty,
+        [],
+        ''
+      );
+
+      const offer = await addOffer(
+        item.id,
+        providerId,
+        pricePerKwh,
+        'INR',
+        offerQty,
+        { startTime: startTime.toISOString(), endTime: endTime.toISOString() }
+      );
+
+      // Publish to CDS
+      if (isExternalCDSEnabled()) {
+        const providerName = user.name ? `${user.name} Energy` : 'Solar Energy';
+        publishOfferToCDS(
+          { id: providerId, name: providerName, trust_score: user.trustScore || 0.5 },
+          {
+            id: item.id,
+            provider_id: item.provider_id,
+            source_type: item.source_type,
+            delivery_mode: item.delivery_mode,
+            available_qty: item.available_qty,
+            production_windows: item.production_windows,
+            meter_id: item.meter_id,
+          },
+          {
+            id: offer.id,
+            item_id: offer.item_id,
+            provider_id: offer.provider_id,
+            price_value: offer.price.value,
+            currency: offer.price.currency,
+            max_qty: offer.maxQuantity,
+            time_window: offer.timeWindow,
+            pricing_model: offer.offerAttributes.pricingModel,
+            settlement_type: offer.offerAttributes.settlementType,
+          }
+        ).then(success => {
+          if (success) logger.info(`Custom offer published to CDS`, { offerId: offer.id });
+          else logger.warn(`CDS publish returned false`, { offerId: offer.id });
+        }).catch(err => logger.error(`Failed to publish custom offer to CDS`, { offerId: offer.id, error: err.message }));
+      }
+
+      logger.info(`Created custom offer for user ${userId}: ${offerQty}kWh at Rs${pricePerKwh}/kWh`);
+
+      return {
+        success: true,
+        offer: {
+          quantity: offerQty,
+          pricePerKwh,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+        },
+      };
+    } catch (error: any) {
+      logger.error(`Failed to create custom offer: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
    * Get earnings summary for a user.
    */
   async getEarningsSummary(userId: string, lang?: string): Promise<string> {

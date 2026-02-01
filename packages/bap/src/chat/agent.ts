@@ -25,7 +25,7 @@ import {
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
 import { mockTradingAgent, parseTimePeriod } from './trading-agent';
-import { askLLM } from './llm-fallback';
+import { askLLM, classifyIntent } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
 
@@ -623,6 +623,12 @@ const states: Record<ChatState, StateHandler> = {
           };
         }
 
+        // Mark profile as complete after mandatory utility cred — App button will work from here
+        await prisma.user.update({
+          where: { id: ctx.userId! },
+          data: { profileComplete: true },
+        });
+
         return {
           messages: [{ text: h(ctx, `Verified! ${result.summary}`, `Verify ho gaya! ${result.summary}`) }],
           newState: 'ASK_INTENT',
@@ -955,44 +961,59 @@ const states: Record<ChatState, StateHandler> = {
       const isNo = ['no', 'n', 'nahi', 'nope', 'not now', 'later', 'baad mein', 'abhi nahi'].includes(lower);
 
       if (isYes) {
-        await prisma.user.update({
-          where: { id: ctx.userId! },
-          data: { profileComplete: true },
-        });
+        try {
+          await prisma.user.update({
+            where: { id: ctx.userId! },
+            data: { profileComplete: true },
+          });
 
-        const offerResult = await mockTradingAgent.createDefaultOffer(ctx.userId!);
+          const offerResult = await mockTradingAgent.createDefaultOffer(ctx.userId!);
 
-        if (offerResult.success && offerResult.offer) {
-          const o = offerResult.offer;
+          if (offerResult.success && offerResult.offer) {
+            const o = offerResult.offer;
+            return {
+              messages: [
+                { text: h(ctx,
+                  `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
+                  `Ho gaya! Aapki energy ab sale pe hai:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.\n\nBuyers ab aapki energy khareed sakte hain!`
+                ) },
+              ],
+              newState: 'GENERAL_CHAT',
+              contextUpdate: { tradingActive: true },
+            };
+          }
+
+          logger.warn(`createDefaultOffer returned error for user ${ctx.userId}: ${offerResult.error}`);
           return {
             messages: [
               { text: h(ctx,
-                `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
-                `Ho gaya! Aapki energy ab sale pe hai:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.\n\nBuyers ab aapki energy khareed sakte hain!`
+                'Profile set up! You can create offers from the Sell tab or tell me here (e.g. "list 50 kWh at Rs 6").',
+                'Profile ready! Sell tab se ya mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
+              ) },
+            ],
+            newState: 'GENERAL_CHAT',
+            contextUpdate: { tradingActive: true },
+          };
+        } catch (error: any) {
+          logger.error(`CONFIRM_TRADING yes handler failed: ${error.message}`);
+          return {
+            messages: [
+              { text: h(ctx,
+                'Profile is set up! You can create offers by telling me (e.g. "list 50 kWh at Rs 6").',
+                'Profile ready hai! Mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
               ) },
             ],
             newState: 'GENERAL_CHAT',
             contextUpdate: { tradingActive: true },
           };
         }
-
-        return {
-          messages: [
-            { text: h(ctx,
-              'Profile set up! You can create offers from the Sell tab.',
-              'Profile ready! Sell tab se offers bana sakte ho.'
-            ) },
-          ],
-          newState: 'GENERAL_CHAT',
-          contextUpdate: { tradingActive: true },
-        };
       }
 
       if (isNo) {
         await prisma.user.update({
           where: { id: ctx.userId! },
           data: { profileComplete: true },
-        });
+        }).catch(() => {});
 
         return {
           messages: [
@@ -1041,133 +1062,151 @@ const states: Record<ChatState, StateHandler> = {
       return { messages: [] };
     },
     async onMessage(ctx, message) {
-      const lower = message.toLowerCase();
+      // --- LLM-based intent classification (primary) ---
+      const intent = await classifyIntent(message);
 
-      // --- Smart data queries ---
+      if (intent && ctx.userId) {
+        switch (intent.intent) {
+          case 'show_listings': {
+            const summary = await mockTradingAgent.getActiveListings(ctx.userId, ctx.language);
+            return { messages: [{ text: summary }] };
+          }
 
-      // Listings / offers count
-      if (
-        (lower.includes('listing') || lower.includes('offer')) &&
-        (lower.includes('my') || lower.includes('mere') || lower.includes('mera') ||
-         lower.includes('kitna') || lower.includes('kitne') || lower.includes('how many') ||
-         lower.includes('show') || lower.includes('dikha') || lower.includes('dikhao') ||
-         lower.includes('abhi') || lower.includes('active'))
-      ) {
-        if (ctx.userId) {
+          case 'show_earnings': {
+            const period = parseTimePeriod(message);
+            if (period) {
+              const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, ctx.language);
+              return { messages: [{ text: summary }] };
+            }
+            const summary = await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language);
+            return { messages: [{ text: summary }] };
+          }
+
+          case 'show_sales': {
+            const period = parseTimePeriod(message) || (intent.params?.time_period ? parseTimePeriod(intent.params.time_period) : null);
+            if (period) {
+              const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, ctx.language);
+              return { messages: [{ text: summary }] };
+            }
+            const summary = await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language);
+            return { messages: [{ text: summary }] };
+          }
+
+          case 'show_balance': {
+            const user = await prisma.user.findUnique({
+              where: { id: ctx.userId },
+              select: { balance: true },
+            });
+            if (user) {
+              return {
+                messages: [{ text: h(ctx, `Your wallet balance: Rs ${user.balance.toFixed(2)}`, `Aapka wallet balance: Rs ${user.balance.toFixed(2)}`) }],
+              };
+            }
+            break;
+          }
+
+          case 'show_orders': {
+            const summary = await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language);
+            return { messages: [{ text: summary }] };
+          }
+
+          case 'create_listing': {
+            const result = await mockTradingAgent.createCustomOffer(ctx.userId, {
+              pricePerKwh: intent.params?.price_per_kwh,
+              quantity: intent.params?.quantity_kwh,
+              timeDesc: intent.params?.time_description,
+            });
+
+            if (result.success && result.offer) {
+              const o = result.offer;
+              const startDate = new Date(o.startTime);
+              const endDate = new Date(o.endTime);
+              const dateStr = startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+              const startStr = startDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+              const endStr = endDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+              return {
+                messages: [
+                  { text: h(ctx,
+                    `Done! New listing created:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit\n${dateStr} ${startStr} - ${endStr}\n\nBuyers can now see and purchase this!`,
+                    `Ho gaya! Naya listing ban gaya:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe\n${dateStr} ${startStr} - ${endStr}\n\nBuyers ab isse dekh aur khareed sakte hain!`
+                  ) },
+                ],
+              };
+            }
+            return { messages: [{ text: result.error || h(ctx, 'Could not create the listing. Try again.', 'Listing nahi ban payi. Dobara try karo.') }] };
+          }
+
+          case 'discom_rates': {
+            const discomName = ctx.discom || h(ctx, 'your DISCOM', 'aapka DISCOM');
+            return {
+              messages: [{
+                text: h(ctx,
+                  `Current ${discomName} rates (approx.):\n- Normal: Rs 5.50/unit\n- Peak hours (6PM-10PM): Rs 7.50/unit\n\nP2P trading rate: Rs 6.00/unit — often cheaper than DISCOM peak rates!`,
+                  `${discomName} ke rate (lagbhag):\n- Normal: Rs 5.50/unit\n- Peak hours (shaam 6-10): Rs 7.50/unit\n\nP2P trading rate: Rs 6.00/unit — aksar DISCOM peak rate se sasta!`
+                ),
+              }],
+            };
+          }
+
+          case 'trading_tips': {
+            return {
+              messages: [{
+                text: h(ctx,
+                  `Tips to improve your earnings:\n\n1. Trade regularly — more trades build trust, attracting more buyers\n2. Keep solar panels clean for maximum generation\n3. List energy during peak hours (6PM-10PM) for higher prices\n4. Price slightly below DISCOM rates for faster sales\n5. Upload all credentials — verified profiles get more buyers`,
+                  `Kamayi badhane ke tips:\n\n1. Regular trade karte raho — jitna zyada trade, utna acha trust score, utne zyada buyers milenge\n2. Solar panels saaf rakho aur maintenance karo — zyada bijli banegi\n3. Peak hours (shaam 6-10) mein energy list karo — zyada price milega\n4. DISCOM rate se thoda kam rate rakho — jaldi bikri hogi\n5. Saare credentials upload karo — verified profile pe zyada buyers aate hain`
+                ),
+              }],
+            };
+          }
+
+          case 'general_qa':
+            // Fall through to KB + LLM below
+            break;
+        }
+      }
+
+      // --- Keyword fallback (when LLM classification unavailable) ---
+      if (!intent && ctx.userId) {
+        const lower = message.toLowerCase();
+
+        if ((lower.includes('listing') || lower.includes('offer')) &&
+            (lower.includes('my') || lower.includes('mere') || lower.includes('show') || lower.includes('dikha') || lower.includes('active') || lower.includes('kitna'))) {
           const summary = await mockTradingAgent.getActiveListings(ctx.userId, ctx.language);
           return { messages: [{ text: summary }] };
         }
-      }
 
-      // Sales by time period (check BEFORE general earnings to catch "sold today" etc.)
-      if (ctx.userId && (lower.includes('sold') || lower.includes('becha') || lower.includes('sale') || lower.includes('bikri') || lower.includes('biki'))) {
-        const period = parseTimePeriod(message);
-        if (period) {
-          const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, ctx.language);
-          return { messages: [{ text: summary }] };
-        }
-      }
-
-      // Earnings (total)
-      if (
-        lower.includes('earn') || lower.includes('kamaayi') || lower.includes('kamayi') ||
-        lower.includes('income') || lower.includes('kamaya') || lower.includes('how much did') ||
-        lower.includes('banaya') || lower.includes('banae') || lower.includes('banaye') ||
-        lower.includes('kamai') || lower.includes('revenue') || lower.includes('munafa')
-      ) {
-        if (ctx.userId) {
-          const period = parseTimePeriod(message);
-          if (period) {
-            const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, ctx.language);
-            return { messages: [{ text: summary }] };
-          }
+        if (lower.includes('earn') || lower.includes('kamai') || lower.includes('kamaya') || lower.includes('income') || lower.includes('munafa')) {
           const summary = await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language);
           return { messages: [{ text: summary }] };
         }
-      }
 
-      // Balance / wallet
-      if (
-        lower.includes('balance') || lower.includes('wallet') || lower.includes('khata') ||
-        lower.includes('account') || lower.includes('paise') || lower.includes('paisa')
-      ) {
-        if (ctx.userId) {
-          const user = await prisma.user.findUnique({
-            where: { id: ctx.userId },
-            select: { balance: true, name: true },
-          });
-          if (user) {
-            return {
-              messages: [{ text: h(ctx, `Your wallet balance: Rs ${user.balance.toFixed(2)}`, `Aapka wallet balance: Rs ${user.balance.toFixed(2)}`) }],
-            };
-          }
+        if (lower.includes('balance') || lower.includes('wallet') || lower.includes('paise') || lower.includes('khata')) {
+          const user = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { balance: true } });
+          if (user) return { messages: [{ text: h(ctx, `Your wallet balance: Rs ${user.balance.toFixed(2)}`, `Aapka wallet balance: Rs ${user.balance.toFixed(2)}`) }] };
         }
-      }
 
-      // Orders
-      if (lower.includes('order') || lower.includes('status') || lower.includes('trade')) {
-        if (ctx.userId) {
+        if (lower.includes('order') || lower.includes('status')) {
           const summary = await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language);
           return { messages: [{ text: summary }] };
         }
-      }
 
-      // DISCOM rate query (mock)
-      if (
-        ((lower.includes('discom') || lower.includes('bijli')) &&
-         (lower.includes('rate') || lower.includes('price') || lower.includes('cost') || lower.includes('kitna') || lower.includes('dar') || lower.includes('daam') || lower.includes('charge'))) ||
-        lower.includes('electricity rate') || lower.includes('electricity price') || lower.includes('tariff')
-      ) {
-        const discomName = ctx.discom || h(ctx, 'your DISCOM', 'aapka DISCOM');
-        return {
-          messages: [{
-            text: h(ctx,
-              `Current ${discomName} rates (approx.):\n- Normal: Rs 5.50/unit\n- Peak hours (6PM-10PM): Rs 7.50/unit\n\nP2P trading rate: Rs 6.00/unit — often cheaper than DISCOM peak rates!`,
-              `${discomName} ke rate (lagbhag):\n- Normal: Rs 5.50/unit\n- Peak hours (shaam 6-10): Rs 7.50/unit\n\nP2P trading rate: Rs 6.00/unit — aksar DISCOM peak rate se sasta!`
-            ),
-          }],
-        };
-      }
-
-      // Recommendation engine (mock)
-      if (
-        ((lower.includes('improve') || lower.includes('increase') || lower.includes('badha') || lower.includes('badhao') || lower.includes('zyada')) &&
-         (lower.includes('profit') || lower.includes('earn') || lower.includes('income') || lower.includes('kamai') || lower.includes('kamayi') || lower.includes('munafa') || lower.includes('fayda') || lower.includes('paise'))) ||
-        (lower.includes('tip') && (lower.includes('trad') || lower.includes('sell') || lower.includes('earn') || lower.includes('profit'))) ||
-        (lower.includes('kaise') && (lower.includes('zyada') || lower.includes('badha')))
-      ) {
-        return {
-          messages: [{
-            text: h(ctx,
-              `Tips to improve your earnings:\n\n1. Trade regularly — more trades build trust, attracting more buyers\n2. Keep solar panels clean for maximum generation\n3. List energy during peak hours (6PM-10PM) for higher prices\n4. Price slightly below DISCOM rates for faster sales\n5. Upload all credentials — verified profiles get more buyers`,
-              `Kamayi badhane ke tips:\n\n1. Regular trade karte raho — jitna zyada trade, utna acha trust score, utne zyada buyers milenge\n2. Solar panels saaf rakho aur maintenance karo — zyada bijli banegi\n3. Peak hours (shaam 6-10) mein energy list karo — zyada price milega\n4. DISCOM rate se thoda kam rate rakho — jaldi bikri hogi\n5. Saare credentials upload karo — verified profile pe zyada buyers aate hain`
-            ),
-          }],
-        };
-      }
-
-      // Create new offer
-      if (lower.includes('new offer') || lower.includes('create offer') || lower.includes('sell more') || lower.includes('naya offer')) {
-        if (ctx.userId) {
+        if ((lower.includes('new') || lower.includes('create') || lower.includes('naya') || lower.includes('daal') || lower.includes('bana')) &&
+            (lower.includes('offer') || lower.includes('listing'))) {
           const result = await mockTradingAgent.createDefaultOffer(ctx.userId);
           if (result.success && result.offer) {
-            return {
-              messages: [
-                { text: h(ctx,
-                  `New offer created: ${result.offer.quantity} kWh at Rs ${result.offer.pricePerKwh}/unit, tomorrow 6AM-6PM.`,
-                  `Naya offer ban gaya: ${result.offer.quantity} kWh Rs ${result.offer.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.`
-                ) },
-              ],
-            };
+            return { messages: [{ text: h(ctx,
+              `New offer created: ${result.offer.quantity} kWh at Rs ${result.offer.pricePerKwh}/unit, tomorrow 6AM-6PM.`,
+              `Naya offer ban gaya: ${result.offer.quantity} kWh Rs ${result.offer.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.`
+            ) }] };
           }
-          return { messages: [{ text: result.error || h(ctx, 'Could not create offer. Try again.', 'Offer nahi ban paya. Dobara try karo.') }] };
+          return { messages: [{ text: result.error || h(ctx, 'Could not create offer.', 'Offer nahi ban paya.') }] };
         }
       }
 
       // --- Knowledge base ---
       const kbAnswer = knowledgeBase.findAnswer(message);
       if (kbAnswer) {
-        // For Hinglish users, rephrase KB answer via LLM
         if (ctx.language === 'hinglish') {
           const hinglishKB = await askLLM(
             message,
@@ -1178,10 +1217,11 @@ const states: Record<ChatState, StateHandler> = {
         return { messages: [{ text: kbAnswer }] };
       }
 
-      // --- LLM fallback ---
-      const llmContext = ctx.language === 'hinglish'
-        ? `User "${ctx.name || 'user'}" on Oorja P2P energy trading platform. They speak Hinglish (Hindi in Roman English). Reply in Hinglish (Roman Hindi script, NOT Devanagari). They can ask about earnings, balance, orders, listings, sales by period.`
-        : `User "${ctx.name || 'user'}" on the Oorja P2P energy trading platform. They can ask about earnings, balance, orders, listings, sales by period.`;
+      // --- LLM conversational fallback ---
+      const langNote = ctx.language === 'hinglish'
+        ? 'They speak Hinglish (Hindi in Roman English). Reply in Hinglish (Roman Hindi script, NOT Devanagari).'
+        : '';
+      const llmContext = `User "${ctx.name || 'user'}" on Oorja P2P energy trading platform. ${langNote} They can ask about earnings, balance, orders, listings. They can create new listings by telling you the price, quantity, and time.`;
       const llmAnswer = await askLLM(message, llmContext);
       if (llmAnswer) {
         return { messages: [{ text: llmAnswer }] };
@@ -1196,7 +1236,7 @@ const states: Record<ChatState, StateHandler> = {
               { text: h(ctx, 'My earnings', 'Meri kamayi'), callbackData: 'how much did I earn' },
               { text: h(ctx, 'My listings', 'Mere listings'), callbackData: 'show my listings' },
               { text: h(ctx, 'My orders', 'Mere orders'), callbackData: 'show my orders' },
-              { text: h(ctx, 'New offer', 'Naya offer'), callbackData: 'create new offer' },
+              { text: h(ctx, 'New listing', 'Naya listing'), callbackData: 'create new offer' },
             ],
           },
         ],

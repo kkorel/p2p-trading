@@ -37,6 +37,89 @@ Personality:
 
 Important: Only answer questions about P2P energy trading, solar energy, the Oorja platform, electricity, DISCOMs, and related topics. For unrelated questions, politely redirect.`;
 
+// --- Intent classification types ---
+
+export interface ClassifiedIntent {
+  intent: 'show_listings' | 'show_earnings' | 'show_balance' | 'show_orders' | 'show_sales'
+    | 'create_listing' | 'discom_rates' | 'trading_tips' | 'general_qa';
+  params?: {
+    price_per_kwh?: number;
+    quantity_kwh?: number;
+    time_description?: string;
+    time_period?: string;
+  };
+}
+
+const INTENT_PROMPT = `You are Oorja, a P2P energy trading assistant. Classify the user's message into ONE intent. The user may speak in English, Hindi (Hinglish/Roman Hindi), or a mix.
+
+Intents:
+- "show_listings": User wants to see their active listings/offers (e.g. "show my listings", "mere offers dikhao", "kitne listing hain")
+- "show_earnings": User asks about income/earnings/money made (e.g. "kitna kamaya", "my earnings", "how much did I earn")
+- "show_balance": User asks about wallet/account balance (e.g. "mere account mein kitne paise", "wallet balance")
+- "show_orders": User asks about order status/history (e.g. "mera order kya hua", "show my orders")
+- "show_sales": User asks about sales for a time period (e.g. "aaj kitna becha", "sold today", "is hafte ki bikri")
+- "create_listing": User wants to CREATE a new energy listing/offer (e.g. "50 kWh Rs 6 pe daal do", "listing daalni hai", "naya offer banao", "sell 30 units at 7 rupees tomorrow")
+- "discom_rates": User asks about DISCOM/electricity rates or tariffs
+- "trading_tips": User asks for tips on how to earn more or improve trading
+- "general_qa": General question about energy trading, Oorja, solar, etc.
+
+IMPORTANT: If the user says they want to "place", "create", "add", "daal", "bana", "list" something — that's "create_listing", NOT "show_listings" or "show_orders".
+
+For "create_listing", extract params if mentioned:
+- price_per_kwh: number (Rs per unit/kWh)
+- quantity_kwh: number (kWh or units)
+- time_description: string (e.g. "tomorrow", "kal", "next week")
+
+For "show_sales", extract:
+- time_period: string (e.g. "today", "aaj", "this week", "is hafte")
+
+Respond ONLY with valid JSON, no markdown, no explanation:
+{"intent": "...", "params": {...}}`;
+
+/**
+ * Classify user intent using LLM. Returns null if LLM unavailable.
+ */
+export async function classifyIntent(userMessage: string): Promise<ClassifiedIntent | null> {
+  if (!OPENROUTER_API_KEY) return null;
+
+  try {
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
+      {
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'system', content: INTENT_PROMPT },
+          { role: 'user', content: userMessage },
+        ],
+        temperature: 0.1,
+        max_tokens: 150,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://p2p-energy-trading.local',
+          'X-Title': 'Oorja Intent Classifier',
+        },
+        timeout: 10000,
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content?.trim();
+    if (!reply) return null;
+
+    const jsonMatch = reply.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    logger.debug(`Intent: "${userMessage.substring(0, 50)}" → ${parsed.intent}`);
+    return parsed as ClassifiedIntent;
+  } catch (error: any) {
+    logger.warn(`Intent classification failed: ${error.message}`);
+    return null;
+  }
+}
+
 /**
  * Ask the LLM a question with optional conversation context.
  * Returns null if the LLM is not configured or fails.
