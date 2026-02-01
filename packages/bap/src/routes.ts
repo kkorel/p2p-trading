@@ -753,13 +753,14 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
           available: offer.blocks.length,
           maximum: offer.maxQty,
         },
-        time_window: {
-          start: offer.timeWindowStart?.toISOString(),
-          end: offer.timeWindowEnd?.toISOString(),
-        },
+        maxQuantity: offer.blocks.length,
+        timeWindow: offer.timeWindowStart && offer.timeWindowEnd ? {
+          startTime: offer.timeWindowStart.toISOString(),
+          endTime: offer.timeWindowEnd.toISOString(),
+        } : null,
       });
     }
-    
+
     const catalog = { providers: Array.from(providerMap.values()) };
     
     // Store in transaction state
@@ -1021,10 +1022,11 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
           id: offer.id,
           price: { value: offer.priceValue, currency: offer.currency || 'INR' },
           quantity: { available: offer.blocks.length, maximum: offer.maxQty },
-          time_window: {
-            start: offer.timeWindowStart?.toISOString(),
-            end: offer.timeWindowEnd?.toISOString(),
-          },
+          maxQuantity: offer.blocks.length,
+          timeWindow: offer.timeWindowStart && offer.timeWindowEnd ? {
+            startTime: offer.timeWindowStart.toISOString(),
+            endTime: offer.timeWindowEnd.toISOString(),
+          } : null,
         });
       }
 
