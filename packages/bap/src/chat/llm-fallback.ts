@@ -10,7 +10,7 @@ const logger = createLogger('OorjaLLM');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
 
 const SYSTEM_PROMPT = `You are Oorja, a friendly and warm energy trading assistant for the Oorja P2P Energy Trading platform in India. You help rural farmers and small solar panel owners sell their extra solar energy to neighbors through the electricity grid.
 
@@ -172,6 +172,82 @@ export async function askLLM(
     return null;
   } catch (error: any) {
     logger.warn(`LLM fallback failed: ${error.message}`);
+    return null;
+  }
+}
+
+// --- Natural response composition ---
+
+const COMPOSE_PROMPT = `You are Oorja, a warm and friendly P2P energy trading assistant in India. You help farmers and small solar panel owners trade surplus solar energy.
+
+CRITICAL LANGUAGE RULES:
+- If told to reply in Hinglish: Use Roman Hindi script (NOT Devanagari). Mix Hindi and English naturally. Example: "Bhai, aapne 45 kWh bech ke Rs 270 kamaye! Bahut accha chal raha hai."
+- If told to reply in English: Use simple, clear English.
+
+RESPONSE STYLE:
+- Talk like a helpful friend/neighbor, not a robot
+- Weave data naturally into sentences — NO bullet-point lists, NO "\\n-" formatting
+- Keep it concise (2-4 sentences)
+- Be encouraging about their trading progress
+- If they created something, be enthusiastic
+- If they have no data yet, encourage them warmly
+- If asked about something unrelated, gently redirect to energy trading
+- Use Rs (not ₹) for currency
+- Address by name when available`;
+
+/**
+ * Compose a natural, conversational response using LLM.
+ * Takes the user's message, relevant data, and user context.
+ * Returns null if LLM unavailable or fails.
+ */
+export async function composeResponse(
+  userMessage: string,
+  dataContext: string,
+  language: string | undefined,
+  userName?: string
+): Promise<string | null> {
+  if (!OPENROUTER_API_KEY) return null;
+
+  const langInstruction = language === 'hinglish'
+    ? 'Reply in Hinglish (Roman Hindi script, NOT Devanagari).'
+    : 'Reply in simple English.';
+
+  const nameNote = userName ? `User's name is ${userName}.` : '';
+
+  try {
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
+      {
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'system', content: COMPOSE_PROMPT },
+          {
+            role: 'user',
+            content: `${langInstruction} ${nameNote}\n\nUser said: "${userMessage}"\n\nRelevant data:\n${dataContext || 'No specific data available.'}\n\nCompose a natural, friendly response.`,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 300,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://p2p-energy-trading.local',
+          'X-Title': 'Oorja Response Composer',
+        },
+        timeout: 15000,
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content?.trim();
+    if (reply) {
+      logger.debug(`Composed: "${userMessage.substring(0, 30)}..." → "${reply.substring(0, 80)}..."`);
+      return reply;
+    }
+    return null;
+  } catch (error: any) {
+    logger.warn(`Response composition failed: ${error.message}`);
     return null;
   }
 }

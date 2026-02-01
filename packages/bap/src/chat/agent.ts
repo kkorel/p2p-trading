@@ -25,7 +25,7 @@ import {
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
 import { mockTradingAgent, parseTimePeriod } from './trading-agent';
-import { askLLM, classifyIntent } from './llm-fallback';
+import { askLLM, classifyIntent, composeResponse } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
 
@@ -1062,34 +1062,42 @@ const states: Record<ChatState, StateHandler> = {
       return { messages: [] };
     },
     async onMessage(ctx, message) {
-      // --- LLM-based intent classification (primary) ---
+      // --- Step 1: Classify intent with LLM ---
       const intent = await classifyIntent(message);
+      let dataContext = '';
+      let fallbackText = '';
 
-      if (intent && ctx.userId) {
+      // --- Step 2: Execute action and gather data ---
+      if (ctx.userId && intent) {
         switch (intent.intent) {
           case 'show_listings': {
-            const summary = await mockTradingAgent.getActiveListings(ctx.userId, ctx.language);
-            return { messages: [{ text: summary }] };
+            dataContext = await mockTradingAgent.getActiveListings(ctx.userId, 'en');
+            fallbackText = ctx.language === 'hinglish'
+              ? await mockTradingAgent.getActiveListings(ctx.userId, 'hinglish')
+              : dataContext;
+            break;
           }
 
           case 'show_earnings': {
             const period = parseTimePeriod(message);
             if (period) {
-              const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, ctx.language);
-              return { messages: [{ text: summary }] };
+              dataContext = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, 'en');
+            } else {
+              dataContext = await mockTradingAgent.getEarningsSummary(ctx.userId, 'en');
             }
-            const summary = await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language);
-            return { messages: [{ text: summary }] };
+            fallbackText = dataContext;
+            break;
           }
 
           case 'show_sales': {
             const period = parseTimePeriod(message) || (intent.params?.time_period ? parseTimePeriod(intent.params.time_period) : null);
             if (period) {
-              const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, ctx.language);
-              return { messages: [{ text: summary }] };
+              dataContext = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, 'en');
+            } else {
+              dataContext = await mockTradingAgent.getEarningsSummary(ctx.userId, 'en');
             }
-            const summary = await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language);
-            return { messages: [{ text: summary }] };
+            fallbackText = dataContext;
+            break;
           }
 
           case 'show_balance': {
@@ -1098,16 +1106,18 @@ const states: Record<ChatState, StateHandler> = {
               select: { balance: true },
             });
             if (user) {
-              return {
-                messages: [{ text: h(ctx, `Your wallet balance: Rs ${user.balance.toFixed(2)}`, `Aapka wallet balance: Rs ${user.balance.toFixed(2)}`) }],
-              };
+              dataContext = `Wallet balance: Rs ${user.balance.toFixed(2)}`;
+              fallbackText = h(ctx, dataContext, `Aapka wallet balance: Rs ${user.balance.toFixed(2)}`);
             }
             break;
           }
 
           case 'show_orders': {
-            const summary = await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language);
-            return { messages: [{ text: summary }] };
+            dataContext = await mockTradingAgent.getOrdersSummary(ctx.userId, 'en');
+            fallbackText = ctx.language === 'hinglish'
+              ? await mockTradingAgent.getOrdersSummary(ctx.userId, 'hinglish')
+              : dataContext;
+            break;
           }
 
           case 'create_listing': {
@@ -1119,78 +1129,79 @@ const states: Record<ChatState, StateHandler> = {
 
             if (result.success && result.offer) {
               const o = result.offer;
-              const startDate = new Date(o.startTime);
-              const endDate = new Date(o.endTime);
-              const dateStr = startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-              const startStr = startDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-              const endStr = endDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-              return {
-                messages: [
-                  { text: h(ctx,
-                    `Done! New listing created:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit\n${dateStr} ${startStr} - ${endStr}\n\nBuyers can now see and purchase this!`,
-                    `Ho gaya! Naya listing ban gaya:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe\n${dateStr} ${startStr} - ${endStr}\n\nBuyers ab isse dekh aur khareed sakte hain!`
-                  ) },
-                ],
-              };
+              const start = new Date(o.startTime);
+              const end = new Date(o.endTime);
+              dataContext = `Successfully created new listing: ${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} to ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}. Buyers can now see and buy this energy.`;
+              fallbackText = h(ctx,
+                `Done! ${o.quantity} kWh listed at Rs ${o.pricePerKwh}/unit.`,
+                `Ho gaya! ${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe list ho gaya.`
+              );
+            } else {
+              dataContext = `Failed to create listing: ${result.error || 'Unknown error'}`;
+              fallbackText = h(ctx, 'Could not create the listing. Try again.', 'Listing nahi ban payi. Dobara try karo.');
             }
-            return { messages: [{ text: result.error || h(ctx, 'Could not create the listing. Try again.', 'Listing nahi ban payi. Dobara try karo.') }] };
+            break;
           }
 
           case 'discom_rates': {
-            const discomName = ctx.discom || h(ctx, 'your DISCOM', 'aapka DISCOM');
-            return {
-              messages: [{
-                text: h(ctx,
-                  `Current ${discomName} rates (approx.):\n- Normal: Rs 5.50/unit\n- Peak hours (6PM-10PM): Rs 7.50/unit\n\nP2P trading rate: Rs 6.00/unit — often cheaper than DISCOM peak rates!`,
-                  `${discomName} ke rate (lagbhag):\n- Normal: Rs 5.50/unit\n- Peak hours (shaam 6-10): Rs 7.50/unit\n\nP2P trading rate: Rs 6.00/unit — aksar DISCOM peak rate se sasta!`
-                ),
-              }],
-            };
+            const name = ctx.discom || 'DISCOM';
+            dataContext = `${name} electricity rates: Normal slab Rs 5.50/unit, Peak hours (6PM-10PM) Rs 7.50/unit. P2P trading rate on Oorja: Rs 6.00/unit — cheaper than peak DISCOM rates, better than net metering (Rs 2/unit).`;
+            fallbackText = dataContext;
+            break;
           }
 
           case 'trading_tips': {
-            return {
-              messages: [{
-                text: h(ctx,
-                  `Tips to improve your earnings:\n\n1. Trade regularly — more trades build trust, attracting more buyers\n2. Keep solar panels clean for maximum generation\n3. List energy during peak hours (6PM-10PM) for higher prices\n4. Price slightly below DISCOM rates for faster sales\n5. Upload all credentials — verified profiles get more buyers`,
-                  `Kamayi badhane ke tips:\n\n1. Regular trade karte raho — jitna zyada trade, utna acha trust score, utne zyada buyers milenge\n2. Solar panels saaf rakho aur maintenance karo — zyada bijli banegi\n3. Peak hours (shaam 6-10) mein energy list karo — zyada price milega\n4. DISCOM rate se thoda kam rate rakho — jaldi bikri hogi\n5. Saare credentials upload karo — verified profile pe zyada buyers aate hain`
-                ),
-              }],
-            };
+            dataContext = 'Trading tips: 1) Trade regularly — more trades = better trust score = more buyers. 2) Keep solar panels clean for maximum generation. 3) List energy during peak hours (6PM-10PM) for higher demand and prices. 4) Price slightly below DISCOM rates (Rs 5-7/unit) for faster sales. 5) Upload all credentials for a verified profile that attracts more buyers.';
+            fallbackText = dataContext;
+            break;
           }
 
           case 'general_qa':
-            // Fall through to KB + LLM below
+            // No data to fetch — compose from KB or general knowledge
             break;
         }
       }
 
-      // --- Keyword fallback (when LLM classification unavailable) ---
+      // Enrich with knowledge base if relevant
+      const kbAnswer = knowledgeBase.findAnswer(message);
+      if (kbAnswer) {
+        if (!dataContext) dataContext = kbAnswer;
+        else dataContext += `\n\nAdditional info: ${kbAnswer}`;
+        if (!fallbackText) fallbackText = kbAnswer;
+      }
+
+      // --- Step 3: Compose natural response with LLM ---
+      if (dataContext || intent?.intent === 'general_qa' || !intent) {
+        const composed = await composeResponse(
+          message,
+          dataContext || 'No specific data available. Answer based on general knowledge about Oorja P2P energy trading platform.',
+          ctx.language,
+          ctx.name
+        );
+        if (composed) return { messages: [{ text: composed }] };
+      }
+
+      // --- Fallback: return raw data if LLM composition failed ---
+      if (fallbackText) return { messages: [{ text: fallbackText }] };
+
+      // --- Keyword fallback (when LLM completely unavailable) ---
       if (!intent && ctx.userId) {
         const lower = message.toLowerCase();
 
         if ((lower.includes('listing') || lower.includes('offer')) &&
             (lower.includes('my') || lower.includes('mere') || lower.includes('show') || lower.includes('dikha') || lower.includes('active') || lower.includes('kitna'))) {
-          const summary = await mockTradingAgent.getActiveListings(ctx.userId, ctx.language);
-          return { messages: [{ text: summary }] };
+          return { messages: [{ text: await mockTradingAgent.getActiveListings(ctx.userId, ctx.language) }] };
         }
-
         if (lower.includes('earn') || lower.includes('kamai') || lower.includes('kamaya') || lower.includes('income') || lower.includes('munafa')) {
-          const summary = await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language);
-          return { messages: [{ text: summary }] };
+          return { messages: [{ text: await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language) }] };
         }
-
         if (lower.includes('balance') || lower.includes('wallet') || lower.includes('paise') || lower.includes('khata')) {
           const user = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { balance: true } });
-          if (user) return { messages: [{ text: h(ctx, `Your wallet balance: Rs ${user.balance.toFixed(2)}`, `Aapka wallet balance: Rs ${user.balance.toFixed(2)}`) }] };
+          if (user) return { messages: [{ text: h(ctx, `Wallet balance: Rs ${user.balance.toFixed(2)}`, `Wallet balance: Rs ${user.balance.toFixed(2)}`) }] };
         }
-
         if (lower.includes('order') || lower.includes('status')) {
-          const summary = await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language);
-          return { messages: [{ text: summary }] };
+          return { messages: [{ text: await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language) }] };
         }
-
         if ((lower.includes('new') || lower.includes('create') || lower.includes('naya') || lower.includes('daal') || lower.includes('bana')) &&
             (lower.includes('offer') || lower.includes('listing'))) {
           const result = await mockTradingAgent.createDefaultOffer(ctx.userId);
@@ -1204,39 +1215,16 @@ const states: Record<ChatState, StateHandler> = {
         }
       }
 
-      // --- Knowledge base ---
-      const kbAnswer = knowledgeBase.findAnswer(message);
-      if (kbAnswer) {
-        if (ctx.language === 'hinglish') {
-          const hinglishKB = await askLLM(
-            message,
-            `Answer in Hinglish (Roman Hindi script, NOT Devanagari). Keep it short and farmer-friendly. Here is the factual answer: "${kbAnswer}". Rephrase in Hinglish. Just give the rephrased answer, nothing else.`
-          );
-          if (hinglishKB) return { messages: [{ text: hinglishKB }] };
-        }
-        return { messages: [{ text: kbAnswer }] };
-      }
-
-      // --- LLM conversational fallback ---
-      const langNote = ctx.language === 'hinglish'
-        ? 'They speak Hinglish (Hindi in Roman English). Reply in Hinglish (Roman Hindi script, NOT Devanagari).'
-        : '';
-      const llmContext = `User "${ctx.name || 'user'}" on Oorja P2P energy trading platform. ${langNote} They can ask about earnings, balance, orders, listings. They can create new listings by telling you the price, quantity, and time.`;
-      const llmAnswer = await askLLM(message, llmContext);
-      if (llmAnswer) {
-        return { messages: [{ text: llmAnswer }] };
-      }
-
       // Last resort
       return {
         messages: [
           {
             text: h(ctx, 'I can help with:', 'Main yeh madad kar sakta hun:'),
             buttons: [
-              { text: h(ctx, 'My earnings', 'Meri kamayi'), callbackData: 'how much did I earn' },
+              { text: h(ctx, 'My earnings', 'Meri kamayi'), callbackData: 'show my earnings' },
               { text: h(ctx, 'My listings', 'Mere listings'), callbackData: 'show my listings' },
               { text: h(ctx, 'My orders', 'Mere orders'), callbackData: 'show my orders' },
-              { text: h(ctx, 'New listing', 'Naya listing'), callbackData: 'create new offer' },
+              { text: h(ctx, 'New listing', 'Naya listing'), callbackData: 'create new listing' },
             ],
           },
         ],
