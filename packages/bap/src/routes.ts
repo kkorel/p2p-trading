@@ -960,8 +960,91 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       ack: response.data,
     });
   } catch (error: any) {
-    logger.error(`Discover request failed: ${error.message}`, { transaction_id: txnId });
-    res.status(500).json({ error: error.message });
+    // Log the full CDS error response for debugging
+    const cdsResponseData = error.response?.data;
+    const cdsStatus = error.response?.status;
+    logger.error(`External CDS discover failed (HTTP ${cdsStatus}): ${error.message}`, {
+      transaction_id: txnId,
+      cdsStatus,
+      cdsResponse: cdsResponseData ? JSON.stringify(cdsResponseData).substring(0, 500) : 'no response body',
+    });
+    console.error(`[CDS-ERROR] HTTP ${cdsStatus}: ${JSON.stringify(cdsResponseData || error.message)}`);
+
+    // Fall back to local catalog so user still gets results
+    logger.info('Falling back to LOCAL catalog after CDS failure', { transaction_id: txnId });
+    try {
+      const localOffers = await prisma.catalogOffer.findMany({
+        where: {
+          ...(sourceType ? { item: { sourceType: sourceType } } : {}),
+          ...(excludeProviderId ? { providerId: { not: excludeProviderId } } : {}),
+          blocks: { some: { status: 'AVAILABLE' } },
+        },
+        include: {
+          item: true,
+          provider: true,
+          blocks: { where: { status: 'AVAILABLE' } },
+        },
+      });
+
+      const filteredOffers = localOffers.filter(offer => {
+        const availableQty = offer.blocks.length;
+        return !minQuantity || availableQty >= minQuantity;
+      });
+
+      const providerMap = new Map<string, any>();
+      for (const offer of filteredOffers) {
+        if (!providerMap.has(offer.providerId)) {
+          providerMap.set(offer.providerId, {
+            id: offer.providerId,
+            descriptor: { name: offer.provider?.name || 'Unknown Provider' },
+            items: [],
+          });
+        }
+        const provider = providerMap.get(offer.providerId)!;
+        let itemEntry = provider.items.find((i: any) => i.id === offer.itemId);
+        if (!itemEntry) {
+          itemEntry = {
+            id: offer.itemId,
+            descriptor: { name: `${offer.item?.sourceType || 'Energy'} from ${offer.provider?.name || 'Provider'}` },
+            itemAttributes: {
+              sourceType: offer.item?.sourceType || 'MIXED',
+              deliveryMode: offer.item?.deliveryMode || 'INJECTION',
+              availableQuantity: offer.blocks.length,
+            },
+            source_type: offer.item?.sourceType || 'MIXED',
+            delivery_mode: offer.item?.deliveryMode || 'INJECTION',
+            offers: [],
+          };
+          provider.items.push(itemEntry);
+        }
+        itemEntry.offers.push({
+          id: offer.id,
+          price: { value: offer.priceValue, currency: offer.currency || 'INR' },
+          quantity: { available: offer.blocks.length, maximum: offer.maxQty },
+          time_window: {
+            start: offer.timeWindowStart?.toISOString(),
+            end: offer.timeWindowEnd?.toISOString(),
+          },
+        });
+      }
+
+      const catalog = { providers: Array.from(providerMap.values()) };
+      await updateTransaction(txnId, { catalog });
+
+      const totalOffers = catalog.providers.reduce((sum, p) =>
+        sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
+      logger.info(`Local fallback catalog: ${catalog.providers.length} providers, ${totalOffers} offers`, { transaction_id: txnId });
+
+      return res.json({
+        transaction_id: txnId,
+        status: 'success',
+        catalog,
+        source: 'local_fallback',
+      });
+    } catch (fallbackError: any) {
+      logger.error(`Local fallback also failed: ${fallbackError.message}`, { transaction_id: txnId });
+      res.status(500).json({ error: 'Discovery failed. Please try again.' });
+    }
   }
 });
 
