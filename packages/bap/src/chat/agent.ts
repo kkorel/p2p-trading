@@ -24,7 +24,7 @@ import {
   getIssuerId,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
-import { mockTradingAgent } from './trading-agent';
+import { mockTradingAgent, parseTimePeriod } from './trading-agent';
 import { askLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
@@ -289,9 +289,9 @@ const states: Record<ChatState, StateHandler> = {
     async onEnter() {
       return {
         messages: [
-          { text: 'Namaste! I am Oorja, your energy trading assistant.' },
+          { text: 'Namaste! Main Oorja hun, aapka energy trading assistant.' },
           {
-            text: 'Choose your language:',
+            text: 'Apni bhasha chune / Choose your language:',
             buttons: LANG_BUTTONS,
             delay: 300,
           },
@@ -309,13 +309,14 @@ const states: Record<ChatState, StateHandler> = {
         };
       }
 
-      // Free-text — detect language from script
-      const detected = detectLanguage(message);
-      const lang = detected !== 'en-IN' ? detected : 'en-IN';
+      // Free-text — show language picker again (don't auto-transition)
       return {
-        messages: [],
-        newState: 'WAITING_NAME',
-        contextUpdate: { language: lang as any, langPicked: true },
+        messages: [
+          {
+            text: 'Apni bhasha chune / Choose your language:',
+            buttons: LANG_BUTTONS,
+          },
+        ],
       };
     },
   },
@@ -850,14 +851,41 @@ const states: Record<ChatState, StateHandler> = {
     async onMessage(ctx, message) {
       const lower = message.toLowerCase();
 
-      if (lower.includes('earn') || lower.includes('kamaayi') || lower.includes('income') || lower.includes('how much did')) {
+      // --- Smart data queries ---
+
+      // Listings / offers count
+      if (lower.includes('listing') || lower.includes('offer') && (lower.includes('my') || lower.includes('mere') || lower.includes('kitne') || lower.includes('how many'))) {
         if (ctx.userId) {
+          const summary = await mockTradingAgent.getActiveListings(ctx.userId);
+          return { messages: [{ text: summary }] };
+        }
+      }
+
+      // Sales by time period (check BEFORE general earnings to catch "sold today" etc.)
+      if (ctx.userId && (lower.includes('sold') || lower.includes('becha') || lower.includes('sale') || lower.includes('bikri'))) {
+        const period = parseTimePeriod(message);
+        if (period) {
+          const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label);
+          return { messages: [{ text: summary }] };
+        }
+      }
+
+      // Earnings (total)
+      if (lower.includes('earn') || lower.includes('kamaayi') || lower.includes('kamayi') || lower.includes('income') || lower.includes('kamaya') || lower.includes('how much did')) {
+        if (ctx.userId) {
+          // Check if a specific period is mentioned
+          const period = parseTimePeriod(message);
+          if (period) {
+            const summary = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label);
+            return { messages: [{ text: summary }] };
+          }
           const summary = await mockTradingAgent.getEarningsSummary(ctx.userId);
           return { messages: [{ text: summary }] };
         }
       }
 
-      if (lower.includes('balance') || lower.includes('wallet') || lower.includes('paisa')) {
+      // Balance / wallet
+      if (lower.includes('balance') || lower.includes('wallet') || (lower.includes('paisa') && !lower.includes('kamaya'))) {
         if (ctx.userId) {
           const user = await prisma.user.findUnique({
             where: { id: ctx.userId },
@@ -871,6 +899,7 @@ const states: Record<ChatState, StateHandler> = {
         }
       }
 
+      // Orders
       if (lower.includes('order') || lower.includes('status') || lower.includes('trade')) {
         if (ctx.userId) {
           const summary = await mockTradingAgent.getOrdersSummary(ctx.userId);
@@ -878,6 +907,7 @@ const states: Record<ChatState, StateHandler> = {
         }
       }
 
+      // Create new offer
       if (lower.includes('new offer') || lower.includes('create offer') || lower.includes('sell more') || lower.includes('naya offer')) {
         if (ctx.userId) {
           const result = await mockTradingAgent.createDefaultOffer(ctx.userId);
@@ -892,23 +922,26 @@ const states: Record<ChatState, StateHandler> = {
         }
       }
 
+      // --- Knowledge base ---
       const kbAnswer = knowledgeBase.findAnswer(message);
       if (kbAnswer) {
         return { messages: [{ text: kbAnswer }] };
       }
 
-      const llmAnswer = await askLLM(message, `User "${ctx.name || 'user'}" on the Oorja P2P energy trading platform.`);
+      // --- LLM fallback ---
+      const llmAnswer = await askLLM(message, `User "${ctx.name || 'user'}" on the Oorja P2P energy trading platform. They can ask about earnings, balance, orders, listings, sales by period.`);
       if (llmAnswer) {
         return { messages: [{ text: llmAnswer }] };
       }
 
+      // Last resort
       return {
         messages: [
           {
             text: 'I can help with:',
             buttons: [
               { text: 'My earnings', callbackData: 'how much did I earn' },
-              { text: 'My balance', callbackData: 'what is my balance' },
+              { text: 'My listings', callbackData: 'show my listings' },
               { text: 'My orders', callbackData: 'show my orders' },
               { text: 'New offer', callbackData: 'create new offer' },
             ],
@@ -971,8 +1004,10 @@ async function translateResponse(
   response: AgentResponse,
   targetLang: SarvamLangCode | 'hinglish'
 ): Promise<AgentResponse> {
-  const effectiveLang: SarvamLangCode = targetLang === 'hinglish' ? 'hi-IN' : targetLang as SarvamLangCode;
+  // Hinglish = English responses (user types Roman Hindi, reads English fine)
+  if (targetLang === 'hinglish') return response;
 
+  const effectiveLang = targetLang as SarvamLangCode;
   if (effectiveLang === 'en-IN' || !isTranslationAvailable()) return response;
 
   const translatedMessages: AgentMessage[] = [];
@@ -1014,59 +1049,14 @@ export async function processMessage(
       data: { platform, platformId, state: 'GREETING', contextJson: '{}' },
     });
 
-    const detectedLang = detectLanguage(userMessage);
     await storeMessage(session.id, 'user', userMessage);
 
-    let processedMessage = userMessage;
-    if (detectedLang !== 'en-IN') {
-      processedMessage = await translateToEnglish(userMessage, detectedLang);
-      logger.info(`Language detected: ${detectedLang}, translated input: "${processedMessage}"`);
-    }
-
-    const ctx: SessionContext = { language: detectedLang };
+    // New session — just show the greeting + language picker, wait for selection
+    const ctx: SessionContext = {};
     const enterResp = await states.GREETING.onEnter(ctx);
     await storeAgentMessages(session.id, enterResp.messages);
 
-    const msgResp = await states.GREETING.onMessage(ctx, processedMessage, fileData);
-
-    if (msgResp.newState) {
-      const effectiveLang = (msgResp.contextUpdate?.language as any) || detectedLang;
-      const newCtx = { ...ctx, ...msgResp.contextUpdate, language: effectiveLang };
-      await transitionState(session.id, msgResp.newState, { ...msgResp.contextUpdate, language: effectiveLang });
-      const newEnter = await states[msgResp.newState as ChatState].onEnter(newCtx);
-      await storeAgentMessages(session.id, newEnter.messages);
-
-      let allMessages = [...enterResp.messages, ...msgResp.messages, ...newEnter.messages];
-      let currentState = msgResp.newState as ChatState;
-      let currentCtx = { ...newCtx, ...newEnter.contextUpdate };
-      let authToken = msgResp.authToken || newEnter.authToken;
-
-      let nextResp = newEnter;
-      while (nextResp.newState && nextResp.newState !== currentState) {
-        await transitionState(session.id, nextResp.newState, nextResp.contextUpdate);
-        currentState = nextResp.newState as ChatState;
-        currentCtx = { ...currentCtx, ...nextResp.contextUpdate };
-        nextResp = await states[currentState].onEnter(currentCtx);
-        await storeAgentMessages(session.id, nextResp.messages);
-        allMessages = [...allMessages, ...nextResp.messages];
-        authToken = authToken || nextResp.authToken;
-      }
-
-      const result: AgentResponse = { messages: allMessages, authToken };
-      return translateResponse(result, effectiveLang);
-    }
-
-    const allMessages = [...enterResp.messages, ...msgResp.messages];
-    await storeAgentMessages(session.id, msgResp.messages);
-    if (msgResp.contextUpdate) {
-      const merged = { ...ctx, ...msgResp.contextUpdate };
-      await prisma.chatSession.update({
-        where: { id: session.id },
-        data: { contextJson: JSON.stringify(merged) },
-      });
-    }
-    const effectiveLang = (msgResp.contextUpdate?.language as any) || detectedLang;
-    return translateResponse({ messages: allMessages }, effectiveLang);
+    return { messages: enterResp.messages };
   }
 
   // Existing session

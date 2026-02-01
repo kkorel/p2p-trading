@@ -11,14 +11,25 @@ export interface ChatMessageData {
   buttons?: Array<{ text: string; callbackData?: string }>;
 }
 
+/** Only restore session if user is authenticated (has authToken). */
 function getStoredSessionId(): string | null {
   if (typeof window === 'undefined') return null;
+  const hasAuth = !!localStorage.getItem('authToken');
+  if (!hasAuth) {
+    // Not logged in — clear any stale session and start fresh
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
   return localStorage.getItem(SESSION_KEY);
 }
 
+/** Only persist session to localStorage if user is authenticated. */
 function storeSessionId(id: string) {
   if (typeof window !== 'undefined') {
-    localStorage.setItem(SESSION_KEY, id);
+    const hasAuth = !!localStorage.getItem('authToken');
+    if (hasAuth) {
+      localStorage.setItem(SESSION_KEY, id);
+    }
   }
 }
 
@@ -53,6 +64,7 @@ export function useChatEngine() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(getStoredSessionId);
   const [initialized, setInitialized] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load history or trigger greeting on mount
@@ -60,21 +72,28 @@ export function useChatEngine() {
     if (initialized) return;
     setInitialized(true);
 
+    const hasAuth = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
+    setIsAuthenticated(hasAuth);
+
     (async () => {
       try {
         const stored = getStoredSessionId();
-        const history = await chatApi.getHistory(stored || undefined);
-        if (history.messages && history.messages.length > 0) {
-          setMessages(
-            history.messages.map((m: any) => ({
-              role: m.role,
-              content: m.content,
-              buttons: m.buttons,
-            }))
-          );
-        } else {
-          await sendMessageToAgent('hi', true);
+        if (stored && hasAuth) {
+          // Authenticated — restore history
+          const history = await chatApi.getHistory(stored);
+          if (history.messages && history.messages.length > 0) {
+            setMessages(
+              history.messages.map((m: any) => ({
+                role: m.role,
+                content: m.content,
+                buttons: m.buttons,
+              }))
+            );
+            return;
+          }
         }
+        // No history or not authenticated — trigger greeting
+        await sendMessageToAgent('hi', true);
       } catch {
         await sendMessageToAgent('hi', true);
       }
@@ -93,11 +112,19 @@ export function useChatEngine() {
         const res = await chatApi.send(text, sessionId || undefined);
         if (res.sessionId) {
           setSessionId(res.sessionId);
-          storeSessionId(res.sessionId);
+          // Only persist after auth
+          if (res.authToken || isAuthenticated) {
+            storeSessionId(res.sessionId);
+          }
         }
 
         if (res.authToken) {
           handleAuthToken(res.authToken);
+          setIsAuthenticated(true);
+          // Now persist the sessionId since we just authenticated
+          if (res.sessionId) {
+            localStorage.setItem(SESSION_KEY, res.sessionId);
+          }
         }
 
         if (res.messages && res.messages.length > 0) {
@@ -119,7 +146,7 @@ export function useChatEngine() {
         setIsLoading(false);
       }
     },
-    [sessionId]
+    [sessionId, isAuthenticated]
   );
 
   const handleSend = useCallback(() => {
@@ -181,11 +208,17 @@ export function useChatEngine() {
         const res = await chatApi.upload(base64, sessionId || undefined, file.name);
         if (res.sessionId) {
           setSessionId(res.sessionId);
-          storeSessionId(res.sessionId);
+          if (res.authToken || isAuthenticated) {
+            storeSessionId(res.sessionId);
+          }
         }
 
         if (res.authToken) {
           handleAuthToken(res.authToken);
+          setIsAuthenticated(true);
+          if (res.sessionId) {
+            localStorage.setItem(SESSION_KEY, res.sessionId);
+          }
         }
 
         if (res.messages && res.messages.length > 0) {
@@ -208,7 +241,7 @@ export function useChatEngine() {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [sessionId]
+    [sessionId, isAuthenticated]
   );
 
   return {
