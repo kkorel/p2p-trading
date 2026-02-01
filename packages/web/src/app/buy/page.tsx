@@ -8,7 +8,7 @@ import { OfferCard } from '@/components/buy/offer-card';
 import { OrderSheet } from '@/components/buy/order-sheet';
 import { EmptyState, SkeletonList, Badge, Button } from '@/components/ui';
 import { buyerApi, type Offer, type TransactionState } from '@/lib/api';
-import { useDataUpdateActions } from '@/contexts/data-update-context';
+import { useP2PStats } from '@/contexts/p2p-stats-context';
 
 interface DiscoveredOffer {
   offer: Offer;
@@ -30,7 +30,7 @@ interface DiscoveredOffer {
 const ITEMS_PER_PAGE = 10;
 
 export default function BuyPage() {
-  const { triggerOrderUpdate, triggerOfferUpdate } = useDataUpdateActions();
+  const { refresh: refreshStats } = useP2PStats();
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [transaction, setTransaction] = useState<TransactionState | null>(null);
   const [offers, setOffers] = useState<DiscoveredOffer[]>([]);
@@ -55,39 +55,39 @@ export default function BuyPage() {
     try {
       // Start discovery
       const result = await buyerApi.discover(params);
-      
+
       // Poll for results (catalog comes async via callback)
       let attempts = 0;
       const maxAttempts = 30;
       let catalogReceived = false;
-      
+
       while (attempts < maxAttempts) {
         await new Promise(r => setTimeout(r, 500));
-        
+
         const txState = await buyerApi.getTransaction(result.transaction_id);
         setTransaction(txState);
-        
+
         // Check for errors in transaction state
         if (txState.error) {
           console.error('Discovery error from backend:', txState.error);
           setDiscoveryError(txState.error);
           break;
         }
-        
+
         // Check if catalog has been received (even if empty)
         if (txState.catalog) {
           catalogReceived = true;
-          
+
           if (txState.catalog.providers && txState.catalog.providers.length > 0) {
             // Extract offers from catalog
             const discoveredOffers: DiscoveredOffer[] = [];
-            
+
             for (const provider of txState.catalog.providers) {
               if (!provider.items) continue;
-              
+
               for (const item of provider.items) {
                 if (!item.offers) continue;
-                
+
                 for (const offer of item.offers) {
                   // Find score from matching results
                   const matchedOffer = txState.matchingResults?.allOffers?.find(
@@ -108,7 +108,7 @@ export default function BuyPage() {
                 }
               }
             }
-            
+
             // Sort by score (if available) or price
             discoveredOffers.sort((a, b) => {
               if (a.score !== undefined && b.score !== undefined) {
@@ -116,7 +116,7 @@ export default function BuyPage() {
               }
               return a.offer.price.value - b.offer.price.value;
             });
-            
+
             console.log(`Discovery complete: ${discoveredOffers.length} offers found`);
             setOffers(discoveredOffers);
           } else {
@@ -126,10 +126,10 @@ export default function BuyPage() {
           // Catalog received - stop polling
           break;
         }
-        
+
         attempts++;
       }
-      
+
       // If we exhausted attempts without receiving catalog
       if (!catalogReceived && attempts >= maxAttempts) {
         console.error('Discovery timeout: No catalog received after max attempts');
@@ -177,22 +177,22 @@ export default function BuyPage() {
       let txState = await buyerApi.getTransaction(txId);
       const previousOrderId = txState.order?.id;
       let attempts = 0;
-      
+
       // Wait for a NEW order (different from previous) or error
       while (attempts < 10) {
         await new Promise(r => setTimeout(r, 500));
         txState = await buyerApi.getTransaction(txId);
-        
+
         // Check for error
         if (txState.error) {
           break;
         }
-        
+
         // Check for new order (different from any previous order)
         if (txState.order && txState.order.id !== previousOrderId) {
           break;
         }
-        
+
         attempts++;
       }
 
@@ -214,23 +214,33 @@ export default function BuyPage() {
       // Get final state
       txState = await buyerApi.getTransaction(txId);
 
-      // After successful purchase, update the offer's available quantity in local state
+      // After successful purchase, update both availableQty and offer.maxQuantity in local state
+      // This fixes Bug 2 (double-buy) and Bug 3 (order sheet shows wrong max)
       if (txState.order) {
         setOffers(prevOffers => prevOffers.map(o => {
           if (o.offer.id === selectedOffer.offer.id) {
+            const newAvailableQty = Math.max(0, o.availableQty - quantity);
+            const newMaxQuantity = Math.max(0, o.offer.maxQuantity - quantity);
             return {
               ...o,
-              availableQty: Math.max(0, o.availableQty - quantity),
+              availableQty: newAvailableQty,
+              offer: {
+                ...o.offer,
+                maxQuantity: newMaxQuantity,
+              },
             };
           }
           return o;
         }).filter(o => o.availableQty > 0)); // Remove sold-out offers
-        
-        // Notify other components (seller's page, orders page) that an order was created
-        triggerOrderUpdate();
-        triggerOfferUpdate();
+
+        // Clear transaction state to force fresh discovery for next purchase
+        // This fixes Bug 7 (discovery bugged after orders/cancellations)
+        setTransaction(null);
+
+        // Refresh P2P stats to update savings display (Bug 8)
+        refreshStats();
       }
-      
+
       return txState.order || null;
     } catch (error) {
       console.error('Order failed:', error);
@@ -287,7 +297,7 @@ export default function BuyPage() {
                   />
                 ))}
               </div>
-              
+
               {/* Load More button */}
               {offers.length > visibleCount && (
                 <Button
@@ -323,7 +333,6 @@ export default function BuyPage() {
           providerId={selectedOffer?.providerId}
           providerName={selectedOffer?.providerName || ''}
           initialQuantity={requestedQuantity}
-          availableQuantity={selectedOffer?.availableQty}
           onConfirm={handleConfirmOrder}
           trustWarning={transaction?.trustWarning}
         />

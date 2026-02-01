@@ -868,22 +868,35 @@ const states: Record<ChatState, StateHandler> = {
       const hasGeneration = verifiedCreds.includes('GENERATION_PROFILE');
       const hasStorage = verifiedCreds.includes('STORAGE_PROFILE');
 
-      // Selling flow — explain what Oorja does and ask to start
+      // Selling flow — explain what Oorja does, show expected earnings, ask to start
       if (hasGeneration || hasStorage) {
         const user = await prisma.user.findUnique({
           where: { id: ctx.userId! },
-          select: { productionCapacity: true },
+          select: { productionCapacity: true, allowedTradeLimit: true },
         });
 
         const capacity = user?.productionCapacity || ctx.productionCapacity;
+        const tradeLimitPct = user?.allowedTradeLimit || 10;
+        const pricePerKwh = 6.0;
         let explainEn: string;
         let explainHi: string;
 
         if (hasGeneration) {
           const capEn = capacity ? `Your solar panel generates ~${capacity} kWh/month. ` : '';
           const capHi = capacity ? `Aapka solar panel ~${capacity} kWh/month bijli banata hai. ` : '';
-          explainEn = `${capEn}I'll sell the extra energy from your solar panels at good prices in the market to maximize your profit.`;
-          explainHi = `${capHi}Main aapke ghar pe lage solar se jo bijli bani hai, usse achhe daam pe market mein bechunga taaki aapka profit ho.`;
+
+          // Calculate expected monthly earnings
+          let earningsEn = '';
+          let earningsHi = '';
+          if (capacity) {
+            const tradeableKwh = Math.floor(capacity * tradeLimitPct / 100);
+            const expectedMonthly = Math.round(tradeableKwh * pricePerKwh);
+            earningsEn = `You can earn approximately Rs ${expectedMonthly}/month from this. `;
+            earningsHi = `Isse aap lagbhag Rs ${expectedMonthly}/month kama sakte ho. `;
+          }
+
+          explainEn = `${capEn}I'll sell the extra energy from your solar panels at good prices in the market to maximize your profit. ${earningsEn}`;
+          explainHi = `${capHi}Main aapke ghar pe lage solar se jo bijli bani hai, usse achhe daam pe market mein bechunga taaki aapka profit ho. ${earningsHi}`;
         } else {
           explainEn = `I'll help you store energy in your battery and sell it at the best times for maximum returns.`;
           explainHi = `Main aapki battery mein store ki hui bijli ko sahi waqt pe bech ke aapka munafa badhaunga.`;

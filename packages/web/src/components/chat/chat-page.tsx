@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { Send, Paperclip, RotateCcw, LayoutGrid, TrendingUp, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { MessageList } from './message-list';
@@ -14,8 +14,8 @@ export function ChatPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const { user, refreshUser } = useAuth();
-  const { balance } = useBalance();
-  const { totalValue, isLoading: statsLoading } = useP2PStats();
+  const { balance, refreshBalance } = useBalance();
+  const { totalValue, isLoading: statsLoading, refresh: refreshStats } = useP2PStats();
   const {
     messages,
     input,
@@ -28,6 +28,16 @@ export function ChatPage() {
     handleReset,
     handleFileUpload,
   } = useChatEngine();
+
+  // Refresh balance + stats when new agent messages arrive (e.g. after auth, offer creation)
+  const prevMsgCount = useRef(messages.length);
+  useEffect(() => {
+    if (messages.length > prevMsgCount.current && user) {
+      refreshBalance();
+      refreshStats();
+    }
+    prevMsgCount.current = messages.length;
+  }, [messages.length, user, refreshBalance, refreshStats]);
 
   return (
     <div className="flex justify-center min-h-screen bg-gray-100">
@@ -46,15 +56,13 @@ export function ChatPage() {
           {/* Balance info — shown only when logged in */}
           {user && (
             <>
-              {!statsLoading && totalValue > 0 && (
-                <div
-                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-xs font-medium shrink-0"
-                  title="P2P Trading Value"
-                >
-                  <TrendingUp size={12} />
-                  <span>+{formatCurrency(totalValue)}</span>
-                </div>
-              )}
+              <div
+                className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-xs font-medium shrink-0"
+                title="P2P Earnings"
+              >
+                <TrendingUp size={12} />
+                <span>{formatCurrency(totalValue)}</span>
+              </div>
               <div
                 className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-xs font-medium shrink-0"
                 title="Wallet Balance"
