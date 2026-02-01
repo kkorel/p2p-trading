@@ -272,6 +272,12 @@ function getOptionalCredButtons(verifiedCreds: string[]): Array<{ text: string; 
   return buttons;
 }
 
+// --- Hinglish helper ---
+// Returns Hinglish text when language is 'hinglish', otherwise English
+function h(ctx: SessionContext, en: string, hi: string): string {
+  return ctx.language === 'hinglish' ? hi : en;
+}
+
 // --- State Handlers ---
 
 const LANG_BUTTONS = [
@@ -322,16 +328,16 @@ const states: Record<ChatState, StateHandler> = {
   },
 
   WAITING_NAME: {
-    async onEnter() {
+    async onEnter(ctx) {
       return {
-        messages: [{ text: 'What is your name?' }],
+        messages: [{ text: h(ctx, 'What is your name?', 'Aapka naam kya hai?') }],
       };
     },
     async onMessage(ctx, message) {
       const name = message.trim();
       if (name.length < 2) {
         return {
-          messages: [{ text: 'Please enter your name.' }],
+          messages: [{ text: h(ctx, 'Please enter your name.', 'Apna naam batao.') }],
         };
       }
       return {
@@ -344,9 +350,10 @@ const states: Record<ChatState, StateHandler> = {
 
   WAITING_PHONE: {
     async onEnter(ctx) {
+      const name = ctx.name || 'friend';
       return {
         messages: [
-          { text: `Nice to meet you, ${ctx.name || 'friend'}! Your phone number?` },
+          { text: h(ctx, `Nice to meet you, ${name}! Your phone number?`, `${name}, aapse milke khushi hui! Aapka phone number?`) },
         ],
       };
     },
@@ -355,7 +362,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!validatePhoneNumber(phone)) {
         return {
-          messages: [{ text: 'Please enter a valid 10-digit phone number.' }],
+          messages: [{ text: h(ctx, 'Please enter a valid 10-digit phone number.', 'Sahi 10-digit phone number daalo.') }],
         };
       }
 
@@ -364,7 +371,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!result.success) {
         return {
-          messages: [{ text: 'Could not send OTP. Please try again.' }],
+          messages: [{ text: h(ctx, 'Could not send OTP. Please try again.', 'OTP nahi bhej paye. Dobara try karo.') }],
         };
       }
 
@@ -380,7 +387,7 @@ const states: Record<ChatState, StateHandler> = {
     async onEnter(ctx) {
       return {
         messages: [
-          { text: `Code sent to ${ctx.phone}. Enter it:` },
+          { text: h(ctx, `Code sent to ${ctx.phone}. Enter it:`, `${ctx.phone} pe code bheja hai. Yahan daalo:`) },
         ],
       };
     },
@@ -390,7 +397,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!/^\d{4,6}$/.test(otp)) {
         return {
-          messages: [{ text: 'Enter the 6-digit code.' }],
+          messages: [{ text: h(ctx, 'Enter the 6-digit code.', '6-digit code daalo.') }],
           contextUpdate: { otpAttempts: attempts },
         };
       }
@@ -400,13 +407,14 @@ const states: Record<ChatState, StateHandler> = {
       if (!result.success) {
         if (attempts >= 3) {
           return {
-            messages: [{ text: 'Too many wrong attempts. Let\'s try again.' }],
+            messages: [{ text: h(ctx, 'Too many wrong attempts. Let\'s try again.', 'Bahut galat try. Chalo phir se shuru karte hain.') }],
             newState: 'WAITING_PHONE',
             contextUpdate: { otpAttempts: 0 },
           };
         }
+        const left = 3 - attempts;
         return {
-          messages: [{ text: `Wrong code. ${3 - attempts} attempt(s) left.` }],
+          messages: [{ text: h(ctx, `Wrong code. ${left} attempt(s) left.`, `Galat code. ${left} try baaki.`) }],
           contextUpdate: { otpAttempts: attempts },
         };
       }
@@ -443,9 +451,10 @@ const states: Record<ChatState, StateHandler> = {
 
   AUTHENTICATED: {
     async onEnter(ctx) {
+      const name = ctx.name || 'friend';
       if (!ctx.userId) {
         return {
-          messages: [{ text: `Welcome, ${ctx.name || 'friend'}!` }],
+          messages: [{ text: h(ctx, `Welcome, ${name}!`, `Swagat hai, ${name}!`) }],
           newState: 'WAITING_UTILITY_CRED',
         };
       }
@@ -453,27 +462,26 @@ const states: Record<ChatState, StateHandler> = {
       const verifiedCreds = await getVerifiedCredentials(ctx.userId);
       const user = await prisma.user.findUnique({ where: { id: ctx.userId } });
 
-      // Returning user with complete profile
       if (user?.profileComplete) {
+        const n = ctx.name || user.name || 'friend';
         return {
-          messages: [{ text: `Welcome back, ${ctx.name || user.name || 'friend'}!` }],
+          messages: [{ text: h(ctx, `Welcome back, ${n}!`, `Wapas swagat, ${n}!`) }],
           newState: 'GENERAL_CHAT',
           contextUpdate: { verifiedCreds },
         };
       }
 
-      // Has utility credential — go to optional creds
       if (verifiedCreds.includes('UTILITY_CUSTOMER')) {
+        const n = ctx.name || user?.name || 'friend';
         return {
-          messages: [{ text: `Welcome back, ${ctx.name || user?.name || 'friend'}!` }],
+          messages: [{ text: h(ctx, `Welcome back, ${n}!`, `Wapas swagat, ${n}!`) }],
           newState: 'OFFER_OPTIONAL_CREDS',
           contextUpdate: { verifiedCreds },
         };
       }
 
-      // No utility credential yet
       return {
-        messages: [{ text: `Welcome, ${ctx.name || 'friend'}!` }],
+        messages: [{ text: h(ctx, `Welcome, ${name}!`, `Swagat hai, ${name}!`) }],
         newState: 'WAITING_UTILITY_CRED',
         contextUpdate: { verifiedCreds },
       };
@@ -484,11 +492,14 @@ const states: Record<ChatState, StateHandler> = {
   },
 
   WAITING_UTILITY_CRED: {
-    async onEnter() {
+    async onEnter(ctx) {
       return {
         messages: [
           {
-            text: 'To start trading, I need your Utility Customer Credential. This is a digital document from your DISCOM.\n\nUpload it now (PDF or JSON).\n\nDon\'t have one? Get sample credentials:\nhttps://open-vcs.up.railway.app',
+            text: h(ctx,
+              'To start trading, I need your Utility Customer Credential. This is a digital document from your DISCOM.\n\nUpload it now (PDF or JSON).\n\nDon\'t have one? Get sample credentials:\nhttps://open-vcs.up.railway.app',
+              'Trading shuru karne ke liye aapka Utility Customer Credential chahiye. Ye aapke DISCOM ka digital document hai.\n\nAbhi upload karo (PDF ya JSON).\n\nNahi hai? Sample yahan se lo:\nhttps://open-vcs.up.railway.app'
+            ),
           },
         ],
       };
@@ -500,7 +511,7 @@ const states: Record<ChatState, StateHandler> = {
           return {
             messages: [
               { text: kbAnswer },
-              { text: 'Upload your Utility Customer Credential when ready (PDF or JSON).', delay: 300 },
+              { text: h(ctx, 'Upload your Utility Customer Credential when ready (PDF or JSON).', 'Jab ready ho tab Utility Customer Credential upload karo (PDF ya JSON).'), delay: 300 },
             ],
           };
         }
@@ -512,14 +523,14 @@ const states: Record<ChatState, StateHandler> = {
             return {
               messages: [
                 { text: llmAnswer },
-                { text: 'Upload the credential when ready.', delay: 300 },
+                { text: h(ctx, 'Upload the credential when ready.', 'Jab ready ho tab credential upload karo.'), delay: 300 },
               ],
             };
           }
         }
 
         return {
-          messages: [{ text: 'Please upload your Utility Customer Credential (PDF or JSON).' }],
+          messages: [{ text: h(ctx, 'Please upload your Utility Customer Credential (PDF or JSON).', 'Apna Utility Customer Credential upload karo (PDF ya JSON).') }],
         };
       }
 
@@ -533,7 +544,7 @@ const states: Record<ChatState, StateHandler> = {
         }
 
         return {
-          messages: [{ text: `Verified! ${result.summary}` }],
+          messages: [{ text: h(ctx, `Verified! ${result.summary}`, `Verify ho gaya! ${result.summary}`) }],
           newState: 'OFFER_OPTIONAL_CREDS',
           contextUpdate: {
             verifiedCreds: [...(ctx.verifiedCreds || []), 'UTILITY_CUSTOMER'],
@@ -553,10 +564,9 @@ const states: Record<ChatState, StateHandler> = {
       const verifiedCreds = ctx.verifiedCreds || [];
       const buttons = getOptionalCredButtons(verifiedCreds);
 
-      // All optional creds done (only "Done" button left)
       if (buttons.length === 1) {
         return {
-          messages: [{ text: 'All credentials verified!' }],
+          messages: [{ text: h(ctx, 'All credentials verified!', 'Saare credentials verify ho gaye!') }],
           newState: 'CONFIRM_TRADING',
         };
       }
@@ -579,7 +589,10 @@ const states: Record<ChatState, StateHandler> = {
       return {
         messages: [
           {
-            text: `${verifiedText}Want to add more credentials? This helps improve your trust score.`,
+            text: h(ctx,
+              `${verifiedText}Want to add more credentials? This helps improve your trust score.`,
+              `${verifiedText}Aur credentials add karna chahte ho? Isse aapka trust score badhega.`
+            ),
             buttons,
           },
         ],
@@ -641,7 +654,7 @@ const states: Record<ChatState, StateHandler> = {
         return {
           messages: [
             { text: kbAnswer },
-            { text: 'Add more credentials?', buttons, delay: 300 },
+            { text: h(ctx, 'Add more credentials?', 'Aur credentials add karna hai?'), buttons, delay: 300 },
           ],
         };
       }
@@ -649,7 +662,7 @@ const states: Record<ChatState, StateHandler> = {
       const buttons = getOptionalCredButtons(ctx.verifiedCreds || []);
       return {
         messages: [
-          { text: 'Choose a credential to add, or tap "Done" to continue.', buttons },
+          { text: h(ctx, 'Choose a credential to add, or tap "Done" to continue.', 'Credential choose karo ya "Done" pe tap karo.'), buttons },
         ],
       };
     },
@@ -661,7 +674,10 @@ const states: Record<ChatState, StateHandler> = {
       return {
         messages: [
           {
-            text: `Upload your ${expectedName} credential (PDF or JSON).`,
+            text: h(ctx,
+              `Upload your ${expectedName} credential (PDF or JSON).`,
+              `Apna ${expectedName} credential upload karo (PDF ya JSON).`
+            ),
           },
         ],
       };
@@ -673,7 +689,7 @@ const states: Record<ChatState, StateHandler> = {
           return {
             messages: [
               { text: kbAnswer },
-              { text: 'Upload the credential when ready.', delay: 300 },
+              { text: h(ctx, 'Upload the credential when ready.', 'Jab ready ho tab credential upload karo.'), delay: 300 },
             ],
           };
         }
@@ -690,8 +706,11 @@ const states: Record<ChatState, StateHandler> = {
         return {
           messages: [
             {
-              text: `Please upload your ${expectedName} (PDF or JSON).`,
-              buttons: [{ text: 'Skip this one', callbackData: 'skip' }],
+              text: h(ctx,
+                `Please upload your ${expectedName} (PDF or JSON).`,
+                `Apna ${expectedName} upload karo (PDF ya JSON).`
+              ),
+              buttons: [{ text: h(ctx, 'Skip this one', 'Ye skip karo'), callbackData: 'skip' }],
             },
           ],
         };
@@ -702,7 +721,7 @@ const states: Record<ChatState, StateHandler> = {
 
         if (!result.success) {
           return {
-            messages: [{ text: result.error || 'Could not verify this credential. Please try again.' }],
+            messages: [{ text: result.error || h(ctx, 'Could not verify this credential. Please try again.', 'Ye credential verify nahi ho paya. Dobara try karo.') }],
           };
         }
 
@@ -710,7 +729,7 @@ const states: Record<ChatState, StateHandler> = {
         const updatedCreds = [...new Set([...(ctx.verifiedCreds || []), dbType])];
 
         return {
-          messages: [{ text: `Verified! ${result.summary}` }],
+          messages: [{ text: h(ctx, `Verified! ${result.summary}`, `Verify ho gaya! ${result.summary}`) }],
           newState: 'OFFER_OPTIONAL_CREDS',
           contextUpdate: {
             verifiedCreds: updatedCreds,
@@ -720,7 +739,7 @@ const states: Record<ChatState, StateHandler> = {
       } catch (error: any) {
         logger.error(`Optional cred verification failed: ${error.message}`);
         return {
-          messages: [{ text: 'Something went wrong. Please try again.' }],
+          messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
         };
       }
     },
@@ -738,15 +757,19 @@ const states: Record<ChatState, StateHandler> = {
         });
 
         const capacity = user?.productionCapacity || ctx.productionCapacity;
-        const capacityText = capacity ? `Your panel produces ~${capacity} kWh/month. ` : '';
+        const capacityTextEn = capacity ? `Your panel produces ~${capacity} kWh/month. ` : '';
+        const capacityTextHi = capacity ? `Aapka panel ~${capacity} kWh/month banata hai. ` : '';
 
         return {
           messages: [
             {
-              text: `${capacityText}Shall I start selling your extra energy?`,
+              text: h(ctx,
+                `${capacityTextEn}Shall I start selling your extra energy?`,
+                `${capacityTextHi}Extra energy bechna shuru karein?`
+              ),
               buttons: [
-                { text: 'Yes, start!', callbackData: 'yes' },
-                { text: 'Not now', callbackData: 'no' },
+                { text: h(ctx, 'Yes, start!', 'Haan, shuru karo!'), callbackData: 'yes' },
+                { text: h(ctx, 'Not now', 'Abhi nahi'), callbackData: 'no' },
               ],
             },
           ],
@@ -761,15 +784,18 @@ const states: Record<ChatState, StateHandler> = {
 
       return {
         messages: [
-          { text: 'Your profile is set up! You can browse energy offers or ask me anything.' },
+          { text: h(ctx,
+            'Your profile is set up! You can browse energy offers or ask me anything.',
+            'Aapka profile ready hai! Energy offers dekh sakte ho ya mujhse kuch bhi poocho.'
+          ) },
         ],
         newState: 'GENERAL_CHAT',
       };
     },
     async onMessage(ctx, message) {
       const lower = message.toLowerCase().trim();
-      const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'start', 'yes, start!'].includes(lower);
-      const isNo = ['no', 'n', 'nahi', 'nope', 'not now', 'later', 'baad mein'].includes(lower);
+      const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'start', 'yes, start!', 'haan, shuru karo!'].includes(lower);
+      const isNo = ['no', 'n', 'nahi', 'nope', 'not now', 'later', 'baad mein', 'abhi nahi'].includes(lower);
 
       if (isYes) {
         await prisma.user.update({
@@ -783,7 +809,10 @@ const states: Record<ChatState, StateHandler> = {
           const o = offerResult.offer;
           return {
             messages: [
-              { text: `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!` },
+              { text: h(ctx,
+                `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
+                `Ho gaya! Aapki energy ab sale pe hai:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.\n\nBuyers ab aapki energy khareed sakte hain!`
+              ) },
             ],
             newState: 'GENERAL_CHAT',
             contextUpdate: { tradingActive: true },
@@ -792,7 +821,10 @@ const states: Record<ChatState, StateHandler> = {
 
         return {
           messages: [
-            { text: 'Profile set up! You can create offers from the Sell tab.' },
+            { text: h(ctx,
+              'Profile set up! You can create offers from the Sell tab.',
+              'Profile ready! Sell tab se offers bana sakte ho.'
+            ) },
           ],
           newState: 'GENERAL_CHAT',
           contextUpdate: { tradingActive: true },
@@ -807,7 +839,10 @@ const states: Record<ChatState, StateHandler> = {
 
         return {
           messages: [
-            { text: 'No problem. You can start selling anytime from the Sell tab or ask me here.' },
+            { text: h(ctx,
+              'No problem. You can start selling anytime from the Sell tab or ask me here.',
+              'Koi baat nahi. Kabhi bhi Sell tab se ya mujhse poocho, bechna shuru kar sakte ho.'
+            ) },
           ],
           newState: 'GENERAL_CHAT',
         };
@@ -819,10 +854,10 @@ const states: Record<ChatState, StateHandler> = {
           messages: [
             { text: kbAnswer },
             {
-              text: 'Start selling your energy?',
+              text: h(ctx, 'Start selling your energy?', 'Energy bechna shuru karein?'),
               buttons: [
-                { text: 'Yes', callbackData: 'yes' },
-                { text: 'No', callbackData: 'no' },
+                { text: h(ctx, 'Yes', 'Haan'), callbackData: 'yes' },
+                { text: h(ctx, 'No', 'Nahi'), callbackData: 'no' },
               ],
               delay: 300,
             },
@@ -833,10 +868,10 @@ const states: Record<ChatState, StateHandler> = {
       return {
         messages: [
           {
-            text: 'Start selling?',
+            text: h(ctx, 'Start selling?', 'Bechna shuru karein?'),
             buttons: [
-              { text: 'Yes', callbackData: 'yes' },
-              { text: 'No', callbackData: 'no' },
+              { text: h(ctx, 'Yes', 'Haan'), callbackData: 'yes' },
+              { text: h(ctx, 'No', 'Nahi'), callbackData: 'no' },
             ],
           },
         ],
@@ -893,7 +928,7 @@ const states: Record<ChatState, StateHandler> = {
           });
           if (user) {
             return {
-              messages: [{ text: `Your balance: Rs ${user.balance.toFixed(2)}` }],
+              messages: [{ text: h(ctx, `Your balance: Rs ${user.balance.toFixed(2)}`, `Aapka balance: Rs ${user.balance.toFixed(2)}`) }],
             };
           }
         }
@@ -914,11 +949,14 @@ const states: Record<ChatState, StateHandler> = {
           if (result.success && result.offer) {
             return {
               messages: [
-                { text: `New offer created: ${result.offer.quantity} kWh at Rs ${result.offer.pricePerKwh}/unit, tomorrow 6AM-6PM.` },
+                { text: h(ctx,
+                  `New offer created: ${result.offer.quantity} kWh at Rs ${result.offer.pricePerKwh}/unit, tomorrow 6AM-6PM.`,
+                  `Naya offer ban gaya: ${result.offer.quantity} kWh Rs ${result.offer.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.`
+                ) },
               ],
             };
           }
-          return { messages: [{ text: result.error || 'Could not create offer. Try again.' }] };
+          return { messages: [{ text: result.error || h(ctx, 'Could not create offer. Try again.', 'Offer nahi ban paya. Dobara try karo.') }] };
         }
       }
 
@@ -929,7 +967,10 @@ const states: Record<ChatState, StateHandler> = {
       }
 
       // --- LLM fallback ---
-      const llmAnswer = await askLLM(message, `User "${ctx.name || 'user'}" on the Oorja P2P energy trading platform. They can ask about earnings, balance, orders, listings, sales by period.`);
+      const llmContext = ctx.language === 'hinglish'
+        ? `User "${ctx.name || 'user'}" on Oorja P2P energy trading platform. They speak Hinglish (Hindi in Roman English). Reply in Hinglish (Roman Hindi script, NOT Devanagari). They can ask about earnings, balance, orders, listings, sales by period.`
+        : `User "${ctx.name || 'user'}" on the Oorja P2P energy trading platform. They can ask about earnings, balance, orders, listings, sales by period.`;
+      const llmAnswer = await askLLM(message, llmContext);
       if (llmAnswer) {
         return { messages: [{ text: llmAnswer }] };
       }
@@ -938,12 +979,12 @@ const states: Record<ChatState, StateHandler> = {
       return {
         messages: [
           {
-            text: 'I can help with:',
+            text: h(ctx, 'I can help with:', 'Main yeh madad kar sakta hun:'),
             buttons: [
-              { text: 'My earnings', callbackData: 'how much did I earn' },
-              { text: 'My listings', callbackData: 'show my listings' },
-              { text: 'My orders', callbackData: 'show my orders' },
-              { text: 'New offer', callbackData: 'create new offer' },
+              { text: h(ctx, 'My earnings', 'Meri kamayi'), callbackData: 'how much did I earn' },
+              { text: h(ctx, 'My listings', 'Mere listings'), callbackData: 'show my listings' },
+              { text: h(ctx, 'My orders', 'Mere orders'), callbackData: 'show my orders' },
+              { text: h(ctx, 'New offer', 'Naya offer'), callbackData: 'create new offer' },
             ],
           },
         ],
