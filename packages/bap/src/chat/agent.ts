@@ -24,7 +24,7 @@ import {
   getIssuerId,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
-import { mockTradingAgent, parseTimePeriod } from './trading-agent';
+import { mockTradingAgent, parseTimePeriod, getWelcomeBackData } from './trading-agent';
 import { askLLM, classifyIntent, composeResponse } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
@@ -472,10 +472,20 @@ const states: Record<ChatState, StateHandler> = {
 
       if (user?.profileComplete) {
         const n = ctx.name || user.name || 'friend';
+
+        // Compose a welcome-back summary with LLM
+        const summaryData = await getWelcomeBackData(ctx.userId);
+        const composed = await composeResponse(
+          'welcome back, give me a summary of my activity',
+          summaryData,
+          ctx.language,
+          n
+        );
+
         return {
-          messages: [{ text: h(ctx, `Welcome back, ${n}!`, `Wapas swagat, ${n}!`) }],
+          messages: [{ text: composed || h(ctx, `Welcome back, ${n}!`, `Wapas swagat, ${n}!`) }],
           newState: 'GENERAL_CHAT',
-          contextUpdate: { verifiedCreds },
+          contextUpdate: { verifiedCreds, tradingActive: true },
         };
       }
 
@@ -1319,20 +1329,113 @@ export async function processMessage(
   platform: 'TELEGRAM' | 'WEB',
   platformId: string,
   userMessage: string,
-  fileData?: FileData
+  fileData?: FileData,
+  authenticatedUserId?: string
 ): Promise<AgentResponse> {
   let session = await prisma.chatSession.findUnique({
     where: { platform_platformId: { platform, platformId } },
   });
 
   if (!session) {
+    // --- Fast-track for authenticated users (logged in via app) ---
+    if (authenticatedUserId) {
+      const user = await prisma.user.findUnique({
+        where: { id: authenticatedUserId },
+        select: { id: true, name: true, profileComplete: true, providerId: true, phone: true },
+      });
+
+      if (user?.profileComplete) {
+        // User already onboarded — skip straight to GENERAL_CHAT with welcome-back summary
+        const verifiedCreds = await getVerifiedCredentials(user.id);
+        const ctx: SessionContext = {
+          userId: user.id,
+          name: user.name || undefined,
+          phone: user.phone || undefined,
+          verifiedCreds,
+          tradingActive: true,
+        };
+
+        session = await prisma.chatSession.create({
+          data: {
+            platform,
+            platformId,
+            state: 'GENERAL_CHAT',
+            contextJson: JSON.stringify(ctx),
+            userId: user.id,
+          },
+        });
+
+        await storeMessage(session.id, 'user', userMessage);
+
+        // Compose a welcome-back summary using LLM
+        const summaryData = await getWelcomeBackData(user.id);
+        const welcomeMsg = await composeResponse(
+          'welcome back, give me a summary of my activity',
+          summaryData,
+          undefined, // language unknown yet — default English
+          user.name || undefined
+        );
+
+        const fallbackWelcome = `Welcome back, ${user.name || 'friend'}! How can I help you today?`;
+        const messages: AgentMessage[] = [{ text: welcomeMsg || fallbackWelcome }];
+        await storeAgentMessages(session.id, messages);
+
+        return { messages };
+      }
+
+      if (user) {
+        // User exists but hasn't completed onboarding — check how far they got
+        const verifiedCreds = await getVerifiedCredentials(user.id);
+        const ctx: SessionContext = {
+          userId: user.id,
+          name: user.name || undefined,
+          phone: user.phone || undefined,
+          verifiedCreds,
+        };
+
+        let startState: ChatState = 'ASK_DISCOM';
+        if (verifiedCreds.includes('UTILITY_CUSTOMER')) {
+          startState = 'ASK_INTENT';
+        }
+
+        session = await prisma.chatSession.create({
+          data: {
+            platform,
+            platformId,
+            state: startState,
+            contextJson: JSON.stringify(ctx),
+            userId: user.id,
+          },
+        });
+
+        await storeMessage(session.id, 'user', userMessage);
+
+        const welcomeMsg: AgentMessage = {
+          text: `Welcome, ${user.name || 'friend'}! Let's finish setting up your profile.`,
+        };
+        const enterResp = await states[startState].onEnter(ctx);
+        const allMessages = [welcomeMsg, ...enterResp.messages];
+        await storeAgentMessages(session.id, allMessages);
+
+        // Chain through if onEnter triggers a state transition
+        if (enterResp.newState && enterResp.newState !== startState) {
+          await transitionState(session.id, enterResp.newState, enterResp.contextUpdate);
+          const chainResp = await states[enterResp.newState as ChatState].onEnter({ ...ctx, ...enterResp.contextUpdate });
+          await storeAgentMessages(session.id, chainResp.messages);
+          return { messages: [...allMessages, ...chainResp.messages] };
+        }
+
+        return { messages: allMessages };
+      }
+    }
+
+    // --- Default: anonymous or unrecognized user — start from greeting ---
     session = await prisma.chatSession.create({
       data: { platform, platformId, state: 'GREETING', contextJson: '{}' },
     });
 
     await storeMessage(session.id, 'user', userMessage);
 
-    // New session — just show the greeting + language picker, wait for selection
     const ctx: SessionContext = {};
     const enterResp = await states.GREETING.onEnter(ctx);
     await storeAgentMessages(session.id, enterResp.messages);

@@ -44,7 +44,7 @@ router.post('/send', async (req: Request, res: Response) => {
     }
 
     const platformId = resolvePlatformId(req, sessionId);
-    const response = await processMessage('WEB', platformId, message.trim());
+    const response = await processMessage('WEB', platformId, message.trim(), undefined, req.user?.id);
 
     // Map agent messages to a simpler shape for the frontend
     const messages = response.messages.map((m) => ({
@@ -93,7 +93,7 @@ router.post('/upload', async (req: Request, res: Response) => {
     };
 
     const label = isJson ? '[JSON credential uploaded]' : '[PDF uploaded]';
-    const response = await processMessage('WEB', platformId, label, fileData);
+    const response = await processMessage('WEB', platformId, label, fileData, req.user?.id);
 
     const messages = response.messages.map((m) => ({
       role: 'agent' as const,

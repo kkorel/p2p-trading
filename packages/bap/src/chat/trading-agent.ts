@@ -499,3 +499,76 @@ export function parseTimePeriod(message: string): { startDate: Date; endDate: Da
 
   return null;
 }
+
+/**
+ * Get a welcome-back data summary for a returning user.
+ * Returns structured data (always English) for LLM composition.
+ */
+export async function getWelcomeBackData(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, balance: true, providerId: true, productionCapacity: true, allowedTradeLimit: true },
+  });
+  if (!user) return '';
+
+  const parts: string[] = [];
+  parts.push(`User name: ${user.name || 'friend'}`);
+  parts.push(`Wallet balance: Rs ${user.balance.toFixed(2)}`);
+
+  if (user.providerId) {
+    // Active listings
+    const offers = await prisma.catalogOffer.findMany({
+      where: { providerId: user.providerId },
+      select: { maxQty: true, priceValue: true },
+    });
+    const totalListed = offers.reduce((sum, o) => sum + o.maxQty, 0);
+    parts.push(`Active listings: ${offers.length} (total ${totalListed} kWh)`);
+
+    // Recent orders (last 7 days)
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const recentOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        createdAt: { gte: weekAgo },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+
+    if (recentOrders.length > 0) {
+      const recentEarnings = recentOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+      const recentKwh = recentOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+      parts.push(`Last 7 days: ${recentOrders.length} order(s), ${recentKwh.toFixed(1)} kWh sold, Rs ${recentEarnings.toFixed(2)} earned`);
+    } else {
+      parts.push('Last 7 days: No new orders');
+    }
+
+    // All-time totals
+    const allOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+    const totalEarnings = allOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const totalKwh = allOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+    parts.push(`All-time: ${allOrders.length} order(s), ${totalKwh.toFixed(1)} kWh sold, Rs ${totalEarnings.toFixed(2)} total earnings`);
+  } else {
+    // Buyer — check buyer orders
+    const buyerOrders = await prisma.order.findMany({
+      where: { buyerId: userId, status: { in: ['ACTIVE', 'COMPLETED'] } },
+      select: { totalPrice: true, totalQty: true },
+    });
+    if (buyerOrders.length > 0) {
+      const totalSpent = buyerOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+      const totalKwh = buyerOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+      parts.push(`Purchases: ${buyerOrders.length} order(s), ${totalKwh.toFixed(1)} kWh bought, Rs ${totalSpent.toFixed(2)} spent`);
+    } else {
+      parts.push('No orders yet');
+    }
+  }
+
+  return parts.join('\n');
+}
