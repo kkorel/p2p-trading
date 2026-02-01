@@ -3,8 +3,9 @@
  * Supports language-aware responses (English / Hinglish).
  */
 
-import { prisma, createLogger, publishOfferToCDS, isExternalCDSEnabled } from '@p2p/shared';
+import { prisma, createLogger, publishOfferToCDS, isExternalCDSEnabled, config } from '@p2p/shared';
 import { registerProvider, addCatalogItem, addOffer } from '../seller-catalog';
+import axios from 'axios';
 
 const logger = createLogger('TradingAgent');
 
@@ -435,6 +436,222 @@ export const mockTradingAgent = {
     );
   },
 };
+
+// --- Buyer-side purchase execution ---
+
+export interface PurchaseResult {
+  success: boolean;
+  order?: {
+    orderId: string;
+    transactionId: string;
+    quantity: number;
+    pricePerKwh: number;
+    totalPrice: number;
+    providerName: string;
+    timeWindow: string;
+  };
+  discoveredOffer?: {
+    offerId: string;
+    providerId: string;
+    providerName: string;
+    price: number;
+    quantity: number;
+    timeWindow: string;
+  };
+  error?: string;
+}
+
+/**
+ * Build a time window from a natural language description.
+ * Returns { startTime, endTime } ISO strings.
+ */
+function buildTimeWindow(timeDesc?: string): { startTime: string; endTime: string } {
+  const now = new Date();
+  const startTime = new Date(now);
+  const endTime = new Date(now);
+
+  if (!timeDesc) {
+    // Default: tomorrow 6AM-6PM
+    startTime.setDate(startTime.getDate() + 1);
+    startTime.setHours(6, 0, 0, 0);
+    endTime.setDate(endTime.getDate() + 1);
+    endTime.setHours(18, 0, 0, 0);
+    return { startTime: startTime.toISOString(), endTime: endTime.toISOString() };
+  }
+
+  const td = timeDesc.toLowerCase();
+  if (td.includes('today') || td.includes('aaj')) {
+    startTime.setHours(Math.max(now.getHours() + 1, 6), 0, 0, 0);
+    endTime.setHours(23, 59, 59, 0);
+  } else {
+    // Default to tomorrow
+    startTime.setDate(startTime.getDate() + 1);
+    startTime.setHours(6, 0, 0, 0);
+    endTime.setDate(endTime.getDate() + 1);
+    endTime.setHours(18, 0, 0, 0);
+  }
+  return { startTime: startTime.toISOString(), endTime: endTime.toISOString() };
+}
+
+/**
+ * Get a valid auth token for a user (from their latest session).
+ */
+async function getUserAuthToken(userId: string): Promise<string | null> {
+  const session = await prisma.session.findFirst({
+    where: { userId, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: 'desc' },
+    select: { token: true },
+  });
+  return session?.token || null;
+}
+
+/**
+ * Small helper: wait for ms milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Execute a full buyer purchase flow: discover → select (auto-match) → init → confirm.
+ * Makes internal HTTP calls to the BAP endpoints.
+ */
+export async function executePurchase(
+  userId: string,
+  params: { quantity: number; maxPrice?: number; timeDesc?: string }
+): Promise<PurchaseResult> {
+  const baseUrl = `http://localhost:${config.ports.bap}`;
+
+  // Get the user's auth token for authenticated requests
+  const token = await getUserAuthToken(userId);
+  if (!token) {
+    return { success: false, error: 'No valid session found. Please log in again.' };
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+
+  const timeWindow = buildTimeWindow(params.timeDesc);
+
+  try {
+    // Step 1: Discover available offers
+    logger.info(`[BuyFlow] Discovering offers for user ${userId}: ${params.quantity} kWh`);
+    const discoverRes = await axios.post(`${baseUrl}/api/discover`, {
+      minQuantity: params.quantity,
+      timeWindow,
+    }, { headers, timeout: 15000 });
+
+    const txId = discoverRes.data.transaction_id;
+    if (!txId) {
+      return { success: false, error: 'Discovery failed — no transaction ID returned.' };
+    }
+
+    // Check if any offers were found
+    const providers = discoverRes.data.catalog?.providers || [];
+    const allOffers: any[] = [];
+    for (const p of providers) {
+      for (const item of (p.items || [])) {
+        for (const offer of (item.offers || [])) {
+          allOffers.push({
+            ...offer,
+            providerName: p.descriptor?.name || 'Unknown Seller',
+            providerId: p.id,
+          });
+        }
+      }
+    }
+
+    if (allOffers.length === 0) {
+      return { success: false, error: 'No energy offers found matching your requirements. Try different quantity or time.' };
+    }
+
+    // Step 2: Select best offer (auto-match)
+    logger.info(`[BuyFlow] Selecting from ${allOffers.length} offers, txId=${txId}`);
+    const selectRes = await axios.post(`${baseUrl}/api/select`, {
+      transaction_id: txId,
+      quantity: params.quantity,
+      requestedTimeWindow: { startTime: timeWindow.startTime, endTime: timeWindow.endTime },
+      autoMatch: true,
+    }, { headers, timeout: 15000 });
+
+    if (selectRes.data.error) {
+      return { success: false, error: selectRes.data.error };
+    }
+
+    const selectedOffer = selectRes.data.selected_offer;
+    if (!selectedOffer) {
+      return { success: false, error: 'No matching offer found. Try adjusting quantity or time window.' };
+    }
+
+    // Build discovered offer info for confirmation prompt
+    const bestOffer = allOffers.find(o => o.id === selectedOffer.id) || allOffers[0];
+    const tw = bestOffer.timeWindow;
+    const twLabel = tw
+      ? `${new Date(tw.startTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${new Date(tw.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}-${new Date(tw.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+      : 'Flexible';
+
+    const discoveredOffer = {
+      offerId: selectedOffer.id,
+      providerId: bestOffer.providerId || selectedOffer.provider_id,
+      providerName: bestOffer.providerName || 'Solar Seller',
+      price: selectedOffer.price?.value || bestOffer.price?.value || 0,
+      quantity: params.quantity,
+      timeWindow: twLabel,
+    };
+
+    // If max price specified and offer exceeds it, reject
+    if (params.maxPrice && discoveredOffer.price > params.maxPrice) {
+      return {
+        success: false,
+        discoveredOffer,
+        error: `Best available price is Rs ${discoveredOffer.price}/unit, which exceeds your max of Rs ${params.maxPrice}/unit.`,
+      };
+    }
+
+    // Step 3: Init order
+    logger.info(`[BuyFlow] Init order, txId=${txId}`);
+    await axios.post(`${baseUrl}/api/init`, {
+      transaction_id: txId,
+    }, { headers, timeout: 15000 });
+
+    // Wait for on_init callback to update state
+    await sleep(2000);
+
+    // Step 4: Confirm order
+    logger.info(`[BuyFlow] Confirming order, txId=${txId}`);
+    const confirmRes = await axios.post(`${baseUrl}/api/confirm`, {
+      transaction_id: txId,
+    }, { headers, timeout: 15000 });
+
+    const orderId = confirmRes.data.order_id;
+
+    // Wait for on_confirm callback
+    await sleep(1000);
+
+    const totalPrice = discoveredOffer.price * params.quantity;
+    logger.info(`[BuyFlow] Purchase complete: order=${orderId}, ${params.quantity}kWh at Rs${discoveredOffer.price}/kWh = Rs${totalPrice}`);
+
+    return {
+      success: true,
+      order: {
+        orderId: orderId || txId,
+        transactionId: txId,
+        quantity: params.quantity,
+        pricePerKwh: discoveredOffer.price,
+        totalPrice,
+        providerName: discoveredOffer.providerName,
+        timeWindow: twLabel,
+      },
+      discoveredOffer,
+    };
+  } catch (error: any) {
+    const msg = error.response?.data?.error || error.message || 'Unknown error';
+    logger.error(`[BuyFlow] Purchase failed: ${msg}`, { userId });
+    return { success: false, error: msg };
+  }
+}
 
 /**
  * Parse a time period from natural language.

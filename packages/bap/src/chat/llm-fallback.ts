@@ -43,10 +43,11 @@ Important:
 
 export interface ClassifiedIntent {
   intent: 'show_listings' | 'show_earnings' | 'show_balance' | 'show_orders' | 'show_sales'
-    | 'create_listing' | 'discom_rates' | 'trading_tips' | 'general_qa';
+    | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'general_qa';
   params?: {
     price_per_kwh?: number;
     quantity_kwh?: number;
+    max_price?: number;
     time_description?: string;
     time_period?: string;
   };
@@ -60,17 +61,24 @@ Intents:
 - "show_balance": User asks about wallet/account balance (e.g. "mere account mein kitne paise", "wallet balance")
 - "show_orders": User asks about order status/history (e.g. "mera order kya hua", "show my orders")
 - "show_sales": User asks about sales for a time period (e.g. "aaj kitna becha", "sold today", "is hafte ki bikri")
-- "create_listing": User wants to CREATE a new energy listing/offer (e.g. "50 kWh Rs 6 pe daal do", "listing daalni hai", "naya offer banao", "sell 30 units at 7 rupees tomorrow")
+- "create_listing": User wants to CREATE/SELL a new energy listing/offer (e.g. "50 kWh Rs 6 pe daal do", "listing daalni hai", "naya offer banao", "sell 30 units at 7 rupees tomorrow")
+- "buy_energy": User wants to BUY/PURCHASE energy (e.g. "buy 20 kWh", "energy khareedni hai", "bijli chahiye", "I want to buy energy", "mujhe 30 unit chahiye", "purchase solar energy")
 - "discom_rates": User asks about DISCOM/electricity rates or tariffs
 - "trading_tips": User asks for tips on how to earn more or improve trading
 - "general_qa": General question about energy trading, Oorja, solar, etc.
 
 IMPORTANT: If the user says they want to "place", "create", "add", "daal", "bana", "list" something — that's "create_listing", NOT "show_listings" or "show_orders".
+IMPORTANT: If the user says they want to "buy", "purchase", "kharid", "chahiye", "leni hai" energy — that's "buy_energy", NOT "create_listing".
 
 For "create_listing", extract params if mentioned:
 - price_per_kwh: number (Rs per unit/kWh)
 - quantity_kwh: number (kWh or units)
 - time_description: string (e.g. "tomorrow", "kal", "next week")
+
+For "buy_energy", extract params if mentioned:
+- quantity_kwh: number (kWh or units the user wants to buy)
+- max_price: number (maximum Rs per unit the user is willing to pay)
+- time_description: string (e.g. "tomorrow", "kal", "today", "aaj")
 
 For "show_sales", extract:
 - time_period: string (e.g. "today", "aaj", "this week", "is hafte")

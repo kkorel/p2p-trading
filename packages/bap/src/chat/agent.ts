@@ -24,7 +24,7 @@ import {
   getIssuerId,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
-import { mockTradingAgent, parseTimePeriod, getWelcomeBackData } from './trading-agent';
+import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase } from './trading-agent';
 import { askLLM, classifyIntent, composeResponse } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
@@ -60,6 +60,23 @@ interface PendingListing {
   awaitingField?: 'energy_type' | 'quantity' | 'price' | 'timeframe' | 'confirm';
 }
 
+interface PendingPurchase {
+  quantity?: number;
+  maxPrice?: number;
+  timeDesc?: string;
+  awaitingField?: 'quantity' | 'price_pref' | 'timeframe' | 'confirm';
+  // Populated after discovery
+  discoveredOffer?: {
+    offerId: string;
+    providerId: string;
+    providerName: string;
+    price: number;
+    quantity: number;
+    timeWindow: string;
+  };
+  transactionId?: string;
+}
+
 interface SessionContext {
   phone?: string;
   name?: string;
@@ -79,6 +96,7 @@ interface SessionContext {
   expectedCredType?: string;
   verifiedCreds?: string[];
   pendingListing?: PendingListing;
+  pendingPurchase?: PendingPurchase;
 }
 
 type ChatState =
@@ -529,6 +547,248 @@ async function createListingFromPending(ctx: SessionContext, pending: PendingLis
   return {
     messages: [{ text: h(ctx, `Could not create the listing: ${result.error || 'Unknown error'}. Please try again.`, `Listing nahi ban payi: ${result.error || 'Unknown error'}. Dobara try karo.`) }],
     contextUpdate: { pendingListing: undefined },
+  };
+}
+
+// --- Purchase (buyer) helpers (multi-turn detail gathering) ---
+
+/**
+ * Check which purchase detail is missing and ask the user for it.
+ * Returns an AgentResponse if something is missing, or null if all details are present.
+ */
+function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurchase): AgentResponse | null {
+  if (pending.quantity == null) {
+    return {
+      messages: [{
+        text: h(ctx,
+          'How many kWh (units) of energy do you want to buy?',
+          'Kitne kWh (unit) energy khareedna chahte ho?'
+        ),
+        buttons: [
+          { text: '10 kWh', callbackData: 'purchase_qty:10' },
+          { text: '25 kWh', callbackData: 'purchase_qty:25' },
+          { text: '50 kWh', callbackData: 'purchase_qty:50' },
+        ],
+      }],
+      contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'quantity' } },
+    };
+  }
+
+  if (pending.maxPrice == null) {
+    return {
+      messages: [{
+        text: h(ctx,
+          'What is the maximum price per unit (kWh) you are willing to pay? DISCOM rates are around Rs 5-8/unit.',
+          'Per unit (kWh) kitne Rs tak dena chahte ho? DISCOM rate Rs 5-8/unit ke aas-paas hai.'
+        ),
+        buttons: [
+          { text: 'Rs 6/unit', callbackData: 'purchase_price:6' },
+          { text: 'Rs 7/unit', callbackData: 'purchase_price:7' },
+          { text: 'Rs 8/unit', callbackData: 'purchase_price:8' },
+          { text: h(ctx, 'Any price', 'Koi bhi price'), callbackData: 'purchase_price:any' },
+        ],
+      }],
+      contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'price_pref' } },
+    };
+  }
+
+  if (!pending.timeDesc) {
+    return {
+      messages: [{
+        text: h(ctx,
+          'When do you need the energy? (e.g. "tomorrow", "today")',
+          'Energy kab chahiye? (jaise "kal", "aaj")'
+        ),
+        buttons: [
+          { text: h(ctx, 'Tomorrow', 'Kal'), callbackData: 'purchase_time:tomorrow' },
+          { text: h(ctx, 'Today', 'Aaj'), callbackData: 'purchase_time:today' },
+        ],
+      }],
+      contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'timeframe' } },
+    };
+  }
+
+  // All details present — show summary and ask for confirmation
+  const priceLabel = pending.maxPrice === 999 ? h(ctx, 'any price', 'koi bhi price') : `Rs ${pending.maxPrice}/unit max`;
+  return {
+    messages: [{
+      text: h(ctx,
+        `Here's your purchase request:\n• ${pending.quantity} kWh\n• ${priceLabel}\n• Time: ${pending.timeDesc}\n\nShall I find the best offer and buy?`,
+        `Aapki purchase request:\n• ${pending.quantity} kWh\n• ${priceLabel}\n• Time: ${pending.timeDesc}\n\nSabse accha offer dhundh ke khareed lun?`
+      ),
+      buttons: [
+        { text: h(ctx, 'Yes, buy!', 'Haan, khareed lo!'), callbackData: 'purchase_confirm:yes' },
+        { text: h(ctx, 'No, cancel', 'Nahi, cancel karo'), callbackData: 'purchase_confirm:no' },
+      ],
+    }],
+    contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'confirm' } },
+  };
+}
+
+/**
+ * Handle user input for a pending purchase (multi-turn).
+ * Returns AgentResponse if handled, null if not a pending-purchase input.
+ */
+async function handlePendingPurchaseInput(ctx: SessionContext, message: string): Promise<AgentResponse | null> {
+  const pending = ctx.pendingPurchase;
+  if (!pending?.awaitingField) return null;
+
+  const lower = message.toLowerCase().trim();
+
+  // Allow cancellation at any point
+  if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop') {
+    return {
+      messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+      contextUpdate: { pendingPurchase: undefined },
+    };
+  }
+
+  switch (pending.awaitingField) {
+    case 'quantity': {
+      let qty: number | undefined;
+      if (message.startsWith('purchase_qty:')) {
+        qty = parseFloat(message.replace('purchase_qty:', ''));
+      } else {
+        qty = parseFloat(message.replace(/[^\d.]/g, ''));
+      }
+
+      if (!qty || qty <= 0) {
+        return {
+          messages: [{ text: h(ctx, 'Please enter a valid number of kWh.', 'Sahi kWh number daalo.') }],
+        };
+      }
+      const updated = { ...pending, quantity: Math.round(qty), awaitingField: undefined as any };
+      const next = askNextPurchaseDetail(ctx, updated);
+      return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
+    }
+
+    case 'price_pref': {
+      let maxPrice: number | undefined;
+      if (message.startsWith('purchase_price:')) {
+        const val = message.replace('purchase_price:', '');
+        maxPrice = val === 'any' ? 999 : parseFloat(val);
+      } else if (lower.includes('any') || lower.includes('koi bhi') || lower.includes('kuch bhi')) {
+        maxPrice = 999;
+      } else {
+        maxPrice = parseFloat(message.replace(/[^\d.]/g, ''));
+      }
+
+      if (!maxPrice || maxPrice <= 0) {
+        return {
+          messages: [{ text: h(ctx, 'Please enter a valid price in Rs or choose "Any price".', 'Sahi price daalo (Rs mein) ya "Koi bhi price" chuno.') }],
+        };
+      }
+      const updated = { ...pending, maxPrice, awaitingField: undefined as any };
+      const next = askNextPurchaseDetail(ctx, updated);
+      return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
+    }
+
+    case 'timeframe': {
+      let timeDesc: string | undefined;
+      if (message.startsWith('purchase_time:')) {
+        timeDesc = message.replace('purchase_time:', '');
+      } else {
+        timeDesc = message.trim();
+      }
+
+      if (!timeDesc || timeDesc.length < 2) {
+        return {
+          messages: [{ text: h(ctx, 'Please tell me when you need the energy (e.g. "tomorrow", "today").', 'Kab chahiye batao (jaise "kal", "aaj").') }],
+        };
+      }
+      const updated = { ...pending, timeDesc, awaitingField: undefined as any };
+      const next = askNextPurchaseDetail(ctx, updated);
+      return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
+    }
+
+    case 'confirm': {
+      if (message.startsWith('purchase_confirm:')) {
+        const answer = message.replace('purchase_confirm:', '');
+        if (answer === 'no') {
+          return {
+            messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+            contextUpdate: { pendingPurchase: undefined },
+          };
+        }
+      }
+
+      const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'buy', 'kharid', 'purchase_confirm:yes'].includes(lower)
+        || message === 'purchase_confirm:yes';
+      const isNo = ['no', 'n', 'nahi', 'nope', 'cancel', 'purchase_confirm:no'].includes(lower)
+        || message === 'purchase_confirm:no';
+
+      if (isNo) {
+        return {
+          messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+          contextUpdate: { pendingPurchase: undefined },
+        };
+      }
+
+      if (isYes) {
+        return await executeAndReportPurchase(ctx, pending);
+      }
+
+      // Re-prompt
+      return {
+        messages: [{
+          text: h(ctx, 'Shall I proceed with the purchase?', 'Purchase karein?'),
+          buttons: [
+            { text: h(ctx, 'Yes', 'Haan'), callbackData: 'purchase_confirm:yes' },
+            { text: h(ctx, 'No', 'Nahi'), callbackData: 'purchase_confirm:no' },
+          ],
+        }],
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Execute the purchase and return result to user.
+ */
+async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPurchase): Promise<AgentResponse> {
+  if (!ctx.userId || !pending.quantity) {
+    return {
+      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+      contextUpdate: { pendingPurchase: undefined },
+    };
+  }
+
+  // Show "searching" message
+  const searchMsg = h(ctx,
+    'Searching for the best offer and processing your purchase...',
+    'Sabse accha offer dhundh raha hun aur purchase process kar raha hun...'
+  );
+
+  const result = await executePurchase(ctx.userId, {
+    quantity: pending.quantity,
+    maxPrice: pending.maxPrice === 999 ? undefined : pending.maxPrice,
+    timeDesc: pending.timeDesc,
+  });
+
+  if (result.success && result.order) {
+    const o = result.order;
+    return {
+      messages: [
+        { text: searchMsg },
+        {
+          text: h(ctx,
+            `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will be delivered via the grid. Payment is held in escrow until delivery is verified.`,
+            `Purchase ho gayi!\n• ${o.quantity} kWh ${o.providerName} se\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nAapki energy grid se deliver hogi. Payment escrow mein hai jab tak delivery verify nahi hoti.`
+          ),
+        },
+      ],
+      contextUpdate: { pendingPurchase: undefined },
+    };
+  }
+
+  return {
+    messages: [
+      { text: searchMsg },
+      { text: h(ctx, `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`, `Purchase nahi ho payi: ${result.error || 'Unknown error'}. Dobara try karo.`) },
+    ],
+    contextUpdate: { pendingPurchase: undefined },
   };
 }
 
@@ -1372,6 +1632,12 @@ const states: Record<ChatState, StateHandler> = {
         if (result) return result;
       }
 
+      // --- Handle pending purchase flow (multi-turn detail gathering) ---
+      if (ctx.pendingPurchase?.awaitingField) {
+        const result = await handlePendingPurchaseInput(ctx, message);
+        if (result) return result;
+      }
+
       // --- Step 1: Classify intent with LLM ---
       const intent = await classifyIntent(message);
       let dataContext = '';
@@ -1464,6 +1730,40 @@ const states: Record<ChatState, StateHandler> = {
             return await createListingFromPending(ctx, pending);
           }
 
+          case 'buy_energy': {
+            // --- Credential gate: must have Consumption Profile to buy ---
+            if (!verifiedCreds.includes('CONSUMPTION_PROFILE')) {
+              return {
+                messages: [
+                  {
+                    text: h(ctx,
+                      'To buy energy, I need your consumption profile credential first. This proves your electricity connection and load capacity.\n\nYou can get it from your DISCOM or download a sample from the credential portal.',
+                      'Energy khareedne ke liye pehle aapka consumption profile credential chahiye. Ye aapka bijli connection aur load capacity prove karta hai.\n\nYe aapko apni DISCOM se ya credential portal se mil jaayega.'
+                    ),
+                    buttons: [
+                      { text: h(ctx, 'Upload credential', 'Credential upload karo'), callbackData: 'upload_cons_cred' },
+                    ],
+                  },
+                ],
+                newState: 'OFFER_OPTIONAL_CREDS',
+                contextUpdate: { expectedCredType: 'ConsumptionProfileCredential' },
+              };
+            }
+
+            // --- Gather missing details interactively ---
+            const pendingBuy: PendingPurchase = {
+              quantity: intent.params?.quantity_kwh,
+              maxPrice: intent.params?.max_price,
+              timeDesc: intent.params?.time_description,
+            };
+
+            const askBuyResult = askNextPurchaseDetail(ctx, pendingBuy);
+            if (askBuyResult) return askBuyResult;
+
+            // All details provided — confirm and execute
+            return await executeAndReportPurchase(ctx, pendingBuy);
+          }
+
           case 'discom_rates': {
             const name = ctx.discom || 'DISCOM';
             dataContext = `${name} electricity rates: Normal slab Rs 5.50/unit, Peak hours (6PM-10PM) Rs 7.50/unit. P2P trading rate on Oorja: Rs 6.00/unit — cheaper than peak DISCOM rates, better than net metering (Rs 2/unit).`;
@@ -1552,6 +1852,32 @@ const states: Record<ChatState, StateHandler> = {
           const askResult = askNextListingDetail(ctx, pending);
           if (askResult) return askResult;
         }
+        // Buy keyword fallback
+        if ((lower.includes('buy') || lower.includes('kharid') || lower.includes('chahiye') || lower.includes('purchase') || lower.includes('leni')) &&
+            (lower.includes('energy') || lower.includes('bijli') || lower.includes('unit') || lower.includes('kwh'))) {
+          // Credential gate for keyword fallback too
+          if (!verifiedCreds.includes('CONSUMPTION_PROFILE')) {
+            return {
+              messages: [
+                {
+                  text: h(ctx,
+                    'To buy energy, I need your consumption profile credential first.',
+                    'Energy khareedne ke liye pehle aapka consumption profile credential chahiye.'
+                  ),
+                  buttons: [
+                    { text: h(ctx, 'Upload credential', 'Credential upload karo'), callbackData: 'upload_cons_cred' },
+                  ],
+                },
+              ],
+              newState: 'OFFER_OPTIONAL_CREDS',
+              contextUpdate: { expectedCredType: 'ConsumptionProfileCredential' },
+            };
+          }
+          // Start interactive purchase
+          const pendingBuy: PendingPurchase = {};
+          const askBuyResult = askNextPurchaseDetail(ctx, pendingBuy);
+          if (askBuyResult) return askBuyResult;
+        }
       }
 
       // Last resort
@@ -1560,10 +1886,10 @@ const states: Record<ChatState, StateHandler> = {
           {
             text: h(ctx, 'I can help with:', 'Main yeh madad kar sakta hun:'),
             buttons: [
-              { text: h(ctx, 'My earnings', 'Meri kamayi'), callbackData: 'show my earnings' },
-              { text: h(ctx, 'My listings', 'Mere listings'), callbackData: 'show my listings' },
               { text: h(ctx, 'My orders', 'Mere orders'), callbackData: 'show my orders' },
+              { text: h(ctx, 'My listings', 'Mere listings'), callbackData: 'show my listings' },
               { text: h(ctx, 'Sell energy', 'Energy bechna'), callbackData: 'I want to sell energy' },
+              { text: h(ctx, 'Buy energy', 'Energy khareedna'), callbackData: 'I want to buy energy' },
             ],
           },
         ],
