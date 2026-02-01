@@ -20,6 +20,10 @@
         {
             "source": "/callbacks/:path*",
             "destination": "https://p2p-trading-production-c4e8.up.railway.app/callbacks/:path*"
+        },
+        {
+            "source": "/chat/:path*",
+            "destination": "https://p2p-trading-production-c4e8.up.railway.app/chat/:path*"
         }
     ]
 }
