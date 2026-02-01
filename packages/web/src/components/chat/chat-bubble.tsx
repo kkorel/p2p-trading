@@ -17,12 +17,16 @@ export function ChatBubble() {
   }
 
   return (
-    <button
-      onClick={() => setIsOpen(true)}
-      className="fixed right-4 bottom-28 z-40 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center hover:bg-teal-700 hover:scale-105 active:scale-95 transition-all"
-      aria-label="Chat with Oorja"
-    >
-      <MessageCircle size={26} />
-    </button>
+    <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none">
+      <div className="w-full max-w-[480px] relative">
+        <button
+          onClick={() => setIsOpen(true)}
+          className="pointer-events-auto absolute right-4 bottom-28 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center hover:bg-teal-700 hover:scale-105 active:scale-95 transition-all"
+          aria-label="Chat with Oorja"
+        >
+          <MessageCircle size={26} />
+        </button>
+      </div>
+    </div>
   );
 }

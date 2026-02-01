@@ -16,14 +16,17 @@ let bot: any = null; // Telegraf instance (lazy-imported)
  */
 export async function startTelegramBot(): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
+  logger.info(`Telegram bot init: token ${token ? 'present' : 'missing'}`);
+
   if (!token) {
     logger.info('TELEGRAM_BOT_TOKEN not set — Telegram bot disabled');
     return;
   }
 
   try {
-    // Lazy import telegraf so the app doesn't fail if not installed
+    logger.info('Loading telegraf module...');
     const { Telegraf } = await import('telegraf');
+    logger.info('Creating bot instance...');
     bot = new Telegraf(token);
 
     // /start command
@@ -106,8 +109,17 @@ export async function startTelegramBot(): Promise<void> {
       }
     });
 
-    // Launch bot (long polling)
-    await bot.launch();
+    // Catch unhandled telegraf errors
+    bot.catch((err: any) => {
+      logger.error(`Telegraf error: ${err.message}`);
+    });
+
+    // Launch bot (long polling) — drop pending updates to avoid conflicts.
+    // Note: bot.launch() never resolves (infinite polling loop), so don't await it.
+    bot.launch({ dropPendingUpdates: true }).catch((err: any) => {
+      logger.error(`Telegram bot polling error: ${err.message}`);
+      bot = null;
+    });
     logger.info('Telegram bot started (long polling)');
   } catch (err: any) {
     logger.error(`Failed to start Telegram bot: ${err.message}`);

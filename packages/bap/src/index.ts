@@ -169,7 +169,7 @@ async function start() {
       startDiscomMockService();
 
       // Start Telegram bot (only if token is configured)
-      startTelegramBot();
+      startTelegramBot().catch(err => logger.error(`Telegram bot startup error: ${err.message}`));
     });
 
     // Graceful shutdown handler

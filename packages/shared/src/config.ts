@@ -2,6 +2,16 @@
  * Shared Configuration
  */
 
+import { config as dotenvConfig } from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env from project root
+const envPath = resolve(process.cwd(), '.env');
+const dotenvResult = dotenvConfig({ path: envPath, override: true });
+if (dotenvResult.error) {
+  console.warn(`[config] Failed to load .env from ${envPath}:`, dotenvResult.error.message);
+}
+
 // Environment detection
 export const isProduction = process.env.NODE_ENV === 'production';
 export const isDevelopment = !isProduction;
