@@ -37,6 +37,11 @@ import {
   // Bulk matcher
   selectOffersForBulk,
   formatBulkSelectionResponse,
+  // Trade rules
+  validateQuantity,
+  roundQuantity,
+  snapTimeWindow,
+  checkTradeWindow,
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
@@ -592,8 +597,17 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   };
   
   const txnId = transaction_id || uuidv4();
-  
-  // Validate time window: end time must be after start time
+
+  // Trade rules: validate minimum quantity (1 kWh)
+  if (minQuantity != null) {
+    const qtyErr = validateQuantity(minQuantity);
+    if (qtyErr) {
+      return res.status(400).json({ success: false, error: qtyErr });
+    }
+  }
+
+  // Trade rules: snap time window to 1-hour delivery blocks (06:00-18:00)
+  let effectiveTimeWindow = timeWindow;
   if (timeWindow?.startTime && timeWindow?.endTime) {
     const startDate = new Date(timeWindow.startTime);
     const endDate = new Date(timeWindow.endTime);
@@ -602,6 +616,13 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         success: false,
         error: 'End time must be after start time',
       });
+    }
+    effectiveTimeWindow = snapTimeWindow(timeWindow.startTime, timeWindow.endTime);
+
+    // Trade rules: gate closure check (T-4h before delivery, T-24h max future)
+    const tradeCheck = checkTradeWindow(effectiveTimeWindow.startTime);
+    if (!tradeCheck.allowed) {
+      return res.status(400).json({ success: false, error: tradeCheck.reason });
     }
   }
   
@@ -617,7 +638,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       sourceType,
       deliveryMode,
       minQuantity,
-      timeWindow,
+      timeWindow: effectiveTimeWindow,
     },
     excludeProviderId, // Store for filtering in callback
     buyerId, // Store buyer ID for order association
@@ -626,7 +647,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     sourceType,
     deliveryMode,
     minQuantity,
-    timeWindow,
+    timeWindow: effectiveTimeWindow,
   });
   // Build JSONPath filter expression for external CDS
   // Format matches BAP-DEG Postman spec:
@@ -671,9 +692,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         expression,
         expressionType: 'jsonpath',
       },
-      intent: timeWindow ? {
+      intent: effectiveTimeWindow ? {
         fulfillment: {
-          time: timeWindow,
+          time: effectiveTimeWindow,
         },
         quantity: minQuantity ? { value: minQuantity } : undefined,
       } : undefined,
@@ -1114,6 +1135,15 @@ router.post('/api/select', async (req: Request, res: Response) => {
     targetQuantity?: number;
     maxOffers?: number;
   };
+
+  // Trade rules: validate quantity (min 1 kWh)
+  const selectQty = targetQuantity || quantity;
+  if (selectQty != null) {
+    const qtyErr = validateQuantity(selectQty);
+    if (qtyErr) {
+      return res.status(400).json({ error: qtyErr });
+    }
+  }
 
   const txState = await getTransaction(transaction_id);
 
@@ -3223,6 +3253,124 @@ router.post('/api/cancel', authMiddleware, async (req: Request, res: Response) =
       error: 'Failed to cancel order',
     });
   }
+});
+
+// ==================== Diagnostic Endpoint (temporary) ====================
+
+interface DiagnosticTest {
+  name: string;
+  endpoint: string;
+  method: string;
+  status: number | null;
+  ok: boolean;
+  latencyMs: number;
+  response?: string;
+  error?: string;
+}
+
+router.get('/api/diagnosis', async (req: Request, res: Response) => {
+  const baseUrl = config.bap.uri;
+  const ledgerUrl = config.external.ledger;
+  const cdsUrl = config.cds.uri;
+  const vcUrl = config.external.vcPortal;
+  const results: DiagnosticTest[] = [];
+
+  async function test(
+    name: string,
+    endpoint: string,
+    method: 'GET' | 'POST',
+    url: string,
+    body?: any,
+    headers?: Record<string, string>
+  ): Promise<DiagnosticTest> {
+    const start = Date.now();
+    try {
+      const resp = method === 'GET'
+        ? await axios.get(url, { timeout: 10000, headers, validateStatus: () => true })
+        : await axios.post(url, body, { timeout: 10000, headers: { 'Content-Type': 'application/json', ...headers }, validateStatus: () => true });
+      const latency = Date.now() - start;
+      const responseStr = typeof resp.data === 'string' ? resp.data.substring(0, 500) : JSON.stringify(resp.data).substring(0, 500);
+      return { name, endpoint, method, status: resp.status, ok: resp.status >= 200 && resp.status < 300, latencyMs: latency, response: responseStr };
+    } catch (err: any) {
+      return { name, endpoint, method, status: null, ok: false, latencyMs: Date.now() - start, error: err.code || err.message };
+    }
+  }
+
+  // --- Internal APIs ---
+  results.push(await test('Health Check', '/health', 'GET', `${baseUrl}/health`));
+  results.push(await test('API Discover (local catalog)', '/api/discover', 'POST', `${baseUrl}/api/discover`, {
+    quantity: 5, maxPrice: 10,
+    requestedTimeWindow: { startTime: new Date(Date.now() + 86400000).toISOString(), endTime: new Date(Date.now() + 86400000 + 14400000).toISOString() },
+  }));
+  results.push(await test('API Select (no txn)', '/api/select', 'POST', `${baseUrl}/api/select`, { transaction_id: 'diag-no-txn', quantity: 5 }));
+  results.push(await test('API Init (no txn)', '/api/init', 'POST', `${baseUrl}/api/init`, { transaction_id: 'diag-no-txn' }));
+  results.push(await test('API Confirm (no txn)', '/api/confirm', 'POST', `${baseUrl}/api/confirm`, { transaction_id: 'diag-no-txn' }));
+  results.push(await test('API Status (no txn)', '/api/status', 'POST', `${baseUrl}/api/status`, { transaction_id: 'diag-no-txn' }));
+
+  // --- Seller Management ---
+  results.push(await test('Seller Offers', '/seller/offers', 'GET', `${baseUrl}/seller/offers`));
+  results.push(await test('Seller Items', '/seller/items', 'GET', `${baseUrl}/seller/items`));
+  results.push(await test('Seller CDS Status', '/seller/cds-status', 'GET', `${baseUrl}/seller/cds-status`));
+
+  // --- BPP Protocol (Beckn) ---
+  const becknCtx = {
+    version: '2.0.0', action: 'select', timestamp: new Date().toISOString(),
+    message_id: 'diag-msg', transaction_id: 'diag-txn',
+    bap_id: config.bap.id, bap_uri: baseUrl, bpp_id: config.bpp.id, bpp_uri: baseUrl,
+    ttl: 'PT30S', domain: 'beckn.one:deg:p2p-trading-interdiscom:2.0.0',
+  };
+  results.push(await test('BPP /select', '/select', 'POST', `${baseUrl}/select`, { context: { ...becknCtx, action: 'select' }, message: { order: { 'beckn:orderItems': [] } } }));
+  results.push(await test('BPP /init', '/init', 'POST', `${baseUrl}/init`, { context: { ...becknCtx, action: 'init' }, message: { order: { 'beckn:orderItems': [] } } }));
+  results.push(await test('BPP /confirm', '/confirm', 'POST', `${baseUrl}/confirm`, { context: { ...becknCtx, action: 'confirm' }, message: { order: { 'beckn:orderItems': [] } } }));
+  results.push(await test('BPP /status', '/status', 'POST', `${baseUrl}/status`, { context: { ...becknCtx, action: 'status' }, message: { order_id: 'diag-order' } }));
+
+  // --- Callbacks ---
+  results.push(await test('Callback on_discover', '/callbacks/on_discover', 'POST', `${baseUrl}/callbacks/on_discover`, { context: { ...becknCtx, action: 'on_discover' }, message: { catalog: { providers: [] } } }));
+  results.push(await test('Callback on_update', '/callbacks/on_update', 'POST', `${baseUrl}/callbacks/on_update`, { context: { ...becknCtx, action: 'on_update' }, message: { order: { 'beckn:orderStatus': 'INPROGRESS' } } }));
+
+  // --- External: DEG Ledger ---
+  results.push(await test('Ledger /ledger/put', '/ledger/put', 'POST', `${ledgerUrl}/ledger/put`, {
+    role: 'BUYER', transactionId: 'diag-txn', orderItemId: 'diag-order',
+    platformIdBuyer: config.bap.id, platformIdSeller: config.bpp.id,
+    tradeDetails: [{ tradeType: 'ENERGY', tradeQty: 1, tradeUnit: 'KWH' }],
+  }));
+  results.push(await test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, { transactionId: 'diag-txn', limit: 1 }));
+
+  // --- External: CDS ---
+  results.push(await test('CDS /beckn/discover', '/beckn/discover', 'POST', `${cdsUrl}/discover`, {
+    context: { ...becknCtx, action: 'discover', bpp_id: undefined, bpp_uri: undefined },
+    message: { intent: { item: { descriptor: { name: 'Energy' } } } },
+  }));
+
+  // --- External: VC Portal ---
+  results.push(await test('VC Portal reachable', '/', 'GET', vcUrl));
+
+  // --- Config snapshot ---
+  const configSnapshot = {
+    bapId: config.bap.id,
+    bapUri: config.bap.uri,
+    bppId: config.bpp.id,
+    bppUri: config.bpp.uri,
+    cdsUri: config.cds.uri,
+    externalCds: config.external.cds,
+    ledgerUrl: config.external.ledger,
+    vcPortal: config.external.vcPortal,
+    useExternalCds: config.external.useExternalCds,
+    enableLedgerWrites: config.external.enableLedgerWrites,
+    matchingWeights: config.matching.weights,
+    env: config.env.nodeEnv,
+  };
+
+  // Summarize
+  const passed = results.filter(r => r.ok).length;
+  const failed = results.filter(r => !r.ok).length;
+
+  res.json({
+    timestamp: new Date().toISOString(),
+    summary: { total: results.length, passed, failed },
+    config: configSnapshot,
+    results,
+  });
 });
 
 export default router;

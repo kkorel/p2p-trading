@@ -12,7 +12,7 @@
  */
 
 import axios from 'axios';
-import { config, createLogger, Order } from '@p2p/shared';
+import { config, createLogger, Order, prisma } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
@@ -131,6 +131,44 @@ export async function writeTradeToLedger(
     const discomIdBuyer = process.env.DISCOM_ID_BUYER || 'DISCOM_BUYER_DEFAULT';
     const discomIdSeller = process.env.DISCOM_ID_SELLER || 'DISCOM_SELLER_DEFAULT';
 
+    // Per trade rules: ledger must use canumber|meternumber composite format
+    // Look up consumerNumber and meterNumber for both buyer and seller
+    let ledgerBuyerId = buyerId;
+    let ledgerSellerId = sellerId;
+
+    try {
+      const [buyerUser, sellerUser] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: buyerId },
+          select: { consumerNumber: true, meterNumber: true },
+        }),
+        // sellerId may be a providerId, so look up via provider
+        prisma.user.findFirst({
+          where: { providerId: sellerId },
+          select: { consumerNumber: true, meterNumber: true },
+        }),
+      ]);
+
+      if (buyerUser?.consumerNumber && buyerUser?.meterNumber) {
+        ledgerBuyerId = `${buyerUser.consumerNumber}|${buyerUser.meterNumber}`;
+      }
+      if (sellerUser?.consumerNumber && sellerUser?.meterNumber) {
+        ledgerSellerId = `${sellerUser.consumerNumber}|${sellerUser.meterNumber}`;
+      }
+
+      logger.info('Ledger IDs resolved', {
+        transactionId,
+        ledgerBuyerId,
+        ledgerSellerId,
+        buyerHasComposite: !!(buyerUser?.consumerNumber && buyerUser?.meterNumber),
+        sellerHasComposite: !!(sellerUser?.consumerNumber && sellerUser?.meterNumber),
+      });
+    } catch (lookupErr: any) {
+      logger.warn('Could not resolve canumber|meternumber for ledger, using raw IDs', {
+        transactionId, error: lookupErr.message,
+      });
+    }
+
     const request: LedgerPutRequest = {
       role: 'BUYER',
       transactionId,
@@ -139,8 +177,8 @@ export async function writeTradeToLedger(
       platformIdSeller: config.bpp.id,
       discomIdBuyer,
       discomIdSeller,
-      buyerId,
-      sellerId,
+      buyerId: ledgerBuyerId,
+      sellerId: ledgerSellerId,
       tradeTime: new Date().toISOString(),
       deliveryStartTime,
       deliveryEndTime,

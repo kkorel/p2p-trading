@@ -38,6 +38,10 @@ import {
   publishCatalogToCDS,
   isExternalCDSEnabled,
   isValidTimeWindow,
+  validateQuantity,
+  roundQuantity,
+  snapTimeWindow,
+  checkTradeWindow,
 } from '@p2p/shared';
 import {
   getOfferById,
@@ -1626,6 +1630,25 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
     });
   }
 
+  // Trade rules: validate quantity (min 1 kWh, round to 2 decimals)
+  const qtyErr = validateQuantity(max_qty);
+  if (qtyErr) {
+    return res.status(400).json({ error: qtyErr });
+  }
+  const roundedQty = roundQuantity(max_qty);
+
+  // Trade rules: snap time window to 1-hour blocks within 06:00-18:00
+  let effectiveTw = time_window;
+  if (time_window?.startTime && time_window?.endTime) {
+    effectiveTw = snapTimeWindow(time_window.startTime, time_window.endTime);
+
+    // Trade rules: gate closure check (T-4h before delivery)
+    const tradeCheck = checkTradeWindow(effectiveTw.startTime);
+    if (!tradeCheck.allowed) {
+      return res.status(400).json({ error: tradeCheck.reason });
+    }
+  }
+
   // Verify the item belongs to this provider
   const items = await getProviderItems(provider_id);
   const itemExists = items.some(i => i.id === item_id);
@@ -1638,8 +1661,8 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
     provider_id,
     price_per_kwh,
     currency || 'INR',
-    max_qty,
-    time_window
+    roundedQty,
+    effectiveTw
   );
 
   logger.info(`New offer created: ${offer.id} for item ${item_id}`);
@@ -1765,6 +1788,13 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
     });
   }
 
+  // Trade rules: validate quantity (min 1 kWh)
+  const directQtyErr = validateQuantity(max_qty);
+  if (directQtyErr) {
+    return res.status(400).json({ error: directQtyErr });
+  }
+  const directRoundedQty = roundQuantity(max_qty);
+
   // Validate time window (startTime must be before endTime)
   if (!isValidTimeWindow(time_window)) {
     return res.status(400).json({
@@ -1772,12 +1802,24 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
     });
   }
 
+  // Trade rules: snap time window to 1-hour blocks within 06:00-18:00
+  let directEffectiveTw = time_window;
+  if (time_window?.startTime && time_window?.endTime) {
+    directEffectiveTw = snapTimeWindow(time_window.startTime, time_window.endTime);
+
+    // Trade rules: gate closure check (T-4h before delivery)
+    const directTradeCheck = checkTradeWindow(directEffectiveTw.startTime);
+    if (!directTradeCheck.allowed) {
+      return res.status(400).json({ error: directTradeCheck.reason });
+    }
+  }
+
   // Auto-create an item for this offer
   const item = await addCatalogItem(
     provider_id,
     source_type.toUpperCase() as any,
     'SCHEDULED',
-    max_qty,
+    directRoundedQty,
     [], // No production windows needed
     '' // No meter ID needed
   );
@@ -1790,8 +1832,8 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
     provider_id,
     price_per_kwh,
     currency || 'INR',
-    max_qty,
-    time_window
+    directRoundedQty,
+    directEffectiveTw
   );
 
   logger.info(`New direct offer created: ${offer.id}`);

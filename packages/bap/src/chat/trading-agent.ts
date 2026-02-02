@@ -3,7 +3,7 @@
  * Supports language-aware responses (English / Hinglish).
  */
 
-import { prisma, createLogger, publishOfferToCDS, isExternalCDSEnabled, config } from '@p2p/shared';
+import { prisma, createLogger, publishOfferToCDS, isExternalCDSEnabled, config, snapTimeWindow, checkTradeWindow, validateQuantity, roundQuantity, checkBuyerCapacity } from '@p2p/shared';
 import { registerProvider, addCatalogItem, addOffer } from '../seller-catalog';
 import axios from 'axios';
 
@@ -439,6 +439,25 @@ export const mockTradingAgent = {
 
 // --- Buyer-side purchase execution ---
 
+export interface SmartBuyOffer {
+  offerId: string;
+  providerId: string;
+  providerName: string;
+  price: number;
+  quantity: number;
+  subtotal: number;
+  timeWindow: string;
+}
+
+export interface SmartBuySummary {
+  totalQuantity: number;
+  totalPrice: number;
+  averagePrice: number;
+  fullyFulfilled: boolean;
+  shortfall: number;
+  offersUsed: number;
+}
+
 export interface PurchaseResult {
   success: boolean;
   order?: {
@@ -450,13 +469,10 @@ export interface PurchaseResult {
     providerName: string;
     timeWindow: string;
   };
-  discoveredOffer?: {
-    offerId: string;
-    providerId: string;
-    providerName: string;
-    price: number;
-    quantity: number;
-    timeWindow: string;
+  // Multi-offer purchase result
+  bulkResult?: {
+    confirmedCount: number;
+    failedCount: number;
   };
   error?: string;
 }
@@ -464,6 +480,8 @@ export interface PurchaseResult {
 export interface DiscoveryResult {
   success: boolean;
   transactionId?: string;
+  selectionType?: 'single' | 'multiple';
+  // For single offer
   discoveredOffer?: {
     offerId: string;
     providerId: string;
@@ -472,6 +490,9 @@ export interface DiscoveryResult {
     quantity: number;
     timeWindow: string;
   };
+  // For smart buy (single or multiple)
+  discoveredOffers?: SmartBuyOffer[];
+  summary?: SmartBuySummary;
   error?: string;
 }
 
@@ -649,7 +670,8 @@ function buildTimeWindow(timeDesc?: string): { startTime: string; endTime: strin
     endTime.setDate(endTime.getDate() + 1);
     endTime.setHours(endHour, 0, 0, 0);
   }
-  return { startTime: startTime.toISOString(), endTime: endTime.toISOString() };
+  // Snap to 1-hour delivery blocks within 06:00-18:00 per trade rules
+  return snapTimeWindow(startTime.toISOString(), endTime.toISOString());
 }
 
 /**
@@ -691,7 +713,27 @@ export async function discoverBestOffer(
     Authorization: `Bearer ${token}`,
   };
 
+  // Validate quantity (min 1 kWh, round to 2 decimals)
+  const qtyError = validateQuantity(params.quantity);
+  if (qtyError) {
+    return { success: false, error: qtyError };
+  }
+  params.quantity = roundQuantity(params.quantity);
+
   const timeWindow = buildTimeWindow(params.timeDesc);
+
+  // Gate closure check: reject if within 4h of delivery start
+  const tradeCheck = checkTradeWindow(timeWindow.startTime);
+  if (!tradeCheck.allowed) {
+    return { success: false, error: tradeCheck.reason || 'Trade not allowed for this time window' };
+  }
+
+  // Buyer sanctioned load check
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { sanctionedLoadKW: true } });
+  const buyerCapError = checkBuyerCapacity(params.quantity, user?.sanctionedLoadKW);
+  if (buyerCapError) {
+    return { success: false, error: buyerCapError };
+  }
 
   try {
     // Step 1: Discover available offers
@@ -727,54 +769,89 @@ export async function discoverBestOffer(
       return { success: false, error: 'No energy offers found matching your requirements. Try different quantity or time.' };
     }
 
-    // Step 2: Select best offer (auto-match)
-    logger.info(`[BuyFlow:Discover] Selecting from ${allOffers.length} offers, txId=${txId}`);
+    // Step 2: Smart buy — automatically picks single or multiple offers
+    logger.info(`[BuyFlow:Discover] Smart buy selecting from ${allOffers.length} offers, txId=${txId}`);
     const selectRes = await axios.post(`${baseUrl}/api/select`, {
       transaction_id: txId,
       quantity: params.quantity,
       requestedTimeWindow: { startTime: timeWindow.startTime, endTime: timeWindow.endTime },
-      autoMatch: true,
+      smartBuy: true,
     }, { headers, timeout: 15000 });
 
     if (selectRes.data.error) {
       return { success: false, error: selectRes.data.error };
     }
 
-    const selectedOffer = selectRes.data.selected_offer;
-    if (!selectedOffer) {
+    const selectionType: 'single' | 'multiple' = selectRes.data.selectionType || 'single';
+    const selectedOffers: any[] = selectRes.data.selectedOffers || [];
+    const summary = selectRes.data.summary;
+
+    if (selectedOffers.length === 0) {
       return { success: false, error: 'No matching offer found. Try adjusting quantity or time window.' };
     }
 
-    const bestOffer = allOffers.find(o => o.id === selectedOffer.id) || allOffers[0];
-    const tw = bestOffer.timeWindow;
-    const twLabel = tw
-      ? `${new Date(tw.startTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${new Date(tw.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}-${new Date(tw.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
-      : 'Flexible';
-
-    const discoveredOffer = {
-      offerId: selectedOffer.id,
-      providerId: bestOffer.providerId || selectedOffer.provider_id,
-      providerName: bestOffer.providerName || 'Solar Seller',
-      price: selectedOffer.price?.value || bestOffer.price?.value || 0,
-      quantity: params.quantity,
-      timeWindow: twLabel,
+    // Format time window label from the first offer's time window
+    const formatTw = (tw: any): string => {
+      if (!tw) return 'Flexible';
+      try {
+        const s = new Date(tw.startTime);
+        const e = new Date(tw.endTime);
+        return `${s.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${s.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}-${e.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+      } catch { return 'Flexible'; }
     };
 
-    if (params.maxPrice && discoveredOffer.price > params.maxPrice) {
+    // Build discovered offers array
+    const discoveredOffers: SmartBuyOffer[] = selectedOffers.map((o: any) => ({
+      offerId: o.offer_id,
+      providerId: o.provider_id,
+      providerName: o.provider_name || 'Seller',
+      price: o.unit_price,
+      quantity: o.quantity,
+      subtotal: o.subtotal,
+      timeWindow: formatTw(o.timeWindow),
+    }));
+
+    const smartSummary: SmartBuySummary = {
+      totalQuantity: summary?.totalQuantity || discoveredOffers.reduce((s, o) => s + o.quantity, 0),
+      totalPrice: summary?.totalPrice || discoveredOffers.reduce((s, o) => s + o.subtotal, 0),
+      averagePrice: summary?.averagePrice || (summary?.totalPrice / summary?.totalQuantity) || 0,
+      fullyFulfilled: summary?.fullyFulfilled ?? true,
+      shortfall: summary?.shortfall || 0,
+      offersUsed: summary?.offersUsed || discoveredOffers.length,
+    };
+
+    // Check max price against average price
+    if (params.maxPrice && smartSummary.averagePrice > params.maxPrice) {
       return {
         success: false,
-        discoveredOffer,
+        selectionType,
+        discoveredOffers,
+        summary: smartSummary,
         transactionId: txId,
-        error: `Best available price is Rs ${discoveredOffer.price}/unit, which exceeds your max of Rs ${params.maxPrice}/unit.`,
+        error: `Average price is Rs ${smartSummary.averagePrice.toFixed(2)}/unit, which exceeds your max of Rs ${params.maxPrice}/unit.`,
       };
     }
 
-    logger.info(`[BuyFlow:Discover] Found offer: ${discoveredOffer.providerName} @ Rs${discoveredOffer.price}/kWh, txId=${txId}`);
+    // Also build legacy single discoveredOffer for backward compat
+    const firstOffer = discoveredOffers[0];
+    const discoveredOffer = selectionType === 'single' ? {
+      offerId: firstOffer.offerId,
+      providerId: firstOffer.providerId,
+      providerName: firstOffer.providerName,
+      price: firstOffer.price,
+      quantity: firstOffer.quantity,
+      timeWindow: firstOffer.timeWindow,
+    } : undefined;
+
+    logger.info(`[BuyFlow:Discover] Smart buy: ${selectionType} mode, ${smartSummary.offersUsed} offers, ${smartSummary.totalQuantity} kWh @ avg Rs${smartSummary.averagePrice.toFixed(2)}/kWh, txId=${txId}`);
 
     return {
       success: true,
       transactionId: txId,
+      selectionType,
       discoveredOffer,
+      discoveredOffers,
+      summary: smartSummary,
     };
   } catch (error: any) {
     const msg = error.response?.data?.error || error.message || 'Unknown error';
@@ -817,9 +894,32 @@ export async function completePurchase(
       transaction_id: transactionId,
     }, { headers, timeout: 15000 });
 
-    const orderId = confirmRes.data.order_id;
     await sleep(1000);
 
+    // Handle bulk mode confirm response
+    if (confirmRes.data.bulk_mode) {
+      const confirmedCount = confirmRes.data.total_confirmed || 0;
+      const failedCount = confirmRes.data.total_failed || 0;
+      logger.info(`[BuyFlow:Complete] Bulk purchase: ${confirmedCount} confirmed, ${failedCount} failed, txId=${transactionId}`);
+
+      return {
+        success: confirmedCount > 0,
+        order: {
+          orderId: transactionId,
+          transactionId,
+          quantity,
+          pricePerKwh: discoveredOffer?.price || 0,
+          totalPrice: (discoveredOffer?.price || 0) * quantity,
+          providerName: discoveredOffer?.providerName || 'Multiple Sellers',
+          timeWindow: discoveredOffer?.timeWindow || 'Flexible',
+        },
+        bulkResult: { confirmedCount, failedCount },
+        error: failedCount > 0 ? `${failedCount} order(s) failed to confirm` : undefined,
+      };
+    }
+
+    // Single order confirm response
+    const orderId = confirmRes.data.order_id;
     const price = discoveredOffer?.price || 0;
     const totalPrice = price * quantity;
     logger.info(`[BuyFlow:Complete] Purchase complete: order=${orderId}, ${quantity}kWh at Rs${price}/kWh = Rs${totalPrice}`);
@@ -835,7 +935,6 @@ export async function completePurchase(
         providerName: discoveredOffer?.providerName || 'Solar Seller',
         timeWindow: discoveredOffer?.timeWindow || 'Flexible',
       },
-      discoveredOffer: discoveredOffer || undefined,
     };
   } catch (error: any) {
     const msg = error.response?.data?.error || error.message || 'Unknown error';
@@ -853,15 +952,27 @@ export async function executePurchase(
   params: { quantity: number; maxPrice?: number; timeDesc?: string }
 ): Promise<PurchaseResult> {
   const discovery = await discoverBestOffer(userId, params);
-  if (!discovery.success || !discovery.transactionId || !discovery.discoveredOffer) {
+  if (!discovery.success || !discovery.transactionId) {
     return {
       success: false,
-      discoveredOffer: discovery.discoveredOffer,
       error: discovery.error,
     };
   }
 
-  return completePurchase(userId, discovery.transactionId, discovery.discoveredOffer, params.quantity);
+  const offer = discovery.discoveredOffer || (discovery.discoveredOffers?.[0] ? {
+    offerId: discovery.discoveredOffers[0].offerId,
+    providerId: discovery.discoveredOffers[0].providerId,
+    providerName: discovery.discoveredOffers[0].providerName,
+    price: discovery.discoveredOffers[0].price,
+    quantity: discovery.discoveredOffers[0].quantity,
+    timeWindow: discovery.discoveredOffers[0].timeWindow,
+  } : undefined);
+
+  if (!offer) {
+    return { success: false, error: discovery.error || 'No offers found' };
+  }
+
+  return completePurchase(userId, discovery.transactionId, offer, params.quantity);
 }
 
 /**
