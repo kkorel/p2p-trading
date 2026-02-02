@@ -495,34 +495,72 @@ function buildTimeWindow(timeDesc?: string): { startTime: string; endTime: strin
 
   const td = timeDesc.toLowerCase();
 
-  // --- Parse specific hour ranges: "1-6 AM", "1 AM to 6 AM", "2 to 8 PM", "1 se 6 baje" ---
+  // --- Parse specific hour ranges: "1-6 AM", "6 AM to 6 PM", "2 to 8 PM", "1 se 6 baje" ---
+  // Capture AM/PM for both start and end hours separately
   const hourRangeMatch = td.match(
-    /(\d{1,2})\s*(?:am|pm|baje)?\s*(?:-|to|se)\s*(\d{1,2})\s*(am|pm|baje)?/i
+    /(\d{1,2})\s*(am|pm|baje)?\s*(?:-|to|se)\s*(\d{1,2})\s*(am|pm|baje)?/i
   );
 
   if (hourRangeMatch) {
     let startH = parseInt(hourRangeMatch[1]);
-    let endH = parseInt(hourRangeMatch[2]);
-    const periodSuffix = (hourRangeMatch[3] || '').toLowerCase();
+    let endH = parseInt(hourRangeMatch[3]);
+    const startSuffix = (hourRangeMatch[2] || '').toLowerCase();
+    const endSuffix = (hourRangeMatch[4] || '').toLowerCase();
 
-    // Determine AM/PM from suffix or context words
-    const hasPm = periodSuffix === 'pm' || td.includes('pm')
-      || td.includes('shaam') || td.includes('sham') || td.includes('dopahar')
-      || td.includes('evening') || td.includes('afternoon');
-    const hasAm = periodSuffix === 'am' || td.includes('am')
-      || td.includes('subah') || td.includes('savere') || td.includes('morning');
+    // If both start and end have explicit AM/PM, apply individually
+    if (startSuffix && endSuffix && startSuffix !== 'baje' && endSuffix !== 'baje') {
+      if (startSuffix === 'pm' && startH < 12) startH += 12;
+      if (startSuffix === 'am' && startH === 12) startH = 0;
+      if (endSuffix === 'pm' && endH < 12) endH += 12;
+      if (endSuffix === 'am' && endH === 12) endH = 0;
+    } else {
+      // Only one or no suffix — use context words to determine AM/PM
+      const suffix = endSuffix || startSuffix;
+      const hasPm = suffix === 'pm'
+        || td.includes('shaam') || td.includes('sham') || td.includes('dopahar')
+        || td.includes('evening') || td.includes('afternoon');
+      const hasAm = suffix === 'am'
+        || td.includes('subah') || td.includes('savere') || td.includes('morning');
 
-    if (hasPm && !hasAm) {
-      if (startH < 12) startH += 12;
-      if (endH < 12) endH += 12;
-    } else if (hasAm) {
-      if (startH === 12) startH = 0;
-      if (endH === 12) endH = 0;
+      if (hasPm && !hasAm) {
+        if (startH < 12) startH += 12;
+        if (endH < 12) endH += 12;
+      } else if (hasAm && !hasPm) {
+        if (startH === 12) startH = 0;
+        if (endH === 12) endH = 0;
+      }
     }
 
     const isToday = td.includes('today') || td.includes('aaj');
+    const isTomorrow = td.includes('tomorrow') || td.includes('kal');
 
-    if (isToday) {
+    // Try to parse an explicit date like "2 Feb 2026", "Feb 2", "3rd March"
+    const monthNames: Record<string, number> = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+    };
+    // "2 Feb 2026" or "2nd Feb" or "2 February 2026"
+    const dateDMY = td.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+(\d{4}))?/i);
+    // "Feb 2" or "February 2, 2026"
+    const dateMDY = td.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?/i);
+    const dateMatch = dateDMY || dateMDY;
+
+    if (dateMatch) {
+      let day: number, month: number, year: number;
+      if (dateDMY) {
+        day = parseInt(dateDMY[1]);
+        month = monthNames[dateDMY[2].substring(0, 3).toLowerCase()];
+        year = dateDMY[3] ? parseInt(dateDMY[3]) : now.getFullYear();
+      } else {
+        month = monthNames[dateMDY![1].substring(0, 3).toLowerCase()];
+        day = parseInt(dateMDY![2]);
+        year = dateMDY![3] ? parseInt(dateMDY![3]) : now.getFullYear();
+      }
+      startTime.setFullYear(year, month, day);
+      endTime.setFullYear(year, month, day);
+      startTime.setHours(startH, 0, 0, 0);
+      endTime.setHours(endH, 0, 0, 0);
+    } else if (isToday) {
       startTime.setHours(startH, 0, 0, 0);
       endTime.setHours(endH, 0, 0, 0);
       // If the window is already past, fall back to tomorrow
@@ -530,8 +568,13 @@ function buildTimeWindow(timeDesc?: string): { startTime: string; endTime: strin
         startTime.setDate(startTime.getDate() + 1);
         endTime.setDate(endTime.getDate() + 1);
       }
+    } else if (isTomorrow) {
+      startTime.setDate(startTime.getDate() + 1);
+      endTime.setDate(endTime.getDate() + 1);
+      startTime.setHours(startH, 0, 0, 0);
+      endTime.setHours(endH, 0, 0, 0);
     } else {
-      // Default to tomorrow if no day specified, or explicitly tomorrow
+      // No day specified — default to tomorrow
       startTime.setDate(startTime.getDate() + 1);
       endTime.setDate(endTime.getDate() + 1);
       startTime.setHours(startH, 0, 0, 0);
@@ -557,7 +600,31 @@ function buildTimeWindow(timeDesc?: string): { startTime: string; endTime: strin
   const isToday = td.includes('today') || td.includes('aaj');
   const isTomorrow = td.includes('tomorrow') || td.includes('kal');
 
-  if (isToday) {
+  // Try to parse an explicit date (e.g. "2 Feb 2026", "Feb 2", "3rd March")
+  const kwMonths: Record<string, number> = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+  };
+  const kwDateDMY = td.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+(\d{4}))?/i);
+  const kwDateMDY = !kwDateDMY ? td.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?/i) : null;
+  const kwDateMatch = kwDateDMY || kwDateMDY;
+
+  if (kwDateMatch) {
+    let day: number, month: number, year: number;
+    if (kwDateDMY) {
+      day = parseInt(kwDateDMY[1]);
+      month = kwMonths[kwDateDMY[2].substring(0, 3).toLowerCase()];
+      year = kwDateDMY[3] ? parseInt(kwDateDMY[3]) : now.getFullYear();
+    } else {
+      month = kwMonths[kwDateMDY![1].substring(0, 3).toLowerCase()];
+      day = parseInt(kwDateMDY![2]);
+      year = kwDateMDY![3] ? parseInt(kwDateMDY![3]) : now.getFullYear();
+    }
+    startTime.setFullYear(year, month, day);
+    endTime.setFullYear(year, month, day);
+    startTime.setHours(startHour ?? 6, 0, 0, 0);
+    endTime.setHours(endHour ?? 18, 0, 0, 0);
+  } else if (isToday) {
     const dayStart = startHour != null ? startHour : Math.max(now.getHours() + 1, 6);
     const dayEnd = endHour != null ? endHour : 23;
     startTime.setHours(dayStart, 0, 0, 0);
