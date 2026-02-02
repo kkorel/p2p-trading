@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp, ShieldCheck, Sun, Battery, BarChart2, Award, CheckCircle2 } from 'lucide-react';
+import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp, ShieldCheck, Sun, Battery, BarChart2, Award, CheckCircle2, Activity, Download } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
@@ -828,6 +828,9 @@ export default function ProfilePage() {
         </Card>
 
 
+        {/* Run Diagnosis */}
+        <DiagnosisButton />
+
         {/* Logout */}
         <Button
           variant="danger"
@@ -840,5 +843,111 @@ export default function ProfilePage() {
         </Button>
       </div>
     </AppShell>
+  );
+}
+
+// Temporary diagnostic tool — remove after debugging
+function DiagnosisButton() {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<{ summary: { total: number; passed: number; failed: number }; results: any[] } | null>(null);
+
+  const runDiagnosis = async () => {
+    setRunning(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/diagnosis');
+      if (!res.ok) {
+        const text = await res.text().catch(() => 'Unknown error');
+        setResult({ summary: { total: 1, passed: 0, failed: 1 }, results: [{ name: `Server error (${res.status})`, ok: false, error: text.substring(0, 200) }] });
+        return;
+      }
+      const data = await res.json();
+      if (!data.summary || !data.results) {
+        setResult({ summary: { total: 1, passed: 0, failed: 1 }, results: [{ name: 'Invalid response', ok: false, error: JSON.stringify(data).substring(0, 200) }] });
+        return;
+      }
+      setResult(data);
+
+      // Auto-download the full report as JSON
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `diagnosis-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setResult({ summary: { total: 0, passed: 0, failed: 1 }, results: [{ name: 'Fetch failed', ok: false, error: err.message }] });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+          <Activity className="w-4 h-4 text-[var(--color-warning)]" />
+          System Diagnosis
+        </h3>
+        {result && (
+          <Badge variant={result.summary.failed === 0 ? 'success' : 'warning'} size="sm">
+            {result.summary.passed}/{result.summary.total} passed
+          </Badge>
+        )}
+      </div>
+
+      {!result && (
+        <p className="text-sm text-[var(--color-text-muted)] mb-3">
+          Tests all API endpoints, external services (Ledger, CDS, VC Portal), and downloads a full report.
+        </p>
+      )}
+
+      {result && (
+        <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
+          {result.results.map((r: any, i: number) => (
+            <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-[var(--color-border)] last:border-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${r.ok ? 'bg-[var(--color-success)]' : 'bg-[var(--color-danger)]'}`} />
+                <span className="text-[var(--color-text)] truncate">{r.name}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  {r.status ?? 'ERR'} · {r.latencyMs ?? '?'}ms
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button
+          fullWidth
+          variant={result ? 'secondary' : 'primary'}
+          loading={running}
+          onClick={runDiagnosis}
+        >
+          <Activity className="h-4 w-4" />
+          {running ? 'Running...' : result ? 'Run Again' : 'Run Diagnosis'}
+        </Button>
+        {result && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `diagnosis-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    </Card>
   );
 }

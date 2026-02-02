@@ -236,6 +236,9 @@ model Order {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  // Bulk order grouping - links orders from same bulk purchase
+  bulkGroupId String? @map("bulk_group_id")
+
   // Cancellation tracking
   cancelledAt   DateTime? @map("cancelled_at")
   cancelledBy   String?   @map("cancelled_by") // 'BUYER' | 'SELLER' | 'SYSTEM'
@@ -261,6 +264,7 @@ model Order {
   @@index([buyerId])
   @@index([status])
   @@index([paymentStatus])
+  @@index([bulkGroupId])
   @@map("orders")
 }
 

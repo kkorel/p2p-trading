@@ -65,7 +65,7 @@ interface PendingPurchase {
   maxPrice?: number;
   timeDesc?: string;
   awaitingField?: 'quantity' | 'price_pref' | 'timeframe' | 'confirm' | 'confirm_offer';
-  // Populated after discovery
+  // Populated after discovery — single offer (legacy)
   discoveredOffer?: {
     offerId: string;
     providerId: string;
@@ -73,6 +73,25 @@ interface PendingPurchase {
     price: number;
     quantity: number;
     timeWindow: string;
+  };
+  // Smart buy multi-offer
+  discoveredOffers?: Array<{
+    offerId: string;
+    providerId: string;
+    providerName: string;
+    price: number;
+    quantity: number;
+    subtotal: number;
+    timeWindow: string;
+  }>;
+  selectionType?: 'single' | 'multiple';
+  summary?: {
+    totalQuantity: number;
+    totalPrice: number;
+    averagePrice: number;
+    fullyFulfilled: boolean;
+    shortfall: number;
+    offersUsed: number;
   };
   transactionId?: string;
 }
@@ -614,8 +633,8 @@ function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurchase): A
 }
 
 /**
- * Discover the best offer and present it to the user for confirmation.
- * Called when all purchase details have been gathered.
+ * Discover the best offer(s) and present them to the user for confirmation.
+ * Uses smart buy to automatically find single or multi-seller deals.
  */
 async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchase): Promise<AgentResponse> {
   if (!ctx.userId || !pending.quantity) {
@@ -627,8 +646,8 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
 
   const searchMsg: AgentMessage = {
     text: h(ctx,
-      'Searching for the best offer...',
-      'Sabse accha offer dhundh raha hun...'
+      'Searching for the best deals...',
+      'Sabse acche deals dhundh raha hun...'
     ),
   };
 
@@ -638,7 +657,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
     timeDesc: pending.timeDesc,
   });
 
-  if (!result.success || !result.discoveredOffer || !result.transactionId) {
+  if (!result.success || !result.transactionId || (!result.discoveredOffer && !result.discoveredOffers?.length)) {
     return {
       messages: [
         searchMsg,
@@ -651,19 +670,78 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
     };
   }
 
-  const offer = result.discoveredOffer;
-  const totalPrice = offer.price * offer.quantity;
+  const offers = result.discoveredOffers || [];
+  const summary = result.summary;
+  const selectionType = result.selectionType || 'single';
+
+  // --- Single offer display ---
+  if (selectionType === 'single' && offers.length === 1) {
+    const offer = offers[0];
+    const totalPrice = offer.subtotal || (offer.price * offer.quantity);
+
+    return {
+      messages: [
+        searchMsg,
+        {
+          text: h(ctx,
+            `Found a match!\n\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh at Rs ${offer.price}/unit\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nDo you want to buy this?`,
+            `Offer mil gaya!\n\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh Rs ${offer.price}/unit pe\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nYe khareedna hai?`
+          ),
+          buttons: [
+            { text: h(ctx, 'Yes, buy it!', 'Haan, khareed lo!'), callbackData: 'purchase_offer_confirm:yes' },
+            { text: h(ctx, 'No, cancel', 'Nahi, cancel karo'), callbackData: 'purchase_offer_confirm:no' },
+          ],
+        },
+      ],
+      contextUpdate: {
+        pendingPurchase: {
+          ...pending,
+          awaitingField: 'confirm_offer',
+          discoveredOffer: {
+            offerId: offer.offerId,
+            providerId: offer.providerId,
+            providerName: offer.providerName,
+            price: offer.price,
+            quantity: offer.quantity,
+            timeWindow: offer.timeWindow,
+          },
+          discoveredOffers: offers,
+          selectionType,
+          summary,
+          transactionId: result.transactionId,
+        },
+      },
+    };
+  }
+
+  // --- Multi-offer display ---
+  const offerLines = offers.map((o, i) =>
+    `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`
+  ).join('\n\n');
+
+  const totalLine = summary
+    ? `Total: ${summary.totalQuantity} kWh | Avg Rs ${summary.averagePrice.toFixed(2)}/unit | Rs ${summary.totalPrice.toFixed(2)}`
+    : `Total: Rs ${offers.reduce((s, o) => s + o.subtotal, 0).toFixed(2)}`;
+
+  const fulfillLine = summary && !summary.fullyFulfilled
+    ? h(ctx,
+        `\n(Partial: ${summary.shortfall} kWh short of ${pending.quantity} kWh requested)`,
+        `\n(Partial: ${pending.quantity} mein se ${summary.shortfall} kWh nahi mili)`
+      )
+    : '';
+
+  const timeWindow = offers[0]?.timeWindow || 'Flexible';
 
   return {
     messages: [
       searchMsg,
       {
         text: h(ctx,
-          `Found a match!\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh at Rs ${offer.price}/unit\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nDo you want to buy this?`,
-          `Offer mil gaya!\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh Rs ${offer.price}/unit pe\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nYe khareedna hai?`
+          `Found best deals from ${offers.length} sellers!\n\n${offerLines}\n\n${totalLine}\nTime: ${timeWindow}${fulfillLine}\n\nAccept this deal?`,
+          `${offers.length} sellers se best deals mile!\n\n${offerLines}\n\n${totalLine}\nTime: ${timeWindow}${fulfillLine}\n\nYe deal accept karna hai?`
         ),
         buttons: [
-          { text: h(ctx, 'Yes, buy it!', 'Haan, khareed lo!'), callbackData: 'purchase_offer_confirm:yes' },
+          { text: h(ctx, 'Yes, buy all!', 'Haan, sab khareed lo!'), callbackData: 'purchase_offer_confirm:yes' },
           { text: h(ctx, 'No, cancel', 'Nahi, cancel karo'), callbackData: 'purchase_offer_confirm:no' },
         ],
       },
@@ -672,7 +750,9 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
       pendingPurchase: {
         ...pending,
         awaitingField: 'confirm_offer',
-        discoveredOffer: offer,
+        discoveredOffers: offers,
+        selectionType,
+        summary,
         transactionId: result.transactionId,
       },
     },
@@ -821,7 +901,9 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
       }
 
       if (isYes) {
-        if (!ctx.userId || !pending.transactionId || !pending.discoveredOffer || !pending.quantity) {
+        // Need userId, transactionId, quantity, and at least one offer
+        const hasOffer = pending.discoveredOffer || (pending.discoveredOffers && pending.discoveredOffers.length > 0);
+        if (!ctx.userId || !pending.transactionId || !hasOffer || !pending.quantity) {
           return {
             messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
             contextUpdate: { pendingPurchase: undefined },
@@ -835,27 +917,64 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           ),
         };
 
+        // Build the offer metadata for completePurchase (uses first offer for legacy fields)
+        const primaryOffer = pending.discoveredOffer || (pending.discoveredOffers ? {
+          offerId: pending.discoveredOffers[0].offerId,
+          providerId: pending.discoveredOffers[0].providerId,
+          providerName: pending.discoveredOffers[0].providerName,
+          price: pending.discoveredOffers[0].price,
+          quantity: pending.discoveredOffers[0].quantity,
+          timeWindow: pending.discoveredOffers[0].timeWindow,
+        } : undefined);
+
         const result = await completePurchase(
           ctx.userId,
           pending.transactionId,
-          pending.discoveredOffer,
+          primaryOffer,
           pending.quantity
         );
 
-        if (result.success && result.order) {
-          const o = result.order;
-          return {
-            messages: [
-              confirmMsg,
-              {
-                text: h(ctx,
-                  `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will be delivered via the grid. Payment is held in escrow until delivery is verified.`,
-                  `Purchase ho gayi!\n• ${o.quantity} kWh ${o.providerName} se\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nAapki energy grid se deliver hogi. Payment escrow mein hai jab tak delivery verify nahi hoti.`
-                ),
-              },
-            ],
-            contextUpdate: { pendingPurchase: undefined },
-          };
+        if (result.success) {
+          // Multi-offer success display
+          if (pending.selectionType === 'multiple' && pending.summary && pending.discoveredOffers) {
+            const s = pending.summary;
+            const offerList = pending.discoveredOffers.map((o, i) =>
+              `${i + 1}. ${o.providerName}: ${o.quantity} kWh × Rs ${o.price}/unit`
+            ).join('\n');
+            const bulkInfo = result.bulkResult
+              ? `\n• ${result.bulkResult.confirmedCount} order(s) confirmed`
+              : '';
+
+            return {
+              messages: [
+                confirmMsg,
+                {
+                  text: h(ctx,
+                    `Purchase successful!\n\n${offerList}\n\n• Total: ${s.totalQuantity} kWh at avg Rs ${s.averagePrice.toFixed(2)}/unit\n• Amount: Rs ${s.totalPrice.toFixed(2)}${bulkInfo}\n• Time: ${pending.discoveredOffers[0].timeWindow}\n\nYour energy will be delivered via the grid. Payment is held in escrow until delivery is verified.`,
+                    `Purchase ho gayi!\n\n${offerList}\n\n• Total: ${s.totalQuantity} kWh avg Rs ${s.averagePrice.toFixed(2)}/unit pe\n• Amount: Rs ${s.totalPrice.toFixed(2)}${bulkInfo}\n• Time: ${pending.discoveredOffers[0].timeWindow}\n\nAapki energy grid se deliver hogi. Payment escrow mein hai jab tak delivery verify nahi hoti.`
+                  ),
+                },
+              ],
+              contextUpdate: { pendingPurchase: undefined },
+            };
+          }
+
+          // Single offer success display
+          if (result.order) {
+            const o = result.order;
+            return {
+              messages: [
+                confirmMsg,
+                {
+                  text: h(ctx,
+                    `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will be delivered via the grid. Payment is held in escrow until delivery is verified.`,
+                    `Purchase ho gayi!\n• ${o.quantity} kWh ${o.providerName} se\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nAapki energy grid se deliver hogi. Payment escrow mein hai jab tak delivery verify nahi hoti.`
+                  ),
+                },
+              ],
+              contextUpdate: { pendingPurchase: undefined },
+            };
+          }
         }
 
         return {
@@ -871,9 +990,13 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
       }
 
       // Re-prompt
+      const isMulti = pending.selectionType === 'multiple';
       return {
         messages: [{
-          text: h(ctx, 'Do you want to buy this offer?', 'Ye offer khareedna hai?'),
+          text: h(ctx,
+            isMulti ? 'Do you want to buy all these offers?' : 'Do you want to buy this offer?',
+            isMulti ? 'Ye saari offers khareedni hain?' : 'Ye offer khareedna hai?'
+          ),
           buttons: [
             { text: h(ctx, 'Yes', 'Haan'), callbackData: 'purchase_offer_confirm:yes' },
             { text: h(ctx, 'No', 'Nahi'), callbackData: 'purchase_offer_confirm:no' },

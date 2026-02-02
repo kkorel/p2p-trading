@@ -98,6 +98,8 @@ interface BecknItemAttributes {
 interface BecknItem {
   '@context': string;
   '@type': string;
+  'beckn:networkId': string[];
+  'beckn:isActive': boolean;
   'beckn:id': string;
   'beckn:descriptor': BecknDescriptor;
   'beckn:provider': {
@@ -121,6 +123,21 @@ interface BecknOfferAttributes {
   minimumQuantity?: number;
   maximumQuantity?: number;
   validityWindow?: {
+    '@type': string;
+    'schema:startTime': string;
+    'schema:endTime': string;
+  };
+  'beckn:price': {
+    value: number;
+    currency: string;
+    unitText: string;
+  };
+  'beckn:maxQuantity': {
+    unitQuantity: number;
+    unitText: string;
+    unitCode: string;
+  };
+  'beckn:timeWindow'?: {
     '@type': string;
     'schema:startTime': string;
     'schema:endTime': string;
@@ -218,6 +235,8 @@ function buildBecknItem(item: SyncItem, providerName: string): BecknItem {
   return {
     '@context': BECKN_CORE_CONTEXT,
     '@type': 'beckn:Item',
+    'beckn:networkId': ['p2p-interdiscom-trading-pilot-network'],
+    'beckn:isActive': true,
     'beckn:id': item.id,
     'beckn:descriptor': {
       '@type': 'beckn:Descriptor',
@@ -281,6 +300,22 @@ function buildBecknOffer(offer: SyncOffer, meterId?: string): BecknOffer {
       minimumQuantity: 1.0,
       maximumQuantity: offer.max_qty,
       validityWindow: offer.time_window ? {
+        '@type': 'beckn:TimePeriod',
+        'schema:startTime': offer.time_window.startTime,
+        'schema:endTime': offer.time_window.endTime,
+      } : undefined,
+      // Per Postman spec: price, maxQuantity, timeWindow inside offerAttributes
+      'beckn:price': {
+        value: offer.price_value,
+        currency: offer.currency || 'INR',
+        unitText: 'kWh',
+      },
+      'beckn:maxQuantity': {
+        unitQuantity: offer.max_qty,
+        unitText: 'kWh',
+        unitCode: 'KWH',
+      },
+      'beckn:timeWindow': offer.time_window ? {
         '@type': 'beckn:TimePeriod',
         'schema:startTime': offer.time_window.startTime,
         'schema:endTime': offer.time_window.endTime,
