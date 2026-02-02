@@ -100,15 +100,33 @@ export function snapTimeWindow(startTime: string, endTime: string): { startTime:
   const snappedStart = snapToHourFloor(start);
   const snappedEnd = snapToHourCeil(end);
 
-  // Clamp hours to delivery range
   const startHour = snappedStart.getHours();
   const endHour = snappedEnd.getHours();
 
+  // Check if the entire requested window falls outside delivery hours (06:00-18:00).
+  // This happens for evening/night requests (e.g., 22:00-02:00).
+  // In this case, advance to the next day's delivery window.
+  const startAfterDelivery = startHour >= DELIVERY_END_HOUR;
+
+  if (startAfterDelivery) {
+    // Entire window is after 18:00 — advance to next day 06:00-18:00
+    snappedStart.setDate(snappedStart.getDate() + 1);
+    snappedStart.setHours(DELIVERY_START_HOUR, 0, 0, 0);
+    snappedEnd.setFullYear(snappedStart.getFullYear(), snappedStart.getMonth(), snappedStart.getDate());
+    snappedEnd.setHours(DELIVERY_END_HOUR, 0, 0, 0);
+    return {
+      startTime: snappedStart.toISOString(),
+      endTime: snappedEnd.toISOString(),
+    };
+  }
+
+  // Clamp hours to delivery range
   snappedStart.setHours(clampHour(startHour), 0, 0, 0);
 
-  // Special case: if endHour is 0 (midnight next day), treat as 18:00 same day
+  // Special case: if end is on a different day and before delivery hours (e.g., 02:00 next day),
+  // treat as end-of-delivery on the start day
   if (endHour < DELIVERY_START_HOUR && snappedEnd.getDate() !== snappedStart.getDate()) {
-    snappedEnd.setDate(snappedStart.getDate());
+    snappedEnd.setFullYear(snappedStart.getFullYear(), snappedStart.getMonth(), snappedStart.getDate());
     snappedEnd.setHours(DELIVERY_END_HOUR, 0, 0, 0);
   } else {
     snappedEnd.setHours(clampHour(endHour), 0, 0, 0);
@@ -118,8 +136,11 @@ export function snapTimeWindow(startTime: string, endTime: string): { startTime:
   if (snappedEnd.getTime() <= snappedStart.getTime()) {
     snappedEnd.setTime(snappedStart.getTime());
     snappedEnd.setHours(snappedStart.getHours() + 1);
-    // Re-clamp
+    // If that pushes past delivery end, advance to next day
     if (snappedEnd.getHours() > DELIVERY_END_HOUR) {
+      snappedStart.setDate(snappedStart.getDate() + 1);
+      snappedStart.setHours(DELIVERY_START_HOUR, 0, 0, 0);
+      snappedEnd.setFullYear(snappedStart.getFullYear(), snappedStart.getMonth(), snappedStart.getDate());
       snappedEnd.setHours(DELIVERY_END_HOUR, 0, 0, 0);
     }
   }
