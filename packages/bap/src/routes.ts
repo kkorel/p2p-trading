@@ -31,6 +31,7 @@ import {
   validateProviderMatch,
   // Secure client for signed Beckn requests
   secureAxios,
+  isSigningEnabled,
   // CDS utilities
   isExternalCDSEnabled,
   // Bulk matcher
@@ -628,15 +629,16 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     timeWindow,
   });
   // Build JSONPath filter expression for external CDS
-  // Format: $[?(@.beckn:itemAttributes.sourceType == 'SOLAR' && ...)]
-  // IMPORTANT: External CDS requires at least one filter to return results
+  // Format matches BAP-DEG Postman spec:
+  // $[?('p2p-interdiscom-trading-pilot-network' == @.beckn:networkId && @.beckn:itemAttributes.sourceType == 'SOLAR' && ...)]
+  // IMPORTANT: External CDS requires networkId filter to identify which network's catalogs to return
   const filterParts: string[] = [];
+
+  // Always include networkId filter (required by CDS per Postman spec)
+  filterParts.push(`'p2p-interdiscom-trading-pilot-network' == @.beckn:networkId`);
+
   if (sourceType) {
     filterParts.push(`@.beckn:itemAttributes.sourceType == '${sourceType}'`);
-  } else {
-    // When no source type specified, filter for any energy type
-    // This ensures we get results from the external CDS
-    filterParts.push(`(@.beckn:itemAttributes.sourceType == 'SOLAR' || @.beckn:itemAttributes.sourceType == 'WIND' || @.beckn:itemAttributes.sourceType == 'HYDRO' || @.beckn:itemAttributes.sourceType == 'MIXED')`);
   }
   if (deliveryMode) {
     filterParts.push(`@.beckn:itemAttributes.deliveryMode == '${deliveryMode}'`);
@@ -644,7 +646,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   if (minQuantity) {
     filterParts.push(`@.beckn:itemAttributes.availableQuantity >= ${minQuantity}`);
   }
-  
+
   // Build JSONPath expression
   const expression = `$[?(${filterParts.join(' && ')})]`;
   
@@ -805,23 +807,36 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   };
   
   const cdsDiscoverUrl = getCdsDiscoverUrl();
-  
+
+  // Log full request for debugging CDS issues
+  console.log(`[CDS-DISCOVER] === OUTBOUND REQUEST ===`);
+  console.log(`[CDS-DISCOVER] URL: ${cdsDiscoverUrl}`);
+  console.log(`[CDS-DISCOVER] Signing enabled: ${isSigningEnabled()}`);
+  console.log(`[CDS-DISCOVER] Request body:\n${JSON.stringify(discoverMessage, null, 2)}`);
+
   logger.info('Sending discover request to external CDS', {
     transaction_id: txnId,
     message_id: context.message_id,
     action: 'discover',
     cdsUrl: cdsDiscoverUrl,
+    signingEnabled: isSigningEnabled(),
+    filterExpression: expression,
   });
-  
+
   // Log outbound event
   await logEvent(txnId, context.message_id, 'discover', 'OUTBOUND', JSON.stringify(discoverMessage));
-  
+
   try {
     const response = await secureAxios.post(cdsDiscoverUrl, discoverMessage);
-    
+
+    // Log full response for debugging
+    console.log(`[CDS-DISCOVER] === RESPONSE ===`);
+    console.log(`[CDS-DISCOVER] Status: ${response.status}`);
+    console.log(`[CDS-DISCOVER] Response body:\n${JSON.stringify(response.data, null, 2)}`);
+
     // Check if the CDS returned catalog data synchronously in the response
     // External CDS may return data in ack.message.catalogs instead of via callback
-    const syncCatalog = response.data?.ack?.message?.catalogs || 
+    const syncCatalog = response.data?.ack?.message?.catalogs ||
                         response.data?.message?.catalogs ||
                         response.data?.catalogs;
     
@@ -974,12 +989,17 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     // Log the full CDS error response for debugging
     const cdsResponseData = error.response?.data;
     const cdsStatus = error.response?.status;
+    const cdsHeaders = error.response?.headers;
+    console.error(`[CDS-DISCOVER] === ERROR ===`);
+    console.error(`[CDS-DISCOVER] HTTP Status: ${cdsStatus || 'NO RESPONSE'}`);
+    console.error(`[CDS-DISCOVER] Error: ${error.message}`);
+    console.error(`[CDS-DISCOVER] Response body:\n${JSON.stringify(cdsResponseData || 'none', null, 2)}`);
+    console.error(`[CDS-DISCOVER] Response headers:\n${JSON.stringify(cdsHeaders || 'none', null, 2)}`);
     logger.error(`External CDS discover failed (HTTP ${cdsStatus}): ${error.message}`, {
       transaction_id: txnId,
       cdsStatus,
       cdsResponse: cdsResponseData ? JSON.stringify(cdsResponseData).substring(0, 500) : 'no response body',
     });
-    console.error(`[CDS-ERROR] HTTP ${cdsStatus}: ${JSON.stringify(cdsResponseData || error.message)}`);
 
     // Fall back to local catalog so user still gets results
     logger.info('Falling back to LOCAL catalog after CDS failure', { transaction_id: txnId });
