@@ -42,22 +42,22 @@ const HINGLISH_MARKERS = new Set([
   // Verbs
   'karo', 'karna', 'batao', 'bata', 'dikhao', 'dikha', 'chahiye', 'chahte',
   'khareed', 'kharid', 'khareedna', 'bechna', 'bech', 'daal', 'daalo', 'bana',
-  'banao', 'dekho', 'dekh', 'samjho', 'samjha', 'suno', 'sun', 'padho', 'likho',
+  'banao', 'dekho', 'dekh', 'samjho', 'samjha', 'suno', 'padho', 'likho',
   'leni', 'deni', 'milegi', 'milega', 'hogi', 'hoga', 'raha', 'rahi',
   // Question words
   'kya', 'kaise', 'kitna', 'kitne', 'kitni', 'kab', 'kahan', 'kaun', 'kyun', 'kyon',
   // Nouns
-  'bijli', 'paise', 'paise', 'rupees', 'paisa', 'kamaya', 'kamayi', 'kamai',
-  'daam', 'unit', 'khata', 'subah', 'dopahar', 'shaam', 'raat', 'kal', 'aaj',
+  'bijli', 'paise', 'paisa', 'kamaya', 'kamayi', 'kamai',
+  'daam', 'khata', 'subah', 'dopahar', 'shaam', 'raat', 'kal', 'aaj',
   'abhi', 'pehle', 'baad', 'agle', 'pichle', 'hafte', 'mahine', 'saal',
   // Pronouns / common
   'mujhe', 'mera', 'mere', 'meri', 'aapka', 'aapke', 'aapki', 'humara', 'hamara',
   'yeh', 'ye', 'wo', 'woh', 'unka', 'iska', 'kuch', 'sab', 'bahut', 'zyada',
-  // Conjunctions / particles
-  'aur', 'ya', 'lekin', 'par', 'se', 'ke', 'ka', 'ki', 'pe', 'mein', 'tak',
-  'ko', 'hai', 'hain', 'tha', 'thi', 'the', 'ho', 'naya', 'purana',
-  // Energy/trading domain
-  'bijli', 'energy', 'solar', 'listing', 'offer', 'deal', 'munafa',
+  // Conjunctions / particles (only unambiguously Hindi ones)
+  'aur', 'ya', 'lekin', 'se', 'ke', 'ka', 'ki', 'pe', 'mein', 'tak',
+  'ko', 'hai', 'hain', 'tha', 'thi', 'naya', 'purana',
+  // Energy/trading domain (only Hindi-specific words)
+  'bijli', 'munafa',
 ]);
 
 /**
@@ -110,9 +110,12 @@ export function detectLanguage(text: string): SarvamLangCode | 'hinglish' {
   // Need at least 2 Indic characters to consider it a native script
   if (maxCount >= 2) return maxLang;
 
-  // Check for Hinglish (Roman Hindi) — if enough Hindi words detected
+  // Check for Hinglish (Roman Hindi) — need both ratio and minimum count
+  const words = text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
   const hinglishScore = detectHinglish(text);
-  if (hinglishScore >= 0.25) return 'hinglish';
+  const hinglishCount = Math.round(hinglishScore * words.length);
+  // Require at least 2 Hindi words AND 30% ratio to avoid false positives on short English sentences
+  if (hinglishCount >= 2 && hinglishScore >= 0.3) return 'hinglish';
 
   return 'en-IN';
 }
