@@ -14,7 +14,8 @@ import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { config } from '../config';
 import { createLogger } from '../utils/logger';
-import { TimeWindow } from '../types/beckn';
+import { TimeWindow, BECKN_SCHEMA_CONTEXT, BECKN_DEFAULT_LOCATION, BecknLocation } from '../types/beckn';
+import { secureAxios } from '../beckn/secure-client';
 
 const logger = createLogger('CDS-PUBLISH');
 
@@ -166,6 +167,8 @@ interface CatalogPublishContext {
   bpp_id: string;
   bpp_uri: string;
   ttl: string;
+  location: BecknLocation;
+  schema_context: string[];
 }
 
 interface CatalogPublishMessage {
@@ -302,6 +305,8 @@ function createPublishContext(transactionId?: string): CatalogPublishContext {
     bpp_id: config.bpp.id,
     bpp_uri: config.bpp.uri,
     ttl: 'PT30S',
+    location: BECKN_DEFAULT_LOCATION,
+    schema_context: BECKN_SCHEMA_CONTEXT,
   };
 }
 
@@ -373,11 +378,8 @@ export async function publishCatalogToCDS(
       context_bpp_uri: publishMessage.context.bpp_uri,
     });
 
-    // Use plain axios for CDS publish (no Beckn signing needed for catalog service)
-    const response = await axios.post(url, publishMessage, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    // Use secureAxios for CDS publish (external CDS requires Beckn HTTP signatures)
+    const response = await secureAxios.post(url, publishMessage, {
       timeout: 30000, // 30 second timeout
     });
 

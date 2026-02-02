@@ -817,7 +817,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   await logEvent(txnId, context.message_id, 'discover', 'OUTBOUND', JSON.stringify(discoverMessage));
   
   try {
-    const response = await axios.post(cdsDiscoverUrl, discoverMessage);
+    const response = await secureAxios.post(cdsDiscoverUrl, discoverMessage);
     
     // Check if the CDS returned catalog data synchronously in the response
     // External CDS may return data in ack.message.catalogs instead of via callback
