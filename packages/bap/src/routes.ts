@@ -3292,25 +3292,41 @@ interface DiagnosticTest {
   name: string;
   endpoint: string;
   method: string;
+  category: 'internal' | 'external' | 'protocol' | 'auth';
   status: number | null;
   ok: boolean;
   latencyMs: number;
   response?: string;
   error?: string;
+  hint?: string;
 }
 
 router.get('/api/diagnosis', async (req: Request, res: Response) => {
+  const requestId = `diag-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   // Use localhost for self-calls to avoid going through the public proxy (which deadlocks)
   const localBase = `http://localhost:${config.ports.bap}`;
   const ledgerUrl = config.external.ledger;
   const cdsUrl = config.cds.uri;
   const vcUrl = config.external.vcPortal;
 
+  function getHint(name: string, status: number | null, error?: string): string | undefined {
+    if (error === 'ECONNREFUSED') return 'Service is not running or port is blocked';
+    if (error === 'ETIMEDOUT' || error === 'ECONNABORTED') return 'Service is slow or unreachable — check network/firewall';
+    if (status === 401) return 'Authentication failed — check API keys or session tokens';
+    if (status === 403) return 'Access denied — check permissions and CORS settings';
+    if (status === 404) return 'Endpoint not found — check URL configuration';
+    if (status === 500) return 'Server error — check service logs for details';
+    if (name.includes('CDS') && status === 401) return 'CDS auth failed — check BECKN signing keys are registered in DEDI';
+    if (name.includes('Ledger') && !status) return 'DEG Ledger unreachable — check LEDGER_URL env var';
+    return undefined;
+  }
+
   async function test(
     name: string,
     endpoint: string,
     method: 'GET' | 'POST',
     url: string,
+    category: DiagnosticTest['category'] = 'internal',
     body?: any,
     headers?: Record<string, string>
   ): Promise<DiagnosticTest> {
@@ -3321,9 +3337,11 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
         : await axios.post(url, body, { timeout: 8000, headers: { 'Content-Type': 'application/json', ...headers }, validateStatus: () => true });
       const latency = Date.now() - start;
       const responseStr = typeof resp.data === 'string' ? resp.data.substring(0, 300) : JSON.stringify(resp.data).substring(0, 300);
-      return { name, endpoint, method, status: resp.status, ok: resp.status >= 200 && resp.status < 300, latencyMs: latency, response: responseStr };
+      const ok = resp.status >= 200 && resp.status < 300;
+      return { name, endpoint, method, category, status: resp.status, ok, latencyMs: latency, response: responseStr, hint: ok ? undefined : getHint(name, resp.status) };
     } catch (err: any) {
-      return { name, endpoint, method, status: null, ok: false, latencyMs: Date.now() - start, error: err.code || err.message };
+      const hint = getHint(name, null, err.code || err.message);
+      return { name, endpoint, method, category, status: null, ok: false, latencyMs: Date.now() - start, error: err.code || err.message, hint };
     }
   }
 
@@ -3334,50 +3352,86 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
     ttl: 'PT30S', domain: 'beckn.one:deg:p2p-trading-interdiscom:2.0.0',
   };
 
+  // --- Auth status check ---
+  const authToken = req.headers.authorization?.replace('Bearer ', '');
+  let authStatus: { authenticated: boolean; userId?: string; userName?: string; sessionExpiry?: string; error?: string } = { authenticated: false };
+  if (authToken) {
+    try {
+      const session = await prisma.session.findFirst({
+        where: { token: authToken, expiresAt: { gt: new Date() } },
+        include: { user: { select: { id: true, name: true, trustScore: true, profileComplete: true } } },
+      });
+      if (session?.user) {
+        authStatus = {
+          authenticated: true,
+          userId: session.user.id,
+          userName: session.user.name || undefined,
+          sessionExpiry: session.expiresAt.toISOString(),
+        };
+      } else {
+        authStatus = { authenticated: false, error: authToken ? 'Session expired or invalid' : 'No token provided' };
+      }
+    } catch {
+      authStatus = { authenticated: false, error: 'Auth check failed' };
+    }
+  }
+
+  // --- DB connectivity check ---
+  let dbStatus: { ok: boolean; latencyMs: number; error?: string } = { ok: false, latencyMs: 0 };
+  {
+    const start = Date.now();
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      dbStatus = { ok: true, latencyMs: Date.now() - start };
+    } catch (err: any) {
+      dbStatus = { ok: false, latencyMs: Date.now() - start, error: err.message };
+    }
+  }
+
   // Run ALL tests in parallel to stay within Railway's timeout
   const results = await Promise.all([
     // Internal APIs (via localhost)
-    test('Health Check', '/health', 'GET', `${localBase}/health`),
-    test('API Discover', '/api/discover', 'POST', `${localBase}/api/discover`, {
+    test('Health Check', '/health', 'GET', `${localBase}/health`, 'internal'),
+    test('API Discover', '/api/discover', 'POST', `${localBase}/api/discover`, 'internal', {
       quantity: 5, maxPrice: 10,
       requestedTimeWindow: { startTime: new Date(Date.now() + 86400000).toISOString(), endTime: new Date(Date.now() + 86400000 + 14400000).toISOString() },
     }),
-    test('API Select (no txn)', '/api/select', 'POST', `${localBase}/api/select`, { transaction_id: 'diag-no-txn', quantity: 5 }),
-    test('API Init (no txn)', '/api/init', 'POST', `${localBase}/api/init`, { transaction_id: 'diag-no-txn' }),
-    test('API Confirm (no txn)', '/api/confirm', 'POST', `${localBase}/api/confirm`, { transaction_id: 'diag-no-txn' }),
-    test('API Status (no txn)', '/api/status', 'POST', `${localBase}/api/status`, { transaction_id: 'diag-no-txn' }),
+    test('API Select (no txn)', '/api/select', 'POST', `${localBase}/api/select`, 'internal', { transaction_id: 'diag-no-txn', quantity: 5 }),
+    test('API Init (no txn)', '/api/init', 'POST', `${localBase}/api/init`, 'internal', { transaction_id: 'diag-no-txn' }),
+    test('API Confirm (no txn)', '/api/confirm', 'POST', `${localBase}/api/confirm`, 'internal', { transaction_id: 'diag-no-txn' }),
+    test('API Status (no txn)', '/api/status', 'POST', `${localBase}/api/status`, 'internal', { transaction_id: 'diag-no-txn' }),
 
     // Seller Management (via localhost)
-    test('Seller Offers', '/seller/offers', 'GET', `${localBase}/seller/offers`),
-    test('Seller Items', '/seller/items', 'GET', `${localBase}/seller/items`),
-    test('Seller CDS Status', '/seller/cds-status', 'GET', `${localBase}/seller/cds-status`),
+    test('Seller Offers', '/seller/offers', 'GET', `${localBase}/seller/offers`, 'internal'),
+    test('Seller Items', '/seller/items', 'GET', `${localBase}/seller/items`, 'internal'),
+    test('Seller CDS Status', '/seller/cds-status', 'GET', `${localBase}/seller/cds-status`, 'internal'),
 
     // BPP Protocol (via localhost)
-    test('BPP /select', '/select', 'POST', `${localBase}/select`, { context: { ...becknCtx, action: 'select' }, message: { order: { 'beckn:orderItems': [] } } }),
-    test('BPP /init', '/init', 'POST', `${localBase}/init`, { context: { ...becknCtx, action: 'init' }, message: { order: { 'beckn:orderItems': [] } } }),
-    test('BPP /confirm', '/confirm', 'POST', `${localBase}/confirm`, { context: { ...becknCtx, action: 'confirm' }, message: { order: { 'beckn:orderItems': [] } } }),
-    test('BPP /status', '/status', 'POST', `${localBase}/status`, { context: { ...becknCtx, action: 'status' }, message: { order_id: 'diag-order' } }),
+    test('BPP /select', '/select', 'POST', `${localBase}/select`, 'protocol', { context: { ...becknCtx, action: 'select' }, message: { order: { 'beckn:orderItems': [] } } }),
+    test('BPP /init', '/init', 'POST', `${localBase}/init`, 'protocol', { context: { ...becknCtx, action: 'init' }, message: { order: { 'beckn:orderItems': [] } } }),
+    test('BPP /confirm', '/confirm', 'POST', `${localBase}/confirm`, 'protocol', { context: { ...becknCtx, action: 'confirm' }, message: { order: { 'beckn:orderItems': [] } } }),
+    test('BPP /status', '/status', 'POST', `${localBase}/status`, 'protocol', { context: { ...becknCtx, action: 'status' }, message: { order_id: 'diag-order' } }),
 
     // Callbacks (via localhost)
-    test('Callback on_discover', '/callbacks/on_discover', 'POST', `${localBase}/callbacks/on_discover`, { context: { ...becknCtx, action: 'on_discover' }, message: { catalog: { providers: [] } } }),
-    test('Callback on_update', '/callbacks/on_update', 'POST', `${localBase}/callbacks/on_update`, { context: { ...becknCtx, action: 'on_update' }, message: { order: { 'beckn:orderStatus': 'INPROGRESS' } } }),
+    test('Callback on_discover', '/callbacks/on_discover', 'POST', `${localBase}/callbacks/on_discover`, 'protocol', { context: { ...becknCtx, action: 'on_discover' }, message: { catalog: { providers: [] } } }),
+    test('Callback on_update', '/callbacks/on_update', 'POST', `${localBase}/callbacks/on_update`, 'protocol', { context: { ...becknCtx, action: 'on_update' }, message: { order: { 'beckn:orderStatus': 'INPROGRESS' } } }),
 
     // External: DEG Ledger
-    test('Ledger /ledger/put', '/ledger/put', 'POST', `${ledgerUrl}/ledger/put`, {
+    test('Ledger /ledger/put', '/ledger/put', 'POST', `${ledgerUrl}/ledger/put`, 'external', {
       role: 'BUYER', transactionId: 'diag-txn', orderItemId: 'diag-order',
       platformIdBuyer: config.bap.id, platformIdSeller: config.bpp.id,
       tradeDetails: [{ tradeType: 'ENERGY', tradeQty: 1, tradeUnit: 'KWH' }],
     }),
-    test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, { transactionId: 'diag-txn', limit: 1 }),
+    test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, 'external', { transactionId: 'diag-txn', limit: 1 }),
 
     // External: CDS
-    test('CDS /beckn/discover', '/beckn/discover', 'POST', `${cdsUrl}/discover`, {
+    test('CDS /beckn/discover', '/beckn/discover', 'POST', `${cdsUrl}/discover`, 'external', {
       context: { ...becknCtx, action: 'discover', bpp_id: undefined, bpp_uri: undefined },
       message: { intent: { item: { descriptor: { name: 'Energy' } } } },
     }),
 
     // External: VC Portal
-    test('VC Portal reachable', '/', 'GET', vcUrl),
+    test('VC Portal reachable', '/', 'GET', vcUrl, 'external'),
   ]);
 
   const configSnapshot = {
@@ -3398,11 +3452,28 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
   const passed = results.filter(r => r.ok).length;
   const failed = results.filter(r => !r.ok).length;
 
+  // Group by category for structured output
+  const byCategory = {
+    internal: results.filter(r => r.category === 'internal'),
+    protocol: results.filter(r => r.category === 'protocol'),
+    external: results.filter(r => r.category === 'external'),
+  };
+
+  // Identify critical failures
+  const criticalFailures = results
+    .filter(r => !r.ok && (r.name === 'Health Check' || r.category === 'external'))
+    .map(r => ({ name: r.name, error: r.error || `HTTP ${r.status}`, hint: r.hint }));
+
   res.json({
+    requestId,
     timestamp: new Date().toISOString(),
-    summary: { total: results.length, passed, failed },
+    summary: { total: results.length, passed, failed, health: failed === 0 ? 'HEALTHY' : criticalFailures.length > 0 ? 'DEGRADED' : 'PARTIAL' },
+    auth: authStatus,
+    database: dbStatus,
     config: configSnapshot,
+    criticalFailures: criticalFailures.length > 0 ? criticalFailures : undefined,
     results,
+    byCategory,
   });
 });
 

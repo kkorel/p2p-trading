@@ -62,7 +62,7 @@ Intents:
 - "show_orders": User asks about order status/history (e.g. "mera order kya hua", "show my orders")
 - "show_sales": User asks about sales for a time period (e.g. "aaj kitna becha", "sold today", "is hafte ki bikri")
 - "create_listing": User wants to CREATE/SELL a new energy listing/offer (e.g. "50 kWh Rs 6 pe daal do", "listing daalni hai", "naya offer banao", "sell 30 units at 7 rupees tomorrow")
-- "buy_energy": User wants to BUY/PURCHASE energy (e.g. "buy 20 kWh", "energy khareedni hai", "bijli chahiye", "I want to buy energy", "mujhe 30 unit chahiye", "purchase solar energy")
+- "buy_energy": User wants to BUY/PURCHASE energy or find the best deal (e.g. "buy 20 kWh", "energy khareedni hai", "bijli chahiye", "I want to buy energy", "mujhe 30 unit chahiye", "purchase solar energy", "find best deal", "find me the best deal", "sabse accha deal", "best offer dikhao")
 - "discom_rates": User asks about DISCOM/electricity rates or tariffs
 - "trading_tips": User asks for tips on how to earn more or improve trading
 - "general_qa": General question about energy trading, Oorja, solar, etc.
@@ -223,9 +223,19 @@ export async function composeResponse(
 ): Promise<string | null> {
   if (!OPENROUTER_API_KEY) return null;
 
-  const langInstruction = language === 'hinglish'
-    ? 'Reply in Hinglish (Roman Hindi script, NOT Devanagari).'
-    : 'Reply in simple English.';
+  const LANG_NAMES: Record<string, string> = {
+    'hi-IN': 'Hindi', 'bn-IN': 'Bengali', 'gu-IN': 'Gujarati', 'kn-IN': 'Kannada',
+    'ml-IN': 'Malayalam', 'mr-IN': 'Marathi', 'od-IN': 'Odia', 'pa-IN': 'Punjabi',
+    'ta-IN': 'Tamil', 'te-IN': 'Telugu',
+  };
+  let langInstruction: string;
+  if (language === 'hinglish') {
+    langInstruction = 'Reply in Hinglish (Roman Hindi script, NOT Devanagari).';
+  } else if (language && LANG_NAMES[language]) {
+    langInstruction = `Reply in simple English. The user understands ${LANG_NAMES[language]}, so use simple words.`;
+  } else {
+    langInstruction = 'Reply in simple English.';
+  }
 
   const nameNote = userName ? `User's name is ${userName}.` : '';
 

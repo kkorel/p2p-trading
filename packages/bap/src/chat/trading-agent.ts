@@ -494,6 +494,11 @@ export interface DiscoveryResult {
   discoveredOffers?: SmartBuyOffer[];
   summary?: SmartBuySummary;
   error?: string;
+  // Populated when no eligible offers found — suggests alternative time windows
+  availableWindows?: Array<{ startTime: string; endTime: string }>;
+  filterReasons?: string[];
+  // Auth expired
+  authExpired?: boolean;
 }
 
 /**
@@ -778,6 +783,16 @@ export async function discoverBestOffer(
       smartBuy: true,
     }, { headers, timeout: 15000 });
 
+    // Handle no_eligible_offers response (200 with suggestions)
+    if (selectRes.data.status === 'no_eligible_offers' || (selectRes.data.selectedOffers?.length === 0 && !selectRes.data.error)) {
+      return {
+        success: false,
+        error: selectRes.data.error || 'No matching offers found for your time window.',
+        availableWindows: selectRes.data.availableWindows,
+        filterReasons: selectRes.data.filterReasons,
+      };
+    }
+
     if (selectRes.data.error) {
       return { success: false, error: selectRes.data.error };
     }
@@ -854,8 +869,15 @@ export async function discoverBestOffer(
       summary: smartSummary,
     };
   } catch (error: any) {
+    const status = error.response?.status;
     const msg = error.response?.data?.error || error.message || 'Unknown error';
-    logger.error(`[BuyFlow:Discover] Discovery failed: ${msg}`, { userId });
+    logger.error(`[BuyFlow:Discover] Discovery failed: ${msg}`, { userId, status });
+
+    // Detect auth errors
+    if (status === 401 || status === 403) {
+      return { success: false, error: 'Your session has expired. Please log in again.', authExpired: true };
+    }
+
     return { success: false, error: msg };
   }
 }
@@ -937,8 +959,14 @@ export async function completePurchase(
       },
     };
   } catch (error: any) {
+    const status = error.response?.status;
     const msg = error.response?.data?.error || error.message || 'Unknown error';
-    logger.error(`[BuyFlow:Complete] Purchase completion failed: ${msg}`, { userId, transactionId });
+    logger.error(`[BuyFlow:Complete] Purchase completion failed: ${msg}`, { userId, transactionId, status });
+
+    if (status === 401 || status === 403) {
+      return { success: false, error: 'Your session has expired. Please log in again.' };
+    }
+
     return { success: false, error: msg };
   }
 }

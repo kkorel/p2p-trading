@@ -60,6 +60,9 @@ model User {
   programEnrollmentDate DateTime? @map("program_enrollment_date")
   programValidUntil     DateTime? @map("program_valid_until")
 
+  // Chat preferences (persisted across sessions)
+  languagePreference String? @map("language_preference") // e.g. 'en-IN', 'hi-IN', 'hinglish'
+
   // Prosumer can be both provider and consumer
   provider   Provider? @relation(fields: [providerId], references: [id])
   providerId String?   @unique @map("provider_id")

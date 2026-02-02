@@ -116,6 +116,8 @@ interface SessionContext {
   verifiedCreds?: string[];
   pendingListing?: PendingListing;
   pendingPurchase?: PendingPurchase;
+  // Runtime-only — not serialized to contextJson
+  _sessionId?: string;
 }
 
 type ChatState =
@@ -658,15 +660,52 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
   });
 
   if (!result.success || !result.transactionId || (!result.discoveredOffer && !result.discoveredOffers?.length)) {
-    return {
-      messages: [
-        searchMsg,
-        { text: h(ctx,
-          `Could not find a matching offer: ${result.error || 'Unknown error'}. Please try again with different parameters.`,
-          `Koi matching offer nahi mila: ${result.error || 'Unknown error'}. Alag parameters se try karo.`
-        ) },
+    // Auth expired — prompt re-login
+    if (result.authExpired) {
+      return {
+        messages: [
+          searchMsg,
+          { text: h(ctx,
+            'Your session has expired. Please log in again using /start.',
+            'Aapka session expire ho gaya. /start se dobara login karo.'
+          ) },
+        ],
+        contextUpdate: { pendingPurchase: undefined },
+      };
+    }
+
+    // Build suggestion message with alternative time windows
+    const messages: AgentMessage[] = [searchMsg];
+    let errorText = result.error || 'No matching offers found.';
+
+    if (result.availableWindows && result.availableWindows.length > 0) {
+      const windowStrs = result.availableWindows.slice(0, 3).map(tw => {
+        try {
+          const s = new Date(tw.startTime);
+          const e = new Date(tw.endTime);
+          return `${s.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${s.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}-${e.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+        } catch { return ''; }
+      }).filter(Boolean);
+
+      if (windowStrs.length > 0) {
+        errorText += h(ctx,
+          `\n\nOffers are available at these times:\n${windowStrs.map((w, i) => `${i + 1}. ${w}`).join('\n')}\n\nWould you like to try a different time?`,
+          `\n\nYe time pe offers available hain:\n${windowStrs.map((w, i) => `${i + 1}. ${w}`).join('\n')}\n\nKya alag time pe try karna hai?`
+        );
+      }
+    }
+
+    messages.push({
+      text: h(ctx, errorText, errorText),
+      buttons: [
+        { text: h(ctx, 'Try different time', 'Alag time'), callbackData: 'purchase_time:retry' },
+        { text: h(ctx, 'Cancel', 'Cancel karo'), callbackData: 'purchase_offer_confirm:no' },
       ],
-      contextUpdate: { pendingPurchase: undefined },
+    });
+
+    return {
+      messages,
+      contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'timeframe', timeDesc: undefined } },
     };
   }
 
@@ -2056,10 +2095,13 @@ const states: Record<ChatState, StateHandler> = {
         if (!fallbackText) fallbackText = kbAnswer;
       }
 
-      // --- Step 3: Compose natural response with LLM ---
+      // --- Step 3: Compose natural response with LLM (with chat memory) ---
       if (dataContext || intent?.intent === 'general_qa' || !intent) {
+        // Load recent chat history for short-term memory
+        const chatHistory = ctx._sessionId ? await getRecentChatContext(ctx._sessionId) : '';
         const fullContext = [
           userProfileContext,
+          chatHistory ? `Recent conversation:\n${chatHistory}` : '',
           dataContext || 'No specific data available. Answer based on general knowledge about Oorja P2P energy trading platform.',
         ].filter(Boolean).join('\n\n');
         const composed = await composeResponse(
@@ -2117,9 +2159,12 @@ const states: Record<ChatState, StateHandler> = {
           const askResult = askNextListingDetail(ctx, pending);
           if (askResult) return askResult;
         }
-        // Buy keyword fallback
-        if ((lower.includes('buy') || lower.includes('kharid') || lower.includes('chahiye') || lower.includes('purchase') || lower.includes('leni')) &&
-            (lower.includes('energy') || lower.includes('bijli') || lower.includes('unit') || lower.includes('kwh'))) {
+        // Buy keyword fallback (includes "best deal", "find deal")
+        if (((lower.includes('buy') || lower.includes('kharid') || lower.includes('chahiye') || lower.includes('purchase') || lower.includes('leni')) &&
+            (lower.includes('energy') || lower.includes('bijli') || lower.includes('unit') || lower.includes('kwh'))) ||
+            (lower.includes('best') && lower.includes('deal')) ||
+            (lower.includes('find') && (lower.includes('deal') || lower.includes('offer'))) ||
+            (lower.includes('acch') && lower.includes('deal'))) {
           // Credential gate for keyword fallback too
           if (!verifiedCreds.includes('CONSUMPTION_PROFILE')) {
             return {
@@ -2261,7 +2306,7 @@ export async function processMessage(
     if (authenticatedUserId) {
       const user = await prisma.user.findUnique({
         where: { id: authenticatedUserId },
-        select: { id: true, name: true, profileComplete: true, providerId: true, phone: true },
+        select: { id: true, name: true, profileComplete: true, providerId: true, phone: true, languagePreference: true },
       });
 
       if (user?.profileComplete) {
@@ -2273,6 +2318,7 @@ export async function processMessage(
           phone: user.phone || undefined,
           verifiedCreds,
           tradingActive: true,
+          language: (user.languagePreference as any) || undefined,
         };
 
         session = await prisma.chatSession.create({
@@ -2367,6 +2413,7 @@ export async function processMessage(
   // Existing session
   await storeMessage(session.id, 'user', userMessage);
   const ctx = JSON.parse(session.contextJson) as SessionContext;
+  ctx._sessionId = session.id; // Runtime-only, not persisted
   const currentState = session.state as ChatState;
   const stateHandler = states[currentState];
 
@@ -2375,27 +2422,52 @@ export async function processMessage(
     return { messages: [{ text: 'Something went wrong. Please try again.' }] };
   }
 
+  // Per-message language detection — dynamically switch language mid-conversation
   const detectedLang = detectLanguage(userMessage);
-  // For hinglish users: don't override with en-IN (Roman Hindi looks like English)
-  const userLang: SarvamLangCode | 'hinglish' =
-    ctx.language === 'hinglish'
-      ? 'hinglish'
-      : (detectedLang !== 'en-IN' ? detectedLang : (ctx.language || 'en-IN'));
-
-  let processedMessage = userMessage;
   const isStructuredInput = /^\d+$/.test(userMessage.trim()) || userMessage.trim().length <= 3;
-  const isHinglish = ctx.language === 'hinglish';
-  if (detectedLang !== 'en-IN' && !isStructuredInput && !isHinglish) {
-    processedMessage = await translateToEnglish(userMessage, detectedLang);
+  const isCallbackData = userMessage.includes(':') && !userMessage.includes(' ');
+
+  // Determine effective language for this message:
+  // 1. If native Indic script detected → use that language
+  // 2. If Hinglish detected → use hinglish
+  // 3. If structured input (numbers, callbacks) → keep existing language preference
+  // 4. Otherwise → use English or keep existing preference
+  let userLang: SarvamLangCode | 'hinglish';
+  if (isStructuredInput || isCallbackData) {
+    // Don't change language on button presses or numeric input
+    userLang = (ctx.language || 'en-IN') as SarvamLangCode | 'hinglish';
+  } else if (detectedLang === 'hinglish') {
+    userLang = 'hinglish';
+  } else if (detectedLang !== 'en-IN') {
+    // Native Indic script (Devanagari, Bengali, etc.)
+    userLang = detectedLang;
+  } else {
+    // Latin script, not Hinglish — if user previously chose a language, keep it
+    // unless they're clearly writing in English now
+    userLang = (ctx.language || 'en-IN') as SarvamLangCode | 'hinglish';
+  }
+
+  // Translate native-script messages to English for processing
+  let processedMessage = userMessage;
+  if (detectedLang !== 'en-IN' && detectedLang !== 'hinglish' && !isStructuredInput) {
+    processedMessage = await translateToEnglish(userMessage, detectedLang as SarvamLangCode);
     logger.info(`Translated [${detectedLang} → en-IN]: "${userMessage}" → "${processedMessage}"`);
   }
 
+  // Update language preference if changed — persist to session and user profile
   if (userLang !== ctx.language) {
     ctx.language = userLang;
     await prisma.chatSession.update({
       where: { id: session.id },
-      data: { contextJson: JSON.stringify(ctx) },
+      data: { contextJson: serializeContext(ctx) },
     });
+    // Persist language preference to user profile for cross-session continuity
+    if (ctx.userId) {
+      prisma.user.update({
+        where: { id: ctx.userId },
+        data: { languagePreference: userLang },
+      }).catch(() => {}); // Fire-and-forget, non-critical
+    }
   }
 
   const response = await stateHandler.onMessage(ctx, processedMessage, fileData);
@@ -2432,7 +2504,7 @@ export async function processMessage(
     const merged = { ...ctx, ...response.contextUpdate };
     await prisma.chatSession.update({
       where: { id: session.id },
-      data: { contextJson: JSON.stringify(merged) },
+      data: { contextJson: serializeContext(merged) },
     });
   }
 
@@ -2441,6 +2513,12 @@ export async function processMessage(
 }
 
 // --- Helpers ---
+
+/** Strip runtime-only fields (prefixed with _) before persisting */
+function serializeContext(ctx: SessionContext): string {
+  const { _sessionId, ...rest } = ctx;
+  return JSON.stringify(rest);
+}
 
 async function transitionState(
   sessionId: string,
@@ -2457,7 +2535,7 @@ async function transitionState(
     where: { id: sessionId },
     data: {
       state: newState as any,
-      contextJson: JSON.stringify(merged),
+      contextJson: serializeContext(merged),
       ...(contextUpdate?.userId ? { userId: contextUpdate.userId } : {}),
       ...(contextUpdate?.authToken ? { authToken: contextUpdate.authToken } : {}),
     },
@@ -2483,5 +2561,35 @@ async function storeAgentMessages(sessionId: string, messages: AgentMessage[]) {
       msg.text,
       msg.buttons ? { buttons: msg.buttons } : undefined
     );
+  }
+}
+
+/**
+ * Load recent chat messages for short-term memory context.
+ * Returns a formatted string of the last N messages (privacy-safe: no phone numbers or tokens).
+ */
+async function getRecentChatContext(sessionId: string, limit: number = 6): Promise<string> {
+  try {
+    const messages = await prisma.chatMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { role: true, content: true },
+    });
+
+    if (messages.length === 0) return '';
+
+    // Reverse to chronological order and format
+    return messages.reverse().map(m => {
+      const role = m.role === 'user' ? 'User' : 'Oorja';
+      // Strip any sensitive data patterns (phone numbers, tokens)
+      const safeContent = m.content
+        .replace(/\b\d{10,12}\b/g, '[phone]')
+        .replace(/Bearer\s+\S+/g, '[token]')
+        .substring(0, 200);
+      return `${role}: ${safeContent}`;
+    }).join('\n');
+  } catch {
+    return '';
   }
 }
