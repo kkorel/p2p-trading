@@ -356,49 +356,75 @@ router.post('/on_select', async (req: Request, res: Response) => {
 
 /**
  * POST /callbacks/on_init - Receive order initialization from BPP
+ * Supports both single order and bulk orders (multiple separate orders)
  */
 router.post('/on_init', async (req: Request, res: Response) => {
   const message = req.body as any; // Can be OnInitMessage or error
   const { context, message: content, error } = message;
-  
+
   logger.info('Received on_init callback', {
     transaction_id: context.transaction_id,
     message_id: context.message_id,
     action: context.action,
     hasError: !!error,
+    hasBulkOrders: !!content?.bulkOrders,
   });
-  
+
   if (await isDuplicateMessage(context.message_id)) {
     return res.json({ status: 'ok', message: 'duplicate ignored' });
   }
-  
+
   await logEvent(context.transaction_id, context.message_id, 'on_init', 'INBOUND', JSON.stringify(message));
-  
+
   // Handle error response
   if (error) {
     logger.error(`Order initialization failed: ${error.message}`, {
       transaction_id: context.transaction_id,
       error_code: error.code,
     });
-    
+
     await updateTransaction(context.transaction_id, {
       status: 'DISCOVERING', // Reset status so user can try again
       error: error.message,
     });
-    
+
     return res.json({ status: 'error', error: error.message });
   }
-  
+
+  // Handle bulk orders (multiple separate orders from bulk purchase)
+  if (content.bulkOrders && content.bulkOrders.length > 0) {
+    await updateTransaction(context.transaction_id, {
+      order: content.order, // Primary order for compatibility
+      bulkOrders: content.bulkOrders, // All orders from bulk purchase
+      bulkGroupId: content.bulkGroupId,
+      status: 'CONFIRMING',
+      error: undefined,
+    });
+
+    logger.info(`Bulk orders initialized: ${content.bulkOrders.length} orders, group ${content.bulkGroupId}`, {
+      transaction_id: context.transaction_id,
+      orderIds: content.bulkOrders.map((o: any) => o.id),
+    });
+
+    return res.json({
+      status: 'ok',
+      order_id: content.order.id,
+      bulk_orders: content.bulkOrders.length,
+      bulk_group_id: content.bulkGroupId,
+    });
+  }
+
+  // Single order (original flow)
   await updateTransaction(context.transaction_id, {
     order: content.order,
     status: 'CONFIRMING',
     error: undefined, // Clear any previous error
   });
-  
+
   logger.info(`Order initialized: ${content.order.id}, status: ${content.order.status}`, {
     transaction_id: context.transaction_id,
   });
-  
+
   res.json({ status: 'ok', order_id: content.order.id, order_status: content.order.status });
 });
 

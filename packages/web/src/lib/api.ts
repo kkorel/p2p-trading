@@ -305,6 +305,18 @@ export const buyerApi = {
       body: JSON.stringify(params),
     }),
 
+  bulkSelect: (params: BulkSelectParams) =>
+    request<BulkSelectResponse>('/api/select', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
+  smartBuy: (params: SmartBuyParams) =>
+    request<SmartBuyResponse>('/api/select', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
   init: (transactionId: string) =>
     request<{ status: string }>('/api/init', {
       method: 'POST',
@@ -522,6 +534,7 @@ export interface BuyerOrder {
   paymentStatus?: string;
   quote?: { price: { value: number }; totalQuantity: number };
   provider?: { id: string; name: string };
+  providers?: Array<{ id: string; name: string }>; // For bulk orders
   itemInfo: {
     item_id: string;
     offer_id: string;
@@ -536,6 +549,12 @@ export interface BuyerOrder {
     penalty?: number | null;
     refund?: number | null;
   };
+  // Bulk order info
+  isBulkOrder?: boolean;
+  isPartOfBulkPurchase?: boolean; // This order is one of multiple from a bulk buy
+  bulkGroupId?: string; // Links orders from the same bulk purchase
+  totalItemCount?: number;
+  totalProviderCount?: number;
 }
 
 export interface DiscoverParams {
@@ -550,6 +569,74 @@ export interface SelectParams {
   quantity: number;
   autoMatch?: boolean;
   requestedTimeWindow?: { start: string; end: string };
+}
+
+// Bulk buy mode
+export interface BulkSelectParams {
+  transaction_id: string;
+  bulkBuy: true;
+  targetQuantity: number;
+  maxOffers?: number;
+  requestedTimeWindow: { startTime: string; endTime: string };
+}
+
+export interface BulkSelectedOffer {
+  offer_id: string;
+  item_id: string;
+  provider_id: string;
+  provider_name: string;
+  quantity: number;
+  unit_price: number;
+  currency: string;
+  subtotal: number;
+  score: number;
+  timeWindow: { startTime: string; endTime: string } | null;
+}
+
+export interface BulkSelectResponse {
+  status: string;
+  transaction_id: string;
+  bulkMode: true;
+  selectedOffers: BulkSelectedOffer[];
+  summary: {
+    totalQuantity: number;
+    totalPrice: number;
+    averagePrice: number;
+    currency: string;
+    fullyFulfilled: boolean;
+    shortfall: number;
+    offersUsed: number;
+    offersAvailable: number;
+  };
+  message: string;
+}
+
+// Smart buy mode - auto determines single vs multiple offers
+export interface SmartBuyParams {
+  transaction_id: string;
+  smartBuy: true;
+  quantity: number;
+  maxOffers?: number;
+  requestedTimeWindow: { startTime: string; endTime: string };
+}
+
+export interface SmartBuyResponse {
+  status: string;
+  transaction_id: string;
+  smartBuy: true;
+  selectionType: 'single' | 'multiple';
+  selectedOffers: BulkSelectedOffer[];
+  summary: {
+    totalQuantity: number;
+    totalPrice: number;
+    averagePrice: number;
+    currency: string;
+    fullyFulfilled: boolean;
+    shortfall: number;
+    offersUsed: number;
+    offersAvailable: number;
+  };
+  message: string;
 }
 
 export interface AddItemParams {
@@ -696,6 +783,16 @@ export interface TransactionState {
     score: number;
     percentage: string;
     message: string;
+  };
+  // Bulk buy mode
+  bulkMode?: boolean;
+  selectedOffers?: BulkSelectedOffer[];
+  bulkSelection?: {
+    totalQuantity: number;
+    totalPrice: number;
+    fullyFulfilled: boolean;
+    shortfall: number;
+    targetQuantity: number;
   };
 }
 

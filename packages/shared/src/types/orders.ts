@@ -39,6 +39,7 @@ export interface Order {
   quote: Quote;
   created_at: string;
   updated_at: string;
+  bulkGroupId?: string; // Links orders from same bulk purchase
 }
 
 // Order in select request

@@ -61,6 +61,13 @@ interface UnifiedOrder {
     sellerPayment?: number;
     discomPenalty?: number;
   };
+  // Bulk order info
+  isBulkOrder?: boolean;
+  isPartOfBulkPurchase?: boolean; // This order is one of multiple from bulk buy
+  bulkGroupId?: string; // Links orders from same bulk purchase
+  totalItemCount?: number;
+  totalProviderCount?: number;
+  providers?: Array<{ id: string; name: string }>;
 }
 
 export default function OrdersPage() {
@@ -93,6 +100,21 @@ export default function OrdersPage() {
           const totalPrice = order.quote?.price?.value || 0;
           // Calculate pricePerKwh: prefer itemInfo, fallback to totalPrice/quantity
           const pricePerKwh = order.itemInfo?.price_per_kwh || (quantity > 0 ? totalPrice / quantity : 0);
+
+          // Bulk order data
+          const isBulkOrder = o.isBulkOrder || false;
+          const isPartOfBulkPurchase = o.isPartOfBulkPurchase || false;
+          const bulkGroupId = o.bulkGroupId || undefined;
+          const totalItemCount = o.totalItemCount || 1;
+          const totalProviderCount = o.totalProviderCount || 1;
+          const providers = o.providers || (order.provider ? [order.provider] : []);
+
+          // For bulk orders, show combined provider names
+          let providerName = order.provider?.name || 'Provider';
+          if (isBulkOrder && providers.length > 1) {
+            providerName = `${providers.length} sellers`;
+          }
+
           allOrders.push({
             id: order.id,
             transactionId: o.transaction_id || order.id,
@@ -100,7 +122,7 @@ export default function OrdersPage() {
             status: order.status,
             paymentStatus: o.paymentStatus || 'PENDING',
             sourceType: order.itemInfo?.source_type || 'MIXED',
-            providerName: order.provider?.name || 'Provider',
+            providerName,
             quantity,
             pricePerKwh,
             totalPrice,
@@ -112,6 +134,13 @@ export default function OrdersPage() {
             cancellation: o.cancellation,
             trustImpact: o.trustImpact,
             fulfillment: o.fulfillment,
+            // Bulk order fields
+            isBulkOrder,
+            isPartOfBulkPurchase,
+            bulkGroupId,
+            totalItemCount: isBulkOrder ? totalItemCount : undefined,
+            totalProviderCount: isBulkOrder ? totalProviderCount : undefined,
+            providers: isBulkOrder ? providers : undefined,
           });
         }
       } catch (err) {
@@ -411,7 +440,7 @@ export default function OrdersPage() {
                           }`} />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium text-[var(--color-text)]">
                             {order.sourceType} Energy
                           </p>
@@ -431,6 +460,14 @@ export default function OrdersPage() {
                               </span>
                             )}
                           </Badge>
+                          {(order.isBulkOrder || order.isPartOfBulkPurchase) && (
+                            <Badge variant="default" size="sm">
+                              <span className="flex items-center gap-0.5">
+                                <Package className="w-2.5 h-2.5" />
+                                Bulk
+                              </span>
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-[var(--color-text-muted)]">
                           {isBought ? `from ${order.providerName}` : 'Your listing'}
@@ -450,12 +487,41 @@ export default function OrdersPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-[var(--color-text-muted)]">Rate</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        {order.isBulkOrder ? 'Avg. Rate' : 'Rate'}
+                      </p>
                       <p className="font-medium text-[var(--color-text)]">
                         {formatCurrency(order.pricePerKwh)}/kWh
                       </p>
                     </div>
                   </div>
+
+                  {/* Bulk Order Details */}
+                  {order.isBulkOrder && order.providers && order.providers.length > 0 && (
+                    <div className="mb-3 p-2 bg-[var(--color-surface)] rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package className="w-4 h-4 text-[var(--color-primary)]" />
+                        <p className="text-xs font-medium text-[var(--color-text)]">
+                          {order.totalItemCount} offers from {order.totalProviderCount} seller{order.totalProviderCount !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {order.providers.slice(0, 5).map((provider) => (
+                          <span
+                            key={provider.id}
+                            className="text-xs px-2 py-0.5 bg-[var(--color-border-subtle)] rounded-full text-[var(--color-text-muted)]"
+                          >
+                            {provider.name}
+                          </span>
+                        ))}
+                        {order.providers.length > 5 && (
+                          <span className="text-xs px-2 py-0.5 bg-[var(--color-border-subtle)] rounded-full text-[var(--color-text-muted)]">
+                            +{order.providers.length - 5} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Delivery Time */}
                   {order.deliveryTime && (

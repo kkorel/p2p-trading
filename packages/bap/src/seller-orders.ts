@@ -18,6 +18,8 @@ export type ExtendedOrder = Order & {
   cancelPenalty?: number;
   cancelRefund?: number;
   paymentStatus?: string;
+  providerId?: string | null;
+  bulkGroupId?: string | null;
 };
 
 /**
@@ -36,7 +38,7 @@ export class OptimisticLockError extends Error {
 function toOrder(dbOrder: any): ExtendedOrder {
   const items = JSON.parse(dbOrder.itemsJson || '[]');
   const quote = JSON.parse(dbOrder.quoteJson || '{}');
-  
+
   return {
     id: dbOrder.id,
     transaction_id: dbOrder.transactionId,
@@ -55,6 +57,8 @@ function toOrder(dbOrder: any): ExtendedOrder {
     cancelPenalty: dbOrder.cancelPenalty,
     cancelRefund: dbOrder.cancelRefund,
     paymentStatus: dbOrder.paymentStatus,
+    providerId: dbOrder.providerId,
+    bulkGroupId: dbOrder.bulkGroupId,
   };
 }
 
@@ -99,10 +103,11 @@ export async function createOrder(
   items: OrderItem[],
   quote: Quote,
   status: OrderStatus = 'PENDING',
-  buyerId?: string | null
+  buyerId?: string | null,
+  bulkGroupId?: string | null
 ): Promise<Order> {
   const orderId = uuidv4();
-  
+
   // Check if provider exists locally - if not, set to null (external provider)
   let validProviderId: string | null = providerId;
   if (providerId) {
@@ -110,7 +115,7 @@ export async function createOrder(
       where: { id: providerId },
       select: { id: true },
     });
-    
+
     if (!providerExists) {
       // External provider - set providerId to null to avoid FK constraint
       // Store the external provider ID in the items JSON for reference
@@ -118,7 +123,7 @@ export async function createOrder(
       validProviderId = null;
     }
   }
-  
+
   // Also check if selected offer exists locally
   let validOfferId: string | null = offerId;
   if (offerId) {
@@ -126,14 +131,14 @@ export async function createOrder(
       where: { id: offerId },
       select: { id: true },
     });
-    
+
     if (!offerExists) {
       // External offer - set to null to avoid FK constraint
       console.log(`[ORDER] External offer ${offerId} - setting selectedOfferId to null`);
       validOfferId = null;
     }
   }
-  
+
   const order = await prisma.order.create({
     data: {
       id: orderId,
@@ -142,6 +147,7 @@ export async function createOrder(
       providerId: validProviderId,
       selectedOfferId: validOfferId,
       buyerId: buyerId || undefined,
+      bulkGroupId: bulkGroupId || undefined,
       totalQty: quote.totalQuantity,
       totalPrice: quote.price.value,
       currency: quote.price.currency,
@@ -149,7 +155,7 @@ export async function createOrder(
       quoteJson: JSON.stringify(quote),
     },
   });
-  
+
   return {
     id: order.id,
     transaction_id: order.transactionId,
@@ -158,6 +164,7 @@ export async function createOrder(
     quote,
     created_at: order.createdAt.toISOString(),
     updated_at: order.updatedAt.toISOString(),
+    bulkGroupId: order.bulkGroupId || undefined,
   };
 }
 
@@ -244,27 +251,36 @@ export async function getOrdersByProviderId(providerId: string): Promise<Extende
 }
 
 /**
- * Get all orders for a seller (by providerId OR sellerId)
- * This handles both local orders (providerId set) and external orders (providerId null but sellerId in payment record)
+ * Get all orders for a seller (by providerId OR sellerId OR blocks)
+ * This handles:
+ * - Local orders (providerId set on order)
+ * - External orders (providerId null but sellerId in payment record)
+ * - Bulk orders (multiple providers - check if any block belongs to this provider)
  */
 export async function getOrdersForSeller(providerId: string | null, userId: string): Promise<ExtendedOrder[]> {
-  // Query orders where user is the seller through providerId OR sellerId
+  // Query orders where user is the seller through providerId OR sellerId OR blocks
   const orders = await prisma.order.findMany({
     where: {
       OR: [
-        // Local orders: providerId matches
+        // Local orders: providerId matches on order
         ...(providerId ? [{ providerId }] : []),
         // Check if there's a payment record where this user is the seller
         {
           payments: {
             some: { sellerId: userId }
           }
-        }
+        },
+        // Bulk orders: check if any block in this order belongs to this provider
+        ...(providerId ? [{
+          blocks: {
+            some: { providerId }
+          }
+        }] : []),
       ]
     },
     orderBy: { createdAt: 'desc' },
   });
-  
+
   return orders.map(toOrder);
 }
 

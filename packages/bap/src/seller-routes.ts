@@ -329,9 +329,10 @@ router.post('/init', async (req: Request, res: Response) => {
   setTimeout(async () => {
     try {
       // Get buyer ID from transaction state
-      const { getTransactionState } = await import('@p2p/shared');
+      const { getTransactionState, updateTransactionState } = await import('@p2p/shared');
       const txState = await getTransactionState(context.transaction_id);
       const buyerId = txState?.buyerId || null;
+      const isBulkMode = txState?.bulkMode && content.order.items.length > 1;
 
       // Check buyer trust score - advisory warning if below 20% (no longer blocks)
       if (buyerId) {
@@ -348,7 +349,6 @@ router.post('/init', async (req: Request, res: Response) => {
           });
 
           // Store warning in transaction state for UI to display
-          const { updateTransactionState } = await import('@p2p/shared');
           await updateTransactionState(context.transaction_id, {
             trustWarning: {
               score: buyer.trustScore,
@@ -361,6 +361,160 @@ router.post('/init', async (req: Request, res: Response) => {
         }
       }
 
+      // ==================== BULK MODE: Create separate orders ====================
+      if (isBulkMode) {
+        logger.info(`Bulk mode: Creating ${content.order.items.length} separate orders`, {
+          transaction_id: context.transaction_id,
+          itemCount: content.order.items.length,
+        });
+
+        const bulkGroupId = context.transaction_id; // Use transaction_id as group identifier
+        const createdOrders: any[] = [];
+        const failedItems: Array<{ offer_id: string; reason: string }> = [];
+
+        for (let i = 0; i < content.order.items.length; i++) {
+          const item = content.order.items[i];
+          const subTransactionId = `${context.transaction_id}_${i}`;
+
+          try {
+            const localOffer = await getOfferById(item.offer_id);
+            if (!localOffer) {
+              failedItems.push({ offer_id: item.offer_id, reason: 'Offer not found' });
+              continue;
+            }
+
+            const itemPrice = localOffer.price.value * item.quantity;
+            const currency = localOffer.price.currency;
+
+            // Get source_type from catalog item
+            const catalogItem = await prisma.catalogItem.findUnique({
+              where: { id: item.item_id },
+              select: { sourceType: true },
+            });
+
+            const orderItem: OrderItem = {
+              item_id: item.item_id,
+              offer_id: item.offer_id,
+              provider_id: localOffer.provider_id,
+              quantity: item.quantity,
+              price: { value: itemPrice, currency },
+              timeWindow: localOffer.timeWindow,
+              source_type: catalogItem?.sourceType || 'UNKNOWN',
+            };
+
+            const quote: Quote = {
+              price: { value: itemPrice, currency },
+              totalQuantity: item.quantity,
+            };
+
+            // Create order in DRAFT state
+            const order = await createOrder(
+              subTransactionId,
+              localOffer.provider_id,
+              localOffer.id,
+              [orderItem],
+              quote,
+              'DRAFT',
+              buyerId,
+              bulkGroupId // Pass bulk group ID
+            );
+
+            // Claim blocks for this order
+            const claimedBlocks = await claimBlocks(item.offer_id, item.quantity, order.id, subTransactionId);
+
+            if (claimedBlocks.length < item.quantity) {
+              // Not enough blocks - release and skip this item
+              await releaseBlocks(subTransactionId);
+              failedItems.push({
+                offer_id: item.offer_id,
+                reason: claimedBlocks.length === 0
+                  ? 'Sold out'
+                  : `Only ${claimedBlocks.length}/${item.quantity} kWh available`,
+              });
+              continue;
+            }
+
+            // Sync reserved blocks to CDS (non-blocking)
+            syncBlocksToCDS({
+              offer_id: item.offer_id,
+              block_ids: claimedBlocks.map(b => b.id),
+              status: 'RESERVED',
+              order_id: order.id,
+              transaction_id: subTransactionId,
+            }).catch(syncError =>
+              logger.error('Failed to sync reserved blocks to CDS', {
+                offerId: item.offer_id,
+                blockCount: claimedBlocks.length,
+                error: syncError.message
+              })
+            );
+
+            // Update order status to PENDING
+            const finalOrder = await updateOrderStatus(order.id, 'PENDING') || order;
+            createdOrders.push(finalOrder);
+
+            logger.info(`Bulk order ${i + 1}/${content.order.items.length} created`, {
+              order_id: order.id,
+              offer_id: item.offer_id,
+              quantity: item.quantity,
+              transaction_id: subTransactionId,
+            });
+          } catch (itemError: any) {
+            logger.error(`Failed to create bulk order for item ${i}`, {
+              offer_id: item.offer_id,
+              error: itemError.message,
+            });
+            failedItems.push({ offer_id: item.offer_id, reason: itemError.message });
+          }
+        }
+
+        // Store bulk orders info in transaction state
+        await updateTransactionState(context.transaction_id, {
+          bulkOrders: createdOrders.map(o => ({
+            id: o.id,
+            transactionId: o.transactionId,
+            status: o.status,
+          })),
+        });
+
+        // Send callback with first order (for compatibility) but include all orders
+        if (createdOrders.length > 0) {
+          const callbackContext = createCallbackContext(context, 'on_init');
+          const onInitMessage = {
+            context: callbackContext,
+            message: {
+              order: createdOrders[0], // Primary order for compatibility
+              bulkOrders: createdOrders, // All orders for bulk mode
+              bulkGroupId,
+              failedItems: failedItems.length > 0 ? failedItems : undefined,
+            },
+          };
+
+          await logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
+          await axios.post(`${context.bap_uri}/callbacks/on_init`, onInitMessage);
+
+          logger.info(`Bulk init complete: ${createdOrders.length} orders created, ${failedItems.length} failed`, {
+            transaction_id: context.transaction_id,
+          });
+        } else {
+          // All items failed
+          const errorCallbackContext = createCallbackContext(context, 'on_init');
+          const errorCallback = {
+            context: errorCallbackContext,
+            error: {
+              code: 'BULK_ORDER_FAILED',
+              message: `All ${content.order.items.length} items failed to process`,
+              failedItems,
+            },
+          };
+
+          await axios.post(`${context.bap_uri}/callbacks/on_init`, errorCallback);
+        }
+
+        return; // Exit for bulk mode
+      }
+
+      // ==================== SINGLE ORDER MODE (original logic) ====================
       // Build order items and quote
       const orderItems: OrderItem[] = [];
       let totalPrice = 0;
@@ -374,7 +528,7 @@ router.post('/init', async (req: Request, res: Response) => {
       for (const item of content.order.items) {
         // Try to get offer from local database first
         const localOffer = await getOfferById(item.offer_id);
-        
+
         if (localOffer) {
           // Local offer - use local data
           selectedOfferId = localOffer.id;
@@ -1192,6 +1346,7 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
     const orders = await getOrdersForSeller(providerId, userId);
 
     // Enrich orders with block and item information
+    // For bulk orders, filter to only show items/blocks belonging to this seller
     const enrichedOrders = await Promise.all(orders.map(async (order) => {
       try {
         // Get DISCOM feedback for this order
@@ -1200,28 +1355,41 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
         });
 
         if (order.items && order.items.length > 0) {
-          const firstItem = order.items[0];
-          const orderBlocks = await getBlocksForOrder(order.id);
-          const actualSoldQty = orderBlocks.length;
-          const blockStats = await getBlockStats(firstItem.offer_id);
+          // Get all blocks for this order that belong to this provider
+          const allOrderBlocks = await getBlocksForOrder(order.id);
+          const sellerBlocks = providerId
+            ? allOrderBlocks.filter(b => b.provider_id === providerId)
+            : allOrderBlocks;
+
+          // If this is a bulk order (multiple items) and we have blocks, use block info
+          // Otherwise fall back to first item
+          const actualSoldQty = sellerBlocks.length || 0;
+
+          // Find items that belong to this seller (via blocks or direct providerId match)
+          const sellerOfferIds = new Set(sellerBlocks.map(b => b.offer_id));
+          const sellerItems = order.items.filter(item =>
+            sellerOfferIds.has(item.offer_id) || order.providerId === providerId
+          );
+
+          // Use first seller item, or fall back to first item
+          const displayItem = sellerItems.length > 0 ? sellerItems[0] : order.items[0];
+          const blockStats = await getBlockStats(displayItem.offer_id);
 
           // Fetch item and offer details
           const item = await prisma.catalogItem.findUnique({
-            where: { id: firstItem.item_id },
+            where: { id: displayItem.item_id },
           });
           const offer = await prisma.catalogOffer.findUnique({
-            where: { id: firstItem.offer_id },
+            where: { id: displayItem.offer_id },
           });
 
-          // Get price from blocks if offer is deleted, or from offer if it
-          // exists Blocks store the price at time of purchase, so this works
-          // even if offer is deleted
-          const totalQty = order.quote?.totalQuantity || 0;
+          // Get price from blocks if offer is deleted, or from offer if it exists
           const pricePerKwh = offer?.priceValue ||
-            (orderBlocks.length > 0 ? orderBlocks[0].price_value : 0) ||
-            (order.quote?.price?.value && totalQty ?
-              order.quote.price.value / totalQty :
-              0);
+            (sellerBlocks.length > 0 ? sellerBlocks[0].price_value : 0) ||
+            (allOrderBlocks.length > 0 ? allOrderBlocks[0].price_value : 0);
+
+          // Calculate seller's portion of the order value
+          const sellerTotal = sellerBlocks.reduce((sum, b) => sum + b.price_value, 0);
 
           // Get delivery time from offer
           const deliveryTime = offer?.timeWindowStart ? {
@@ -1233,20 +1401,26 @@ router.get('/seller/my-orders', authMiddleware, async (req: Request, res: Respon
           const sellerCancelled = cancelledBy?.startsWith('SELLER:');
 
           // If buyer cancels, seller receives 5% compensation (half of 10% penalty)
+          // For bulk orders, this should be proportional to seller's share
           const cancellationCompensation = order.status === 'CANCELLED' && order.cancelPenalty && !sellerCancelled
-            ? order.cancelPenalty * 0.5
+            ? order.cancelPenalty * 0.5 * (actualSoldQty / (order.quote?.totalQuantity || actualSoldQty))
             : null;
 
           return {
             ...order,
             paymentStatus: order.paymentStatus || 'PENDING',
+            // For bulk orders, show seller's portion
+            isBulkOrder: order.items.length > 1,
+            sellerItemCount: sellerItems.length,
+            totalItemCount: order.items.length,
             itemInfo: {
-              item_id: firstItem.item_id,
-              offer_id: firstItem.offer_id,
+              item_id: displayItem.item_id,
+              offer_id: displayItem.offer_id,
               sold_quantity: actualSoldQty,
               block_stats: blockStats,
               source_type: item?.sourceType || 'UNKNOWN',
               price_per_kwh: pricePerKwh,
+              seller_total: sellerTotal, // Total value for this seller's items
             },
             deliveryTime,
             // Cancellation info for seller

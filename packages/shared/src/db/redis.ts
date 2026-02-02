@@ -105,6 +105,29 @@ export interface TransactionState {
     percentage: string;
     message: string;
   };
+  // Bulk buy mode
+  bulkMode?: boolean;
+  selectedOffers?: Array<{
+    offer: any;
+    provider: any;
+    quantity: number;
+    score: number;
+    subtotal: number;
+  }>;
+  bulkSelection?: {
+    totalQuantity: number;
+    totalPrice: number;
+    fullyFulfilled: boolean;
+    shortfall: number;
+    targetQuantity: number;
+  };
+  // Bulk orders (separate orders from bulk purchase)
+  bulkOrders?: Array<{
+    id: string;
+    transactionId: string;
+    status: string;
+  }>;
+  bulkGroupId?: string;
   status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
   updated_at: string;

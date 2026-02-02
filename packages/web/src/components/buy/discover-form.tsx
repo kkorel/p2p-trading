@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Search, Sun, Wind, Droplets, Sparkles } from 'lucide-react';
+import { Zap, Sun, Wind, Droplets, Sparkles, List } from 'lucide-react';
 import { Button, Input, Card } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
@@ -14,21 +14,26 @@ const sourceTypes = [
 ];
 
 type DiscoverFormInput = {
-  minQuantity: string;
+  quantity: string;
   startTime: string;
   endTime: string;
 };
 
 interface DiscoverFormProps {
-  onDiscover: (data: {
+  onSmartBuy: (data: {
     sourceType?: string;
-    minQuantity: number;
+    quantity: number;
     timeWindow: { startTime: string; endTime: string };
   }) => Promise<void>;
+  onBrowse?: () => void;
   isLoading: boolean;
 }
 
-export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
+export function DiscoverForm({
+  onSmartBuy,
+  onBrowse,
+  isLoading,
+}: DiscoverFormProps) {
   const [sourceType, setSourceType] = useState('');
 
   const {
@@ -38,7 +43,7 @@ export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
     formState: { errors },
   } = useForm<DiscoverFormInput>({
     defaultValues: {
-      minQuantity: '30',
+      quantity: '50',
       startTime: getDefaultStartTime(),
       endTime: getDefaultEndTime(),
     },
@@ -48,12 +53,12 @@ export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
   const startTimeValue = watch('startTime');
 
   const onSubmit = async (data: DiscoverFormInput) => {
-    const qty = parseInt(data.minQuantity, 10);
+    const qty = parseInt(data.quantity, 10);
     if (isNaN(qty) || qty < 1) return;
-    
-    await onDiscover({
+
+    await onSmartBuy({
       sourceType: sourceType || undefined,
-      minQuantity: qty,
+      quantity: qty,
       timeWindow: {
         startTime: new Date(data.startTime).toISOString(),
         endTime: new Date(data.endTime).toISOString(),
@@ -95,12 +100,16 @@ export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
 
         {/* Quantity */}
         <Input
-          label="Minimum Quantity (kWh)"
+          label="Quantity (kWh)"
           type="number"
           min={1}
-          max={1000}
-          {...register('minQuantity', { required: 'Required', min: { value: 1, message: 'Min 1 kWh' } })}
-          error={errors.minQuantity?.message}
+          max={5000}
+          {...register('quantity', {
+            required: 'Required',
+            min: { value: 1, message: 'Min 1 kWh' },
+          })}
+          error={errors.quantity?.message}
+          hint="We'll find the best offer(s) to fulfill your order"
         />
 
         {/* Time Window */}
@@ -132,9 +141,22 @@ export function DiscoverForm({ onDiscover, isLoading }: DiscoverFormProps) {
 
         {/* Submit */}
         <Button type="submit" fullWidth loading={isLoading}>
-          <Search className="h-4 w-4" />
-          Discover Offers
+          <Zap className="h-4 w-4" />
+          Find Best Deal
         </Button>
+
+        {/* Browse option */}
+        {onBrowse && (
+          <button
+            type="button"
+            onClick={onBrowse}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors"
+          >
+            <List className="h-4 w-4" />
+            Or browse all offers manually
+          </button>
+        )}
       </form>
     </Card>
   );

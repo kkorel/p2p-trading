@@ -33,6 +33,9 @@ import {
   secureAxios,
   // CDS utilities
   isExternalCDSEnabled,
+  // Bulk matcher
+  selectOffersForBulk,
+  formatBulkSelectionResponse,
 } from '@p2p/shared';
 import { logEvent } from './events';
 import { createTransaction, getTransaction, updateTransaction, getAllTransactions, clearAllTransactions } from './state';
@@ -1061,15 +1064,22 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
 
 /**
  * POST /api/select - Select an offer (with matching algorithm)
+ * Supports smart buy mode (auto single/multi) and bulk mode for selecting multiple offers
  */
 router.post('/api/select', async (req: Request, res: Response) => {
-  const { 
+  const {
     transaction_id,
     offer_id,
     item_id,
     quantity,
     requestedTimeWindow,
-    autoMatch
+    autoMatch,
+    // Smart buy mode - auto determines single vs multi
+    smartBuy,
+    // Bulk buy mode parameters (explicit multi-offer)
+    bulkBuy,
+    targetQuantity,
+    maxOffers,
   } = req.body as {
     transaction_id: string;
     offer_id?: string;
@@ -1077,23 +1087,243 @@ router.post('/api/select', async (req: Request, res: Response) => {
     quantity: number;
     requestedTimeWindow?: TimeWindow;
     autoMatch?: boolean;
+    // Smart buy mode
+    smartBuy?: boolean;
+    // Bulk buy mode
+    bulkBuy?: boolean;
+    targetQuantity?: number;
+    maxOffers?: number;
   };
-  
+
   const txState = await getTransaction(transaction_id);
-  
+
   if (!txState || !txState.catalog) {
     return res.status(400).json({ error: 'No catalog found for transaction. Run discover first.' });
   }
-  
+
   let selectedOffer: CatalogOffer | undefined;
   let selectedItemId: string | undefined;
   let matchingResult: any;
-  
+
+  // Helper: Effective target quantity for smart/bulk modes
+  const effectiveTarget = targetQuantity || quantity;
+
+  // ==================== SMART BUY MODE ====================
+  // Automatically determines if single or multiple offers are needed
+  if (smartBuy && effectiveTarget && requestedTimeWindow) {
+    // Collect all offers and providers from the catalog
+    const allOffers: CatalogOffer[] = [];
+    const providers = new Map<string, Provider>();
+
+    for (const providerCatalog of txState.catalog.providers) {
+      providers.set(providerCatalog.id, {
+        id: providerCatalog.id,
+        name: providerCatalog.descriptor?.name || 'Unknown',
+        trust_score: config.matching.defaultTrustScore,
+        total_orders: 0,
+        successful_orders: 0,
+      });
+
+      for (const item of providerCatalog.items) {
+        for (const offer of item.offers) {
+          allOffers.push(offer);
+        }
+      }
+    }
+
+    if (allOffers.length === 0) {
+      return res.status(400).json({ error: 'No offers available in catalog' });
+    }
+
+    // Score all offers using existing matching algorithm
+    const criteria: MatchingCriteria = {
+      requestedQuantity: 1, // Use 1 for scoring, actual qty handled by selector
+      requestedTimeWindow,
+    };
+
+    matchingResult = matchOffers(allOffers, providers, criteria);
+
+    // Use bulk matcher to select offers
+    const smartResult = selectOffersForBulk(
+      matchingResult.allOffers,
+      effectiveTarget,
+      maxOffers || 15
+    );
+
+    if (smartResult.selectedOffers.length === 0) {
+      // Provide helpful error message
+      let errorMessage = 'No matching offers found';
+      if (matchingResult.allOffers.length === 0) {
+        errorMessage = 'No offers available in the catalog';
+      } else if (matchingResult.eligibleCount === 0) {
+        const filterReasons = matchingResult.allOffers
+          .flatMap((o: any) => o.filterReasons || [])
+          .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+        if (filterReasons.some((r: string) => r.includes('Time window'))) {
+          errorMessage = 'No offers match the requested time window. Try adjusting your delivery time.';
+        } else if (filterReasons.length > 0) {
+          errorMessage = `No offers match your criteria: ${filterReasons[0]}`;
+        }
+      }
+      return res.status(400).json({
+        error: errorMessage,
+        offersAvailable: matchingResult.allOffers.length,
+        eligibleOffers: matchingResult.eligibleCount,
+      });
+    }
+
+    // Determine selection type: single if only 1 offer AND fully fulfilled
+    const isSingleOffer = smartResult.selectedOffers.length === 1 && smartResult.fullyFulfilled;
+    const selectionType = isSingleOffer ? 'single' : 'multiple';
+
+    logger.info(`Smart buy selection: ${selectionType} mode - ${smartResult.offersUsed} offers for ${smartResult.totalQuantity}/${effectiveTarget} kWh`, {
+      transaction_id,
+      selectionType,
+      fullyFulfilled: smartResult.fullyFulfilled,
+      shortfall: smartResult.shortfall,
+    });
+
+    // Store selection in transaction state (same format as bulk mode)
+    await updateTransaction(transaction_id, {
+      bulkMode: !isSingleOffer, // Only true if multiple offers
+      selectedOffers: smartResult.selectedOffers,
+      bulkSelection: {
+        totalQuantity: smartResult.totalQuantity,
+        totalPrice: smartResult.totalPrice,
+        fullyFulfilled: smartResult.fullyFulfilled,
+        shortfall: smartResult.shortfall,
+        targetQuantity: effectiveTarget,
+      },
+      // For single offer mode, also set the legacy fields
+      selectedOffer: isSingleOffer ? smartResult.selectedOffers[0].offer : undefined,
+      selectedQuantity: isSingleOffer ? smartResult.selectedOffers[0].quantity : undefined,
+      order: undefined,
+      error: undefined,
+    });
+
+    // Return smart buy response with selection type
+    const response = formatBulkSelectionResponse(smartResult);
+    return res.json({
+      status: 'ok',
+      transaction_id,
+      smartBuy: true,
+      selectionType,
+      ...response,
+      message: smartResult.fullyFulfilled
+        ? isSingleOffer
+          ? `Found 1 offer for ${smartResult.totalQuantity} kWh`
+          : `Found ${smartResult.offersUsed} offers for ${smartResult.totalQuantity} kWh`
+        : `Partial fulfillment: ${smartResult.totalQuantity}/${effectiveTarget} kWh available (${smartResult.shortfall} kWh short)`,
+    });
+  }
+
+  // ==================== BULK BUY MODE (explicit multi-offer) ====================
+  if (bulkBuy && targetQuantity && requestedTimeWindow) {
+    // Collect all offers and providers from the catalog
+    const allOffers: CatalogOffer[] = [];
+    const providers = new Map<string, Provider>();
+
+    for (const providerCatalog of txState.catalog.providers) {
+      providers.set(providerCatalog.id, {
+        id: providerCatalog.id,
+        name: providerCatalog.descriptor?.name || 'Unknown',
+        trust_score: config.matching.defaultTrustScore,
+        total_orders: 0,
+        successful_orders: 0,
+      });
+
+      for (const item of providerCatalog.items) {
+        for (const offer of item.offers) {
+          allOffers.push(offer);
+        }
+      }
+    }
+
+    if (allOffers.length === 0) {
+      return res.status(400).json({ error: 'No offers available in catalog' });
+    }
+
+    // Score all offers using existing matching algorithm
+    const criteria: MatchingCriteria = {
+      requestedQuantity: 1, // Use 1 for scoring, actual qty handled by bulk selector
+      requestedTimeWindow,
+    };
+
+    matchingResult = matchOffers(allOffers, providers, criteria);
+
+    // Use bulk matcher to select offers
+    const bulkResult = selectOffersForBulk(
+      matchingResult.allOffers,
+      targetQuantity,
+      maxOffers || 15
+    );
+
+    if (bulkResult.selectedOffers.length === 0) {
+      // Provide helpful error message based on why no offers matched
+      let errorMessage = 'No matching offers found for bulk order';
+      if (matchingResult.allOffers.length === 0) {
+        errorMessage = 'No offers available in the catalog';
+      } else if (matchingResult.eligibleCount === 0) {
+        // Check common filter failures
+        const filterReasons = matchingResult.allOffers
+          .flatMap(o => o.filterReasons || [])
+          .filter((v, i, a) => a.indexOf(v) === i); // unique
+        if (filterReasons.some(r => r.includes('Time window'))) {
+          errorMessage = 'No offers match the requested time window. Try adjusting your delivery time.';
+        } else if (filterReasons.length > 0) {
+          errorMessage = `No offers match your criteria: ${filterReasons[0]}`;
+        }
+      }
+      return res.status(400).json({
+        error: errorMessage,
+        offersAvailable: matchingResult.allOffers.length,
+        eligibleOffers: matchingResult.eligibleCount,
+      });
+    }
+
+    logger.info(`Bulk selection: ${bulkResult.offersUsed} offers selected for ${bulkResult.totalQuantity}/${targetQuantity} kWh`, {
+      transaction_id,
+      fullyFulfilled: bulkResult.fullyFulfilled,
+      shortfall: bulkResult.shortfall,
+    });
+
+    // Store bulk selection in transaction state
+    await updateTransaction(transaction_id, {
+      bulkMode: true,
+      selectedOffers: bulkResult.selectedOffers,
+      bulkSelection: {
+        totalQuantity: bulkResult.totalQuantity,
+        totalPrice: bulkResult.totalPrice,
+        fullyFulfilled: bulkResult.fullyFulfilled,
+        shortfall: bulkResult.shortfall,
+        targetQuantity,
+      },
+      // Clear single offer selection
+      selectedOffer: undefined,
+      selectedQuantity: undefined,
+      order: undefined,
+      error: undefined,
+    });
+
+    // Return bulk selection preview (no BPP call needed yet)
+    const response = formatBulkSelectionResponse(bulkResult);
+    return res.json({
+      status: 'ok',
+      transaction_id,
+      bulkMode: true,
+      ...response,
+      message: bulkResult.fullyFulfilled
+        ? `Selected ${bulkResult.offersUsed} offers for ${bulkResult.totalQuantity} kWh`
+        : `Partial fulfillment: ${bulkResult.totalQuantity}/${targetQuantity} kWh available (${bulkResult.shortfall} kWh short)`,
+    });
+  }
+
+  // ==================== SINGLE OFFER MODE (existing logic) ====================
   if (autoMatch && txState.catalog && requestedTimeWindow) {
     // Use matching algorithm to select best offer
     const allOffers: CatalogOffer[] = [];
     const providers = new Map<string, Provider>();
-    
+
     for (const providerCatalog of txState.catalog.providers) {
       // Add provider with default trust score (in production, fetch from registry)
       providers.set(providerCatalog.id, {
@@ -1103,31 +1333,31 @@ router.post('/api/select', async (req: Request, res: Response) => {
         total_orders: 0,
         successful_orders: 0,
       });
-      
+
       for (const item of providerCatalog.items) {
         for (const offer of item.offers) {
           allOffers.push(offer);
         }
       }
     }
-    
+
     const criteria: MatchingCriteria = {
       requestedQuantity: quantity,
       requestedTimeWindow,
     };
-    
+
     matchingResult = matchOffers(allOffers, providers, criteria);
-    
+
     if (matchingResult.selectedOffer) {
       selectedOffer = matchingResult.selectedOffer.offer;
       selectedItemId = selectedOffer.item_id;
-      
+
       logger.info(`Matching algorithm selected offer: ${selectedOffer.id} with score ${matchingResult.selectedOffer.score.toFixed(3)}`, {
         transaction_id,
         breakdown: matchingResult.selectedOffer.breakdown,
       });
     } else {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: matchingResult.reason || 'No matching offers found',
         allOffers: matchingResult.allOffers.length,
       });
@@ -1195,11 +1425,15 @@ router.post('/api/select', async (req: Request, res: Response) => {
   
   // Update state - store the offer and quantity, and CLEAR the old order to allow a new one
   // This is critical for allowing multiple purchases from the same discovery
-  await updateTransaction(transaction_id, { 
-    selectedOffer, 
+  await updateTransaction(transaction_id, {
+    selectedOffer,
     selectedQuantity: quantity,
     order: undefined, // Clear old order so new one can be created
     error: undefined, // Clear any previous error
+    // Clear bulk mode fields when using single offer mode
+    bulkMode: false,
+    selectedOffers: undefined,
+    bulkSelection: undefined,
   });
   
   try {
@@ -1244,23 +1478,67 @@ router.post('/api/select', async (req: Request, res: Response) => {
 
 /**
  * POST /api/init - Initialize order
+ * Supports both single offer and bulk mode
  */
 router.post('/api/init', async (req: Request, res: Response) => {
   const { transaction_id } = req.body as { transaction_id: string };
-  
+
   const txState = await getTransaction(transaction_id);
-  
-  if (!txState || !txState.selectedOffer) {
+
+  if (!txState) {
+    return res.status(400).json({ error: 'Transaction not found' });
+  }
+
+  // Check for bulk mode or single offer mode
+  const isBulkMode = txState.bulkMode && txState.selectedOffers && txState.selectedOffers.length > 0;
+  const hasSingleOffer = txState.selectedOffer;
+
+  if (!isBulkMode && !hasSingleOffer) {
     return res.status(400).json({ error: 'No offer selected. Run select first.' });
   }
-  
-  const offer = txState.selectedOffer;
-  
-  // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
-  const targetBppUri = offer.bpp_uri || config.bpp.uri;
-  const targetBppId = offer.bpp_id || offer.provider_id;
-  const isExternalBpp = !!offer.bpp_uri && offer.bpp_uri !== config.bpp.uri;
-  
+
+  let orderItems: Array<{ item_id: string; offer_id: string; quantity: number }>;
+  let providerId: string;
+  let targetBppUri: string;
+  let targetBppId: string;
+  let isExternalBpp: boolean;
+
+  if (isBulkMode) {
+    // ==================== BULK MODE ====================
+    // Build items array from all selected offers
+    orderItems = txState.selectedOffers!.map(s => ({
+      item_id: s.offer.item_id,
+      offer_id: s.offer.id,
+      quantity: s.quantity,
+    }));
+
+    // Use first offer for BPP routing (all should be local BPP for bulk)
+    const firstOffer = txState.selectedOffers![0].offer;
+    providerId = firstOffer.provider_id;
+    targetBppUri = firstOffer.bpp_uri || config.bpp.uri;
+    targetBppId = firstOffer.bpp_id || firstOffer.provider_id;
+    isExternalBpp = !!firstOffer.bpp_uri && firstOffer.bpp_uri !== config.bpp.uri;
+
+    logger.info(`Bulk init: ${orderItems.length} items, total ${txState.bulkSelection?.totalQuantity} kWh`, {
+      transaction_id,
+    });
+  } else {
+    // ==================== SINGLE OFFER MODE ====================
+    const offer = txState.selectedOffer!;
+    const selectedQuantity = txState.selectedQuantity || offer.maxQuantity;
+
+    orderItems = [{
+      item_id: offer.item_id,
+      offer_id: offer.id,
+      quantity: selectedQuantity,
+    }];
+
+    providerId = offer.provider_id;
+    targetBppUri = offer.bpp_uri || config.bpp.uri;
+    targetBppId = offer.bpp_id || offer.provider_id;
+    isExternalBpp = !!offer.bpp_uri && offer.bpp_uri !== config.bpp.uri;
+  }
+
   // Create context with correct BPP info
   const context = createContext({
     action: 'init',
@@ -1270,53 +1548,51 @@ router.post('/api/init', async (req: Request, res: Response) => {
     bpp_id: targetBppId,
     bpp_uri: targetBppUri,
   });
-  
-  // Build init message - use the quantity from selected offer (set during select)
-  const selectedQuantity = txState.selectedQuantity || offer.maxQuantity;
-  
+
+  // Build init message
   const initMessage: InitMessage = {
     context,
     message: {
       order: {
-        items: [{
-          item_id: offer.item_id,
-          offer_id: offer.id,
-          quantity: selectedQuantity,
-        }],
-        provider: { id: offer.provider_id },
+        items: orderItems,
+        provider: { id: providerId },
       },
     },
   };
-  
+
   logger.info('Sending init request', {
     transaction_id,
     message_id: context.message_id,
     action: 'init',
     targetBppUri,
     isExternalBpp,
+    itemCount: orderItems.length,
+    bulkMode: isBulkMode,
   });
-  
+
   await logEvent(transaction_id, context.message_id, 'init', 'OUTBOUND', JSON.stringify(initMessage));
-  
+
   try {
     // Route to the correct BPP based on offer's bpp_uri
     const targetUrl = isExternalBpp ? `${targetBppUri}/init` : `${config.urls.bpp}/init`;
-    
+
     logger.info(`Routing init to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
-    
+
     // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
-    const response = isExternalBpp 
+    const response = isExternalBpp
       ? await secureAxios.post(targetUrl, initMessage)
       : await axios.post(targetUrl, initMessage);
-    
+
     res.json({
       status: 'ok',
       transaction_id,
       message_id: context.message_id,
+      bulkMode: isBulkMode,
+      itemCount: orderItems.length,
       ack: response.data,
     });
   } catch (error: any) {
-    logger.error(`Init request failed: ${error.message}`, { 
+    logger.error(`Init request failed: ${error.message}`, {
       transaction_id,
       status: error.response?.status,
       data: error.response?.data,
@@ -1327,28 +1603,87 @@ router.post('/api/init', async (req: Request, res: Response) => {
 
 /**
  * POST /api/confirm - Confirm order
+ * Supports both single order and bulk orders (confirms all orders in bulk group)
  */
 router.post('/api/confirm', async (req: Request, res: Response) => {
   const { transaction_id, order_id } = req.body as { transaction_id: string; order_id?: string };
-  
+
   const txState = await getTransaction(transaction_id);
-  
+
   if (!txState) {
     return res.status(400).json({ error: 'Transaction not found' });
   }
-  
+
+  // Check for bulk orders mode
+  const hasBulkOrders = txState.bulkOrders && txState.bulkOrders.length > 0;
+
+  if (hasBulkOrders) {
+    // ==================== BULK ORDERS CONFIRMATION ====================
+    logger.info(`Confirming ${txState.bulkOrders!.length} bulk orders`, {
+      transaction_id,
+      orderIds: txState.bulkOrders!.map(o => o.id),
+    });
+
+    const confirmedOrders: string[] = [];
+    const failedOrders: Array<{ id: string; error: string }> = [];
+    const targetUrl = `${config.urls.bpp}/confirm`;
+
+    // Confirm each order in parallel
+    await Promise.all(txState.bulkOrders!.map(async (bulkOrder) => {
+      try {
+        const context = createContext({
+          action: 'confirm',
+          transaction_id: bulkOrder.transactionId,
+          bap_id: config.bap.id,
+          bap_uri: config.bap.uri,
+          bpp_id: config.bpp.id,
+          bpp_uri: config.bpp.uri,
+        });
+
+        const confirmMessage: ConfirmMessage = {
+          context,
+          message: {
+            order: { id: bulkOrder.id },
+          },
+        };
+
+        await logEvent(bulkOrder.transactionId, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
+        await axios.post(targetUrl, confirmMessage);
+        confirmedOrders.push(bulkOrder.id);
+
+        logger.info(`Bulk order confirmed: ${bulkOrder.id}`, { transaction_id: bulkOrder.transactionId });
+      } catch (error: any) {
+        logger.error(`Failed to confirm bulk order ${bulkOrder.id}: ${error.message}`);
+        failedOrders.push({ id: bulkOrder.id, error: error.message });
+      }
+    }));
+
+    // Return result
+    res.json({
+      status: failedOrders.length === 0 ? 'ok' : 'partial',
+      transaction_id,
+      bulk_mode: true,
+      confirmed_orders: confirmedOrders,
+      failed_orders: failedOrders.length > 0 ? failedOrders : undefined,
+      total_confirmed: confirmedOrders.length,
+      total_failed: failedOrders.length,
+    });
+    return;
+  }
+
+  // ==================== SINGLE ORDER CONFIRMATION (original flow) ====================
   const orderId = order_id || txState.order?.id;
-  
+
   if (!orderId) {
     return res.status(400).json({ error: 'No order ID available. Run init first or provide order_id.' });
   }
-  
+
   // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
   const offer = txState.selectedOffer;
   const targetBppUri = offer?.bpp_uri || config.bpp.uri;
   const targetBppId = offer?.bpp_id || offer?.provider_id || config.bpp.id;
   const isExternalBpp = !!offer?.bpp_uri && offer.bpp_uri !== config.bpp.uri;
-  
+
   // Create context with correct BPP info
   const context = createContext({
     action: 'confirm',
@@ -1358,7 +1693,7 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     bpp_id: targetBppId,
     bpp_uri: targetBppUri,
   });
-  
+
   // Build confirm message
   const confirmMessage: ConfirmMessage = {
     context,
@@ -1366,7 +1701,7 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
       order: { id: orderId },
     },
   };
-  
+
   logger.info('Sending confirm request', {
     transaction_id,
     message_id: context.message_id,
@@ -1375,17 +1710,17 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     targetBppUri,
     isExternalBpp,
   });
-  
+
   await logEvent(transaction_id, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
-  
+
   try {
     // Route to the correct BPP based on offer's bpp_uri
     const targetUrl = isExternalBpp ? `${targetBppUri}/confirm` : `${config.urls.bpp}/confirm`;
-    
+
     logger.info(`Routing confirm to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
-    
+
     // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
-    const response = isExternalBpp 
+    const response = isExternalBpp
       ? await secureAxios.post(targetUrl, confirmMessage)
       : await axios.post(targetUrl, confirmMessage);
 
@@ -1438,7 +1773,7 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     } catch (error: any) {
       logger.warn(`Settlement initiation skipped: ${error.message}`, { transaction_id });
     }
-    
+
     res.json({
       status: 'ok',
       transaction_id,
@@ -2423,6 +2758,12 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
             item: true,
           },
         },
+        blocks: {
+          include: {
+            provider: true,
+            offer: true,
+          },
+        },
       },
     });
 
@@ -2431,7 +2772,7 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
     const formattedOrders = await Promise.all(orders.map(async (order: any) => {
       let items: any[] = [];
       let quote: any = {};
-      
+
       try {
         items = JSON.parse(order.itemsJson || '[]');
       } catch {
@@ -2447,6 +2788,31 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
       const selectedOffer = order.selectedOffer;
       const totalQty = order.totalQty || items[0]?.quantity?.value || 0;
 
+      // Detect bulk order: multiple items or multiple unique providers in blocks
+      const isBulkOrder = items.length > 1 || (order.blocks && new Set(order.blocks.map((b: any) => b.providerId)).size > 1);
+      const totalItemCount = items.length;
+
+      // Get all unique providers from blocks (for bulk orders)
+      const providersMap = new Map<string, { id: string; name: string }>();
+      if (order.blocks && order.blocks.length > 0) {
+        for (const block of order.blocks) {
+          if (block.provider && !providersMap.has(block.provider.id)) {
+            providersMap.set(block.provider.id, {
+              id: block.provider.id,
+              name: block.provider.name,
+            });
+          }
+        }
+      }
+      // Fallback to order.provider if no blocks
+      if (providersMap.size === 0 && order.provider) {
+        providersMap.set(order.provider.id, {
+          id: order.provider.id,
+          name: order.provider.name,
+        });
+      }
+      const providers = Array.from(providersMap.values());
+
       // Calculate price_per_kwh: prefer offer value, fallback to calculating
       // from quote
       let pricePerKwh = selectedOffer?.priceValue || 0;
@@ -2454,10 +2820,29 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
         pricePerKwh = quote.price.value / totalQty;
       }
 
-      // Get source_type: prefer offer, then stored items, then lookup from
-      // catalog
+      // For bulk orders, calculate average price from blocks
+      if (isBulkOrder && order.blocks && order.blocks.length > 0) {
+        const totalBlockPrice = order.blocks.reduce((sum: number, b: any) => sum + (b.priceValue || 0), 0);
+        const blockCount = order.blocks.length;
+        if (blockCount > 0) {
+          pricePerKwh = totalBlockPrice / blockCount;
+        }
+      }
+
+      // Get source_type: prefer offer, then stored items, then lookup from catalog
+      // For bulk orders, collect all unique source types
       let sourceType = selectedOffer?.item?.sourceType || items[0]?.source_type;
-      if (!sourceType || sourceType === 'UNKNOWN') {
+      const sourceTypes = new Set<string>();
+
+      if (isBulkOrder && items.length > 0) {
+        for (const item of items) {
+          if (item.source_type && item.source_type !== 'UNKNOWN') {
+            sourceTypes.add(item.source_type);
+          }
+        }
+      }
+
+      if ((!sourceType || sourceType === 'UNKNOWN') && sourceTypes.size === 0) {
         // Fallback: lookup from catalog item directly
         const itemId = items[0]?.item_id || selectedOffer?.itemId;
         if (itemId) {
@@ -2468,6 +2853,16 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
           sourceType = catalogItem?.sourceType || 'UNKNOWN';
         }
       }
+
+      // For bulk orders with mixed sources, show 'MIXED'
+      if (sourceTypes.size > 1) {
+        sourceType = 'MIXED';
+      } else if (sourceTypes.size === 1) {
+        sourceType = Array.from(sourceTypes)[0];
+      }
+
+      // An order is part of a bulk purchase if it has a bulkGroupId
+      const isPartOfBulkPurchase = !!order.bulkGroupId;
 
       return {
         id: order.id,
@@ -2486,11 +2881,10 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
           penalty: order.cancelledBy?.startsWith('SELLER:') ? null : order.cancelPenalty,
           refund: order.cancelRefund,
         } : undefined,
-        provider: order.provider ? {
-          id: order.provider.id,
-          name: order.provider.name,
-        } :
-                                   undefined,
+        // For single-offer orders, return single provider; for bulk, return first provider
+        provider: providers.length > 0 ? providers[0] : undefined,
+        // For bulk orders, return all providers
+        providers: isBulkOrder ? providers : undefined,
         itemInfo: {
           item_id: items[0]?.item_id || selectedOffer?.itemId || null,
           offer_id: items[0]?.offer_id || order.selectedOfferId || null,
@@ -2498,6 +2892,13 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
           price_per_kwh: pricePerKwh,
           quantity: totalQty,
         },
+        // Bulk order info - isBulkOrder means single order with multiple items (legacy)
+        // isPartOfBulkPurchase means this is one of multiple separate orders from bulk buy
+        isBulkOrder,
+        isPartOfBulkPurchase,
+        bulkGroupId: order.bulkGroupId || undefined,
+        totalItemCount: isBulkOrder ? totalItemCount : undefined,
+        totalProviderCount: isBulkOrder ? providers.length : undefined,
       };
     }));
 

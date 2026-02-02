@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Zap, Package, ChevronDown } from 'lucide-react';
+import { Zap, Package, ChevronDown, ArrowLeft } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { DiscoverForm } from '@/components/buy/discover-form';
 import { OfferCard } from '@/components/buy/offer-card';
 import { OrderSheet } from '@/components/buy/order-sheet';
+import { SmartOrderSheet } from '@/components/buy/smart-order-sheet';
 import { EmptyState, SkeletonList, Badge, Button } from '@/components/ui';
-import { buyerApi, type Offer, type TransactionState } from '@/lib/api';
+import { buyerApi, type Offer, type TransactionState, type SmartBuyResponse } from '@/lib/api';
 import { useP2PStats } from '@/contexts/p2p-stats-context';
 
 interface DiscoveredOffer {
@@ -31,32 +32,121 @@ const ITEMS_PER_PAGE = 10;
 
 export default function BuyPage() {
   const { refresh: refreshStats } = useP2PStats();
-  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [transaction, setTransaction] = useState<TransactionState | null>(null);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+
+  // Smart buy state
+  const [smartSelection, setSmartSelection] = useState<SmartBuyResponse | null>(null);
+  const [smartOrderSheetOpen, setSmartOrderSheetOpen] = useState(false);
+
+  // Browse mode state (manual offer selection)
+  const [browseMode, setBrowseMode] = useState(false);
   const [offers, setOffers] = useState<DiscoveredOffer[]>([]);
   const [selectedOffer, setSelectedOffer] = useState<DiscoveredOffer | null>(null);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [requestedQuantity, setRequestedQuantity] = useState(10);
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
-  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [browseTimeWindow, setBrowseTimeWindow] = useState<{ startTime: string; endTime: string } | null>(null);
 
-  const handleDiscover = useCallback(async (params: {
+  // Main smart buy handler
+  const handleSmartBuy = useCallback(async (params: {
     sourceType?: string;
-    minQuantity: number;
+    quantity: number;
     timeWindow: { startTime: string; endTime: string };
   }) => {
-    setIsDiscovering(true);
-    setOffers([]);
-    setSelectedOffer(null);
-    setRequestedQuantity(params.minQuantity);
-    setVisibleCount(ITEMS_PER_PAGE); // Reset pagination on new search
+    setIsLoading(true);
     setDiscoveryError(null);
+    setSmartSelection(null);
+    setBrowseMode(false);
+    setOffers([]);
 
     try {
-      // Start discovery
-      const result = await buyerApi.discover(params);
+      // First run discovery to get the catalog
+      const discoverResult = await buyerApi.discover({
+        sourceType: params.sourceType,
+        minQuantity: 1, // Get all offers
+        timeWindow: params.timeWindow,
+      });
 
-      // Poll for results (catalog comes async via callback)
+      // Wait for catalog
+      let attempts = 0;
+      const maxAttempts = 30;
+      let catalogReceived = false;
+
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 500));
+
+        const txState = await buyerApi.getTransaction(discoverResult.transaction_id);
+        setTransaction(txState);
+
+        if (txState.error) {
+          setDiscoveryError(txState.error);
+          return;
+        }
+
+        if (txState.catalog) {
+          catalogReceived = true;
+          break;
+        }
+
+        attempts++;
+      }
+
+      if (!catalogReceived) {
+        setDiscoveryError('Discovery timed out. Please try again.');
+        return;
+      }
+
+      // Run smart buy selection
+      const smartResult = await buyerApi.smartBuy({
+        transaction_id: discoverResult.transaction_id,
+        smartBuy: true,
+        quantity: params.quantity,
+        requestedTimeWindow: params.timeWindow,
+      });
+
+      console.log('Smart buy result:', smartResult);
+      setSmartSelection(smartResult);
+      setSmartOrderSheetOpen(true);
+    } catch (error: any) {
+      console.error('Smart buy failed:', error);
+      setDiscoveryError(error?.message || 'Failed to find offers');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Browse mode: discover all offers for manual selection
+  const handleBrowse = useCallback(async () => {
+    // Use default time window for browse
+    const now = new Date();
+    const startTime = new Date(now);
+    startTime.setMinutes(0, 0, 0);
+    startTime.setHours(startTime.getHours() + 1);
+
+    const endTime = new Date(startTime);
+    endTime.setHours(endTime.getHours() + 4);
+
+    const timeWindow = {
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+    };
+
+    setIsLoading(true);
+    setBrowseMode(true);
+    setOffers([]);
+    setSelectedOffer(null);
+    setVisibleCount(ITEMS_PER_PAGE);
+    setDiscoveryError(null);
+    setBrowseTimeWindow(timeWindow);
+
+    try {
+      const result = await buyerApi.discover({
+        minQuantity: 1,
+        timeWindow,
+      });
+
       let attempts = 0;
       const maxAttempts = 30;
       let catalogReceived = false;
@@ -67,19 +157,15 @@ export default function BuyPage() {
         const txState = await buyerApi.getTransaction(result.transaction_id);
         setTransaction(txState);
 
-        // Check for errors in transaction state
         if (txState.error) {
-          console.error('Discovery error from backend:', txState.error);
           setDiscoveryError(txState.error);
           break;
         }
 
-        // Check if catalog has been received (even if empty)
         if (txState.catalog) {
           catalogReceived = true;
 
           if (txState.catalog.providers && txState.catalog.providers.length > 0) {
-            // Extract offers from catalog
             const discoveredOffers: DiscoveredOffer[] = [];
 
             for (const provider of txState.catalog.providers) {
@@ -89,7 +175,6 @@ export default function BuyPage() {
                 if (!item.offers) continue;
 
                 for (const offer of item.offers) {
-                  // Find score from matching results
                   const matchedOffer = txState.matchingResults?.allOffers?.find(
                     m => m.offer.id === offer.id
                   );
@@ -109,7 +194,6 @@ export default function BuyPage() {
               }
             }
 
-            // Sort by score (if available) or price
             discoveredOffers.sort((a, b) => {
               if (a.score !== undefined && b.score !== undefined) {
                 return b.score - a.score;
@@ -117,86 +201,72 @@ export default function BuyPage() {
               return a.offer.price.value - b.offer.price.value;
             });
 
-            console.log(`Discovery complete: ${discoveredOffers.length} offers found`);
             setOffers(discoveredOffers);
           } else {
-            console.log('Discovery complete: No offers found matching criteria');
             setOffers([]);
           }
-          // Catalog received - stop polling
           break;
         }
 
         attempts++;
       }
 
-      // If we exhausted attempts without receiving catalog
       if (!catalogReceived && attempts >= maxAttempts) {
-        console.error('Discovery timeout: No catalog received after max attempts');
         setDiscoveryError('Discovery timed out. Please try again.');
       }
     } catch (error) {
-      console.error('Discovery failed:', error);
+      console.error('Browse failed:', error);
       setDiscoveryError(error instanceof Error ? error.message : 'Discovery failed');
     } finally {
-      setIsDiscovering(false);
+      setIsLoading(false);
     }
   }, []);
 
+  // Exit browse mode
+  const handleExitBrowse = () => {
+    setBrowseMode(false);
+    setOffers([]);
+    setSelectedOffer(null);
+    setTransaction(null);
+    setDiscoveryError(null);
+  };
+
   const handleSelectOffer = (offer: DiscoveredOffer) => {
     setSelectedOffer(offer);
+    setRequestedQuantity(Math.min(offer.availableQty, 50)); // Default to min of available or 50
     setOrderSheetOpen(true);
   };
 
+  // Manual order confirmation (browse mode)
   const handleConfirmOrder = async (quantity: number) => {
     if (!selectedOffer || !transaction) return null;
 
     try {
-      // Use the existing transaction that has the catalog from discovery
-      // This ensures the select/init/confirm flow has access to the catalog data
       const txId = transaction.transaction_id;
 
-      // Select the offer with the existing transaction
       await buyerApi.select({
         transaction_id: txId,
         offer_id: selectedOffer.offer.id,
         quantity,
       });
 
-      // Wait for selection callback
       await new Promise(r => setTimeout(r, 500));
-
-      // Initialize order
       await buyerApi.init(txId);
-
-      // Wait for init callback
       await new Promise(r => setTimeout(r, 500));
 
-      // Get order ID from transaction
-      // Store the previous order ID (if any) to detect when a new order is created
       let txState = await buyerApi.getTransaction(txId);
       const previousOrderId = txState.order?.id;
       let attempts = 0;
 
-      // Wait for a NEW order (different from previous) or error
       while (attempts < 10) {
         await new Promise(r => setTimeout(r, 500));
         txState = await buyerApi.getTransaction(txId);
 
-        // Check for error
-        if (txState.error) {
-          break;
-        }
-
-        // Check for new order (different from any previous order)
-        if (txState.order && txState.order.id !== previousOrderId) {
-          break;
-        }
-
+        if (txState.error) break;
+        if (txState.order && txState.order.id !== previousOrderId) break;
         attempts++;
       }
 
-      // Check for error first
       if (txState.error) {
         throw new Error(txState.error);
       }
@@ -205,39 +275,75 @@ export default function BuyPage() {
         throw new Error('Order creation failed. Please try again.');
       }
 
-      // Confirm order
       await buyerApi.confirm(txId, txState.order.id);
-
-      // Wait for confirmation
       await new Promise(r => setTimeout(r, 500));
-
-      // Get final state
       txState = await buyerApi.getTransaction(txId);
 
-      // After successful purchase, update both availableQty and offer.maxQuantity in local state
-      // This fixes Bug 2 (double-buy) and Bug 3 (order sheet shows wrong max)
       if (txState.order) {
         setOffers(prevOffers => prevOffers.map(o => {
           if (o.offer.id === selectedOffer.offer.id) {
             const newAvailableQty = Math.max(0, o.availableQty - quantity);
-            const newMaxQuantity = Math.max(0, o.offer.maxQuantity - quantity);
             return {
               ...o,
               availableQty: newAvailableQty,
               offer: {
                 ...o.offer,
-                maxQuantity: newMaxQuantity,
+                maxQuantity: Math.max(0, o.offer.maxQuantity - quantity),
               },
             };
           }
           return o;
-        }).filter(o => o.availableQty > 0)); // Remove sold-out offers
+        }).filter(o => o.availableQty > 0));
 
-        // Clear transaction state to force fresh discovery for next purchase
-        // This fixes Bug 7 (discovery bugged after orders/cancellations)
         setTransaction(null);
+        refreshStats();
+      }
 
-        // Refresh P2P stats to update savings display (Bug 8)
+      return txState.order || null;
+    } catch (error) {
+      console.error('Order failed:', error);
+      throw error;
+    }
+  };
+
+  // Smart order confirmation
+  const handleSmartConfirm = async () => {
+    if (!transaction || !smartSelection) return null;
+
+    try {
+      const txId = transaction.transaction_id;
+
+      await buyerApi.init(txId);
+      await new Promise(r => setTimeout(r, 500));
+
+      let txState = await buyerApi.getTransaction(txId);
+      const previousOrderId = txState.order?.id;
+      let attempts = 0;
+
+      while (attempts < 10) {
+        await new Promise(r => setTimeout(r, 500));
+        txState = await buyerApi.getTransaction(txId);
+
+        if (txState.error) break;
+        if (txState.order && txState.order.id !== previousOrderId) break;
+        attempts++;
+      }
+
+      if (txState.error) {
+        throw new Error(txState.error);
+      }
+
+      if (!txState.order) {
+        throw new Error('Order creation failed. Please try again.');
+      }
+
+      await buyerApi.confirm(txId, txState.order.id);
+      await new Promise(r => setTimeout(r, 500));
+      txState = await buyerApi.getTransaction(txId);
+
+      if (txState.order) {
+        setTransaction(null);
+        setSmartSelection(null);
         refreshStats();
       }
 
@@ -251,16 +357,35 @@ export default function BuyPage() {
   return (
     <AppShell title="Buy Energy">
       <div className="flex flex-col gap-4">
-        {/* Discover Form */}
-        <DiscoverForm onDiscover={handleDiscover} isLoading={isDiscovering} />
+        {/* Browse mode header */}
+        {browseMode && (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={handleExitBrowse}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+            <span className="text-sm text-[var(--color-text-muted)]">
+              Browsing all offers
+            </span>
+          </div>
+        )}
+
+        {/* Discover Form - hidden in browse mode */}
+        {!browseMode && (
+          <DiscoverForm
+            onSmartBuy={handleSmartBuy}
+            onBrowse={handleBrowse}
+            isLoading={isLoading}
+          />
+        )}
 
         {/* Results section */}
         <div>
-          {isDiscovering ? (
+          {isLoading ? (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-semibold text-[var(--color-text)]">
-                  Finding Offers...
+                  {browseMode ? 'Loading Offers...' : 'Finding Best Deal...'}
                 </h2>
               </div>
               <SkeletonList count={3} />
@@ -268,10 +393,10 @@ export default function BuyPage() {
           ) : discoveryError ? (
             <EmptyState
               icon={<Package className="h-12 w-12" />}
-              title="Discovery Error"
+              title="No Offers Found"
               description={discoveryError}
             />
-          ) : offers.length > 0 ? (
+          ) : browseMode && offers.length > 0 ? (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-semibold text-[var(--color-text)]">
@@ -280,7 +405,6 @@ export default function BuyPage() {
                 <Badge variant="primary">{offers.length} found</Badge>
               </div>
               <div className="flex flex-col gap-3">
-                {/* Show only visible offers (pagination) */}
                 {offers.slice(0, visibleCount).map((item) => (
                   <OfferCard
                     key={item.offer.id}
@@ -298,7 +422,6 @@ export default function BuyPage() {
                 ))}
               </div>
 
-              {/* Load More button */}
               {offers.length > visibleCount && (
                 <Button
                   variant="secondary"
@@ -310,22 +433,31 @@ export default function BuyPage() {
                 </Button>
               )}
             </div>
-          ) : transaction ? (
+          ) : browseMode ? (
             <EmptyState
               icon={<Package className="h-12 w-12" />}
               title="No offers found"
-              description="Try adjusting your search criteria or time window"
+              description="No energy offers available at the moment"
             />
           ) : (
             <EmptyState
               icon={<Zap className="h-12 w-12" />}
-              title="Discover Energy"
-              description="Search for available energy offers in your area"
+              title="Buy Energy"
+              description="Enter the amount you need and we'll find the best deal for you"
             />
           )}
         </div>
 
-        {/* Order Sheet */}
+        {/* Smart Order Sheet (unified single/multi) */}
+        <SmartOrderSheet
+          open={smartOrderSheetOpen}
+          onClose={() => setSmartOrderSheetOpen(false)}
+          selection={smartSelection}
+          onConfirm={handleSmartConfirm}
+          trustWarning={transaction?.trustWarning}
+        />
+
+        {/* Manual Order Sheet (browse mode) */}
         <OrderSheet
           open={orderSheetOpen}
           onClose={() => setOrderSheetOpen(false)}

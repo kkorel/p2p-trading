@@ -48,6 +48,15 @@ interface MatchingResult {
   reason?: string;
 }
 
+// Bulk mode selected offer with quantity
+export interface BulkSelectedOffer {
+  offer: CatalogOffer;
+  provider: Provider;
+  quantity: number;
+  score: number;
+  subtotal: number;
+}
+
 export interface TransactionState {
   transaction_id: string;
   catalog?: Catalog;
@@ -56,6 +65,24 @@ export interface TransactionState {
   providers?: Map<string, Provider>;
   order?: Order;
   discoveryCriteria?: DiscoveryCriteria;
+
+  // Bulk buy mode
+  bulkMode?: boolean;
+  selectedOffers?: BulkSelectedOffer[];
+  bulkSelection?: {
+    totalQuantity: number;
+    totalPrice: number;
+    fullyFulfilled: boolean;
+    shortfall: number;
+    targetQuantity: number;
+  };
+  // Bulk orders (separate orders from bulk purchase)
+  bulkOrders?: Array<{
+    id: string;
+    transactionId: string;
+    status: string;
+  }>;
+  bulkGroupId?: string;
   matchingResults?: MatchingResult | null;
   excludeProviderId?: string | null; // User's own provider to exclude from results
   buyerId?: string | null; // User ID of the buyer for order association
