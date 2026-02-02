@@ -153,6 +153,9 @@ router.post('/select', async (req: Request, res: Response) => {
 
     providerId = offer.provider_id;
 
+    // Resolve item_id: prefer request value, fall back to offer's own item_id from DB
+    const resolvedItemId = item.item_id || offer.item_id;
+
     // Check available blocks instead of max quantity
     const availableBlocks = await getAvailableBlockCount(item.offer_id);
     if (item.quantity > availableBlocks) {
@@ -160,9 +163,11 @@ router.post('/select', async (req: Request, res: Response) => {
     }
 
     // Also check item-level availability as a safety check
-    const availableQty = await getItemAvailableQuantity(item.item_id);
-    if (availableQty !== null && item.quantity > availableQty) {
-      validationErrors.push(`Requested quantity ${item.quantity} exceeds item available ${availableQty}`);
+    if (resolvedItemId) {
+      const availableQty = await getItemAvailableQuantity(resolvedItemId);
+      if (availableQty !== null && item.quantity > availableQty) {
+        validationErrors.push(`Requested quantity ${item.quantity} exceeds item available ${availableQty}`);
+      }
     }
 
     // Calculate prices
@@ -172,13 +177,13 @@ router.post('/select', async (req: Request, res: Response) => {
     currency = offer.price.currency;
 
     // Get source_type from item
-    const catalogItem = await prisma.catalogItem.findUnique({
-      where: { id: item.item_id },
+    const catalogItem = resolvedItemId ? await prisma.catalogItem.findUnique({
+      where: { id: resolvedItemId },
       select: { sourceType: true },
-    });
+    }) : null;
 
     orderItems.push({
-      item_id: item.item_id,
+      item_id: resolvedItemId || item.item_id,
       offer_id: item.offer_id,
       provider_id: offer.provider_id,
       quantity: item.quantity,

@@ -822,6 +822,8 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
                         response.data?.message?.catalogs ||
                         response.data?.catalogs;
     
+    let processedCatalog: { providers: any[] } | null = null;
+
     if (syncCatalog && syncCatalog.length > 0) {
       logger.info('Processing synchronous catalog response from CDS', {
         transaction_id: txnId,
@@ -954,12 +956,15 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       logger.info(`Synchronous catalog processed: ${filteredProviders.length} providers, ${allOffers.length} offers`, {
         transaction_id: txnId,
       });
+
+      processedCatalog = { providers: filteredProviders };
     }
-    
+
     res.json({
       status: 'ok',
       transaction_id: txnId,
       message_id: context.message_id,
+      ...(processedCatalog ? { catalog: processedCatalog, source: 'external_cds' } : {}),
       ack: response.data,
     });
   } catch (error: any) {
@@ -1022,6 +1027,8 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         }
         itemEntry.offers.push({
           id: offer.id,
+          item_id: offer.itemId,
+          provider_id: offer.providerId,
           price: { value: offer.priceValue, currency: offer.currency || 'INR' },
           quantity: { available: offer.blocks.length, maximum: offer.maxQty },
           maxQuantity: offer.blocks.length,

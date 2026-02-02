@@ -580,8 +580,11 @@ export async function executePurchase(
       return { success: false, error: 'Discovery failed — no transaction ID returned.' };
     }
 
-    // Check if any offers were found
-    const providers = discoverRes.data.catalog?.providers || [];
+    // Check if any offers were found (handle both local and external CDS response formats)
+    const catalog = discoverRes.data.catalog
+      || discoverRes.data.ack?.message?.catalog
+      || null;
+    const providers = catalog?.providers || [];
     const allOffers: any[] = [];
     for (const p of providers) {
       for (const item of (p.items || [])) {
