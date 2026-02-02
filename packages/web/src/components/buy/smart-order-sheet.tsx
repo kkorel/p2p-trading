@@ -223,7 +223,7 @@ export function SmartOrderSheet({
                 {isSingleOffer ? 'Price' : 'Average Price'}
               </p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                {formatCurrency(isSingleOffer ? singleOffer!.unit_price : summary.averagePrice)}/kWh
+                {formatCurrency(isSingleOffer ? singleOffer!.unit_price : (summary.averagePrice ?? 0))}/kWh
               </p>
             </div>
             <div className="text-right">

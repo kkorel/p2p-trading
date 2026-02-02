@@ -624,19 +624,25 @@ export interface SmartBuyResponse {
   status: string;
   transaction_id: string;
   smartBuy: true;
-  selectionType: 'single' | 'multiple';
+  selectionType?: 'single' | 'multiple';
   selectedOffers: BulkSelectedOffer[];
   summary: {
     totalQuantity: number;
     totalPrice: number;
-    averagePrice: number;
-    currency: string;
+    averagePrice?: number;
+    currency?: string;
     fullyFulfilled: boolean;
     shortfall: number;
     offersUsed: number;
-    offersAvailable: number;
+    offersAvailable?: number;
   };
-  message: string;
+  message?: string;
+  // Returned when no offers match
+  error?: string;
+  offersAvailable?: number;
+  eligibleOffers?: number;
+  filterReasons?: string[];
+  availableWindows?: Array<{ startTime: string; endTime: string }>;
 }
 
 export interface AddItemParams {

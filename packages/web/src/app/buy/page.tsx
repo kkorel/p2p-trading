@@ -107,6 +107,25 @@ export default function BuyPage() {
       });
 
       console.log('Smart buy result:', smartResult);
+
+      // Handle "no eligible offers" response
+      if (smartResult.status === 'no_eligible_offers' || smartResult.selectedOffers?.length === 0) {
+        let message = smartResult.error || 'No matching offers found.';
+        // Add suggestion about available time windows
+        if (smartResult.availableWindows && smartResult.availableWindows.length > 0) {
+          const windowStrs = smartResult.availableWindows.slice(0, 3).map(tw => {
+            const s = new Date(tw.startTime);
+            const e = new Date(tw.endTime);
+            return `${s.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${s.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}-${e.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+          });
+          message += ` Available windows: ${windowStrs.join(', ')}`;
+        } else if (smartResult.offersAvailable && smartResult.offersAvailable > 0) {
+          message += ` ${smartResult.offersAvailable} offers exist but none match your time window.`;
+        }
+        setDiscoveryError(message);
+        return;
+      }
+
       setSmartSelection(smartResult);
       setSmartOrderSheetOpen(true);
     } catch (error: any) {

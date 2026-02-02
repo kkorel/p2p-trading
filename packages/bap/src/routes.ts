@@ -1160,7 +1160,11 @@ router.post('/api/select', async (req: Request, res: Response) => {
 
   // ==================== SMART BUY MODE ====================
   // Automatically determines if single or multiple offers are needed
-  if (smartBuy && effectiveTarget && requestedTimeWindow) {
+  // Use the snapped time window from discover criteria if available, since the catalog
+  // was already filtered by it. Fall back to the frontend's requestedTimeWindow.
+  const effectiveSmartTimeWindow = txState.discoveryCriteria?.timeWindow || requestedTimeWindow;
+
+  if (smartBuy && effectiveTarget && (requestedTimeWindow || effectiveSmartTimeWindow)) {
     // Collect all offers and providers from the catalog
     const allOffers: CatalogOffer[] = [];
     const providers = new Map<string, Provider>();
@@ -1186,9 +1190,11 @@ router.post('/api/select', async (req: Request, res: Response) => {
     }
 
     // Score all offers using existing matching algorithm
+    // Use the snapped time window that was used to filter the catalog during discover,
+    // ensuring consistency between catalog contents and matching criteria
     const criteria: MatchingCriteria = {
       requestedQuantity: 1, // Use 1 for scoring, actual qty handled by selector
-      requestedTimeWindow,
+      requestedTimeWindow: effectiveSmartTimeWindow,
     };
 
     matchingResult = matchOffers(allOffers, providers, criteria);
@@ -1201,24 +1207,46 @@ router.post('/api/select', async (req: Request, res: Response) => {
     );
 
     if (smartResult.selectedOffers.length === 0) {
-      // Provide helpful error message
+      // Collect available time windows from all offers for suggestions
+      const availableWindows = matchingResult.allOffers
+        .filter((o: any) => o.offer.timeWindow?.startTime && o.offer.timeWindow?.endTime)
+        .map((o: any) => o.offer.timeWindow)
+        .filter((tw: any, i: number, arr: any[]) => arr.findIndex(t => t.startTime === tw.startTime) === i)
+        .slice(0, 5);
+
       let errorMessage = 'No matching offers found';
+      const filterReasons = matchingResult.allOffers
+        .flatMap((o: any) => o.filterReasons || [])
+        .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+
       if (matchingResult.allOffers.length === 0) {
         errorMessage = 'No offers available in the catalog';
       } else if (matchingResult.eligibleCount === 0) {
-        const filterReasons = matchingResult.allOffers
-          .flatMap((o: any) => o.filterReasons || [])
-          .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
         if (filterReasons.some((r: string) => r.includes('Time window'))) {
           errorMessage = 'No offers match the requested time window. Try adjusting your delivery time.';
         } else if (filterReasons.length > 0) {
           errorMessage = `No offers match your criteria: ${filterReasons[0]}`;
         }
       }
-      return res.status(400).json({
+
+      // Return 200 with structured "no eligible" result so frontend can show suggestions
+      return res.json({
+        status: 'no_eligible_offers',
+        transaction_id,
+        smartBuy: true,
         error: errorMessage,
         offersAvailable: matchingResult.allOffers.length,
         eligibleOffers: matchingResult.eligibleCount,
+        filterReasons,
+        availableWindows,
+        selectedOffers: [],
+        summary: {
+          totalQuantity: 0,
+          totalPrice: 0,
+          offersUsed: 0,
+          fullyFulfilled: false,
+          shortfall: effectiveTarget,
+        },
       });
     }
 
@@ -1268,7 +1296,9 @@ router.post('/api/select', async (req: Request, res: Response) => {
   }
 
   // ==================== BULK BUY MODE (explicit multi-offer) ====================
-  if (bulkBuy && targetQuantity && requestedTimeWindow) {
+  const effectiveBulkTimeWindow = txState.discoveryCriteria?.timeWindow || requestedTimeWindow;
+
+  if (bulkBuy && targetQuantity && (requestedTimeWindow || effectiveBulkTimeWindow)) {
     // Collect all offers and providers from the catalog
     const allOffers: CatalogOffer[] = [];
     const providers = new Map<string, Provider>();
@@ -1294,9 +1324,10 @@ router.post('/api/select', async (req: Request, res: Response) => {
     }
 
     // Score all offers using existing matching algorithm
+    // Use the snapped time window from discover criteria for consistency
     const criteria: MatchingCriteria = {
       requestedQuantity: 1, // Use 1 for scoring, actual qty handled by bulk selector
-      requestedTimeWindow,
+      requestedTimeWindow: effectiveBulkTimeWindow,
     };
 
     matchingResult = matchOffers(allOffers, providers, criteria);
