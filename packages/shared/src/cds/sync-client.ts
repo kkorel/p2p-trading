@@ -24,7 +24,7 @@ const logger = createLogger('CDS-PUBLISH');
 const BECKN_CORE_CONTEXT = 'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/main/schema/core/v2/context.jsonld';
 const BECKN_ENERGY_RESOURCE_CONTEXT = 'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/p2p-trading/schema/EnergyResource/v0.2/context.jsonld';
 const BECKN_ENERGY_TRADE_OFFER_CONTEXT = 'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/p2p-trading/schema/EnergyTradeOffer/v0.2/context.jsonld';
-const BECKN_DOMAIN = process.env.BECKN_DOMAIN || 'beckn.one:deg:p2p-trading:2.0.0';
+const BECKN_DOMAIN = process.env.BECKN_DOMAIN || 'beckn.one:deg:p2p-trading-interdiscom:2.0.0';
 const BECKN_VERSION = '2.0.0';
 
 // ==================== Type Definitions ====================

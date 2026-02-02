@@ -2,10 +2,10 @@
  * Beckn v2 Protocol Types for P2P Energy Trading
  */
 
-// Domain constant - Must match external CDS/Registry domain
-// Use beckn.one:deg:p2p-trading:2.0.0 for external CDS
+// Domain constant - Must match external CDS/Registry domain and DEDI registration
+// The interdiscom pilot network uses beckn.one:deg:p2p-trading-interdiscom:2.0.0
 export const BECKN_DOMAIN =
-    process.env.BECKN_DOMAIN || 'beckn.one:deg:p2p-trading:2.0.0';
+    process.env.BECKN_DOMAIN || 'beckn.one:deg:p2p-trading-interdiscom:2.0.0';
 export const BECKN_VERSION = '2.0.0';
 
 // Schema context required for Beckn v2.0 - Array of JSON-LD schema URLs
