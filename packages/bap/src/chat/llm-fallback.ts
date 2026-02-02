@@ -69,6 +69,9 @@ Intents:
 
 IMPORTANT: If the user says they want to "place", "create", "add", "daal", "bana", "list" something — that's "create_listing", NOT "show_listings" or "show_orders".
 IMPORTANT: If the user says they want to "buy", "purchase", "kharid", "chahiye", "leni hai" energy — that's "buy_energy", NOT "create_listing".
+IMPORTANT: When the user specifies all buy details in one message, extract ALL params. Examples:
+  "buy 20 kWh at Rs 6 from 1-6 AM today" → {"intent": "buy_energy", "params": {"quantity_kwh": 20, "max_price": 6, "time_description": "1-6 AM today"}}
+  "mujhe 30 unit chahiye Rs 7 pe kal subah 1 se 6 baje" → {"intent": "buy_energy", "params": {"quantity_kwh": 30, "max_price": 7, "time_description": "kal subah 1 se 6 baje"}}
 
 For "create_listing", extract params if mentioned:
 - price_per_kwh: number (Rs per unit/kWh)
@@ -78,7 +81,7 @@ For "create_listing", extract params if mentioned:
 For "buy_energy", extract params if mentioned:
 - quantity_kwh: number (kWh or units the user wants to buy)
 - max_price: number (maximum Rs per unit the user is willing to pay)
-- time_description: string (e.g. "tomorrow", "kal", "today", "aaj")
+- time_description: string — preserve the EXACT time phrase the user said (e.g. "1-6 AM today", "2 to 8 PM tomorrow", "kal subah 1 se 6 baje", "tomorrow morning", "today evening"). Do NOT simplify or normalize the time.
 
 For "show_sales", extract:
 - time_period: string (e.g. "today", "aaj", "this week", "is hafte")

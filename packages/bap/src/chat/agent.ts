@@ -24,7 +24,7 @@ import {
   getIssuerId,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
-import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase } from './trading-agent';
+import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase } from './trading-agent';
 import { askLLM, classifyIntent, composeResponse } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
@@ -64,7 +64,7 @@ interface PendingPurchase {
   quantity?: number;
   maxPrice?: number;
   timeDesc?: string;
-  awaitingField?: 'quantity' | 'price_pref' | 'timeframe' | 'confirm';
+  awaitingField?: 'quantity' | 'price_pref' | 'timeframe' | 'confirm' | 'confirm_offer';
   // Populated after discovery
   discoveredOffer?: {
     offerId: string;
@@ -609,20 +609,73 @@ function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurchase): A
     };
   }
 
-  // All details present — show summary and ask for confirmation
-  const priceLabel = pending.maxPrice === 999 ? h(ctx, 'any price', 'koi bhi price') : `Rs ${pending.maxPrice}/unit max`;
-  return {
-    messages: [{
-      text: h(ctx,
-        `Here's your purchase request:\n• ${pending.quantity} kWh\n• ${priceLabel}\n• Time: ${pending.timeDesc}\n\nShall I find the best offer and buy?`,
-        `Aapki purchase request:\n• ${pending.quantity} kWh\n• ${priceLabel}\n• Time: ${pending.timeDesc}\n\nSabse accha offer dhundh ke khareed lun?`
-      ),
-      buttons: [
-        { text: h(ctx, 'Yes, buy!', 'Haan, khareed lo!'), callbackData: 'purchase_confirm:yes' },
-        { text: h(ctx, 'No, cancel', 'Nahi, cancel karo'), callbackData: 'purchase_confirm:no' },
+  // All details present — signal caller to proceed with discovery
+  return null;
+}
+
+/**
+ * Discover the best offer and present it to the user for confirmation.
+ * Called when all purchase details have been gathered.
+ */
+async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchase): Promise<AgentResponse> {
+  if (!ctx.userId || !pending.quantity) {
+    return {
+      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+      contextUpdate: { pendingPurchase: undefined },
+    };
+  }
+
+  const searchMsg: AgentMessage = {
+    text: h(ctx,
+      'Searching for the best offer...',
+      'Sabse accha offer dhundh raha hun...'
+    ),
+  };
+
+  const result = await discoverBestOffer(ctx.userId, {
+    quantity: pending.quantity,
+    maxPrice: pending.maxPrice === 999 ? undefined : pending.maxPrice,
+    timeDesc: pending.timeDesc,
+  });
+
+  if (!result.success || !result.discoveredOffer || !result.transactionId) {
+    return {
+      messages: [
+        searchMsg,
+        { text: h(ctx,
+          `Could not find a matching offer: ${result.error || 'Unknown error'}. Please try again with different parameters.`,
+          `Koi matching offer nahi mila: ${result.error || 'Unknown error'}. Alag parameters se try karo.`
+        ) },
       ],
-    }],
-    contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'confirm' } },
+      contextUpdate: { pendingPurchase: undefined },
+    };
+  }
+
+  const offer = result.discoveredOffer;
+  const totalPrice = offer.price * offer.quantity;
+
+  return {
+    messages: [
+      searchMsg,
+      {
+        text: h(ctx,
+          `Found a match!\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh at Rs ${offer.price}/unit\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nDo you want to buy this?`,
+          `Offer mil gaya!\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh Rs ${offer.price}/unit pe\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nYe khareedna hai?`
+        ),
+        buttons: [
+          { text: h(ctx, 'Yes, buy it!', 'Haan, khareed lo!'), callbackData: 'purchase_offer_confirm:yes' },
+          { text: h(ctx, 'No, cancel', 'Nahi, cancel karo'), callbackData: 'purchase_offer_confirm:no' },
+        ],
+      },
+    ],
+    contextUpdate: {
+      pendingPurchase: {
+        ...pending,
+        awaitingField: 'confirm_offer',
+        discoveredOffer: offer,
+        transactionId: result.transactionId,
+      },
+    },
   };
 }
 
@@ -660,7 +713,8 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
       }
       const updated = { ...pending, quantity: Math.round(qty), awaitingField: undefined as any };
       const next = askNextPurchaseDetail(ctx, updated);
-      return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
+      if (next) return next;
+      return discoverAndShowOffer(ctx, updated);
     }
 
     case 'price_pref': {
@@ -681,7 +735,8 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
       }
       const updated = { ...pending, maxPrice, awaitingField: undefined as any };
       const next = askNextPurchaseDetail(ctx, updated);
-      return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
+      if (next) return next;
+      return discoverAndShowOffer(ctx, updated);
     }
 
     case 'timeframe': {
@@ -699,7 +754,8 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
       }
       const updated = { ...pending, timeDesc, awaitingField: undefined as any };
       const next = askNextPurchaseDetail(ctx, updated);
-      return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
+      if (next) return next;
+      return discoverAndShowOffer(ctx, updated);
     }
 
     case 'confirm': {
@@ -736,6 +792,91 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           buttons: [
             { text: h(ctx, 'Yes', 'Haan'), callbackData: 'purchase_confirm:yes' },
             { text: h(ctx, 'No', 'Nahi'), callbackData: 'purchase_confirm:no' },
+          ],
+        }],
+      };
+    }
+
+    case 'confirm_offer': {
+      if (message.startsWith('purchase_offer_confirm:')) {
+        const answer = message.replace('purchase_offer_confirm:', '');
+        if (answer === 'no') {
+          return {
+            messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+            contextUpdate: { pendingPurchase: undefined },
+          };
+        }
+      }
+
+      const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'buy', 'kharid', 'purchase_offer_confirm:yes'].includes(lower)
+        || message === 'purchase_offer_confirm:yes';
+      const isNo = ['no', 'n', 'nahi', 'nope', 'cancel', 'purchase_offer_confirm:no'].includes(lower)
+        || message === 'purchase_offer_confirm:no';
+
+      if (isNo) {
+        return {
+          messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+          contextUpdate: { pendingPurchase: undefined },
+        };
+      }
+
+      if (isYes) {
+        if (!ctx.userId || !pending.transactionId || !pending.discoveredOffer || !pending.quantity) {
+          return {
+            messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+            contextUpdate: { pendingPurchase: undefined },
+          };
+        }
+
+        const confirmMsg: AgentMessage = {
+          text: h(ctx,
+            'Completing your purchase...',
+            'Aapki purchase complete kar raha hun...'
+          ),
+        };
+
+        const result = await completePurchase(
+          ctx.userId,
+          pending.transactionId,
+          pending.discoveredOffer,
+          pending.quantity
+        );
+
+        if (result.success && result.order) {
+          const o = result.order;
+          return {
+            messages: [
+              confirmMsg,
+              {
+                text: h(ctx,
+                  `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will be delivered via the grid. Payment is held in escrow until delivery is verified.`,
+                  `Purchase ho gayi!\n• ${o.quantity} kWh ${o.providerName} se\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nAapki energy grid se deliver hogi. Payment escrow mein hai jab tak delivery verify nahi hoti.`
+                ),
+              },
+            ],
+            contextUpdate: { pendingPurchase: undefined },
+          };
+        }
+
+        return {
+          messages: [
+            confirmMsg,
+            { text: h(ctx,
+              `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`,
+              `Purchase nahi ho payi: ${result.error || 'Unknown error'}. Dobara try karo.`
+            ) },
+          ],
+          contextUpdate: { pendingPurchase: undefined },
+        };
+      }
+
+      // Re-prompt
+      return {
+        messages: [{
+          text: h(ctx, 'Do you want to buy this offer?', 'Ye offer khareedna hai?'),
+          buttons: [
+            { text: h(ctx, 'Yes', 'Haan'), callbackData: 'purchase_offer_confirm:yes' },
+            { text: h(ctx, 'No', 'Nahi'), callbackData: 'purchase_offer_confirm:no' },
           ],
         }],
       };
@@ -1761,8 +1902,8 @@ const states: Record<ChatState, StateHandler> = {
             const askBuyResult = askNextPurchaseDetail(ctx, pendingBuy);
             if (askBuyResult) return askBuyResult;
 
-            // All details provided — confirm and execute
-            return await executeAndReportPurchase(ctx, pendingBuy);
+            // All details provided — discover best offer and show to user
+            return await discoverAndShowOffer(ctx, pendingBuy);
           }
 
           case 'discom_rates': {

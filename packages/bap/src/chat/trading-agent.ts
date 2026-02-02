@@ -461,6 +461,20 @@ export interface PurchaseResult {
   error?: string;
 }
 
+export interface DiscoveryResult {
+  success: boolean;
+  transactionId?: string;
+  discoveredOffer?: {
+    offerId: string;
+    providerId: string;
+    providerName: string;
+    price: number;
+    quantity: number;
+    timeWindow: string;
+  };
+  error?: string;
+}
+
 /**
  * Build a time window from a natural language description.
  * Returns { startTime, endTime } ISO strings.
@@ -480,6 +494,52 @@ function buildTimeWindow(timeDesc?: string): { startTime: string; endTime: strin
   }
 
   const td = timeDesc.toLowerCase();
+
+  // --- Parse specific hour ranges: "1-6 AM", "1 AM to 6 AM", "2 to 8 PM", "1 se 6 baje" ---
+  const hourRangeMatch = td.match(
+    /(\d{1,2})\s*(?:am|pm|baje)?\s*(?:-|to|se)\s*(\d{1,2})\s*(am|pm|baje)?/i
+  );
+
+  if (hourRangeMatch) {
+    let startH = parseInt(hourRangeMatch[1]);
+    let endH = parseInt(hourRangeMatch[2]);
+    const periodSuffix = (hourRangeMatch[3] || '').toLowerCase();
+
+    // Determine AM/PM from suffix or context words
+    const hasPm = periodSuffix === 'pm' || td.includes('pm')
+      || td.includes('shaam') || td.includes('sham') || td.includes('dopahar')
+      || td.includes('evening') || td.includes('afternoon');
+    const hasAm = periodSuffix === 'am' || td.includes('am')
+      || td.includes('subah') || td.includes('savere') || td.includes('morning');
+
+    if (hasPm && !hasAm) {
+      if (startH < 12) startH += 12;
+      if (endH < 12) endH += 12;
+    } else if (hasAm) {
+      if (startH === 12) startH = 0;
+      if (endH === 12) endH = 0;
+    }
+
+    const isToday = td.includes('today') || td.includes('aaj');
+
+    if (isToday) {
+      startTime.setHours(startH, 0, 0, 0);
+      endTime.setHours(endH, 0, 0, 0);
+      // If the window is already past, fall back to tomorrow
+      if (endTime <= now) {
+        startTime.setDate(startTime.getDate() + 1);
+        endTime.setDate(endTime.getDate() + 1);
+      }
+    } else {
+      // Default to tomorrow if no day specified, or explicitly tomorrow
+      startTime.setDate(startTime.getDate() + 1);
+      endTime.setDate(endTime.getDate() + 1);
+      startTime.setHours(startH, 0, 0, 0);
+      endTime.setHours(endH, 0, 0, 0);
+    }
+
+    return { startTime: startTime.toISOString(), endTime: endTime.toISOString() };
+  }
 
   // Parse time-of-day keywords: morning, afternoon, evening, night
   let startHour: number | null = null;
@@ -545,16 +605,15 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Execute a full buyer purchase flow: discover → select (auto-match) → init → confirm.
- * Makes internal HTTP calls to the BAP endpoints.
+ * Phase 1: Discover available offers and select the best match.
+ * Returns the best offer info and transactionId without completing the purchase.
  */
-export async function executePurchase(
+export async function discoverBestOffer(
   userId: string,
   params: { quantity: number; maxPrice?: number; timeDesc?: string }
-): Promise<PurchaseResult> {
+): Promise<DiscoveryResult> {
   const baseUrl = `http://localhost:${config.ports.bap}`;
 
-  // Get the user's auth token for authenticated requests
   const token = await getUserAuthToken(userId);
   if (!token) {
     return { success: false, error: 'No valid session found. Please log in again.' };
@@ -569,7 +628,7 @@ export async function executePurchase(
 
   try {
     // Step 1: Discover available offers
-    logger.info(`[BuyFlow] Discovering offers for user ${userId}: ${params.quantity} kWh`);
+    logger.info(`[BuyFlow:Discover] Discovering offers for user ${userId}: ${params.quantity} kWh`);
     const discoverRes = await axios.post(`${baseUrl}/api/discover`, {
       minQuantity: params.quantity,
       timeWindow,
@@ -580,7 +639,6 @@ export async function executePurchase(
       return { success: false, error: 'Discovery failed — no transaction ID returned.' };
     }
 
-    // Check if any offers were found (handle both local and external CDS response formats)
     const catalog = discoverRes.data.catalog
       || discoverRes.data.ack?.message?.catalog
       || null;
@@ -603,7 +661,7 @@ export async function executePurchase(
     }
 
     // Step 2: Select best offer (auto-match)
-    logger.info(`[BuyFlow] Selecting from ${allOffers.length} offers, txId=${txId}`);
+    logger.info(`[BuyFlow:Discover] Selecting from ${allOffers.length} offers, txId=${txId}`);
     const selectRes = await axios.post(`${baseUrl}/api/select`, {
       transaction_id: txId,
       quantity: params.quantity,
@@ -620,7 +678,6 @@ export async function executePurchase(
       return { success: false, error: 'No matching offer found. Try adjusting quantity or time window.' };
     }
 
-    // Build discovered offer info for confirmation prompt
     const bestOffer = allOffers.find(o => o.id === selectedOffer.id) || allOffers[0];
     const tw = bestOffer.timeWindow;
     const twLabel = tw
@@ -636,56 +693,108 @@ export async function executePurchase(
       timeWindow: twLabel,
     };
 
-    // If max price specified and offer exceeds it, reject
     if (params.maxPrice && discoveredOffer.price > params.maxPrice) {
       return {
         success: false,
         discoveredOffer,
+        transactionId: txId,
         error: `Best available price is Rs ${discoveredOffer.price}/unit, which exceeds your max of Rs ${params.maxPrice}/unit.`,
       };
     }
 
-    // Step 3: Init order
-    logger.info(`[BuyFlow] Init order, txId=${txId}`);
-    await axios.post(`${baseUrl}/api/init`, {
-      transaction_id: txId,
-    }, { headers, timeout: 15000 });
-
-    // Wait for on_init callback to update state
-    await sleep(2000);
-
-    // Step 4: Confirm order
-    logger.info(`[BuyFlow] Confirming order, txId=${txId}`);
-    const confirmRes = await axios.post(`${baseUrl}/api/confirm`, {
-      transaction_id: txId,
-    }, { headers, timeout: 15000 });
-
-    const orderId = confirmRes.data.order_id;
-
-    // Wait for on_confirm callback
-    await sleep(1000);
-
-    const totalPrice = discoveredOffer.price * params.quantity;
-    logger.info(`[BuyFlow] Purchase complete: order=${orderId}, ${params.quantity}kWh at Rs${discoveredOffer.price}/kWh = Rs${totalPrice}`);
+    logger.info(`[BuyFlow:Discover] Found offer: ${discoveredOffer.providerName} @ Rs${discoveredOffer.price}/kWh, txId=${txId}`);
 
     return {
       success: true,
-      order: {
-        orderId: orderId || txId,
-        transactionId: txId,
-        quantity: params.quantity,
-        pricePerKwh: discoveredOffer.price,
-        totalPrice,
-        providerName: discoveredOffer.providerName,
-        timeWindow: twLabel,
-      },
+      transactionId: txId,
       discoveredOffer,
     };
   } catch (error: any) {
     const msg = error.response?.data?.error || error.message || 'Unknown error';
-    logger.error(`[BuyFlow] Purchase failed: ${msg}`, { userId });
+    logger.error(`[BuyFlow:Discover] Discovery failed: ${msg}`, { userId });
     return { success: false, error: msg };
   }
+}
+
+/**
+ * Phase 2: Complete a purchase by running init → confirm on an already-selected offer.
+ */
+export async function completePurchase(
+  userId: string,
+  transactionId: string,
+  discoveredOffer: DiscoveryResult['discoveredOffer'],
+  quantity: number
+): Promise<PurchaseResult> {
+  const baseUrl = `http://localhost:${config.ports.bap}`;
+
+  const token = await getUserAuthToken(userId);
+  if (!token) {
+    return { success: false, error: 'No valid session found. Please log in again.' };
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+
+  try {
+    logger.info(`[BuyFlow:Complete] Init order, txId=${transactionId}`);
+    await axios.post(`${baseUrl}/api/init`, {
+      transaction_id: transactionId,
+    }, { headers, timeout: 15000 });
+
+    await sleep(2000);
+
+    logger.info(`[BuyFlow:Complete] Confirming order, txId=${transactionId}`);
+    const confirmRes = await axios.post(`${baseUrl}/api/confirm`, {
+      transaction_id: transactionId,
+    }, { headers, timeout: 15000 });
+
+    const orderId = confirmRes.data.order_id;
+    await sleep(1000);
+
+    const price = discoveredOffer?.price || 0;
+    const totalPrice = price * quantity;
+    logger.info(`[BuyFlow:Complete] Purchase complete: order=${orderId}, ${quantity}kWh at Rs${price}/kWh = Rs${totalPrice}`);
+
+    return {
+      success: true,
+      order: {
+        orderId: orderId || transactionId,
+        transactionId,
+        quantity,
+        pricePerKwh: price,
+        totalPrice,
+        providerName: discoveredOffer?.providerName || 'Solar Seller',
+        timeWindow: discoveredOffer?.timeWindow || 'Flexible',
+      },
+      discoveredOffer: discoveredOffer || undefined,
+    };
+  } catch (error: any) {
+    const msg = error.response?.data?.error || error.message || 'Unknown error';
+    logger.error(`[BuyFlow:Complete] Purchase completion failed: ${msg}`, { userId, transactionId });
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Execute a full buyer purchase flow: discover → select → init → confirm.
+ * Convenience wrapper that calls both phases sequentially.
+ */
+export async function executePurchase(
+  userId: string,
+  params: { quantity: number; maxPrice?: number; timeDesc?: string }
+): Promise<PurchaseResult> {
+  const discovery = await discoverBestOffer(userId, params);
+  if (!discovery.success || !discovery.transactionId || !discovery.discoveredOffer) {
+    return {
+      success: false,
+      discoveredOffer: discovery.discoveredOffer,
+      error: discovery.error,
+    };
+  }
+
+  return completePurchase(userId, discovery.transactionId, discovery.discoveredOffer, params.quantity);
 }
 
 /**
