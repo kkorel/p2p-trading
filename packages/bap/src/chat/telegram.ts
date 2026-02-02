@@ -133,7 +133,10 @@ export async function startTelegramBot(): Promise<void> {
           await sendTelegramMessage(ctx, msg.text, msg.buttons);
         }
       } catch (err: any) {
-        logger.error(`Telegram callback error: ${err.message}`);
+        logger.error(`Telegram callback error: ${err.message}\n${err.stack}`);
+        try {
+          await ctx.reply('Something went wrong. Please try again.');
+        } catch { /* ignore reply failure */ }
       }
     });
 

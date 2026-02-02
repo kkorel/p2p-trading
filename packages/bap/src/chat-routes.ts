@@ -60,7 +60,7 @@ router.post('/send', async (req: Request, res: Response) => {
       authToken: response.authToken || undefined,
     });
   } catch (error: any) {
-    logger.error(`Chat send error: ${error.message}`);
+    logger.error(`Chat send error: ${error.message}\n${error.stack}`);
     res.status(500).json({ success: false, error: 'Failed to process message' });
   }
 });

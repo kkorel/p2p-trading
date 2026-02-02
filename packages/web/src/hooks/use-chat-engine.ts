@@ -137,7 +137,8 @@ export function useChatEngine() {
             })),
           ]);
         }
-      } catch (err) {
+      } catch (err: any) {
+        console.error('[Chat] sendMessageToAgent error:', err);
         setMessages((prev) => [
           ...prev,
           { role: 'agent', content: 'Sorry, something went wrong. Please try again.' },
