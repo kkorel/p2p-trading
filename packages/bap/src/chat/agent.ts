@@ -64,7 +64,7 @@ interface PendingPurchase {
   quantity?: number;
   maxPrice?: number;
   timeDesc?: string;
-  awaitingField?: 'quantity' | 'price_pref' | 'timeframe' | 'confirm' | 'confirm_offer';
+  awaitingField?: 'quantity' | 'timeframe' | 'confirm' | 'confirm_offer';
   // Populated after discovery — single offer (legacy)
   discoveredOffer?: {
     offerId: string;
@@ -595,23 +595,8 @@ function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurchase): A
     };
   }
 
-  if (pending.maxPrice == null) {
-    return {
-      messages: [{
-        text: h(ctx,
-          'What is the maximum price per unit (kWh) you are willing to pay? DISCOM rates are around Rs 5-8/unit.',
-          'Per unit (kWh) kitne Rs tak dena chahte ho? DISCOM rate Rs 5-8/unit ke aas-paas hai.'
-        ),
-        buttons: [
-          { text: 'Rs 6/unit', callbackData: 'purchase_price:6' },
-          { text: 'Rs 7/unit', callbackData: 'purchase_price:7' },
-          { text: 'Rs 8/unit', callbackData: 'purchase_price:8' },
-          { text: h(ctx, 'Any price', 'Koi bhi price'), callbackData: 'purchase_price:any' },
-        ],
-      }],
-      contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'price_pref' } },
-    };
-  }
+  // maxPrice is no longer asked — smart-buy finds the cheapest combination automatically.
+  // If user volunteers a max price via intent params, it's kept but not required.
 
   if (!pending.timeDesc) {
     return {
@@ -655,7 +640,6 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
 
   const result = await discoverBestOffer(ctx.userId, {
     quantity: pending.quantity,
-    maxPrice: pending.maxPrice === 999 ? undefined : pending.maxPrice,
     timeDesc: pending.timeDesc,
   });
 
@@ -831,28 +815,6 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         };
       }
       const updated = { ...pending, quantity: Math.round(qty), awaitingField: undefined as any };
-      const next = askNextPurchaseDetail(ctx, updated);
-      if (next) return next;
-      return discoverAndShowOffer(ctx, updated);
-    }
-
-    case 'price_pref': {
-      let maxPrice: number | undefined;
-      if (message.startsWith('purchase_price:')) {
-        const val = message.replace('purchase_price:', '');
-        maxPrice = val === 'any' ? 999 : parseFloat(val);
-      } else if (lower.includes('any') || lower.includes('koi bhi') || lower.includes('kuch bhi')) {
-        maxPrice = 999;
-      } else {
-        maxPrice = parseFloat(message.replace(/[^\d.]/g, ''));
-      }
-
-      if (!maxPrice || maxPrice <= 0) {
-        return {
-          messages: [{ text: h(ctx, 'Please enter a valid price in Rs or choose "Any price".', 'Sahi price daalo (Rs mein) ya "Koi bhi price" chuno.') }],
-        };
-      }
-      const updated = { ...pending, maxPrice, awaitingField: undefined as any };
       const next = askNextPurchaseDetail(ctx, updated);
       if (next) return next;
       return discoverAndShowOffer(ctx, updated);
@@ -1067,7 +1029,6 @@ async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPur
 
   const result = await executePurchase(ctx.userId, {
     quantity: pending.quantity,
-    maxPrice: pending.maxPrice === 999 ? undefined : pending.maxPrice,
     timeDesc: pending.timeDesc,
   });
 

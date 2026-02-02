@@ -1165,6 +1165,9 @@ router.post('/api/select', async (req: Request, res: Response) => {
   const effectiveSmartTimeWindow = txState.discoveryCriteria?.timeWindow || requestedTimeWindow;
 
   if (smartBuy && effectiveTarget && (requestedTimeWindow || effectiveSmartTimeWindow)) {
+    const source = req.body.source || (req.headers['user-agent']?.includes('axios') ? 'chat-agent (server)' : 'web-ui (browser)');
+    logger.info(`[SmartBuy] ⚡ SMART BUY triggered | source=${source} | qty=${effectiveTarget} kWh | txId=${transaction_id} | timeWindow=${JSON.stringify(effectiveSmartTimeWindow)}`);
+
     // Collect all offers and providers from the catalog
     const allOffers: CatalogOffer[] = [];
     const providers = new Map<string, Provider>();
@@ -1254,7 +1257,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
     const isSingleOffer = smartResult.selectedOffers.length === 1 && smartResult.fullyFulfilled;
     const selectionType = isSingleOffer ? 'single' : 'multiple';
 
-    logger.info(`Smart buy selection: ${selectionType} mode - ${smartResult.offersUsed} offers for ${smartResult.totalQuantity}/${effectiveTarget} kWh`, {
+    logger.info(`[SmartBuy] ✅ Result | source=${source} | ${selectionType} mode | ${smartResult.offersUsed} seller(s) | ${smartResult.totalQuantity}/${effectiveTarget} kWh | Rs ${smartResult.totalPrice.toFixed(2)} | fulfilled=${smartResult.fullyFulfilled}`, {
       transaction_id,
       selectionType,
       fullyFulfilled: smartResult.fullyFulfilled,

@@ -781,6 +781,7 @@ export async function discoverBestOffer(
       quantity: params.quantity,
       requestedTimeWindow: { startTime: timeWindow.startTime, endTime: timeWindow.endTime },
       smartBuy: true,
+      source: 'chat-agent',
     }, { headers, timeout: 15000 });
 
     // Handle no_eligible_offers response (200 with suggestions)
