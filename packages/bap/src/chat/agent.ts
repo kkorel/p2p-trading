@@ -2333,17 +2333,21 @@ export async function processMessage(
 
         await storeMessage(session.id, 'user', userMessage);
 
-        // Compose a welcome-back summary using LLM
+        // Compose a welcome-back summary using LLM — respect saved language preference
+        const savedLang = ctx.language;
+        logger.info(`[Language] New session for user ${user.id}, saved preference: "${savedLang || 'none'}"`);
         const summaryData = await getWelcomeBackData(user.id);
         const credContext = 'User profile: Already onboarded and verified. Do NOT ask for credentials — they have already completed onboarding.';
         const welcomeMsg = await composeResponse(
           'welcome back, give me a summary of my activity',
           `${credContext}\n\n${summaryData}`,
-          undefined, // language unknown yet — default English
+          savedLang,
           user.name || undefined
         );
 
-        const fallbackWelcome = `Welcome back, ${user.name || 'friend'}! How can I help you today?`;
+        const fallbackWelcome = savedLang === 'hinglish'
+          ? `Wapas aaye ${user.name || 'dost'}! Aaj kya madad karun?`
+          : `Welcome back, ${user.name || 'friend'}! How can I help you today?`;
         const messages: AgentMessage[] = [{ text: welcomeMsg || fallbackWelcome }];
         await storeAgentMessages(session.id, messages);
 
@@ -2428,10 +2432,10 @@ export async function processMessage(
   const isCallbackData = userMessage.includes(':') && !userMessage.includes(' ');
 
   // Determine effective language for this message:
-  // 1. If native Indic script detected → use that language
-  // 2. If Hinglish detected → use hinglish
-  // 3. If structured input (numbers, callbacks) → keep existing language preference
-  // 4. Otherwise → use English or keep existing preference
+  // 1. Structured input (numbers, callbacks) → keep existing preference
+  // 2. Native Indic script detected → switch to that language
+  // 3. Hinglish detected → switch to hinglish
+  // 4. English detected (no Indic, no Hinglish) → switch to English
   let userLang: SarvamLangCode | 'hinglish';
   if (isStructuredInput || isCallbackData) {
     // Don't change language on button presses or numeric input
@@ -2442,9 +2446,8 @@ export async function processMessage(
     // Native Indic script (Devanagari, Bengali, etc.)
     userLang = detectedLang;
   } else {
-    // Latin script, not Hinglish — if user previously chose a language, keep it
-    // unless they're clearly writing in English now
-    userLang = (ctx.language || 'en-IN') as SarvamLangCode | 'hinglish';
+    // English detected — switch to English
+    userLang = 'en-IN';
   }
 
   // Translate native-script messages to English for processing
@@ -2456,6 +2459,7 @@ export async function processMessage(
 
   // Update language preference if changed — persist to session and user profile
   if (userLang !== ctx.language) {
+    logger.info(`[Language] Switching: "${ctx.language || 'none'}" → "${userLang}" (detected: ${detectedLang}, input: "${userMessage.substring(0, 40)}")`);
     ctx.language = userLang;
     await prisma.chatSession.update({
       where: { id: session.id },
@@ -2468,6 +2472,8 @@ export async function processMessage(
         data: { languagePreference: userLang },
       }).catch(() => {}); // Fire-and-forget, non-critical
     }
+  } else {
+    logger.debug(`[Language] Kept: "${userLang}" (detected: ${detectedLang})`);
   }
 
   const response = await stateHandler.onMessage(ctx, processedMessage, fileData);
