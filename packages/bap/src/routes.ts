@@ -3269,11 +3269,11 @@ interface DiagnosticTest {
 }
 
 router.get('/api/diagnosis', async (req: Request, res: Response) => {
-  const baseUrl = config.bap.uri;
+  // Use localhost for self-calls to avoid going through the public proxy (which deadlocks)
+  const localBase = `http://localhost:${config.ports.bap}`;
   const ledgerUrl = config.external.ledger;
   const cdsUrl = config.cds.uri;
   const vcUrl = config.external.vcPortal;
-  const results: DiagnosticTest[] = [];
 
   async function test(
     name: string,
@@ -3286,66 +3286,69 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
     const start = Date.now();
     try {
       const resp = method === 'GET'
-        ? await axios.get(url, { timeout: 10000, headers, validateStatus: () => true })
-        : await axios.post(url, body, { timeout: 10000, headers: { 'Content-Type': 'application/json', ...headers }, validateStatus: () => true });
+        ? await axios.get(url, { timeout: 8000, headers, validateStatus: () => true })
+        : await axios.post(url, body, { timeout: 8000, headers: { 'Content-Type': 'application/json', ...headers }, validateStatus: () => true });
       const latency = Date.now() - start;
-      const responseStr = typeof resp.data === 'string' ? resp.data.substring(0, 500) : JSON.stringify(resp.data).substring(0, 500);
+      const responseStr = typeof resp.data === 'string' ? resp.data.substring(0, 300) : JSON.stringify(resp.data).substring(0, 300);
       return { name, endpoint, method, status: resp.status, ok: resp.status >= 200 && resp.status < 300, latencyMs: latency, response: responseStr };
     } catch (err: any) {
       return { name, endpoint, method, status: null, ok: false, latencyMs: Date.now() - start, error: err.code || err.message };
     }
   }
 
-  // --- Internal APIs ---
-  results.push(await test('Health Check', '/health', 'GET', `${baseUrl}/health`));
-  results.push(await test('API Discover (local catalog)', '/api/discover', 'POST', `${baseUrl}/api/discover`, {
-    quantity: 5, maxPrice: 10,
-    requestedTimeWindow: { startTime: new Date(Date.now() + 86400000).toISOString(), endTime: new Date(Date.now() + 86400000 + 14400000).toISOString() },
-  }));
-  results.push(await test('API Select (no txn)', '/api/select', 'POST', `${baseUrl}/api/select`, { transaction_id: 'diag-no-txn', quantity: 5 }));
-  results.push(await test('API Init (no txn)', '/api/init', 'POST', `${baseUrl}/api/init`, { transaction_id: 'diag-no-txn' }));
-  results.push(await test('API Confirm (no txn)', '/api/confirm', 'POST', `${baseUrl}/api/confirm`, { transaction_id: 'diag-no-txn' }));
-  results.push(await test('API Status (no txn)', '/api/status', 'POST', `${baseUrl}/api/status`, { transaction_id: 'diag-no-txn' }));
-
-  // --- Seller Management ---
-  results.push(await test('Seller Offers', '/seller/offers', 'GET', `${baseUrl}/seller/offers`));
-  results.push(await test('Seller Items', '/seller/items', 'GET', `${baseUrl}/seller/items`));
-  results.push(await test('Seller CDS Status', '/seller/cds-status', 'GET', `${baseUrl}/seller/cds-status`));
-
-  // --- BPP Protocol (Beckn) ---
   const becknCtx = {
     version: '2.0.0', action: 'select', timestamp: new Date().toISOString(),
     message_id: 'diag-msg', transaction_id: 'diag-txn',
-    bap_id: config.bap.id, bap_uri: baseUrl, bpp_id: config.bpp.id, bpp_uri: baseUrl,
+    bap_id: config.bap.id, bap_uri: config.bap.uri, bpp_id: config.bpp.id, bpp_uri: config.bpp.uri,
     ttl: 'PT30S', domain: 'beckn.one:deg:p2p-trading-interdiscom:2.0.0',
   };
-  results.push(await test('BPP /select', '/select', 'POST', `${baseUrl}/select`, { context: { ...becknCtx, action: 'select' }, message: { order: { 'beckn:orderItems': [] } } }));
-  results.push(await test('BPP /init', '/init', 'POST', `${baseUrl}/init`, { context: { ...becknCtx, action: 'init' }, message: { order: { 'beckn:orderItems': [] } } }));
-  results.push(await test('BPP /confirm', '/confirm', 'POST', `${baseUrl}/confirm`, { context: { ...becknCtx, action: 'confirm' }, message: { order: { 'beckn:orderItems': [] } } }));
-  results.push(await test('BPP /status', '/status', 'POST', `${baseUrl}/status`, { context: { ...becknCtx, action: 'status' }, message: { order_id: 'diag-order' } }));
 
-  // --- Callbacks ---
-  results.push(await test('Callback on_discover', '/callbacks/on_discover', 'POST', `${baseUrl}/callbacks/on_discover`, { context: { ...becknCtx, action: 'on_discover' }, message: { catalog: { providers: [] } } }));
-  results.push(await test('Callback on_update', '/callbacks/on_update', 'POST', `${baseUrl}/callbacks/on_update`, { context: { ...becknCtx, action: 'on_update' }, message: { order: { 'beckn:orderStatus': 'INPROGRESS' } } }));
+  // Run ALL tests in parallel to stay within Railway's timeout
+  const results = await Promise.all([
+    // Internal APIs (via localhost)
+    test('Health Check', '/health', 'GET', `${localBase}/health`),
+    test('API Discover', '/api/discover', 'POST', `${localBase}/api/discover`, {
+      quantity: 5, maxPrice: 10,
+      requestedTimeWindow: { startTime: new Date(Date.now() + 86400000).toISOString(), endTime: new Date(Date.now() + 86400000 + 14400000).toISOString() },
+    }),
+    test('API Select (no txn)', '/api/select', 'POST', `${localBase}/api/select`, { transaction_id: 'diag-no-txn', quantity: 5 }),
+    test('API Init (no txn)', '/api/init', 'POST', `${localBase}/api/init`, { transaction_id: 'diag-no-txn' }),
+    test('API Confirm (no txn)', '/api/confirm', 'POST', `${localBase}/api/confirm`, { transaction_id: 'diag-no-txn' }),
+    test('API Status (no txn)', '/api/status', 'POST', `${localBase}/api/status`, { transaction_id: 'diag-no-txn' }),
 
-  // --- External: DEG Ledger ---
-  results.push(await test('Ledger /ledger/put', '/ledger/put', 'POST', `${ledgerUrl}/ledger/put`, {
-    role: 'BUYER', transactionId: 'diag-txn', orderItemId: 'diag-order',
-    platformIdBuyer: config.bap.id, platformIdSeller: config.bpp.id,
-    tradeDetails: [{ tradeType: 'ENERGY', tradeQty: 1, tradeUnit: 'KWH' }],
-  }));
-  results.push(await test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, { transactionId: 'diag-txn', limit: 1 }));
+    // Seller Management (via localhost)
+    test('Seller Offers', '/seller/offers', 'GET', `${localBase}/seller/offers`),
+    test('Seller Items', '/seller/items', 'GET', `${localBase}/seller/items`),
+    test('Seller CDS Status', '/seller/cds-status', 'GET', `${localBase}/seller/cds-status`),
 
-  // --- External: CDS ---
-  results.push(await test('CDS /beckn/discover', '/beckn/discover', 'POST', `${cdsUrl}/discover`, {
-    context: { ...becknCtx, action: 'discover', bpp_id: undefined, bpp_uri: undefined },
-    message: { intent: { item: { descriptor: { name: 'Energy' } } } },
-  }));
+    // BPP Protocol (via localhost)
+    test('BPP /select', '/select', 'POST', `${localBase}/select`, { context: { ...becknCtx, action: 'select' }, message: { order: { 'beckn:orderItems': [] } } }),
+    test('BPP /init', '/init', 'POST', `${localBase}/init`, { context: { ...becknCtx, action: 'init' }, message: { order: { 'beckn:orderItems': [] } } }),
+    test('BPP /confirm', '/confirm', 'POST', `${localBase}/confirm`, { context: { ...becknCtx, action: 'confirm' }, message: { order: { 'beckn:orderItems': [] } } }),
+    test('BPP /status', '/status', 'POST', `${localBase}/status`, { context: { ...becknCtx, action: 'status' }, message: { order_id: 'diag-order' } }),
 
-  // --- External: VC Portal ---
-  results.push(await test('VC Portal reachable', '/', 'GET', vcUrl));
+    // Callbacks (via localhost)
+    test('Callback on_discover', '/callbacks/on_discover', 'POST', `${localBase}/callbacks/on_discover`, { context: { ...becknCtx, action: 'on_discover' }, message: { catalog: { providers: [] } } }),
+    test('Callback on_update', '/callbacks/on_update', 'POST', `${localBase}/callbacks/on_update`, { context: { ...becknCtx, action: 'on_update' }, message: { order: { 'beckn:orderStatus': 'INPROGRESS' } } }),
 
-  // --- Config snapshot ---
+    // External: DEG Ledger
+    test('Ledger /ledger/put', '/ledger/put', 'POST', `${ledgerUrl}/ledger/put`, {
+      role: 'BUYER', transactionId: 'diag-txn', orderItemId: 'diag-order',
+      platformIdBuyer: config.bap.id, platformIdSeller: config.bpp.id,
+      tradeDetails: [{ tradeType: 'ENERGY', tradeQty: 1, tradeUnit: 'KWH' }],
+    }),
+    test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, { transactionId: 'diag-txn', limit: 1 }),
+
+    // External: CDS
+    test('CDS /beckn/discover', '/beckn/discover', 'POST', `${cdsUrl}/discover`, {
+      context: { ...becknCtx, action: 'discover', bpp_id: undefined, bpp_uri: undefined },
+      message: { intent: { item: { descriptor: { name: 'Energy' } } } },
+    }),
+
+    // External: VC Portal
+    test('VC Portal reachable', '/', 'GET', vcUrl),
+  ]);
+
   const configSnapshot = {
     bapId: config.bap.id,
     bapUri: config.bap.uri,
@@ -3361,7 +3364,6 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
     env: config.env.nodeEnv,
   };
 
-  // Summarize
   const passed = results.filter(r => r.ok).length;
   const failed = results.filter(r => !r.ok).length;
 

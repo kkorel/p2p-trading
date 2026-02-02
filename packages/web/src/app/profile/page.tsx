@@ -856,7 +856,16 @@ function DiagnosisButton() {
     setResult(null);
     try {
       const res = await fetch('/api/diagnosis');
+      if (!res.ok) {
+        const text = await res.text().catch(() => 'Unknown error');
+        setResult({ summary: { total: 1, passed: 0, failed: 1 }, results: [{ name: `Server error (${res.status})`, ok: false, error: text.substring(0, 200) }] });
+        return;
+      }
       const data = await res.json();
+      if (!data.summary || !data.results) {
+        setResult({ summary: { total: 1, passed: 0, failed: 1 }, results: [{ name: 'Invalid response', ok: false, error: JSON.stringify(data).substring(0, 200) }] });
+        return;
+      }
       setResult(data);
 
       // Auto-download the full report as JSON
