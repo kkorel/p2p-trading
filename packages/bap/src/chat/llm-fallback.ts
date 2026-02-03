@@ -43,7 +43,8 @@ Important:
 
 export interface ClassifiedIntent {
   intent: 'show_listings' | 'show_earnings' | 'show_balance' | 'show_orders' | 'show_sales'
-    | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'general_qa';
+    | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'market_insights' 
+    | 'show_dashboard' | 'track_activity' | 'general_qa';
   params?: {
     price_per_kwh?: number;
     quantity_kwh?: number;
@@ -63,6 +64,9 @@ Intents:
 - "show_sales": User asks about sales for a time period (e.g. "aaj kitna becha", "sold today", "is hafte ki bikri")
 - "create_listing": User wants to CREATE/SELL a new energy listing/offer (e.g. "50 kWh Rs 6 pe daal do", "listing daalni hai", "naya offer banao", "sell 30 units at 7 rupees tomorrow")
 - "buy_energy": User wants to BUY/PURCHASE energy or find the best deal (e.g. "buy 20 kWh", "energy khareedni hai", "bijli chahiye", "I want to buy energy", "mujhe 30 unit chahiye", "purchase solar energy", "find best deal", "find me the best deal", "sabse accha deal", "best offer dikhao")
+- "market_insights": User asks about market conditions, prices, available offers, trends (e.g. "market insights", "market kaisa hai", "current prices", "what's the market like", "available energy", "show market", "market update", "price trends")
+- "show_dashboard": User wants to see their dashboard or overall status (e.g. "show dashboard", "my dashboard", "mera dashboard", "overview", "my status")
+- "track_activity": User wants to track BOTH orders AND earnings together (e.g. "track orders and earnings", "track activity", "my activity", "meri activity", "status dekho", "show status", "kya chal raha hai", "activity summary")
 - "discom_rates": User asks about DISCOM/electricity rates or tariffs
 - "trading_tips": User asks for tips on how to earn more or improve trading
 - "general_qa": General question about energy trading, Oorja, solar, etc.
