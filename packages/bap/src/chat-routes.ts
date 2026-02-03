@@ -61,6 +61,7 @@ router.post('/send', async (req: Request, res: Response) => {
       sessionId: platformId,
       messages,
       authToken: response.authToken || undefined,
+      responseLanguage: response.responseLanguage,
       voiceOutputEnabled: response.voiceOutputEnabled,
     });
   } catch (error: any) {
@@ -110,6 +111,8 @@ router.post('/upload', async (req: Request, res: Response) => {
       sessionId: platformId,
       messages,
       authToken: response.authToken || undefined,
+      responseLanguage: response.responseLanguage,
+      voiceOutputEnabled: response.voiceOutputEnabled,
     });
   } catch (error: any) {
     logger.error(`Chat upload error: ${error.message}`);

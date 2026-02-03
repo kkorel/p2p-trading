@@ -25,13 +25,14 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
     input,
     setInput,
     isLoading,
+    sessionId,
     fileInputRef,
     handleSend,
     handleKeyDown,
     handleButtonClick,
     handleReset,
     handleFileUpload,
-    sendMessageToAgent,
+    handleVoiceResult,
     responseLanguage,
     setResponseLanguage,
   } = useChatEngine();
@@ -296,13 +297,16 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
               />
               {/* Voice input button */}
               <VoiceButton
-                onTranscript={(text, language) => {
+                sessionId={sessionId || undefined}
+                onVoiceResult={(result) => {
                   // Update response language for TTS
-                  if (language) {
-                    setResponseLanguage(language);
+                  if (result.responseLanguage) {
+                    setResponseLanguage(result.responseLanguage);
+                  } else if (result.language) {
+                    setResponseLanguage(result.language);
                   }
-                  // Send the transcribed text as a message
-                  sendMessageToAgent(text);
+                  // Handle the full voice result (includes agent messages - no double processing)
+                  handleVoiceResult(result);
                 }}
                 disabled={isLoading}
               />

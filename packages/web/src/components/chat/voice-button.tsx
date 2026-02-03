@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Mic, Loader2, X, AlertCircle, Send, MicOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useVoiceInput } from '@/hooks/use-voice-input';
+import { useVoiceInput, type VoiceResult } from '@/hooks/use-voice-input';
 
 /**
  * Props for the VoiceButton component
  */
 export interface VoiceButtonProps {
-  /** Callback when transcription is ready (includes detected language for TTS) */
-  onTranscript: (text: string, language?: string) => void;
+  /** Callback when transcription is ready (DEPRECATED: use onVoiceResult instead) */
+  onTranscript?: (text: string, language?: string) => void;
+  /** Callback when voice response is ready (includes agent messages - avoids double processing) */
+  onVoiceResult?: (result: VoiceResult) => void;
   /** Callback when recording starts (use to stop TTS) */
   onRecordingStart?: () => void;
   /** Callback when recording stops */
@@ -35,10 +37,12 @@ export interface VoiceButtonProps {
  */
 export function VoiceButton({ 
   onTranscript,
+  onVoiceResult,
   onRecordingStart,
   onRecordingStop,
   disabled = false,
   className,
+  sessionId,
 }: VoiceButtonProps) {
   const [showError, setShowError] = useState(false);
 
@@ -56,9 +60,15 @@ export function VoiceButton({
   } = useVoiceInput({
     maxDuration: 30,
     minDuration: 0.5,
-    onTranscript: (text: string, language?: string) => {
+    sessionId,
+    // Use onVoiceResult if provided (avoids double processing)
+    onVoiceResult: onVoiceResult ? (result) => {
+      onVoiceResult(result);
+    } : undefined,
+    // Fallback to onTranscript for backwards compatibility
+    onTranscript: !onVoiceResult && onTranscript ? (text: string, language?: string) => {
       onTranscript(text, language);
-    },
+    } : undefined,
     onRecordingStart: () => {
       onRecordingStart?.();
     },

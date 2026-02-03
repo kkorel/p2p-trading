@@ -18,6 +18,12 @@ import {
 } from '@p2p/shared';
 import { logEvent, isDuplicateMessage } from './events';
 import { updateTransaction, getTransaction, createTransaction } from './state';
+import {
+  notifyOrderConfirmed,
+  notifyOrderCompleted,
+  notifyDeliveryUpdate,
+  checkAndNotifyMilestones,
+} from './chat/notifications';
 
 const router = Router();
 const logger = createLogger('BAP');
@@ -460,6 +466,27 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
     transaction_id: context.transaction_id,
   });
 
+  // Send WhatsApp notifications (async, don't block response)
+  const orderItems = content.order.items || [];
+  const firstItem = orderItems[0] as any || {};
+  const quote = content.order.quote as any || {};
+  
+  notifyOrderConfirmed({
+    orderId: content.order.id,
+    transactionId: context.transaction_id,
+    buyerId: txState?.buyerId || undefined,
+    sellerId: firstItem?.provider_id,
+    quantity: quote?.breakup?.find((b: any) => b.title === 'energy')?.quantity || 0,
+    totalPrice: quote?.price?.value || 0,
+    pricePerKwh: quote?.breakup?.find((b: any) => b.title === 'energy')?.price?.value || 0,
+    timeWindow: firstItem?.fulfillment?.time?.range 
+      ? `${firstItem.fulfillment.time.range.start} - ${firstItem.fulfillment.time.range.end}`
+      : undefined,
+    energyType: firstItem?.descriptor?.name || 'solar',
+  }).catch(err => {
+    logger.warn(`Failed to send order notifications: ${err.message}`);
+  });
+
   // Write trade to DEG Ledger (async, don't block response)
   // Import dynamically to avoid circular dependencies
   import('./ledger').then(async ({ writeTradeToLedger }) => {
@@ -674,6 +701,65 @@ router.post('/on_update', async (req: Request, res: Response) => {
       total_delivered: totalDelivered,
       total_curtailed: totalCurtailed,
     });
+    
+    // Get transaction for buyer/seller info
+    const txState = await getTransaction(context.transaction_id);
+    
+    // Get seller ID from the order/selected offer (provider ID)
+    const sellerId = (txState?.order as any)?.provider_id || txState?.selectedOffer?.provider_id || null;
+    
+    // Send completion notifications
+    if (effectiveStatus === 'COMPLETED') {
+      const orderPrice = (txState?.order as any)?.quote?.price?.value || 0;
+      
+      notifyOrderCompleted({
+        orderId,
+        buyerId: txState?.buyerId || undefined,
+        sellerId: sellerId || undefined,
+        quantity: totalDelivered + totalCurtailed,
+        totalPrice: orderPrice,
+        deliveredQty: totalDelivered,
+      }).catch(err => {
+        logger.warn(`Failed to send completion notification: ${err.message}`);
+      });
+      
+      // Check for milestone achievements (buyer)
+      if (txState?.buyerId) {
+        checkAndNotifyMilestones({
+          userId: txState.buyerId,
+          isSeller: false,
+          orderQuantity: totalDelivered,
+          orderAmount: orderPrice,
+        }).catch(err => {
+          logger.warn(`Failed to check buyer milestones: ${err.message}`);
+        });
+      }
+      
+      // Check for milestone achievements (seller)
+      if (sellerId) {
+        checkAndNotifyMilestones({
+          userId: sellerId,
+          isSeller: true,
+          orderQuantity: totalDelivered,
+          orderAmount: orderPrice,
+        }).catch(err => {
+          logger.warn(`Failed to check seller milestones: ${err.message}`);
+        });
+      }
+    } else if (totalCurtailed > 0) {
+      // Notify about partial delivery/curtailment
+      notifyDeliveryUpdate({
+        orderId,
+        buyerId: txState?.buyerId || undefined,
+        sellerId: sellerId || undefined,
+        deliveredQty: totalDelivered,
+        expectedQty: totalDelivered + totalCurtailed,
+        curtailedQty: totalCurtailed,
+        curtailmentReason: fulfillmentUpdates.find(u => u.curtailmentReason)?.curtailmentReason,
+      }).catch(err => {
+        logger.warn(`Failed to send delivery update notification: ${err.message}`);
+      });
+    }
     
     // Could trigger VC-based settlement verification here
     // This would involve comparing meter readings against VCs

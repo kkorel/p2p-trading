@@ -1140,3 +1140,135 @@ export async function getWelcomeBackData(userId: string): Promise<string> {
 
   return parts.join('\n');
 }
+
+/**
+ * Generate a text-based trading dashboard with key metrics.
+ */
+export async function generateDashboard(userId: string, lang?: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      name: true,
+      balance: true,
+      trustScore: true,
+      allowedTradeLimit: true,
+      providerId: true,
+      productionCapacity: true,
+    },
+  });
+  
+  if (!user) {
+    return ht(lang, 'Dashboard not available.', 'Dashboard available nahi hai.');
+  }
+
+  const trustTier = getTrustTier(user.trustScore);
+  
+  // Seller stats
+  let sellerSection = '';
+  if (user.providerId) {
+    const offers = await prisma.catalogOffer.findMany({
+      where: { providerId: user.providerId },
+      select: { maxQty: true, priceValue: true },
+    });
+    
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const recentOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        createdAt: { gte: weekAgo },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+    
+    const allOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+    
+    const weeklyEarnings = recentOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const weeklyKwh = recentOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+    const totalEarnings = allOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const totalKwh = allOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+    const totalListed = offers.reduce((sum, o) => sum + o.maxQty, 0);
+    
+    sellerSection = ht(lang,
+      `\n📊 *Seller Stats*\n` +
+      `Active Listings: ${offers.length} (${totalListed} kWh)\n` +
+      `This Week: ₹${weeklyEarnings.toFixed(0)} earned, ${weeklyKwh.toFixed(1)} kWh\n` +
+      `All-Time: ₹${totalEarnings.toFixed(0)} earned, ${totalKwh.toFixed(1)} kWh`,
+      
+      `\n📊 *Seller Stats*\n` +
+      `Active Listings: ${offers.length} (${totalListed} kWh)\n` +
+      `Is Hafte: ₹${weeklyEarnings.toFixed(0)} kamai, ${weeklyKwh.toFixed(1)} kWh\n` +
+      `Total: ₹${totalEarnings.toFixed(0)} kamai, ${totalKwh.toFixed(1)} kWh`
+    );
+  }
+  
+  // Buyer stats
+  const buyerOrders = await prisma.order.findMany({
+    where: {
+      buyerId: userId,
+      status: { in: ['ACTIVE', 'COMPLETED'] },
+    },
+    select: { totalPrice: true, totalQty: true },
+  });
+  
+  let buyerSection = '';
+  if (buyerOrders.length > 0) {
+    const totalSpent = buyerOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const totalBoughtKwh = buyerOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+    
+    buyerSection = ht(lang,
+      `\n🔋 *Buyer Stats*\n` +
+      `Orders: ${buyerOrders.length}\n` +
+      `Energy Bought: ${totalBoughtKwh.toFixed(1)} kWh\n` +
+      `Total Spent: ₹${totalSpent.toFixed(0)}`,
+      
+      `\n🔋 *Buyer Stats*\n` +
+      `Orders: ${buyerOrders.length}\n` +
+      `Energy Liya: ${totalBoughtKwh.toFixed(1)} kWh\n` +
+      `Total Kharch: ₹${totalSpent.toFixed(0)}`
+    );
+  }
+  
+  // Build dashboard
+  const dashboard = ht(lang,
+    `📊 *Oorja Dashboard*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `👤 ${user.name || 'Trader'}\n` +
+    `💰 Balance: ₹${user.balance.toFixed(0)}\n` +
+    `🌟 Trust: ${trustTier.name} (${(user.trustScore * 100).toFixed(0)}%)\n` +
+    `📈 Trade Limit: ${user.allowedTradeLimit}%` +
+    sellerSection +
+    buyerSection +
+    `\n\n━━━━━━━━━━━━━━━━━━━━\n` +
+    `Quick Actions: "create listing", "buy energy", "earnings"`,
+    
+    `📊 *Oorja Dashboard*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `👤 ${user.name || 'Trader'}\n` +
+    `💰 Balance: ₹${user.balance.toFixed(0)}\n` +
+    `🌟 Trust: ${trustTier.name} (${(user.trustScore * 100).toFixed(0)}%)\n` +
+    `📈 Trade Limit: ${user.allowedTradeLimit}%` +
+    sellerSection +
+    buyerSection +
+    `\n\n━━━━━━━━━━━━━━━━━━━━\n` +
+    `Quick Actions: "listing banao", "bijli khareedu", "kamai dekho"`
+  );
+  
+  return dashboard;
+}
+
+// Trust tier helper
+function getTrustTier(score: number): { name: string; emoji: string } {
+  if (score >= 0.9) return { name: 'Platinum', emoji: '💎' };
+  if (score >= 0.7) return { name: 'Gold', emoji: '🥇' };
+  if (score >= 0.5) return { name: 'Silver', emoji: '🥈' };
+  if (score >= 0.3) return { name: 'Bronze', emoji: '🥉' };
+  return { name: 'Starter', emoji: '🌱' };
+}

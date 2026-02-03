@@ -14,6 +14,7 @@ import {
   createLogger,
 } from '@p2p/shared';
 import { authMiddleware, devModeOnly } from './middleware';
+import { sendFirstLoginWelcome } from './chat/notifications';
 
 const logger = createLogger('Auth');
 
@@ -136,6 +137,15 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
         },
       },
     });
+
+    // Send proactive WhatsApp welcome on first login (fire-and-forget)
+    // This triggers once per user - the function checks whatsappWelcomeSent flag
+    if (result.isNewUser || !user!.profileComplete) {
+      // Don't await - let it run in background
+      sendFirstLoginWelcome(user!.id).catch(err => {
+        logger.warn(`Background WhatsApp welcome failed: ${err.message}`);
+      });
+    }
 
     res.json({
       success: true,
@@ -881,6 +891,11 @@ router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response
 
     logger.info(`User ${req.user!.id} completed onboarding via VC: capacityKW=${capacityKW}, estimatedMonthlyKWh=${estimatedMonthlyKWh}, method=${extractionMethod}`);
 
+    // Send proactive WhatsApp welcome now that profile is complete (fire-and-forget)
+    sendFirstLoginWelcome(req.user!.id).catch(err => {
+      logger.warn(`Background WhatsApp welcome on VC verification failed: ${err.message}`);
+    });
+
     res.json({
       success: true,
       verification: {
@@ -1000,10 +1015,19 @@ router.post('/verify-credential', authMiddleware, async (req: Request, res: Resp
     let claims: Record<string, any> = {};
     const userUpdate: Record<string, any> = {};
 
+    // Get current user to check existing values before overwriting
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { name: true },
+    });
+
     switch (credType) {
       case 'UtilityCustomerCredential': {
         claims = extractNormalizedUtilityCustomerClaims(credential as any);
-        if (claims.fullName) userUpdate.name = claims.fullName;
+        // Only use VC name if user hasn't already set their own name
+        if (claims.fullName && !currentUser?.name) {
+          userUpdate.name = claims.fullName;
+        }
         if (claims.consumerNumber) userUpdate.consumerNumber = claims.consumerNumber;
         if (claims.meterNumber) userUpdate.meterNumber = claims.meterNumber;
         if (claims.installationAddress) userUpdate.installationAddress = claims.installationAddress;
@@ -1181,6 +1205,19 @@ router.post('/complete-onboarding', authMiddleware, async (req: Request, res: Re
 
     const credCount = updatedUser.credentials.length;
     logger.info(`User ${req.user!.id} completed onboarding with ${credCount} credential(s)`);
+    logger.info(`User phone: ${updatedUser.phone}, profileComplete: ${updatedUser.profileComplete}`);
+
+    // Send proactive WhatsApp welcome now that profile is complete (fire-and-forget)
+    logger.info(`Triggering WhatsApp welcome for user ${req.user!.id}...`);
+    sendFirstLoginWelcome(req.user!.id).then(sent => {
+      if (sent) {
+        logger.info(`WhatsApp welcome SENT successfully to user ${req.user!.id}`);
+      } else {
+        logger.warn(`WhatsApp welcome NOT sent to user ${req.user!.id} - check function logs for details`);
+      }
+    }).catch(err => {
+      logger.error(`WhatsApp welcome FAILED for user ${req.user!.id}: ${err.message}`);
+    });
 
     res.json({
       success: true,

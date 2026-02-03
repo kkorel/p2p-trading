@@ -64,6 +64,20 @@ const ERROR_MESSAGES: Record<VoiceErrorType, VoiceError> = {
 };
 
 /**
+ * Voice response from the server including agent messages
+ */
+export interface VoiceResult {
+  transcript: string;
+  language?: string;
+  languageName?: string;
+  sessionId?: string;
+  messages?: Array<{ role: string; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
+  authToken?: string;
+  responseLanguage?: string;
+  voiceOutputEnabled?: boolean;
+}
+
+/**
  * Configuration options for the voice input hook
  */
 export interface UseVoiceInputOptions {
@@ -71,8 +85,12 @@ export interface UseVoiceInputOptions {
   maxDuration?: number;
   /** Minimum recording duration in seconds (default: 1) */
   minDuration?: number;
-  /** Callback when transcription is ready */
+  /** Session ID for chat continuity */
+  sessionId?: string;
+  /** Callback when transcription is ready (DEPRECATED: use onVoiceResult instead) */
   onTranscript?: (text: string, language?: string) => void;
+  /** Callback when voice response is ready (includes agent messages - prevents double processing) */
+  onVoiceResult?: (result: VoiceResult) => void;
   /** Callback for audio level updates (0-1) for visualization */
   onAudioLevel?: (level: number) => void;
   /** Callback when recording starts */
@@ -128,7 +146,9 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
   const {
     maxDuration = 30,
     minDuration = 1,
+    sessionId,
     onTranscript,
+    onVoiceResult,
     onAudioLevel,
     onRecordingStart,
     onRecordingStop,
@@ -423,6 +443,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
           body: JSON.stringify({
             audio: base64Audio,
             mimeType: mimeType,
+            sessionId: sessionId, // Include sessionId for chat continuity
           }),
         });
 
@@ -438,11 +459,30 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
 
         const data = await response.json();
 
-        if (data.transcript) {
+        // Check for success and valid transcript
+        if (data.success !== false && data.transcript) {
           setState('idle');
           setDuration(0);
-          onTranscript?.(data.transcript, data.language);
+          
+          // Prefer onVoiceResult if provided (includes agent messages to avoid double processing)
+          if (onVoiceResult) {
+            onVoiceResult({
+              transcript: data.transcript,
+              language: data.language,
+              languageName: data.languageName,
+              sessionId: data.sessionId,
+              messages: data.messages,
+              authToken: data.authToken,
+              responseLanguage: data.responseLanguage,
+              voiceOutputEnabled: data.voiceOutputEnabled,
+            });
+          } else {
+            // Fallback to onTranscript for backwards compatibility
+            onTranscript?.(data.transcript, data.language);
+          }
         } else {
+          // Handle API-level failure or missing transcript
+          console.warn('[VoiceInput] API returned failure or no transcript:', data.error || 'No transcript');
           handleError('transcription_failed');
         }
       } catch (err) {
@@ -452,7 +492,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     };
 
     mediaRecorder.stop();
-  }, [state, minDuration, handleError, onRecordingStop, onTranscript]);
+  }, [state, minDuration, sessionId, handleError, onRecordingStop, onTranscript, onVoiceResult]);
 
   /**
    * Cancel recording without processing

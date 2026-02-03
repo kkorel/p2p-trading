@@ -24,10 +24,11 @@ import {
   getIssuerId,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
-import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase } from './trading-agent';
+import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard } from './trading-agent';
 import { askLLM, classifyIntent, composeResponse, extractNameWithLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
+import { sendProactiveMessage, isWhatsAppConnected, getWhatsAppBotNumber } from './whatsapp';
 
 const logger = createLogger('OorjaAgent');
 
@@ -136,6 +137,7 @@ interface SessionContext {
   voiceOutputEnabled?: boolean;
   // Runtime-only — not serialized to contextJson
   _sessionId?: string;
+  _platform?: 'TELEGRAM' | 'WEB' | 'WHATSAPP';
 }
 
 type ChatState =
@@ -322,6 +324,50 @@ function h(ctx: SessionContext, en: string, hi: string): string {
   return ctx.language === 'hinglish' ? hi : en;
 }
 
+// --- App URL for registration redirects ---
+const APP_URL = 'https://p2p-trading-snowy.vercel.app/';
+
+/**
+ * Generate response for unverified WhatsApp users.
+ * These users must register on the app first.
+ * Auto-detects language from user message.
+ */
+function getUnverifiedWhatsAppResponse(userMessage: string): AgentResponse {
+  const detectedLang = detectLanguage(userMessage);
+  const isHinglish = detectedLang === 'hinglish' || detectedLang === 'hi-IN';
+  
+  const message = isHinglish
+    ? `Namaste! Main Oorja hun, aapka P2P energy trading assistant.
+
+Meri services use karne ke liye, pehle app pe register karo:
+${APP_URL}
+
+Register hone ke baad, main aapki madad kar sakta hun:
+• Solar energy bechna
+• Sasti green energy khareedna
+• Orders aur earnings track karna
+• Market insights lena
+
+Jaldi milte hain!`
+    : `Namaste! I'm Oorja, your P2P energy trading assistant.
+
+To use my services, please register on our app first:
+${APP_URL}
+
+Once you're registered, I can help you:
+• Sell your solar energy
+• Buy affordable green energy
+• Track your orders and earnings
+• Get market insights
+
+See you soon!`;
+
+  return {
+    messages: [{ text: message }],
+    responseLanguage: isHinglish ? 'hinglish' : 'en-IN',
+  };
+}
+
 /**
  * Extract the actual name from common phrases like "My name is Jack" or "I'm Jack".
  * Returns just the name portion, or the full message if no pattern matches.
@@ -402,6 +448,47 @@ function extractName(message: string): string {
  * Check which listing detail is missing and ask the user for it.
  * Returns an AgentResponse if something is missing, or null if all details are present.
  */
+// --- Market Price Insights ---
+
+interface MarketPriceInsight {
+  en: string;
+  hi: string;
+  low: number;
+  recommended: number;
+  high: number;
+  discomRate: number;
+}
+
+/**
+ * Get market price insights for an energy type.
+ * In production, this would query actual market data.
+ */
+function getMarketPriceInsight(energyType: string): MarketPriceInsight {
+  // Market data (in production, fetch from database/API)
+  const marketData: Record<string, { avg: number; min: number; max: number; discom: number }> = {
+    SOLAR: { avg: 4.5, min: 4.0, max: 5.5, discom: 7.5 },
+    WIND: { avg: 4.2, min: 3.8, max: 5.0, discom: 7.5 },
+    HYDRO: { avg: 4.8, min: 4.2, max: 5.8, discom: 7.5 },
+    MIXED: { avg: 4.5, min: 4.0, max: 5.5, discom: 7.5 },
+  };
+
+  const data = marketData[energyType] || marketData.SOLAR;
+  const savings = Math.round(((data.discom - data.avg) / data.discom) * 100);
+
+  return {
+    en: `Current market: ₹${data.min}-${data.max}/kWh (avg ₹${data.avg})\n` +
+        `DISCOM rate: ₹${data.discom}/kWh\n` +
+        `Your buyers save ~${savings}% vs DISCOM!`,
+    hi: `Market rate: ₹${data.min}-${data.max}/kWh (avg ₹${data.avg})\n` +
+        `DISCOM rate: ₹${data.discom}/kWh\n` +
+        `Buyers ko ~${savings}% bachega DISCOM se!`,
+    low: data.min,
+    recommended: data.avg,
+    high: data.max,
+    discomRate: data.discom,
+  };
+}
+
 function askNextListingDetail(ctx: SessionContext, pending: PendingListing): AgentResponse | null {
   if (!pending.energyType) {
     return {
@@ -433,16 +520,24 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
   }
 
   if (pending.pricePerKwh == null) {
+    // Get market pricing insights
+    const marketInsight = getMarketPriceInsight(pending.energyType || 'SOLAR');
+    
     return {
       messages: [{
         text: h(ctx,
-          'What price per unit (kWh) in Rs? DISCOM rates are around Rs 5-8/unit.',
-          'Per unit (kWh) kitne Rs mein bechoge? DISCOM rate Rs 5-8/unit ke aas-paas hai.'
+          `💡 *Smart Pricing*\n\n` +
+          `${marketInsight.en}\n\n` +
+          `What price per unit (kWh) in Rs would you like?`,
+          
+          `💡 *Smart Pricing*\n\n` +
+          `${marketInsight.hi}\n\n` +
+          `Per unit (kWh) kitne Rs mein bechoge?`
         ),
         buttons: [
-          { text: 'Rs 5/unit', callbackData: 'listing_price:5' },
-          { text: 'Rs 6/unit', callbackData: 'listing_price:6' },
-          { text: 'Rs 7/unit', callbackData: 'listing_price:7' },
+          { text: `₹${marketInsight.low}/unit (Quick sale)`, callbackData: `listing_price:${marketInsight.low}` },
+          { text: `₹${marketInsight.recommended}/unit (Recommended)`, callbackData: `listing_price:${marketInsight.recommended}` },
+          { text: `₹${marketInsight.high}/unit (Premium)`, callbackData: `listing_price:${marketInsight.high}` },
         ],
       }],
       contextUpdate: { pendingListing: { ...pending, awaitingField: 'price' } },
@@ -499,6 +594,23 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
       messages: [{ text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.') }],
       contextUpdate: { pendingListing: undefined },
     };
+  }
+
+  // Handle numeric input for WhatsApp - convert to callbacks based on current field
+  const numInput = parseInt(message.trim(), 10);
+  if (!isNaN(numInput) && numInput >= 1 && numInput <= 10) {
+    if (pending.awaitingField === 'energy_type' && numInput <= 3) {
+      const typeMap = ['SOLAR', 'WIND', 'HYDRO'];
+      message = `listing_type:${typeMap[numInput - 1]}`;
+    } else if (pending.awaitingField === 'price' && numInput <= 3) {
+      // Prices are dynamically generated, so we can't map directly - let it parse as price
+    } else if (pending.awaitingField === 'timeframe' && numInput <= 2) {
+      const timeMap = ['tomorrow', 'today'];
+      message = `listing_time:${timeMap[numInput - 1]}`;
+    } else if (pending.awaitingField === 'confirm' && numInput <= 2) {
+      const confirmMap = ['yes', 'no'];
+      message = `listing_confirm:${confirmMap[numInput - 1]}`;
+    }
   }
 
   switch (pending.awaitingField) {
@@ -893,6 +1005,25 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
     };
   }
 
+  // Handle numeric input for WhatsApp - convert to callbacks based on current field
+  const numInput = parseInt(message.trim(), 10);
+  if (!isNaN(numInput) && numInput >= 1 && numInput <= 10) {
+    if (pending.awaitingField === 'quantity' && numInput <= 3) {
+      const qtyMap = [10, 25, 50];
+      message = `purchase_qty:${qtyMap[numInput - 1]}`;
+    } else if (pending.awaitingField === 'timeframe' && numInput <= 3) {
+      const timeMap = ['tomorrow morning', 'tomorrow afternoon', 'today evening'];
+      message = `purchase_time:${timeMap[numInput - 1]}`;
+    } else if ((pending.awaitingField === 'confirm' || pending.awaitingField === 'confirm_offer') && numInput <= 2) {
+      const confirmMap = ['yes', 'no'];
+      if (pending.awaitingField === 'confirm') {
+        message = `purchase_confirm:${confirmMap[numInput - 1]}`;
+      } else {
+        message = `purchase_offer_confirm:${confirmMap[numInput - 1]}`;
+      }
+    }
+  }
+
   switch (pending.awaitingField) {
     case 'quantity': {
       let qty: number | undefined;
@@ -1193,6 +1324,275 @@ const CRED_FARMER_NAMES: Record<string, { en: string; hi: string }> = {
   UtilityProgramEnrollmentCredential: { en: 'program enrollment ID', hi: 'program ka ID' },
 };
 
+// --- Progress Indicator Helper ---
+
+const ONBOARDING_STEPS = [
+  { state: 'GREETING', step: 1, en: 'Choose language', hi: 'Bhasha chuno' },
+  { state: 'WAITING_NAME', step: 2, en: 'Your name', hi: 'Aapka naam' },
+  { state: 'WAITING_PHONE', step: 3, en: 'Phone number', hi: 'Phone number' },
+  { state: 'WAITING_OTP', step: 4, en: 'Verify OTP', hi: 'OTP verify' },
+  { state: 'ASK_DISCOM', step: 5, en: 'Electricity company', hi: 'Bijli company' },
+  { state: 'WAITING_UTILITY_CRED', step: 6, en: 'Upload credential', hi: 'Credential upload' },
+  { state: 'ASK_INTENT', step: 7, en: 'Your goal', hi: 'Aapka goal' },
+];
+
+const TOTAL_STEPS = 7;
+
+/**
+ * Generate a progress indicator for onboarding.
+ * Returns: "Step 3 of 7: Phone number\n━━━━━○○○ 43%"
+ */
+function getProgressIndicator(state: string, ctx: SessionContext): string {
+  const stepInfo = ONBOARDING_STEPS.find(s => s.state === state);
+  if (!stepInfo) return '';
+
+  const { step, en, hi } = stepInfo;
+  const label = h(ctx, en, hi);
+  const percent = Math.round((step / TOTAL_STEPS) * 100);
+  
+  // Create visual progress bar
+  const filledBlocks = Math.floor((step / TOTAL_STEPS) * 7);
+  const emptyBlocks = 7 - filledBlocks;
+  const progressBar = '━'.repeat(filledBlocks) + '○'.repeat(emptyBlocks);
+  
+  const stepText = h(ctx, `Step ${step} of ${TOTAL_STEPS}`, `Step ${step}/${TOTAL_STEPS}`);
+  
+  return `${stepText}: ${label}\n${progressBar} ${percent}%\n\n`;
+}
+
+// --- Universal Commands ---
+
+const UNIVERSAL_COMMANDS: Record<string, string[]> = {
+  help: ['help', 'madad', 'sahayata', 'menu', '?'],
+  back: ['back', 'peeche', 'previous', 'wapas'],
+  cancel: ['cancel', 'band', 'ruko', 'stop', 'abort'],
+  status: ['status', 'sthiti', 'where', 'kahan'],
+  language: ['language', 'bhasha', 'lang'],
+};
+
+// Map states to their previous state (for 'back' command)
+const STATE_BACK_MAP: Record<string, string> = {
+  WAITING_NAME: 'GREETING',
+  WAITING_PHONE: 'WAITING_NAME',
+  WAITING_OTP: 'WAITING_PHONE',
+  ASK_DISCOM: 'WAITING_OTP',
+  WAITING_UTILITY_CRED: 'ASK_DISCOM',
+  ASK_INTENT: 'WAITING_UTILITY_CRED',
+  OFFER_OPTIONAL_CREDS: 'ASK_INTENT',
+  WAITING_OPTIONAL_CRED: 'OFFER_OPTIONAL_CREDS',
+  CONFIRM_TRADING: 'ASK_INTENT',
+};
+
+/**
+ * Handle universal commands that work in any state.
+ * Returns null if not a universal command.
+ */
+async function handleUniversalCommand(
+  command: string,
+  ctx: SessionContext,
+  currentState: string,
+  sessionId: string
+): Promise<AgentResponse | null> {
+  const normalized = command.toLowerCase().trim();
+
+  // Check for help command
+  if (UNIVERSAL_COMMANDS.help.includes(normalized)) {
+    const helpText = h(ctx,
+      `📋 *Help Menu*\n\n` +
+      `Commands you can use anytime:\n` +
+      `• "help" - Show this menu\n` +
+      `• "back" - Go to previous step\n` +
+      `• "cancel" - Cancel current action\n` +
+      `• "status" - See where you are\n` +
+      `• "language" - Change language\n` +
+      `• "reset" - Start over\n\n` +
+      `Current state: ${currentState}`,
+      
+      `📋 *Madad Menu*\n\n` +
+      `Ye commands kabhi bhi use kar sakte ho:\n` +
+      `• "madad" - Ye menu dikhao\n` +
+      `• "peeche" - Pichle step pe jao\n` +
+      `• "band" - Current action cancel karo\n` +
+      `• "status" - Kahan ho dekho\n` +
+      `• "bhasha" - Bhasha badlo\n` +
+      `• "reset" - Phir se shuru karo\n\n` +
+      `Current state: ${currentState}`
+    );
+    return { messages: [{ text: helpText }] };
+  }
+
+  // Check for status command
+  if (UNIVERSAL_COMMANDS.status.includes(normalized)) {
+    const stepInfo = ONBOARDING_STEPS.find(s => s.state === currentState);
+    let statusText: string;
+    
+    if (stepInfo) {
+      const progress = getProgressIndicator(currentState, ctx);
+      statusText = h(ctx,
+        `📍 *Your Status*\n\n${progress}` +
+        `Name: ${ctx.name || 'Not set'}\n` +
+        `Phone: ${ctx.phone || 'Not set'}\n` +
+        `Verified: ${ctx.userId ? 'Yes ✓' : 'No'}`,
+        
+        `📍 *Aapka Status*\n\n${progress}` +
+        `Naam: ${ctx.name || 'Nahi hai'}\n` +
+        `Phone: ${ctx.phone || 'Nahi hai'}\n` +
+        `Verified: ${ctx.userId ? 'Haan ✓' : 'Nahi'}`
+      );
+    } else {
+      statusText = h(ctx,
+        `📍 *Your Status*\n\n` +
+        `State: ${currentState}\n` +
+        `Name: ${ctx.name || 'Not set'}\n` +
+        `Phone: ${ctx.phone || 'Not set'}\n` +
+        `Verified: ${ctx.userId ? 'Yes ✓' : 'No'}\n` +
+        `Trading: ${ctx.tradingActive ? 'Active ✓' : 'Not started'}`,
+        
+        `📍 *Aapka Status*\n\n` +
+        `State: ${currentState}\n` +
+        `Naam: ${ctx.name || 'Nahi hai'}\n` +
+        `Phone: ${ctx.phone || 'Nahi hai'}\n` +
+        `Verified: ${ctx.userId ? 'Haan ✓' : 'Nahi'}\n` +
+        `Trading: ${ctx.tradingActive ? 'Chalu ✓' : 'Shuru nahi'}`
+      );
+    }
+    return { messages: [{ text: statusText }] };
+  }
+
+  // Check for back command
+  if (UNIVERSAL_COMMANDS.back.includes(normalized)) {
+    const previousState = STATE_BACK_MAP[currentState];
+    
+    if (!previousState) {
+      return {
+        messages: [{
+          text: h(ctx,
+            "Can't go back from here. Type 'help' for options.",
+            "Yahan se peeche nahi ja sakte. 'madad' type karo options ke liye."
+          ),
+        }],
+      };
+    }
+
+    // Transition to previous state
+    await prisma.chatSession.update({
+      where: { id: sessionId },
+      data: { state: previousState as any },
+    });
+
+    const enterResp = await states[previousState as ChatState].onEnter(ctx);
+    const backMsg = h(ctx, '⬅️ Going back...', '⬅️ Peeche ja rahe hain...');
+    
+    return {
+      messages: [{ text: backMsg }, ...enterResp.messages],
+      newState: previousState,
+    };
+  }
+
+  // Check for cancel command (cancel pending operations)
+  if (UNIVERSAL_COMMANDS.cancel.includes(normalized)) {
+    if (ctx.pendingListing || ctx.pendingPurchase) {
+      const cancelText = h(ctx,
+        '❌ Operation cancelled. What would you like to do?',
+        '❌ Cancel ho gaya. Ab kya karna hai?'
+      );
+      return {
+        messages: [{ text: cancelText }],
+        contextUpdate: { pendingListing: undefined, pendingPurchase: undefined },
+      };
+    }
+    
+    return {
+      messages: [{
+        text: h(ctx,
+          "Nothing to cancel. Type 'help' for options.",
+          "Cancel karne ke liye kuch nahi hai. 'madad' type karo options ke liye."
+        ),
+      }],
+    };
+  }
+
+  // Check for language command
+  if (UNIVERSAL_COMMANDS.language.includes(normalized)) {
+    return {
+      messages: [{
+        text: h(ctx, 'Choose your language:', 'Apni bhasha chuno:'),
+        buttons: LANG_BUTTONS,
+      }],
+    };
+  }
+
+  return null;
+}
+
+// --- Smart Suggestions Helper ---
+
+/**
+ * Generate context-aware button suggestions based on user state and history.
+ */
+function getSmartSuggestions(ctx: SessionContext, currentState: string): Array<{ text: string; callbackData?: string }> {
+  const suggestions: Array<{ text: string; callbackData?: string }> = [];
+  const verifiedCreds = ctx.verifiedCreds || [];
+  
+  // For onboarding states, show help and relevant action
+  if (ONBOARDING_STEPS.find(s => s.state === currentState)) {
+    suggestions.push({ text: h(ctx, 'Help', 'Madad'), callbackData: 'cmd:help' });
+    if (STATE_BACK_MAP[currentState]) {
+      suggestions.push({ text: h(ctx, 'Back', 'Peeche'), callbackData: 'cmd:back' });
+    }
+    return suggestions;
+  }
+  
+  // For GENERAL_CHAT, provide trading-related suggestions
+  if (currentState === 'GENERAL_CHAT') {
+    const hasGeneration = verifiedCreds.includes('GENERATION_PROFILE');
+    const hasStorage = verifiedCreds.includes('STORAGE_PROFILE');
+    const hasConsumption = verifiedCreds.includes('CONSUMPTION_PROFILE');
+    
+    // Seller suggestions (has generation or storage credential)
+    if (hasGeneration || hasStorage) {
+      suggestions.push({ text: h(ctx, '📊 My Dashboard', '📊 Dashboard'), callbackData: 'action:dashboard' });
+      suggestions.push({ text: h(ctx, '➕ New Listing', '➕ Naya Listing'), callbackData: 'action:create_listing' });
+      suggestions.push({ text: h(ctx, '💰 My Earnings', '💰 Kamai'), callbackData: 'action:show_earnings' });
+    }
+    
+    // Buyer suggestions (has consumption credential)
+    if (hasConsumption || (!hasGeneration && !hasStorage)) {
+      suggestions.push({ text: h(ctx, '🔋 Buy Energy', '🔋 Bijli Khareedu'), callbackData: 'action:buy_energy' });
+      suggestions.push({ text: h(ctx, '📦 My Orders', '📦 Orders'), callbackData: 'action:show_orders' });
+    }
+    
+    // Universal suggestions
+    if (ctx.pendingListing || ctx.pendingPurchase) {
+      suggestions.unshift({ text: h(ctx, '❌ Cancel', '❌ Band'), callbackData: 'cmd:cancel' });
+    }
+    
+    // Add browse marketplace
+    suggestions.push({ text: h(ctx, '🏪 Browse Market', '🏪 Market Dekho'), callbackData: 'action:browse' });
+    
+    // Limit to 4 suggestions
+    return suggestions.slice(0, 4);
+  }
+  
+  return suggestions;
+}
+
+/**
+ * Convert numeric input (1, 2, 3...) to corresponding button callback data.
+ * WhatsApp shows buttons as numbered text, so users reply with numbers.
+ */
+function convertNumericToCallback(
+  input: string,
+  buttons: Array<{ text: string; callbackData?: string }>
+): string | null {
+  const num = parseInt(input.trim(), 10);
+  if (isNaN(num) || num < 1 || num > buttons.length) {
+    return null;
+  }
+  const button = buttons[num - 1];
+  return button.callbackData || button.text;
+}
+
 const states: Record<ChatState, StateHandler> = {
   GREETING: {
     async onEnter() {
@@ -1208,9 +1608,20 @@ const states: Record<ChatState, StateHandler> = {
       };
     },
     async onMessage(ctx, message) {
-      // Language selection from button
+      // Language selection from button callback
       if (message.startsWith('lang:')) {
         const lang = message.replace('lang:', '');
+        return {
+          messages: [],
+          newState: 'WAITING_NAME',
+          contextUpdate: { language: lang as any, langPicked: true },
+        };
+      }
+
+      // Handle numeric input (WhatsApp users reply with 1, 2, 3...)
+      const numericCallback = convertNumericToCallback(message, LANG_BUTTONS);
+      if (numericCallback && numericCallback.startsWith('lang:')) {
+        const lang = numericCallback.replace('lang:', '');
         return {
           messages: [],
           newState: 'WAITING_NAME',
@@ -1257,8 +1668,9 @@ const states: Record<ChatState, StateHandler> = {
       if (ctx.nameAsked) {
         return { messages: [] };
       }
+      const progress = getProgressIndicator('WAITING_NAME', ctx);
       return {
-        messages: [{ text: h(ctx, 'What is your name?', 'Aapka naam kya hai?') }],
+        messages: [{ text: progress + h(ctx, 'What is your name?', 'Aapka naam kya hai?') }],
       };
     },
     async onMessage(ctx, message) {
@@ -1286,9 +1698,10 @@ const states: Record<ChatState, StateHandler> = {
   WAITING_PHONE: {
     async onEnter(ctx) {
       const name = ctx.name || 'friend';
+      const progress = getProgressIndicator('WAITING_PHONE', ctx);
       return {
         messages: [
-          { text: h(ctx, `Nice to meet you, ${name}! Your phone number?`, `${name}, aapse milke khushi hui! Aapka phone number?`) },
+          { text: progress + h(ctx, `Nice to meet you, ${name}! Your phone number?`, `${name}, aapse milke khushi hui! Aapka phone number?`) },
         ],
       };
     },
@@ -1320,9 +1733,10 @@ const states: Record<ChatState, StateHandler> = {
 
   WAITING_OTP: {
     async onEnter(ctx) {
+      const progress = getProgressIndicator('WAITING_OTP', ctx);
       return {
         messages: [
-          { text: h(ctx, `Code sent to ${ctx.phone}. Enter it:`, `${ctx.phone} pe code bheja hai. Yahan daalo:`) },
+          { text: progress + h(ctx, `Code sent to ${ctx.phone}. Enter it:`, `${ctx.phone} pe code bheja hai. Yahan daalo:`) },
         ],
       };
     },
@@ -1369,6 +1783,23 @@ const states: Record<ChatState, StateHandler> = {
         userId: result.userId!,
         deviceInfo: 'Oorja-Agent',
       });
+
+      // Send WhatsApp welcome for new users who registered via web
+      if (result.isNewUser && ctx._platform === 'WEB' && ctx.phone && isWhatsAppConnected()) {
+        const userName = ctx.name || 'friend';
+        const botNumber = getWhatsAppBotNumber();
+        const welcomeMsg = h(ctx,
+          `Hi ${userName}! Welcome to Oorja. You just registered on our website. You can continue chatting here on WhatsApp anytime! Just message me to pick up where you left off.`,
+          `Namaste ${userName}! Oorja mein aapka swagat hai. Aapne website pe register kiya. Aap WhatsApp pe bhi baat kar sakte ho! Bas message bhejo.`
+        );
+        
+        // Fire-and-forget - don't block the response
+        sendProactiveMessage(ctx.phone, welcomeMsg).catch(err => {
+          logger.warn(`Failed to send WhatsApp welcome: ${err.message}`);
+        });
+        
+        logger.info(`Sent WhatsApp welcome to new web user: ${ctx.phone}`);
+      }
 
       return {
         messages: [],
@@ -1439,10 +1870,11 @@ const states: Record<ChatState, StateHandler> = {
 
   ASK_DISCOM: {
     async onEnter(ctx) {
+      const progress = getProgressIndicator('ASK_DISCOM', ctx);
       return {
         messages: [
           {
-            text: h(ctx,
+            text: progress + h(ctx,
               'Which company do you get electricity from?',
               'Aap konsi company se bijli lete ho?'
             ),
@@ -1452,6 +1884,12 @@ const states: Record<ChatState, StateHandler> = {
       };
     },
     async onMessage(ctx, message) {
+      // Handle numeric input (WhatsApp users reply with 1, 2, 3...)
+      const numericCallback = convertNumericToCallback(message, DISCOM_LIST);
+      if (numericCallback) {
+        message = numericCallback;
+      }
+
       if (message.startsWith('discom:')) {
         const discomKey = message.replace('discom:', '');
 
@@ -1504,6 +1942,7 @@ const states: Record<ChatState, StateHandler> = {
 
   WAITING_UTILITY_CRED: {
     async onEnter(ctx) {
+      const progress = getProgressIndicator('WAITING_UTILITY_CRED', ctx);
       const discomLabel = ctx.discom || 'your DISCOM';
       // Look up DISCOM-specific credential link
       const discomKey = Object.keys(DISCOM_CRED_LINKS).find(
@@ -1514,7 +1953,7 @@ const states: Record<ChatState, StateHandler> = {
       return {
         messages: [
           {
-            text: h(ctx,
+            text: progress + h(ctx,
               `I need your electricity account ID from ${discomLabel}. You can get it online here:\n${credLink}\n\nDownload and upload it here (PDF or JSON).`,
               `Mujhe aapki bijli company (${discomLabel}) ka ID chahiye. Vo aapko online mil jaayega is website par:\n${credLink}\n\nDownload karke yahan upload karo (PDF ya JSON).`
             ),
@@ -1585,24 +2024,38 @@ const states: Record<ChatState, StateHandler> = {
 
   ASK_INTENT: {
     async onEnter(ctx) {
+      const progress = getProgressIndicator('ASK_INTENT', ctx);
+      const intentButtons = [
+        { text: h(ctx, 'Sell solar energy', 'Solar se bijli bechna'), callbackData: 'intent:solar' },
+        { text: h(ctx, 'Battery storage', 'Battery mein store karna'), callbackData: 'intent:battery' },
+        { text: h(ctx, 'Buy energy', 'Bijli khareedna'), callbackData: 'intent:buy' },
+        { text: h(ctx, 'Just browse', 'Bas dekhna hai'), callbackData: 'intent:skip' },
+      ];
       return {
         messages: [
           {
-            text: h(ctx,
+            text: progress + h(ctx,
               'What would you like to do?',
               'Ab batao, aapko kya karna hai?'
             ),
-            buttons: [
-              { text: h(ctx, 'Sell solar energy', 'Solar se bijli bechna'), callbackData: 'intent:solar' },
-              { text: h(ctx, 'Battery storage', 'Battery mein store karna'), callbackData: 'intent:battery' },
-              { text: h(ctx, 'Buy energy', 'Bijli khareedna'), callbackData: 'intent:buy' },
-              { text: h(ctx, 'Just browse', 'Bas dekhna hai'), callbackData: 'intent:skip' },
-            ],
+            buttons: intentButtons,
           },
         ],
       };
     },
     async onMessage(ctx, message) {
+      // Handle numeric input (WhatsApp users reply with 1, 2, 3...)
+      const intentButtons = [
+        { text: 'Sell solar energy', callbackData: 'intent:solar' },
+        { text: 'Battery storage', callbackData: 'intent:battery' },
+        { text: 'Buy energy', callbackData: 'intent:buy' },
+        { text: 'Just browse', callbackData: 'intent:skip' },
+      ];
+      const numericCallback = convertNumericToCallback(message, intentButtons);
+      if (numericCallback) {
+        message = numericCallback;
+      }
+
       if (message.startsWith('intent:')) {
         const intent = message.replace('intent:', '');
 
@@ -1756,8 +2209,8 @@ const states: Record<ChatState, StateHandler> = {
           };
         }
 
-        // Let user skip
-        if (message.toLowerCase().includes('skip') || message.toLowerCase().includes('back') || message.toLowerCase().includes('nahi')) {
+        // Let user skip (including numeric "1" for the Skip button)
+        if (message.toLowerCase().includes('skip') || message.toLowerCase().includes('back') || message.toLowerCase().includes('nahi') || message.trim() === '1') {
           return {
             messages: [],
             newState: 'CONFIRM_TRADING',
@@ -1894,6 +2347,10 @@ const states: Record<ChatState, StateHandler> = {
       };
     },
     async onMessage(ctx, message) {
+      // Handle numeric input (WhatsApp: 1 = Yes, 2 = No)
+      if (message.trim() === '1') message = 'yes';
+      else if (message.trim() === '2') message = 'no';
+      
       const lower = message.toLowerCase().trim();
       const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'start', 'yes, start!', 'haan, shuru karo!'].includes(lower);
       const isNo = ['no', 'n', 'nahi', 'nope', 'not now', 'later', 'baad mein', 'abhi nahi'].includes(lower);
@@ -1996,11 +2453,113 @@ const states: Record<ChatState, StateHandler> = {
   },
 
   GENERAL_CHAT: {
-    async onEnter() {
+    async onEnter(ctx) {
+      // Show smart suggestions when entering general chat
+      const suggestions = getSmartSuggestions(ctx, 'GENERAL_CHAT');
+      if (suggestions.length > 0) {
+        return {
+          messages: [{
+            text: h(ctx, 
+              'How can I help you today?',
+              'Aaj kya madad karun?'
+            ),
+            buttons: suggestions,
+          }],
+        };
+      }
       return { messages: [] };
     },
     async onMessage(ctx, message) {
       const verifiedCreds = ctx.verifiedCreds || (ctx.userId ? await getVerifiedCredentials(ctx.userId) : []);
+
+      // --- Handle numeric input for smart suggestions ---
+      const smartSuggestions = getSmartSuggestions(ctx, 'GENERAL_CHAT');
+      const numericCallback = convertNumericToCallback(message, smartSuggestions);
+      if (numericCallback) {
+        message = numericCallback;
+      }
+
+      // --- Handle sync callbacks (cross-platform continuation) ---
+      if (message.startsWith('sync:')) {
+        const syncAction = message.replace('sync:', '');
+        if (syncAction === 'continue') {
+          // User wants to continue with synced pending operation
+          if (ctx.pendingListing?.awaitingField) {
+            const listing = ctx.pendingListing;
+            return {
+              messages: [{
+                text: h(ctx,
+                  `Great! Let's continue with your listing.\n\nSo far:\n• Type: ${listing.energyType || 'Not set'}\n• Quantity: ${listing.quantity ? listing.quantity + ' kWh' : 'Not set'}\n• Price: ${listing.pricePerKwh ? '₹' + listing.pricePerKwh + '/kWh' : 'Not set'}\n\nWhat's next?`,
+                  `Bahut badhiya! Aapki listing continue karte hain.\n\nAb tak:\n• Type: ${listing.energyType || 'Nahi hai'}\n• Quantity: ${listing.quantity ? listing.quantity + ' kWh' : 'Nahi hai'}\n• Price: ${listing.pricePerKwh ? '₹' + listing.pricePerKwh + '/kWh' : 'Nahi hai'}\n\nAage kya?`
+                ),
+              }],
+            };
+          } else if (ctx.pendingPurchase?.awaitingField) {
+            const purchase = ctx.pendingPurchase;
+            return {
+              messages: [{
+                text: h(ctx,
+                  `Great! Let's continue with your purchase.\n\nSo far:\n• Quantity: ${purchase.quantity ? purchase.quantity + ' kWh' : 'Not set'}\n• Time: ${purchase.timeDesc || 'Not set'}\n\nWhat's next?`,
+                  `Bahut badhiya! Aapki purchase continue karte hain.\n\nAb tak:\n• Quantity: ${purchase.quantity ? purchase.quantity + ' kWh' : 'Nahi hai'}\n• Time: ${purchase.timeDesc || 'Nahi hai'}\n\nAage kya?`
+                ),
+              }],
+            };
+          }
+          return {
+            messages: [{ text: h(ctx, 'Nothing pending to continue. How can I help?', 'Kuch pending nahi hai. Kya madad karun?') }],
+          };
+        } else if (syncAction === 'fresh') {
+          // User wants to start fresh - clear pending operations
+          return {
+            messages: [{
+              text: h(ctx, 'Starting fresh! How can I help you?', 'Naya shuru! Kya madad karun?'),
+              buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+            }],
+            contextUpdate: { pendingListing: undefined, pendingPurchase: undefined },
+          };
+        }
+      }
+
+      // --- Handle quick action callbacks from smart suggestions ---
+      if (message.startsWith('action:')) {
+        const action = message.replace('action:', '');
+        switch (action) {
+          case 'dashboard':
+            // Generate and return dashboard directly
+            if (ctx.userId) {
+              const dashboard = await generateDashboard(ctx.userId, ctx.language);
+              return {
+                messages: [{
+                  text: dashboard,
+                  buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+                }],
+              };
+            }
+            message = 'show my dashboard';
+            break;
+          case 'create_listing':
+            message = 'create a new listing';
+            break;
+          case 'show_earnings':
+            message = 'show my earnings';
+            break;
+          case 'buy_energy':
+            message = 'buy energy';
+            break;
+          case 'show_orders':
+            message = 'show my orders';
+            break;
+          case 'browse':
+            message = 'show available energy';
+            break;
+        }
+      }
+
+      // --- Handle universal command callbacks ---
+      if (message.startsWith('cmd:')) {
+        const cmd = message.replace('cmd:', '');
+        return handleUniversalCommand(cmd, ctx, 'GENERAL_CHAT', ctx._sessionId || '') || { messages: [] };
+      }
 
       // --- Build user profile context so LLM knows credentials are already verified ---
       let userProfileContext = '';
@@ -2504,7 +3063,184 @@ export async function processMessage(
       }
     }
 
+    // --- WhatsApp: Require app verification before chatting ---
+    const isWhatsAppMessage = platform === 'WHATSAPP' && (platformId.includes('@s.whatsapp.net') || platformId.includes('@lid'));
+    
+    if (isWhatsAppMessage) {
+      // Extract phone number from WhatsApp JID (standard format)
+      // For LID format, we need to look up by recent activity
+      const isLidFormat = platformId.includes('@lid');
+      const whatsappPhone = isLidFormat ? null : platformId.replace('@s.whatsapp.net', '');
+      
+      let existingUser: { id: string; name: string | null; profileComplete: boolean; phone: string | null; languagePreference: string | null } | null = null;
+      
+      if (whatsappPhone) {
+        // Standard format: Try to find existing user by phone
+        existingUser = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { phone: whatsappPhone },
+              { phone: `+${whatsappPhone}` },
+              // Handle various formats
+              { phone: { endsWith: whatsappPhone.slice(-10) } },
+            ],
+          },
+          select: { id: true, name: true, profileComplete: true, phone: true, languagePreference: true },
+        });
+      } else {
+        // LID format: Check for existing session with this LID first
+        const existingLidSession = await prisma.chatSession.findUnique({
+          where: { platform_platformId: { platform: 'WHATSAPP', platformId } },
+        });
+        
+        if (existingLidSession?.userId) {
+          existingUser = await prisma.user.findUnique({
+            where: { id: existingLidSession.userId },
+            select: { id: true, name: true, profileComplete: true, phone: true, languagePreference: true },
+          });
+          if (existingUser) {
+            logger.info(`Found existing LID session for user ${existingUser.id}`);
+          }
+        } else {
+          // No existing session - try to find a user who recently got WhatsApp welcome
+          // This is a heuristic for when user completes onboarding → gets welcome → replies
+          const recentWelcomedUsers = await prisma.user.findMany({
+            where: {
+              profileComplete: true,
+              whatsappWelcomeSent: true,
+              // Look for users who were updated in the last 10 minutes (likely just completed onboarding)
+              updatedAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+            },
+            select: { id: true, name: true, profileComplete: true, phone: true, languagePreference: true },
+            orderBy: { updatedAt: 'desc' },
+            take: 5,
+          });
+          
+          // Filter out users without phone (can't do NOT null in Prisma updateMany/findMany easily)
+          const usersWithPhone = recentWelcomedUsers.filter(u => u.phone);
+          
+          if (usersWithPhone.length === 1) {
+            // Only one recent user - high confidence this is them
+            existingUser = usersWithPhone[0];
+            logger.info(`LID heuristic: Matched to recent user ${existingUser.id} (phone: ${existingUser.phone})`);
+          } else if (usersWithPhone.length > 1) {
+            logger.warn(`LID heuristic: Found ${usersWithPhone.length} recent users, cannot determine which one - asking for verification`);
+          } else {
+            logger.info(`LID format detected but no recent welcomed users found`);
+          }
+        }
+      }
+
+      // VERIFIED USER: Has completed profile on the app
+      if (existingUser?.profileComplete) {
+        logger.info(`WhatsApp verified user: ${existingUser.id} for phone ${whatsappPhone || existingUser.phone || 'LID:' + platformId}`);
+        
+        const verifiedCreds = await getVerifiedCredentials(existingUser.id);
+        
+        // --- Cross-platform sync: Check for active sessions on other platforms ---
+        const otherSessions = await prisma.chatSession.findMany({
+          where: {
+            userId: existingUser.id,
+            platform: { not: 'WHATSAPP' },
+            isActive: true,
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+        });
+        
+        let syncedContext: Partial<SessionContext> = {};
+        let syncMessage: string | null = null;
+        
+        if (otherSessions.length > 0) {
+          const otherSession = otherSessions[0];
+          const otherCtx = JSON.parse(otherSession.contextJson) as SessionContext;
+          
+          // Sync pending operations
+          if (otherCtx.pendingListing) {
+            syncedContext.pendingListing = otherCtx.pendingListing;
+            syncMessage = h({ language: existingUser.languagePreference as any },
+              `I see you were creating a listing on ${otherSession.platform === 'WEB' ? 'the website' : 'another device'}. Want to continue here?`,
+              `Maine dekha ${otherSession.platform === 'WEB' ? 'website' : 'dusre device'} pe aap listing bana rahe the. Yahan continue karein?`
+            );
+          } else if (otherCtx.pendingPurchase) {
+            syncedContext.pendingPurchase = otherCtx.pendingPurchase;
+            syncMessage = h({ language: existingUser.languagePreference as any },
+              `I see you were buying energy on ${otherSession.platform === 'WEB' ? 'the website' : 'another device'}. Want to continue here?`,
+              `Maine dekha ${otherSession.platform === 'WEB' ? 'website' : 'dusre device'} pe aap bijli khareed rahe the. Yahan continue karein?`
+            );
+          }
+          
+          // Sync language preference
+          if (otherCtx.language && !existingUser.languagePreference) {
+            syncedContext.language = otherCtx.language;
+          }
+          
+          logger.info(`Cross-platform sync: Synced context from ${otherSession.platform} session`);
+        }
+        
+        const ctx: SessionContext = {
+          userId: existingUser.id,
+          name: existingUser.name || undefined,
+          phone: existingUser.phone || undefined,
+          verifiedCreds,
+          tradingActive: true,
+          language: (existingUser.languagePreference as any) || undefined,
+          ...syncedContext,
+        };
+
+        // Verified WhatsApp users go directly to GENERAL_CHAT - no onboarding
+        session = await prisma.chatSession.create({
+          data: {
+            platform,
+            platformId,
+            state: 'GENERAL_CHAT',
+            contextJson: JSON.stringify(ctx),
+            userId: existingUser.id,
+          },
+        });
+
+        await storeMessage(session.id, 'user', userMessage);
+
+        // Welcome verified user with activity summary
+        const savedLang = ctx.language;
+        const summaryData = await getWelcomeBackData(existingUser.id);
+        const credContext = 'User profile: Already onboarded and verified. Do NOT ask for credentials.';
+        const welcomeMsg = await composeResponse(
+          'welcome back on WhatsApp, give me a summary',
+          `${credContext}\n\n${summaryData}`,
+          savedLang,
+          existingUser.name || undefined
+        );
+
+        const fallbackWelcome = savedLang === 'hinglish'
+          ? `Wapas aaye ${existingUser.name || 'dost'}! WhatsApp pe swagat hai. Aaj kya madad karun?`
+          : `Welcome back, ${existingUser.name || 'friend'}! Great to see you on WhatsApp. How can I help?`;
+        
+        const messages: AgentMessage[] = [{ text: welcomeMsg || fallbackWelcome }];
+        
+        // Add sync message if there's a pending operation
+        if (syncMessage) {
+          messages.push({
+            text: syncMessage,
+            buttons: [
+              { text: h(ctx, 'Yes, continue', 'Haan, continue'), callbackData: 'sync:continue' },
+              { text: h(ctx, 'No, start fresh', 'Nahi, naya shuru'), callbackData: 'sync:fresh' },
+            ],
+          });
+        }
+        
+        await storeAgentMessages(session.id, messages);
+        return { messages };
+      }
+
+      // UNVERIFIED USER: Either doesn't exist or hasn't completed profile
+      // Redirect them to register on the app
+      logger.info(`WhatsApp unverified user from ${whatsappPhone ? 'phone ' + whatsappPhone : 'LID ' + platformId} - redirecting to app`);
+      return getUnverifiedWhatsAppResponse(userMessage);
+    }
+
     // --- Default: anonymous or unrecognized user — start from greeting ---
+    // Note: WhatsApp users never reach here - they get redirected above
     session = await prisma.chatSession.upsert({
       where: { platform_platformId: { platform, platformId } },
       create: { platform, platformId, state: 'GREETING', contextJson: '{}' },
@@ -2514,6 +3250,7 @@ export async function processMessage(
     await storeMessage(session.id, 'user', userMessage);
 
     const ctx: SessionContext = {};
+    ctx._platform = platform; // Set platform for state handlers
     const enterResp = await states.GREETING.onEnter(ctx);
     await storeAgentMessages(session.id, enterResp.messages);
 
@@ -2524,12 +3261,57 @@ export async function processMessage(
   await storeMessage(session.id, 'user', userMessage);
   const ctx = JSON.parse(session.contextJson) as SessionContext;
   ctx._sessionId = session.id; // Runtime-only, not persisted
+  ctx._platform = platform; // Runtime-only, not persisted
   const currentState = session.state as ChatState;
+
+  // --- WhatsApp verification check for existing sessions ---
+  // If user isn't verified (profileComplete), redirect to app
+  if (platform === 'WHATSAPP') {
+    let isVerified = false;
+    if (ctx.userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.userId },
+        select: { profileComplete: true },
+      });
+      isVerified = user?.profileComplete === true;
+    }
+    
+    if (!isVerified) {
+      logger.info(`WhatsApp session exists but user not verified - redirecting to app`);
+      // Clear the old session
+      await prisma.chatSession.delete({ where: { id: session.id } }).catch(err => {
+        logger.warn(`Failed to delete unverified WhatsApp session ${session.id}: ${err.message}`);
+      });
+      return getUnverifiedWhatsAppResponse(userMessage);
+    }
+  }
+
   const stateHandler = states[currentState];
 
   if (!stateHandler) {
     logger.error(`Unknown state: ${currentState}`);
     return { messages: [{ text: 'Something went wrong. Please try again.' }] };
+  }
+
+  // Check for universal commands (help, back, cancel, status, language)
+  const universalResponse = await handleUniversalCommand(
+    userMessage,
+    ctx,
+    currentState,
+    session.id
+  );
+  
+  if (universalResponse) {
+    // Update context if needed
+    if (universalResponse.contextUpdate) {
+      const updatedCtx = { ...ctx, ...universalResponse.contextUpdate };
+      await prisma.chatSession.update({
+        where: { id: session.id },
+        data: { contextJson: serializeContext(updatedCtx) },
+      });
+    }
+    await storeAgentMessages(session.id, universalResponse.messages);
+    return universalResponse;
   }
 
   // Per-message language detection — dynamically switch language mid-conversation

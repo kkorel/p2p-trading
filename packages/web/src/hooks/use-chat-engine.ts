@@ -286,6 +286,72 @@ export function useChatEngine() {
     []
   );
 
+  // Handle voice result directly (avoids double processing)
+  const handleVoiceResult = useCallback(
+    (result: {
+      transcript: string;
+      language?: string;
+      sessionId?: string;
+      messages?: Array<{ role: string; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
+      authToken?: string;
+      responseLanguage?: string;
+      voiceOutputEnabled?: boolean;
+    }) => {
+      // Validate transcript
+      if (!result.transcript || !result.transcript.trim()) {
+        console.warn('[Chat] Empty transcript received from voice input');
+        return;
+      }
+
+      // Add user's voice transcript as a message
+      setMessages((prev) => [...prev, { role: 'user', content: result.transcript }]);
+
+      // Update session ID if provided
+      if (result.sessionId) {
+        setSessionId(result.sessionId);
+        sessionIdRef.current = result.sessionId;
+        const willBeAuthenticated = !!result.authToken || isAuthenticatedRef.current;
+        storeSessionId(result.sessionId, willBeAuthenticated);
+      }
+
+      // Handle auth token
+      if (result.authToken) {
+        handleAuthToken(result.authToken);
+        setIsAuthenticated(true);
+        isAuthenticatedRef.current = true;
+        if (result.sessionId) {
+          storeSessionId(result.sessionId, true);
+        }
+      }
+
+      // Add agent messages
+      const agentMessages = result.messages;
+      if (agentMessages && agentMessages.length > 0) {
+        setMessages((prev) => [
+          ...prev,
+          ...agentMessages.map((m) => ({
+            role: 'agent' as const,
+            content: m.content,
+            buttons: m.buttons,
+          })),
+        ]);
+      }
+
+      // Update response language
+      if (result.responseLanguage) {
+        setResponseLanguage(result.responseLanguage);
+      }
+
+      // Sync voice preference from server
+      if (result.voiceOutputEnabled !== undefined) {
+        window.dispatchEvent(new CustomEvent('voice:preference', {
+          detail: { enabled: result.voiceOutputEnabled }
+        }));
+      }
+    },
+    []
+  );
+
   return {
     messages,
     input,
@@ -298,6 +364,7 @@ export function useChatEngine() {
     handleButtonClick,
     handleReset,
     handleFileUpload,
+    handleVoiceResult,
     sendMessageToAgent,
     responseLanguage,
     setResponseLanguage,

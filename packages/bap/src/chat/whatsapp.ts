@@ -142,6 +142,39 @@ export async function startWhatsAppBot(): Promise<void> {
 }
 
 /**
+ * Extract phone number from various WhatsApp message formats.
+ * Handles both standard JID (@s.whatsapp.net) and LID (@lid) formats.
+ */
+function extractPhoneFromMessage(msg: proto.IWebMessageInfo, chatId: string): string | null {
+  // Standard format: 447552335216@s.whatsapp.net
+  if (chatId.includes('@s.whatsapp.net')) {
+    return chatId.replace('@s.whatsapp.net', '');
+  }
+  
+  // LID format: Check participant or verifiedBizName or pushName for context
+  // The actual phone might be in msg.pushName or we need to use the chat ID as-is
+  
+  // Check if there's a participant field (used in groups, but might have info)
+  const participant = msg.key.participant;
+  if (participant && participant.includes('@s.whatsapp.net')) {
+    return participant.replace('@s.whatsapp.net', '');
+  }
+  
+  // For LID format, the number before @lid is NOT the phone number
+  // We need to check if the message has verifiedBizName context or use pushName
+  // For now, strip the @lid suffix but mark it specially
+  if (chatId.includes('@lid')) {
+    // LID is a WhatsApp internal ID, not a phone number
+    // We'll use it as platformId but can't match to user phone directly
+    logger.warn(`LID format detected: ${chatId} - cannot extract phone number directly`);
+    return null;
+  }
+  
+  // Fallback: return as-is (might be a different format)
+  return chatId.replace(/@.*$/, '');
+}
+
+/**
  * Handle incoming WhatsApp message based on type.
  */
 async function handleIncomingMessage(
@@ -151,9 +184,11 @@ async function handleIncomingMessage(
   const message = msg.message;
   if (!message) return;
 
-  // Log incoming message for debugging
-  const senderNumber = chatId.replace('@s.whatsapp.net', '');
-  logger.info(`WhatsApp message from +${senderNumber}`);
+  // Extract phone number for logging
+  const phoneNumber = extractPhoneFromMessage(msg, chatId);
+  const isLidFormat = chatId.includes('@lid');
+  
+  logger.info(`WhatsApp message from ${isLidFormat ? 'LID:' : '+'}${phoneNumber || chatId}${isLidFormat ? ' (LID format - user lookup may fail)' : ''}`);
 
   // Text message (regular or extended)
   if (message.conversation || message.extendedTextMessage?.text) {
@@ -263,6 +298,12 @@ async function handleVoiceMessage(
   }
 
   try {
+    // Ensure sock is still connected
+    if (!sock) {
+      logger.warn('WhatsApp disconnected while handling voice message');
+      return;
+    }
+    
     // Download audio (cast to WAMessage for type compatibility)
     const buffer = await downloadMediaMessage(
       msg as WAMessage,
@@ -270,7 +311,7 @@ async function handleVoiceMessage(
       {},
       {
         logger: logger as any,
-        reuploadRequest: sock!.updateMediaMessage,
+        reuploadRequest: sock.updateMediaMessage,
       }
     );
 
@@ -344,6 +385,12 @@ async function handleDocumentMessage(
   }
 
   try {
+    // Ensure sock is still connected
+    if (!sock) {
+      logger.warn('WhatsApp disconnected while handling document');
+      return;
+    }
+    
     // Let user know we're processing
     await sendWhatsAppMessage(chatId, '📄 Processing your document...');
 
@@ -354,7 +401,7 @@ async function handleDocumentMessage(
       {},
       {
         logger: logger as any,
-        reuploadRequest: sock!.updateMediaMessage,
+        reuploadRequest: sock.updateMediaMessage,
       }
     );
 
@@ -439,6 +486,69 @@ export function isWhatsAppConnected(): boolean {
  */
 export function getWhatsAppState(): 'disconnected' | 'connecting' | 'connected' {
   return connectionState;
+}
+
+/**
+ * Send a proactive message to a user by phone number.
+ * Used for notifications (order updates, welcome messages, etc.)
+ * 
+ * @param phoneNumber - Phone number (with or without + prefix, e.g., "919876543210" or "+919876543210")
+ * @param text - Message text
+ * @param buttons - Optional buttons (will be shown as numbered text options)
+ * @returns true if sent successfully, false otherwise
+ */
+export async function sendProactiveMessage(
+  phoneNumber: string,
+  text: string,
+  buttons?: Array<{ text: string; callbackData?: string }>
+): Promise<boolean> {
+  if (!sock || connectionState !== 'connected') {
+    logger.warn(`Cannot send proactive message: WhatsApp not connected (state: ${connectionState})`);
+    return false;
+  }
+
+  if (!phoneNumber || !text) {
+    logger.warn('Cannot send proactive message: missing phone number or text');
+    return false;
+  }
+
+  // Normalize phone number to WhatsApp JID format
+  // Remove any non-digit characters except leading +
+  let normalized = phoneNumber.replace(/[^\d+]/g, '');
+  if (normalized.startsWith('+')) {
+    normalized = normalized.slice(1);
+  }
+  
+  // Validate phone number is not empty and has reasonable length
+  if (!normalized || normalized.length < 7) {
+    logger.warn(`Cannot send proactive message: invalid phone number "${phoneNumber}"`);
+    return false;
+  }
+  
+  // Create WhatsApp JID (phone@s.whatsapp.net)
+  const jid = `${normalized}@s.whatsapp.net`;
+
+  logger.info(`Sending proactive message to ${normalized}`);
+
+  try {
+    await sendWhatsAppMessage(jid, text, buttons);
+    logger.info(`Proactive message sent successfully to ${normalized}`);
+    return true;
+  } catch (err: any) {
+    logger.error(`Failed to send proactive message to ${normalized}: ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * Get the bot's WhatsApp number (for deep links).
+ */
+export function getWhatsAppBotNumber(): string | null {
+  // Return the linked phone number (hardcoded for now, could be dynamic)
+  if (connectionState === 'connected') {
+    return '447405987693'; // UK number without +
+  }
+  return null;
 }
 
 function sleep(ms: number): Promise<void> {
