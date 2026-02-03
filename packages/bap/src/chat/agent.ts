@@ -510,11 +510,11 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
     return {
       messages: [{
         text: h(ctx,
-          '☀️ *Sell Your Energy*\n\nHow would you like to proceed?\n\n⚡ *Quick Sell* - One step with smart defaults\n📝 *Detailed* - Customize all options',
-          '☀️ *Energy Becho*\n\nKaise proceed karna chahte ho?\n\n⚡ *Quick Sell* - Ek step mein smart defaults ke saath\n📝 *Detailed* - Sab options customize karo'
+          '☀️ *Sell Your Energy*\n\nHow would you like to proceed?\n\n⚡ *Sell Automatically* - One step with smart defaults\n📝 *Detailed* - Customize all options',
+          '☀️ *Energy Becho*\n\nKaise proceed karna chahte ho?\n\n⚡ *Automatic Sell* - Ek step mein smart defaults ke saath\n📝 *Detailed* - Sab options customize karo'
         ),
         buttons: [
-          { text: h(ctx, '⚡ Quick Sell (Recommended)', '⚡ Quick Sell (Recommended)'), callbackData: 'listing_mode:quick' },
+          { text: h(ctx, '⚡ Sell Automatically', '⚡ Automatic Sell'), callbackData: 'listing_mode:quick' },
           { text: h(ctx, '📝 Detailed Options', '📝 Detailed Options'), callbackData: 'listing_mode:detailed' },
         ],
       }],
@@ -529,20 +529,18 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
       return {
         messages: [{
           text: h(ctx,
-            `⚡ *Quick Sell Mode*\n\n` +
+            `⚡ *Sell Automatically*\n\n` +
             `Using smart defaults:\n` +
             `• Type: ☀️ Solar\n` +
             `• Price: ₹${QUICK_SELL_DEFAULTS.pricePerKwh}/unit (market recommended)\n` +
             `• Time: Tomorrow 6AM-6PM\n\n` +
-            `📊 *Just tell me: How many units do you want to sell?*\n\n` +
-            `💡 Tip: 50 units = enough for 5 homes for 1 day`,
-            `⚡ *Quick Sell Mode*\n\n` +
+            `📊 *Just tell me: How many units do you want to sell?*`,
+            `⚡ *Automatic Sell*\n\n` +
             `Smart defaults use kar rahe:\n` +
             `• Type: ☀️ Solar\n` +
             `• Rate: ₹${QUICK_SELL_DEFAULTS.pricePerKwh}/unit (market recommended)\n` +
             `• Time: Kal subah 6-shaam 6\n\n` +
-            `📊 *Bas batao: Kitne unit bechna hai?*\n\n` +
-            `💡 Tip: 50 unit = 5 ghar ke liye 1 din ki bijli`
+            `📊 *Bas batao: Kitne unit bechna hai?*`
           ),
           buttons: [
             { text: '🔋 25 units', callbackData: 'listing_qty:25' },
@@ -713,9 +711,9 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
       // Invalid selection - re-prompt
       return {
         messages: [{
-          text: h(ctx, 'Please select Quick Sell or Detailed:', 'Quick Sell ya Detailed chuno:'),
+          text: h(ctx, 'Please select Automatic or Detailed:', 'Automatic ya Detailed chuno:'),
           buttons: [
-            { text: h(ctx, '⚡ Quick Sell', '⚡ Quick Sell'), callbackData: 'listing_mode:quick' },
+            { text: h(ctx, '⚡ Sell Automatically', '⚡ Automatic Sell'), callbackData: 'listing_mode:quick' },
             { text: h(ctx, '📝 Detailed', '📝 Detailed'), callbackData: 'listing_mode:detailed' },
           ],
         }],
@@ -2240,30 +2238,19 @@ function fuzzyMatchCommand(input: string): string | null {
 const states: Record<ChatState, StateHandler> = {
   GREETING: {
     async onEnter(ctx) {
+      // For web users, mention the speaker button in the greeting
+      const voiceNote = ctx._platform === 'WEB' 
+        ? '\n\n🔊 Agar meri messages sunna chahte ho, speaker button dabao.'
+        : '';
+      
       const messages: AgentMessage[] = [
-        { text: 'Namaste! Main Oorja hun.\nMain aapko apne ghar pe banai bijli se paise kamane mein madad karunga. Aur jinhe bijli khareedni hai, unhe sahi daam pe dilaunga.' },
+        { text: `Namaste! Main Oorja hun.\nMain aapko apne ghar pe banai bijli se paise kamane mein madad karunga. Aur jinhe bijli khareedni hai, unhe sahi daam pe dilaunga.${voiceNote}` },
         {
           text: 'Apni bhasha chune / Choose your language:',
           buttons: LANG_BUTTONS,
           delay: 300,
         },
       ];
-
-      // For web users: Offer voice feature at the start (only once)
-      if (ctx._platform === 'WEB' && !ctx.voicePromptShown && ctx.voiceOutputEnabled === undefined) {
-        messages.push({
-          text: '🔊 *Voice Feature*\n\nI can read messages aloud while you work.\n\n🔊 *Voice*\n\nMain bolke bhi sunaya sakta hun. Kya voice chahiye?',
-          buttons: [
-            { text: '🔊 Yes / Haan', callbackData: 'voice:enable' },
-            { text: '🔇 No / Nahi', callbackData: 'voice:disable' },
-          ],
-          delay: 600,
-        });
-        return {
-          messages,
-          contextUpdate: { voicePromptShown: true },
-        };
-      }
 
       return { messages };
     },

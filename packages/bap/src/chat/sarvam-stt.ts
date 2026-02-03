@@ -191,7 +191,7 @@ export async function transcribeAudio(
     filename,
     contentType: mimeType.split(';')[0].trim(),
   });
-  formData.append('model', 'saarika:v2');
+  formData.append('model', 'saarika:v2.5');
   
   logger.info(`Transcribing audio: ${(audioBuffer.length / 1024).toFixed(1)}KB, ${mimeType}`);
   
