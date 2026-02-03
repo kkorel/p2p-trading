@@ -86,7 +86,12 @@ export function useChatEngine() {
     setIsAuthenticated(hasAuth);
     isAuthenticatedRef.current = hasAuth;
 
-    // Check for existing session (both auth and anon)
+    // Anonymous users: clear stale session on load so reload starts fresh
+    if (!hasAuth) {
+      clearStoredSession();
+    }
+
+    // Check for existing session (authenticated only — anon cleared above)
     const storedSession = getStoredSessionId();
     if (storedSession) {
       setSessionId(storedSession);

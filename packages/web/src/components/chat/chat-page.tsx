@@ -254,35 +254,6 @@ export function ChatPage() {
             </>
           )}
 
-          {/* Voice Toggle - Large, accessible button with clear text labels */}
-          {settingsLoaded && (
-            <button
-              onClick={handleVoiceToggle}
-              className={`relative flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 shrink-0 font-semibold text-base ${
-                isAutoPlayActive 
-                  ? 'bg-white text-teal-600 shadow-lg' 
-                  : 'bg-white/20 hover:bg-white/30 text-white border border-white/30'
-              }`}
-              title={isAutoPlayActive ? 'Voice is ON - tap to turn off' : 'Voice is OFF - tap to turn on'}
-              aria-label={isAutoPlayActive ? 'Turn off voice responses' : 'Turn on voice responses'}
-            >
-              {isAutoPlayActive ? (
-                <>
-                  <div className="relative">
-                    <Volume2 size={22} className="relative z-10" />
-                    {/* Animated sound waves */}
-                    <span className="absolute -right-0.5 top-1/2 -translate-y-1/2 w-2 h-2 bg-teal-500 rounded-full animate-ping" />
-                  </div>
-                  <span className="whitespace-nowrap">Voice On</span>
-                </>
-              ) : (
-                <>
-                  <VolumeX size={22} />
-                  <span className="whitespace-nowrap">Voice Off</span>
-                </>
-              )}
-            </button>
-          )}
           <button
             onClick={handleReset}
             className="p-1.5 rounded-full hover:bg-teal-500/80 transition-colors shrink-0"
@@ -302,24 +273,6 @@ export function ChatPage() {
             <span>App</span>
           </button>
         </div>
-
-        {/* Voice Toggle Toast Notification - Large and clear */}
-        {voiceToast && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className={`flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-base font-semibold ${
-              voiceToast.includes('ON') 
-                ? 'bg-teal-600 text-white' 
-                : 'bg-gray-800 text-white'
-            }`}>
-              {voiceToast.includes('ON') ? (
-                <Volume2 size={22} />
-              ) : (
-                <VolumeX size={22} />
-              )}
-              <span>{voiceToast.includes('ON') ? 'Voice is ON' : 'Voice is OFF'}</span>
-            </div>
-          </div>
-        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto bg-gray-50/50">
