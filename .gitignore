@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 
 # Build outputs
@@ -44,6 +44,9 @@ packages/*/src/**/*.d.ts
 
 # Uploads folder (runtime)
 packages/bap/uploads/
+
+# WhatsApp Baileys auth state (contains session credentials)
+packages/bap/.whatsapp-auth/
 
 # Prisma temp files
 packages/shared/src/generated/prisma/*.tmp*

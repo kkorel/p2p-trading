@@ -2382,7 +2382,7 @@ async function translateResponse(
 // --- Main Entry Point ---
 
 export async function processMessage(
-  platform: 'TELEGRAM' | 'WEB',
+  platform: 'TELEGRAM' | 'WEB' | 'WHATSAPP',
   platformId: string,
   userMessage: string,
   fileData?: FileData,

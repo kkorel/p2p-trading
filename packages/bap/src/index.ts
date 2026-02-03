@@ -30,6 +30,7 @@ import chatRoutes from './chat-routes';
 import { initDb, closeDb, checkDbHealth } from './db';
 import { startDiscomMockService, stopDiscomMockService } from './discom-mock';
 import { startTelegramBot, stopTelegramBot } from './chat/telegram';
+import { startWhatsAppBot, stopWhatsAppBot } from './chat/whatsapp';
 
 const app = express();
 const logger = createLogger('PROSUMER');
@@ -170,6 +171,9 @@ async function start() {
 
       // Start Telegram bot (only if token is configured)
       startTelegramBot().catch(err => logger.error(`Telegram bot startup error: ${err.message}`));
+
+      // Start WhatsApp bot (only if WHATSAPP_ENABLED=true)
+      startWhatsAppBot().catch(err => logger.error(`WhatsApp bot startup error: ${err.message}`));
     });
 
     // Graceful shutdown handler
@@ -180,6 +184,7 @@ async function start() {
         try {
           stopDiscomMockService();
           stopTelegramBot();
+          stopWhatsAppBot();
           await closeDb();
           logger.info('Database connections closed');
           process.exit(0);

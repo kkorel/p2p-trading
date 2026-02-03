@@ -404,6 +404,7 @@ model PaymentRecord {
 enum ChatPlatform {
   TELEGRAM
   WEB
+  WHATSAPP
 }
 
 enum ChatState {
