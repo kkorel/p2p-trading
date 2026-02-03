@@ -31,59 +31,16 @@ const SCRIPT_RANGES: Array<{ lang: SarvamLangCode; ranges: Array<[number, number
   { lang: 'od-IN', ranges: [[0x0B00, 0x0B7F]] }, // Odia
 ];
 
-/**
- * Common Hindi/Hinglish words written in Latin script.
- * Used to detect when user is writing Roman Hindi (Hinglish).
- */
-const HINGLISH_MARKERS = new Set([
-  // Greetings / fillers
-  'namaste', 'namaskar', 'bhai', 'bhaiya', 'didi', 'ji', 'haan', 'nahi', 'nah',
-  'accha', 'theek', 'sahi', 'chalo', 'acha', 'bilkul', 'zaroor',
-  // Verbs
-  'karo', 'karna', 'batao', 'bata', 'dikhao', 'dikha', 'chahiye', 'chahte',
-  'khareed', 'kharid', 'khareedna', 'bechna', 'bech', 'daal', 'daalo', 'bana',
-  'banao', 'dekho', 'dekh', 'samjho', 'samjha', 'suno', 'padho', 'likho',
-  'leni', 'deni', 'milegi', 'milega', 'hogi', 'hoga', 'raha', 'rahi',
-  // Question words
-  'kya', 'kaise', 'kitna', 'kitne', 'kitni', 'kab', 'kahan', 'kaun', 'kyun', 'kyon',
-  // Nouns
-  'bijli', 'paise', 'paisa', 'kamaya', 'kamayi', 'kamai',
-  'daam', 'khata', 'subah', 'dopahar', 'shaam', 'raat', 'kal', 'aaj',
-  'abhi', 'pehle', 'baad', 'agle', 'pichle', 'hafte', 'mahine', 'saal',
-  // Pronouns / common
-  'mujhe', 'mera', 'mere', 'meri', 'aapka', 'aapke', 'aapki', 'humara', 'hamara',
-  'yeh', 'ye', 'wo', 'woh', 'unka', 'iska', 'kuch', 'sab', 'bahut', 'zyada',
-  // Conjunctions / particles (only unambiguously Hindi ones)
-  'aur', 'ya', 'lekin', 'se', 'ke', 'ka', 'ki', 'pe', 'mein', 'tak',
-  'ko', 'hai', 'hain', 'tha', 'thi', 'naya', 'purana',
-  // Energy/trading domain (only Hindi-specific words)
-  'bijli', 'munafa',
-]);
 
-/**
- * Detect if text is Hinglish (Hindi written in Latin/Roman script).
- * Returns a confidence score 0-1. Score > 0.2 likely Hinglish.
- */
-export function detectHinglish(text: string): number {
-  const words = text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
-  if (words.length === 0) return 0;
 
-  let hinglishCount = 0;
-  for (const word of words) {
-    if (HINGLISH_MARKERS.has(word)) {
-      hinglishCount++;
-    }
-  }
-
-  return hinglishCount / words.length;
-}
 
 /**
  * Detect language from text using Unicode script analysis.
- * Also detects Hinglish (Roman Hindi) via keyword matching.
- * Returns the detected language code, 'hinglish', or 'en-IN'.
+ * Returns the detected language code or 'en-IN' (default).
+ * Note: Roman script text is detected as English. Users who want Hindi
+ * should speak/type in Devanagari or use voice input.
  */
-export function detectLanguage(text: string): SarvamLangCode | 'hinglish' {
+export function detectLanguage(text: string): SarvamLangCode {
   const counts: Record<string, number> = {};
 
   for (const char of text) {
@@ -109,13 +66,6 @@ export function detectLanguage(text: string): SarvamLangCode | 'hinglish' {
 
   // Need at least 2 Indic characters to consider it a native script
   if (maxCount >= 2) return maxLang;
-
-  // Check for Hinglish (Roman Hindi) — need both ratio and minimum count
-  const words = text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
-  const hinglishScore = detectHinglish(text);
-  const hinglishCount = Math.round(hinglishScore * words.length);
-  // Require at least 2 Hindi words AND 30% ratio to avoid false positives on short English sentences
-  if (hinglishCount >= 2 && hinglishScore >= 0.3) return 'hinglish';
 
   return 'en-IN';
 }

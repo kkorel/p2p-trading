@@ -26,12 +26,12 @@ const entries: KBEntry[] = [
   {
     keywords: ['trade limit', 'how much can i sell', 'kitna bech', 'limit', 'maximum'],
     answer:
-      'Your trade limit depends on two things: your solar panel capacity (from your credential document) and your trust score. New sellers start at about 10% of their production. As you complete more trades successfully, your trust score and trade limit go up!',
+      'Your trade limit depends on two things: your solar panel capacity (from your Solar ID document) and your trust score. New sellers start at about 10% of their production. As you complete more trades successfully, your trust score and trade limit go up!',
   },
   {
     keywords: ['vc', 'credential', 'certificate', 'document', 'praman patra', 'generation profile'],
     answer:
-      'A Verifiable Credential (VC) is a digital certificate that proves you own a solar panel and how much energy it can produce. Your DISCOM office provides this document. Think of it as an ID card for your solar panel!',
+      'A Solar ID (also called Generation Profile) is a digital document that proves you own a solar panel and how much energy it can produce. Your electricity company (DISCOM) gives you this document. Think of it as an ID card for your solar panel!',
   },
   {
     keywords: ['wallet', 'balance', 'paisa', 'money', 'payment', 'paise'],
@@ -56,7 +56,7 @@ const entries: KBEntry[] = [
   {
     keywords: ['how does it work', 'process', 'steps', 'kaise kaam'],
     answer:
-      'Here is how it works:\n1. You upload your solar panel credential (VC document)\n2. Your production capacity and trade limit are set automatically\n3. I create a sell offer with a fair price\n4. Buyers find and purchase your energy\n5. DISCOM verifies delivery through the grid\n6. Payment is released to your wallet!',
+      'Here is how it works:\n1. You upload your Solar ID document (from your electricity company)\n2. Your production capacity and trade limit are set automatically\n3. I create a sell offer with a fair price\n4. Buyers find and purchase your energy\n5. Your electricity company verifies delivery through the grid\n6. Payment is released to your wallet!',
   },
   {
     keywords: ['help', 'madad', 'commands', 'kya kar sakte', 'what can you do'],
@@ -71,22 +71,22 @@ const entries: KBEntry[] = [
   {
     keywords: ['where to get vc', 'where to get credential', 'kahan se milega', 'download vc', 'get certificate', 'where credential'],
     answer:
-      'You can get your Generation Profile Credential from your local DISCOM office — they issue this digital certificate for solar panel owners.\n\nIf you want to try the platform first, you can download a sample credential from:\nhttps://open-vcs.up.railway.app',
+      'You can get your Solar ID document from your local electricity office (DISCOM) — they give this digital document to solar panel owners.\n\nIf you want to try the platform first, you can download a sample ID from:\nhttps://open-vcs.up.railway.app',
   },
   {
     keywords: ['why vc', 'why credential', 'why need', 'kyun chahiye', 'purpose of vc', 'why upload'],
     answer:
-      'The credential proves that you actually own a solar panel and how much energy it can produce. Without it, anyone could pretend to be a seller! It protects buyers and makes the marketplace trustworthy.\n\nThink of it like a driving license — you need it to prove you can drive.',
+      'The Solar ID proves that you actually own a solar panel and how much energy it can produce. Without it, anyone could pretend to be a seller! It protects buyers and makes the marketplace trustworthy.\n\nThink of it like a driving license — you need it to prove you can drive.',
   },
   {
     keywords: ['bses', 'bses rajdhani', 'bses yamuna'],
     answer:
-      'BSES (both Rajdhani and Yamuna) serves parts of Delhi. If you are a BSES customer with solar panels, you can get your Generation Profile Credential from your nearest BSES office or their online portal.',
+      'BSES (both Rajdhani and Yamuna) serves parts of Delhi. If you are a BSES customer with solar panels, you can get your Solar ID document from your nearest BSES office or their online portal.',
   },
   {
     keywords: ['tata power'],
     answer:
-      'Tata Power serves parts of Delhi and Mumbai. If you are a Tata Power customer with solar panels, visit your nearest Tata Power office or their online portal to get your Generation Profile Credential.',
+      'Tata Power serves parts of Delhi and Mumbai. If you are a Tata Power customer with solar panels, visit your nearest Tata Power office or their online portal to get your Solar ID document.',
   },
   {
     keywords: ['net metering', 'feed in', 'grid sell'],
@@ -96,7 +96,7 @@ const entries: KBEntry[] = [
   {
     keywords: ['safe', 'is it safe', 'kya safe hai', 'fraud', 'dhoka', 'scam'],
     answer:
-      'Yes, it is completely safe! Here is why:\n- Your credentials are verified digitally\n- Buyer payments are held in escrow (locked) until DISCOM confirms delivery\n- DISCOM independently verifies energy was actually delivered\n- You get paid automatically after verification\n\nNo one can cheat the system.',
+      'Yes, it is completely safe! Here is why:\n- Your ID documents are verified digitally\n- Buyer payments are held in escrow (locked) until your electricity company confirms delivery\n- They independently verify energy was actually delivered\n- You get paid automatically after verification\n\nNo one can cheat the system.',
   },
   {
     keywords: ['how long', 'kitna time', 'when payment', 'kab milega', 'when will i get paid'],

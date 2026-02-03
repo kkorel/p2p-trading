@@ -1,9 +1,9 @@
 /**
  * Sarvam AI Speech-to-Text Integration
  * 
- * Uses Sarvam's Saaras model for speech-to-text with translation.
- * Saaras auto-detects the input language and outputs English transcript,
- * which is perfect for our agent that processes English internally.
+ * Uses Sarvam's Saarika model for speech-to-text (native script).
+ * Saarika auto-detects the input language and outputs transcript in the original language,
+ * so Hindi speech appears as देवनागरी, not English.
  * 
  * Supported languages: Hindi, Bengali, Tamil, Telugu, Kannada, Malayalam,
  * Marathi, Gujarati, Punjabi, Odia, and English.
@@ -19,7 +19,7 @@ const logger = createLogger('SarvamSTT');
 
 // Configuration
 const SARVAM_API_KEY = process.env.SARVAM_API_KEY || '';
-const SARVAM_STT_URL = 'https://api.sarvam.ai/speech-to-text-translate';
+const SARVAM_STT_URL = 'https://api.sarvam.ai/speech-to-text';
 const MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024; // 10MB max
 const REQUEST_TIMEOUT_MS = 30000; // 30 seconds
 
@@ -27,7 +27,7 @@ const REQUEST_TIMEOUT_MS = 30000; // 30 seconds
  * Transcription result from Sarvam STT
  */
 export interface TranscriptionResult {
-  /** English transcript of the audio */
+  /** Transcript in original language (native script) */
   transcript: string;
   /** Detected source language code (e.g., 'hi-IN', 'ta-IN') */
   languageCode: string;
@@ -161,7 +161,7 @@ function validateAudio(audioBuffer: Buffer, mimeType: string): void {
  * 
  * @param audioBuffer - Audio data as Buffer
  * @param mimeType - MIME type of the audio (e.g., 'audio/webm')
- * @returns Transcription result with English text and detected language
+ * @returns Transcription result with native-script text and detected language
  * @throws STTError on failure
  */
 export async function transcribeAudio(
@@ -191,7 +191,7 @@ export async function transcribeAudio(
     filename,
     contentType: mimeType.split(';')[0].trim(),
   });
-  formData.append('model', 'saaras:v2.5');
+  formData.append('model', 'saarika:v2');
   
   logger.info(`Transcribing audio: ${(audioBuffer.length / 1024).toFixed(1)}KB, ${mimeType}`);
   

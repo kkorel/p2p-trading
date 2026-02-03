@@ -19,7 +19,7 @@ Key facts about the platform:
 - Sellers set their own price per kWh (unit). DISCOM rate is ~Rs 10/kWh for consumers. Sellers typically price Rs 5-8/kWh
 - Selling back to grid (net metering) pays only Rs 2/kWh — P2P trading pays much more
 - DISCOM is the local electricity distribution company that manages the grid and verifies energy delivery
-- To start selling, a user needs a Generation Profile Credential (VC) — a digital certificate proving solar panel ownership and capacity
+- To start selling, a user needs a Solar ID (also called Generation Profile) — a digital document proving solar panel ownership and capacity
 - The VC is issued by the user's DISCOM office. Common DISCOMs in India: BSES Rajdhani, BSES Yamuna, Tata Power, MSEDCL, BESCOM, CESC, TANGEDCO, UHBVN, DHBVN, PSPCL, JVVNL
 - The user can download a sample VC from: https://open-vcs.up.railway.app
 - Trade limit depends on solar panel capacity and trust score. New sellers start at 10% of production capacity
@@ -37,7 +37,7 @@ Personality:
 
 Important:
 - Only answer questions about P2P energy trading, solar energy, the Oorja platform, electricity, DISCOMs, and related topics. For unrelated questions, politely redirect.
-- If the conversation context mentions the user is already onboarded or has verified credentials, do NOT ask them to upload or provide credentials again. Help them with trading instead.`;
+- If the conversation context mentions the user is already onboarded or has verified ID documents, do NOT ask them to upload or provide documents again. Help them with trading instead.`;
 
 // --- Intent classification types ---
 
@@ -54,7 +54,7 @@ export interface ClassifiedIntent {
   };
 }
 
-const INTENT_PROMPT = `You are Oorja, a P2P energy trading assistant. Classify the user's message into ONE intent. The user may speak in English, Hindi (Hinglish/Roman Hindi), or a mix.
+const INTENT_PROMPT = `You are Oorja, a P2P energy trading assistant. Classify the user's message into ONE intent. The user may speak in English, Hindi, or a mix.
 
 Intents:
 - "show_listings": User wants to see their active listings/offers (e.g. "show my listings", "mere offers dikhao", "kitne listing hain")
@@ -199,7 +199,7 @@ export async function askLLM(
 const COMPOSE_PROMPT = `You are Oorja, a warm and friendly P2P energy trading assistant in India. You help farmers and small solar panel owners trade surplus solar energy.
 
 CRITICAL LANGUAGE RULES:
-- If told to reply in Hinglish: Use Roman Hindi script (NOT Devanagari). Mix Hindi and English naturally. Example: "Bhai, aapne 45 kWh bech ke Rs 270 kamaye! Bahut accha chal raha hai."
+- If told to reply in Hindi: Use simple Hindi that mixes with English naturally. Example: "Bhai, aapne 45 kWh bech ke Rs 270 kamaye! Bahut accha chal raha hai."
 - If told to reply in English: Use simple, clear English.
 
 RESPONSE STYLE:
@@ -213,7 +213,7 @@ RESPONSE STYLE:
 - Use Rs (not ₹) for currency
 - Address by name when available
 
-IMPORTANT: If the data context says the user is "already onboarded" or has "verified credentials", NEVER ask them to upload, provide, or submit any credentials or documents. They have already completed this step. Focus on helping them with trading, earnings, listings, and other platform features instead.`;
+IMPORTANT: If the data context says the user is "already onboarded" or has "verified ID documents", NEVER ask them to upload, provide, or submit any documents. They have already completed this step. Focus on helping them with trading, earnings, listings, and other platform features instead.`;
 
 /**
  * Extract a person's name from natural speech using LLM.
@@ -231,7 +231,7 @@ Rules:
 - Remove questions they ask back (like "what's yours?", "and you?")
 - If they say "My name is X" or "I'm X" or "Call me X", extract X
 - If they just say a name like "Jack" or "Priya", return that
-- Handle Hindi/Hinglish: "Mera naam Raj hai" → "Raj"
+- Handle Hindi: "Mera naam Raj hai" → "Raj"
 - If you cannot find a clear name, return "UNCLEAR"
 
 Examples:
@@ -302,8 +302,8 @@ export async function composeResponse(
     'ta-IN': 'Tamil', 'te-IN': 'Telugu',
   };
   let langInstruction: string;
-  if (language === 'hinglish') {
-    langInstruction = 'Reply in Hinglish (Roman Hindi script, NOT Devanagari).';
+  if (language === 'hi-IN') {
+    langInstruction = 'Reply in Hindi (mix Roman Hindi with some English words naturally).';
   } else if (language && LANG_NAMES[language]) {
     langInstruction = `Reply in ${LANG_NAMES[language]} using the native script. Keep it simple and conversational.`;
   } else {

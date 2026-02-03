@@ -57,7 +57,7 @@ async function getUserContact(userId: string): Promise<UserNotificationInfo> {
  * Simple bilingual message helper.
  */
 function msg(lang: string, en: string, hi: string): string {
-  return lang === 'hinglish' || lang === 'hi-IN' ? hi : en;
+  return lang === 'hi-IN' ? hi : en;
 }
 
 /**

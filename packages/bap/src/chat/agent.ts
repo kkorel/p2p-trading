@@ -127,7 +127,7 @@ interface SessionContext {
   tradeLimit?: number;
   discom?: string;
   askedDiscom?: boolean;
-  language?: SarvamLangCode | 'hinglish';
+  language?: SarvamLangCode;
   intent?: 'sell' | 'buy' | 'learn';
   langPicked?: boolean;
   /** Flag to skip name question in WAITING_NAME.onEnter if already asked */
@@ -176,11 +176,11 @@ interface StateHandler {
 // --- Credential mapping ---
 
 const CRED_DISPLAY_NAMES: Record<string, string> = {
-  UtilityCustomerCredential: 'Utility Customer',
-  GenerationProfileCredential: 'Generation Profile (Solar)',
-  ConsumptionProfileCredential: 'Consumption Profile',
-  StorageProfileCredential: 'Storage Profile (Battery)',
-  UtilityProgramEnrollmentCredential: 'Program Enrollment',
+  UtilityCustomerCredential: 'Electricity Connection ID',
+  GenerationProfileCredential: 'Solar Panel ID',
+  ConsumptionProfileCredential: 'Consumption ID',
+  StorageProfileCredential: 'Battery Storage ID',
+  UtilityProgramEnrollmentCredential: 'Program Enrollment ID',
 };
 
 // --- Credential processing helper ---
@@ -209,7 +209,7 @@ async function processCredentialUpload(
   // Detect type
   const detectedType = detectCredentialType(credential);
   if (!detectedType) {
-    return { success: false, credType: '', summary: '', error: 'This does not look like a valid credential. Please upload a Beckn DEG credential (PDF or JSON).' };
+    return { success: false, credType: '', summary: '', error: 'This does not look like a valid ID document. Please upload your Solar ID or Electricity Connection ID (PDF or JSON file from your electricity company).' };
   }
 
   // Check expected type
@@ -220,7 +220,7 @@ async function processCredentialUpload(
       success: false,
       credType: detectedType,
       summary: '',
-      error: `This is a ${actualName} credential, but I need a ${expectedName} credential. Please upload the right one.`,
+      error: `This is a ${actualName}, but I need your ${expectedName}. Please upload the right document.`,
     };
   }
 
@@ -325,8 +325,7 @@ async function getVerifiedCredentials(userId: string): Promise<string[]> {
   return creds.map((c) => c.credentialType);
 }
 
-// --- Language helper ---
-// Returns alt (Hinglish/Roman) text for ANY non-English language.
+// Returns alt (Hindi) text for ANY non-English language.
 // translateResponse() later converts this to native script (Devanagari, Tamil, etc.).
 function h(ctx: SessionContext | { language?: string }, en: string, alt: string): string {
   if (!ctx.language || ctx.language === 'en-IN') return en;
@@ -343,9 +342,9 @@ const APP_URL = 'https://p2p-trading-snowy.vercel.app/';
  */
 function getUnverifiedWhatsAppResponse(userMessage: string): AgentResponse {
   const detectedLang = detectLanguage(userMessage);
-  const isHinglish = detectedLang === 'hinglish' || detectedLang === 'hi-IN';
+  const isHindi = detectedLang === 'hi-IN';
   
-  const message = isHinglish
+  const message = isHindi
     ? `Namaste! Main Oorja hun, aapka P2P energy trading assistant.
 
 Meri services use karne ke liye, pehle app pe register karo:
@@ -373,7 +372,7 @@ See you soon!`;
 
   return {
     messages: [{ text: message }],
-    responseLanguage: isHinglish ? 'hinglish' : 'en-IN',
+    responseLanguage: isHindi ? 'hi-IN' : 'en-IN',
   };
 }
 
@@ -391,7 +390,7 @@ function extractName(message: string): string {
     /^(?:name:?\s*)(.+)$/i,
   ];
   
-  // Common patterns in Hindi/Hinglish
+  // Common patterns in Hindi
   const hindiPatterns = [
     /^(?:mera naam|mera name|naam|name)\s+(?:hai\s+)?(.+)$/i,
     /^(?:main|mai|me)\s+(.+?)\s+(?:hun|hoon|hu)$/i,
@@ -2240,17 +2239,33 @@ function fuzzyMatchCommand(input: string): string | null {
 
 const states: Record<ChatState, StateHandler> = {
   GREETING: {
-    async onEnter() {
-      return {
-        messages: [
-          { text: 'Namaste! Main Oorja hun.\nMain aapko apne ghar pe banai bijli se paise kamane mein madad karunga. Aur jinhe bijli khareedni hai, unhe sahi daam pe dilaunga.' },
-          {
-            text: 'Apni bhasha chune / Choose your language:',
-            buttons: LANG_BUTTONS,
-            delay: 300,
-          },
-        ],
-      };
+    async onEnter(ctx) {
+      const messages: AgentMessage[] = [
+        { text: 'Namaste! Main Oorja hun.\nMain aapko apne ghar pe banai bijli se paise kamane mein madad karunga. Aur jinhe bijli khareedni hai, unhe sahi daam pe dilaunga.' },
+        {
+          text: 'Apni bhasha chune / Choose your language:',
+          buttons: LANG_BUTTONS,
+          delay: 300,
+        },
+      ];
+
+      // For web users: Offer voice feature at the start (only once)
+      if (ctx._platform === 'WEB' && !ctx.voicePromptShown && ctx.voiceOutputEnabled === undefined) {
+        messages.push({
+          text: '🔊 *Voice Feature*\n\nI can read messages aloud while you work.\n\n🔊 *Voice*\n\nMain bolke bhi sunaya sakta hun. Kya voice chahiye?',
+          buttons: [
+            { text: '🔊 Yes / Haan', callbackData: 'voice:enable' },
+            { text: '🔇 No / Nahi', callbackData: 'voice:disable' },
+          ],
+          delay: 600,
+        });
+        return {
+          messages,
+          contextUpdate: { voicePromptShown: true },
+        };
+      }
+
+      return { messages };
     },
     async onMessage(ctx, message) {
       // Language selection from button callback
@@ -3103,24 +3118,6 @@ const states: Record<ChatState, StateHandler> = {
     async onEnter(ctx) {
       const messages: AgentMessage[] = [];
       
-      // For web users: Show voice prompt on first visit if not already shown
-      if (ctx._platform === 'WEB' && !ctx.voicePromptShown && ctx.voiceOutputEnabled === undefined) {
-        messages.push({
-          text: h(ctx,
-            '🔊 *Voice Feature Available!*\n\nWould you like me to read messages aloud? This helps while you\'re busy with other tasks.',
-            '🔊 *Voice Feature Available!*\n\nKya aap chahte ho ki main messages bolke sunau? Ye tab helpful hai jab aap busy ho.'
-          ),
-          buttons: [
-            { text: h(ctx, '🔊 Yes, enable voice', '🔊 Haan, voice on karo'), callbackData: 'voice:enable' },
-            { text: h(ctx, '🔇 No thanks', '🔇 Nahi, theek hai'), callbackData: 'voice:disable' },
-          ],
-        });
-        return {
-          messages,
-          contextUpdate: { voicePromptShown: true },
-        };
-      }
-      
       // Show smart suggestions when entering general chat
       const suggestions = getSmartSuggestions(ctx, 'GENERAL_CHAT');
       if (suggestions.length > 0) {
@@ -3338,8 +3335,8 @@ const states: Record<ChatState, StateHandler> = {
         switch (intent.intent) {
           case 'show_listings': {
             dataContext = await mockTradingAgent.getActiveListings(ctx.userId, 'en');
-            fallbackText = ctx.language === 'hinglish'
-              ? await mockTradingAgent.getActiveListings(ctx.userId, 'hinglish')
+            fallbackText = ctx.language === 'hi-IN'
+              ? await mockTradingAgent.getActiveListings(ctx.userId, 'hi-IN')
               : dataContext;
             break;
           }
@@ -3380,8 +3377,8 @@ const states: Record<ChatState, StateHandler> = {
 
           case 'show_orders': {
             dataContext = await mockTradingAgent.getOrdersSummary(ctx.userId, 'en');
-            fallbackText = ctx.language === 'hinglish'
-              ? await mockTradingAgent.getOrdersSummary(ctx.userId, 'hinglish')
+            fallbackText = ctx.language === 'hi-IN'
+              ? await mockTradingAgent.getOrdersSummary(ctx.userId, 'hi-IN')
               : dataContext;
             break;
           }
@@ -3688,27 +3685,21 @@ const states: Record<ChatState, StateHandler> = {
 
 async function translateResponse(
   response: AgentResponse,
-  targetLang: SarvamLangCode | 'hinglish'
+  targetLang: SarvamLangCode
 ): Promise<AgentResponse> {
-  // Hinglish = English responses (user types Roman Hindi, reads English fine)
-  // For TTS purposes, treat hinglish as Hindi (hi-IN)
-  if (targetLang === 'hinglish') {
-    return { ...response, responseLanguage: 'hi-IN' };
-  }
-
-  const effectiveLang = targetLang as SarvamLangCode;
-  if (effectiveLang === 'en-IN' || !isTranslationAvailable()) {
-    return { ...response, responseLanguage: effectiveLang };
+  // For English or if translation is unavailable, pass through
+  if (targetLang === 'en-IN' || !isTranslationAvailable()) {
+    return { ...response, responseLanguage: targetLang };
   }
 
   const translatedMessages: AgentMessage[] = [];
   for (const msg of response.messages) {
-    const translatedText = await translateFromEnglish(msg.text, effectiveLang);
+    const translatedText = await translateFromEnglish(msg.text, targetLang);
     let translatedButtons = msg.buttons;
     if (msg.buttons && msg.buttons.length > 0) {
       translatedButtons = await Promise.all(
         msg.buttons.map(async (btn) => ({
-          text: await translateFromEnglish(btn.text, effectiveLang),
+          text: await translateFromEnglish(btn.text, targetLang),
           callbackData: btn.callbackData,
         }))
       );
@@ -3720,7 +3711,7 @@ async function translateResponse(
     });
   }
 
-  return { ...response, messages: translatedMessages, responseLanguage: effectiveLang };
+  return { ...response, messages: translatedMessages, responseLanguage: targetLang };
 }
 
 // --- Main Entry Point ---
@@ -3787,7 +3778,7 @@ export async function processMessage(
           user.name || undefined
         );
 
-        const fallbackWelcome = savedLang === 'hinglish'
+        const fallbackWelcome = savedLang === 'hi-IN'
           ? `Wapas aaye ${user.name || 'dost'}! Aaj kya madad karun?`
           : `Welcome back, ${user.name || 'friend'}! How can I help you today?`;
         const messages: AgentMessage[] = [{ text: welcomeMsg || fallbackWelcome }];
@@ -3997,7 +3988,7 @@ export async function processMessage(
           existingUser.name || undefined
         );
 
-        const fallbackWelcome = savedLang === 'hinglish'
+        const fallbackWelcome = savedLang === 'hi-IN'
           ? `Wapas aaye ${existingUser.name || 'dost'}! WhatsApp pe swagat hai. Aaj kya madad karun?`
           : `Welcome back, ${existingUser.name || 'friend'}! Great to see you on WhatsApp. How can I help?`;
         
@@ -4097,7 +4088,7 @@ export async function processMessage(
     }
     await storeAgentMessages(session.id, universalResponse.messages);
     // Translate universal command responses to the user's language
-    const ucLang = (universalResponse.contextUpdate?.language || ctx.language || 'en-IN') as SarvamLangCode | 'hinglish';
+    const ucLang = (universalResponse.contextUpdate?.language || ctx.language || 'en-IN') as SarvamLangCode;
     return translateResponse(universalResponse, ucLang);
   }
 
@@ -4107,19 +4098,18 @@ export async function processMessage(
   const isStructuredInput = /^\d+$/.test(userMessage.trim()) || userMessage.trim().length <= 3;
   const isCallbackData = userMessage.includes(':') && !userMessage.includes(' ');
   
-  let detectedLang: SarvamLangCode | 'hinglish';
+  let detectedLang: SarvamLangCode;
   let processedMessage = userMessage;
   
   if (voiceOptions?.isVoiceInput && voiceOptions.detectedLanguage) {
-    // Voice input: STT already translated to English, use the detected language
+    // Voice input: STT already returns transcript in native script
     detectedLang = voiceOptions.detectedLanguage as SarvamLangCode;
     logger.info(`[Voice] Using STT-detected language: ${detectedLang}`);
-    // Message is already in English from STT, no translation needed
   } else {
     // Text input: detect language from the text
     detectedLang = detectLanguage(userMessage);
     // Translate native-script messages to English for processing
-    if (detectedLang !== 'en-IN' && detectedLang !== 'hinglish' && !isStructuredInput) {
+    if (detectedLang !== 'en-IN' && !isStructuredInput) {
       processedMessage = await translateToEnglish(userMessage, detectedLang as SarvamLangCode);
       logger.info(`Translated [${detectedLang} → en-IN]: "${userMessage}" → "${processedMessage}"`);
     }
@@ -4129,22 +4119,19 @@ export async function processMessage(
   // 1. Structured input (numbers, callbacks) → keep existing preference
   // 2. Voice input with detected language → use that language
   // 3. Native Indic script detected → switch to that language
-  // 4. Hinglish detected → switch to hinglish
-  // 5. English detected (no Indic, no Hinglish) → switch to English
-  let userLang: SarvamLangCode | 'hinglish';
+  // 4. English detected → switch to English
+  let userLang: SarvamLangCode;
   if (isStructuredInput || isCallbackData) {
     // Don't change language on button presses or numeric input
-    userLang = (ctx.language || 'en-IN') as SarvamLangCode | 'hinglish';
+    userLang = (ctx.language || 'en-IN') as SarvamLangCode;
   } else if (voiceOptions?.isVoiceInput && voiceOptions.detectedLanguage) {
     // Voice input: always use the STT-detected language
     userLang = voiceOptions.detectedLanguage as SarvamLangCode;
-  } else if (detectedLang === 'hinglish') {
-    userLang = 'hinglish';
   } else if (detectedLang !== 'en-IN') {
     // Native Indic script (Devanagari, Bengali, etc.)
     userLang = detectedLang;
   } else {
-    // English detected — switch to English
+    // English detected—switch to English
     userLang = 'en-IN';
   }
 

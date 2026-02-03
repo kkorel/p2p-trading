@@ -1,6 +1,6 @@
 /**
  * Trading Agent — Creates offers and reports earnings/listings for sellers.
- * Supports language-aware responses (English / Hinglish).
+ * Supports language-aware responses (English / Hindi).
  */
 
 import { prisma, createLogger, publishOfferToCDS, isExternalCDSEnabled, config, snapTimeWindow, checkTradeWindow, validateQuantity, roundQuantity, checkBuyerCapacity } from '@p2p/shared';
@@ -11,7 +11,21 @@ const logger = createLogger('TradingAgent');
 
 type LangOption = string | undefined;
 function ht(lang: LangOption, en: string, hi: string): string {
-  return lang === 'hinglish' ? hi : en;
+  return lang === 'hi-IN' ? hi : en;
+}
+
+// Translate order status to user-friendly text
+function translateStatus(status: string, lang?: string): string {
+  const statusMap: Record<string, { en: string; hi: string }> = {
+    'PENDING': { en: '⏳ Pending', hi: '⏳ रुका हुआ' },
+    'CONFIRMED': { en: '✅ Confirmed', hi: '✅ पक्का' },
+    'COMPLETED': { en: '✅ Delivered', hi: '✅ मिल गया' },
+    'CANCELLED': { en: '❌ Cancelled', hi: '❌ रद्द' },
+    'ACTIVE': { en: '🔵 Active', hi: '🔵 चालू' },
+    'FAILED': { en: '❌ Failed', hi: '❌ असफल' },
+  };
+  const entry = statusMap[status] || { en: status, hi: status };
+  return lang === 'hi-IN' ? entry.hi : entry.en;
 }
 
 export const mockTradingAgent = {
@@ -299,7 +313,7 @@ export const mockTradingAgent = {
       if (orders.length > 0) {
         const lines = orders.map(
           (o, i) =>
-            `${i + 1}. ${o.totalQty || 0} kWh — Rs ${(o.totalPrice || 0).toFixed(2)} — ${o.status}`
+            `${i + 1}. ${o.totalQty || 0} kWh — Rs ${(o.totalPrice || 0).toFixed(2)} — ${translateStatus(o.status, lang)}`
         );
         return ht(lang,
           `Your recent orders (as seller):\n${lines.join('\n')}`,
@@ -319,7 +333,7 @@ export const mockTradingAgent = {
     if (buyerOrders.length > 0) {
       const lines = buyerOrders.map(
         (o, i) =>
-          `${i + 1}. ${o.totalQty || 0} kWh — Rs ${(o.totalPrice || 0).toFixed(2)} — ${o.status}`
+          `${i + 1}. ${o.totalQty || 0} kWh — Rs ${(o.totalPrice || 0).toFixed(2)} — ${translateStatus(o.status, lang)}`
       );
       return ht(lang,
         `Your recent orders (as buyer):\n${lines.join('\n')}`,
@@ -1278,7 +1292,7 @@ function getTrustTier(score: number): { name: string; emoji: string } {
  * Now with personalized recommendations based on user state.
  */
 export async function getMarketInsights(lang?: string, userId?: string): Promise<string> {
-  const ht = (en: string, hi: string) => lang === 'hinglish' ? hi : en;
+  const ht = (en: string, hi: string) => lang === 'hi-IN' ? hi : en;
   
   // Get user data for personalization if available
   let userData: {
@@ -1501,7 +1515,7 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
  * Perfect for "track orders and earnings" requests.
  */
 export async function getActivitySummary(userId: string, lang?: string): Promise<string> {
-  const ht = (en: string, hi: string) => lang === 'hinglish' ? hi : en;
+  const ht = (en: string, hi: string) => lang === 'hi-IN' ? hi : en;
   
   // Get user balance and provider info
   const user = await prisma.user.findUnique({
@@ -1629,7 +1643,7 @@ export interface TopDeal {
 }
 
 export async function getTopDeals(limit: number = 3, lang?: string): Promise<{ deals: TopDeal[], message: string }> {
-  const ht = (en: string, hi: string) => lang === 'hinglish' ? hi : en;
+  const ht = (en: string, hi: string) => lang === 'hi-IN' ? hi : en;
   const DISCOM_RATE = 7.5; // Peak DISCOM rate for comparison
   
   // Get best available offers

@@ -385,7 +385,7 @@ async function handleDocumentMessage(
   const isJson = mimeType.includes('json') || fileName.toLowerCase().endsWith('.json');
 
   if (!isPdf && !isJson) {
-    await sendWhatsAppMessage(chatId, 'Please upload a PDF or JSON credential file.');
+    await sendWhatsAppMessage(chatId, 'Please upload your ID document (PDF or JSON file from your electricity company).');
     return;
   }
 

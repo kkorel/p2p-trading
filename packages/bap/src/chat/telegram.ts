@@ -93,7 +93,7 @@ export async function startTelegramBot(): Promise<void> {
         const isJson = mimeType.includes('json') || fileName.toLowerCase().endsWith('.json');
 
         if (!isPdf && !isJson) {
-          await ctx.reply('Please upload a PDF or JSON credential file.');
+          await ctx.reply('Please upload your ID document (PDF or JSON file from your electricity company).');
           return;
         }
 
