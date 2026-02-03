@@ -1469,11 +1469,40 @@ router.post('/api/select', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Either offer_id or autoMatch with requestedTimeWindow is required' });
   }
   
+  // Resolve item ID for use in message and attribute lookup
+  const resolvedItemId = selectedItemId || item_id || selectedOffer.item_id;
+
+  // Look up item attributes from catalog for Beckn orderItemAttributes
+  let itemMeterId: string | undefined;
+  if (txState.catalog) {
+    for (const providerCatalog of txState.catalog.providers) {
+      for (const catalogItem of providerCatalog.items) {
+        if (catalogItem.id === resolvedItemId) {
+          itemMeterId = catalogItem.itemAttributes?.meterId;
+          break;
+        }
+      }
+      if (itemMeterId) break;
+    }
+  }
+
+  // Look up provider's utility customer info from DB
+  let utilityCustomerId: string | undefined;
+  try {
+    const providerRecord = await prisma.provider.findUnique({
+      where: { id: selectedOffer.provider_id },
+      include: { user: true },
+    });
+    utilityCustomerId = providerRecord?.user?.consumerNumber || undefined;
+  } catch (e) {
+    // Non-critical — proceed without utilityCustomerId
+  }
+
   // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
   const targetBppUri = selectedOffer.bpp_uri || config.bpp.uri;
   const targetBppId = selectedOffer.bpp_id || selectedOffer.provider_id;
   const isExternalBpp = !!selectedOffer.bpp_uri && selectedOffer.bpp_uri !== config.bpp.uri;
-  
+
   // Create context with correct BPP info
   const context = createContext({
     action: 'select',
@@ -1483,15 +1512,22 @@ router.post('/api/select', async (req: Request, res: Response) => {
     bpp_id: targetBppId,
     bpp_uri: targetBppUri,
   });
-  
-  // Build select message
+
+  // Build select message with Beckn orderItemAttributes (providerAttributes)
   const selectMessage: SelectMessage = {
     context,
     message: {
       orderItems: [{
-        item_id: selectedItemId || item_id || selectedOffer.item_id,
+        item_id: resolvedItemId,
         offer_id: selectedOffer.id,
         quantity,
+        'beckn:orderItemAttributes': {
+          providerAttributes: {
+            meterId: itemMeterId,
+            utilityCustomerId,
+            userType: 'prosumer',
+          },
+        },
       }],
     },
   };
