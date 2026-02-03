@@ -3,7 +3,7 @@
  * Uses Prisma ORM for PostgreSQL persistence
  */
 
-import { prisma, connectPrisma, disconnectPrisma, clearAllTransactionStates } from '@p2p/shared';
+import { prisma, connectPrisma, disconnectPrisma, clearAllTransactionStates, disconnectRedis } from '@p2p/shared';
 import { generateSeedData } from '@p2p/shared';
 
 async function seed() {
@@ -96,6 +96,13 @@ async function seed() {
   }
 
   await disconnectPrisma();
+  
+  // Disconnect Redis to allow process to exit cleanly
+  try {
+    await disconnectRedis();
+  } catch (error) {
+    // Ignore - Redis may not have been connected
+  }
 
   const totalBlocks = SEED_DATA.offers.reduce((sum, o) => sum + o.max_qty, 0);
   console.log('\n🎉 Prosumer database seeding complete!');
@@ -105,7 +112,11 @@ async function seed() {
   console.log(`   - ${totalBlocks} total blocks`);
 }
 
-seed().catch(err => {
-  console.error('Seed failed:', err);
-  process.exit(1);
-});
+seed()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  });

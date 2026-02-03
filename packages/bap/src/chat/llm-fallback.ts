@@ -43,7 +43,8 @@ Important:
 
 export interface ClassifiedIntent {
   intent: 'show_listings' | 'show_earnings' | 'show_balance' | 'show_orders' | 'show_sales'
-    | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'general_qa';
+    | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'market_insights'
+    | 'show_dashboard' | 'track_activity' | 'change_language' | 'general_qa';
   params?: {
     price_per_kwh?: number;
     quantity_kwh?: number;
@@ -63,8 +64,12 @@ Intents:
 - "show_sales": User asks about sales for a time period (e.g. "aaj kitna becha", "sold today", "is hafte ki bikri")
 - "create_listing": User wants to CREATE/SELL a new energy listing/offer (e.g. "50 kWh Rs 6 pe daal do", "listing daalni hai", "naya offer banao", "sell 30 units at 7 rupees tomorrow")
 - "buy_energy": User wants to BUY/PURCHASE energy or find the best deal (e.g. "buy 20 kWh", "energy khareedni hai", "bijli chahiye", "I want to buy energy", "mujhe 30 unit chahiye", "purchase solar energy", "find best deal", "find me the best deal", "sabse accha deal", "best offer dikhao")
+- "market_insights": User asks about market conditions, prices, available offers, trends (e.g. "market insights", "market kaisa hai", "current prices", "what's the market like", "available energy", "show market", "market update", "price trends")
+- "show_dashboard": User wants to see their dashboard or overall status (e.g. "show dashboard", "my dashboard", "mera dashboard", "overview", "my status")
+- "track_activity": User wants to track BOTH orders AND earnings together (e.g. "track orders and earnings", "track activity", "my activity", "meri activity", "status dekho", "show status", "kya chal raha hai", "activity summary")
 - "discom_rates": User asks about DISCOM/electricity rates or tariffs
 - "trading_tips": User asks for tips on how to earn more or improve trading
+- "change_language": User wants to change/switch their chat language (e.g. "change to Hindi", "switch language", "Tamil mein baat karo", "bhasha badlo", "I want to talk in Bengali")
 - "general_qa": General question about energy trading, Oorja, solar, etc.
 
 IMPORTANT: If the user says they want to "place", "create", "add", "daal", "bana", "list" something — that's "create_listing", NOT "show_listings" or "show_orders".
@@ -211,6 +216,74 @@ RESPONSE STYLE:
 IMPORTANT: If the data context says the user is "already onboarded" or has "verified credentials", NEVER ask them to upload, provide, or submit any credentials or documents. They have already completed this step. Focus on helping them with trading, earnings, listings, and other platform features instead.`;
 
 /**
+ * Extract a person's name from natural speech using LLM.
+ * Handles casual responses like "Uh, Jack, what's yours?" → "Jack"
+ * Returns null if LLM unavailable or fails.
+ */
+export async function extractNameWithLLM(userMessage: string): Promise<string | null> {
+  if (!OPENROUTER_API_KEY) return null;
+
+  const NAME_EXTRACT_PROMPT = `Extract the person's NAME from this message. The user was asked "What is your name?" and responded with this message.
+
+Rules:
+- Return ONLY the name, nothing else
+- Remove filler words (uh, um, well, etc.)
+- Remove questions they ask back (like "what's yours?", "and you?")
+- If they say "My name is X" or "I'm X" or "Call me X", extract X
+- If they just say a name like "Jack" or "Priya", return that
+- Handle Hindi/Hinglish: "Mera naam Raj hai" → "Raj"
+- If you cannot find a clear name, return "UNCLEAR"
+
+Examples:
+- "Uh, Jack, what's yours?" → "Jack"
+- "My name is Priya" → "Priya"
+- "I'm John, nice to meet you" → "John"
+- "Mera naam Raj hai" → "Raj"
+- "Call me Sam" → "Sam"
+- "Jack" → "Jack"
+- "Hello there" → "UNCLEAR"
+
+User's message: "${userMessage}"
+
+Return ONLY the extracted name (one or two words max) or "UNCLEAR":`;
+
+  try {
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
+      {
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'user', content: NAME_EXTRACT_PROMPT },
+        ],
+        temperature: 0.1,
+        max_tokens: 20,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://p2p-energy-trading.local',
+          'X-Title': 'Oorja Name Extractor',
+        },
+        timeout: 5000,
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content?.trim();
+    if (reply && reply !== 'UNCLEAR' && reply.length >= 2 && reply.length <= 50) {
+      // Clean up any quotes or extra punctuation
+      const cleaned = reply.replace(/^["']|["']$/g, '').trim();
+      logger.debug(`Name extracted: "${userMessage.substring(0, 30)}..." → "${cleaned}"`);
+      return cleaned;
+    }
+    return null;
+  } catch (error: any) {
+    logger.warn(`Name extraction failed: ${error.message}`);
+    return null;
+  }
+}
+
+/**
  * Compose a natural, conversational response using LLM.
  * Takes the user's message, relevant data, and user context.
  * Returns null if LLM unavailable or fails.
@@ -232,7 +305,7 @@ export async function composeResponse(
   if (language === 'hinglish') {
     langInstruction = 'Reply in Hinglish (Roman Hindi script, NOT Devanagari).';
   } else if (language && LANG_NAMES[language]) {
-    langInstruction = `Reply in simple English. The user understands ${LANG_NAMES[language]}, so use simple words.`;
+    langInstruction = `Reply in ${LANG_NAMES[language]} using the native script. Keep it simple and conversational.`;
   } else {
     langInstruction = 'Reply in simple English.';
   }

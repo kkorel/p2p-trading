@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Bot, User } from 'lucide-react';
+import { useEffect, useRef, useMemo } from 'react';
+import { Bot, User, Check } from 'lucide-react';
 import type { ChatMessageData } from '@/hooks/use-chat-engine';
+import { InlineSpeakerButton } from './speaker-button';
 
 export type { ChatMessageData };
 
@@ -10,14 +11,44 @@ interface MessageListProps {
   messages: ChatMessageData[];
   onButtonClick?: (callbackData: string, displayText: string) => void;
   isLoading?: boolean;
+  /** Language code for TTS (e.g., 'hi-IN', 'en-IN'). Defaults to 'en-IN' */
+  responseLanguage?: string;
+  /** Whether to show speaker buttons on agent messages */
+  showSpeaker?: boolean;
 }
 
-export function MessageList({ messages, onButtonClick, isLoading }: MessageListProps) {
+/** Check if a button is a voice preference button */
+function isVoicePrefButton(callbackData?: string): boolean {
+  return callbackData === 'voice_pref:yes' || callbackData === 'voice_pref:no';
+}
+
+export function MessageList({ 
+  messages, 
+  onButtonClick, 
+  isLoading,
+  responseLanguage = 'en-IN',
+  showSpeaker = true,
+}: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+  
+  // Find which voice preference was selected (if any) by looking at user messages
+  const selectedVoicePref = useMemo(() => {
+    for (const msg of messages) {
+      if (msg.role === 'user') {
+        if (msg.content.includes('Yes, speak') || msg.content.includes('Haan, bolo')) {
+          return 'voice_pref:yes';
+        }
+        if (msg.content.includes('No, text only') || msg.content.includes('Nahi, sirf text')) {
+          return 'voice_pref:no';
+        }
+      }
+    }
+    return null;
+  }, [messages]);
 
   return (
     <div className="flex flex-col gap-2 p-3">
@@ -38,27 +69,64 @@ export function MessageList({ messages, onButtonClick, isLoading }: MessageListP
           {/* Bubble */}
           <div className="max-w-[80%] flex flex-col gap-1.5">
             <div
-              className={`px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+              className={`relative px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'agent'
                   ? 'bg-gray-100 text-gray-900 rounded-2xl rounded-bl-md'
                   : 'bg-teal-600 text-white rounded-2xl rounded-br-md'
               }`}
             >
               {msg.content}
+              
+              {/* Speaker button for agent messages */}
+              {msg.role === 'agent' && showSpeaker && msg.content.length > 0 && (
+                <span className="inline-block ml-1.5 align-middle">
+                  <InlineSpeakerButton
+                    text={msg.content}
+                    languageCode={responseLanguage}
+                  />
+                </span>
+              )}
             </div>
 
             {/* Inline buttons */}
             {msg.role === 'agent' && msg.buttons && msg.buttons.length > 0 && (
               <div className="flex flex-wrap gap-1.5 ml-1">
-                {msg.buttons.map((btn, j) => (
-                  <button
-                    key={j}
-                    onClick={() => onButtonClick?.(btn.callbackData || btn.text, btn.text)}
-                    className="px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-full hover:bg-teal-100 transition-colors"
-                  >
-                    {btn.text}
-                  </button>
-                ))}
+                {msg.buttons.map((btn, j) => {
+                  const isVoiceBtn = isVoicePrefButton(btn.callbackData);
+                  const isSelected = isVoiceBtn && btn.callbackData === selectedVoicePref;
+                  const isVoiceDisabled = isVoiceBtn && selectedVoicePref !== null;
+                  
+                  if (isVoiceBtn) {
+                    // Voice preference buttons - show locked state with selection indicator
+                    return (
+                      <div
+                        key={j}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                          isSelected
+                            ? 'bg-teal-600 text-white'
+                            : isVoiceDisabled
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'text-teal-700 bg-teal-50 border border-teal-200'
+                        }`}
+                        title={isVoiceDisabled ? 'Voice setting now controlled from header' : undefined}
+                      >
+                        {isSelected && <Check size={12} className="shrink-0" />}
+                        {btn.text}
+                      </div>
+                    );
+                  }
+                  
+                  // Regular buttons
+                  return (
+                    <button
+                      key={j}
+                      onClick={() => onButtonClick?.(btn.callbackData || btn.text, btn.text)}
+                      className="px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-full hover:bg-teal-100 transition-colors"
+                    >
+                      {btn.text}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

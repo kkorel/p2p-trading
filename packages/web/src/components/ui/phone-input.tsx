@@ -135,6 +135,13 @@ export function PhoneInput({
         )}
       </div>
 
+      {/* Dial code display */}
+      <div className="h-[44px] px-2 flex items-center bg-[var(--color-surface)] border-y border-[var(--color-border)]">
+        <span className="text-sm text-[var(--color-text-muted)] select-none whitespace-nowrap">
+          {selectedCountry.dialCode}
+        </span>
+      </div>
+      
       {/* Phone input */}
       <input
         type="tel"
@@ -143,7 +150,7 @@ export function PhoneInput({
         onBlur={onBlur}
         placeholder={placeholder}
         disabled={disabled}
-        className="flex-1 h-[44px] px-3 rounded-r-[12px] bg-[var(--color-surface)] border border-[var(--color-border)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent disabled:opacity-50"
+        className="flex-1 h-[44px] px-3 rounded-r-[12px] bg-[var(--color-surface)] border border-l-0 border-[var(--color-border)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent disabled:opacity-50"
       />
     </div>
   );

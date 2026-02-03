@@ -42,6 +42,12 @@ import {
   roundQuantity,
   snapTimeWindow,
   checkTradeWindow,
+  // Beckn v2 wire-format parsers/builders
+  parseWireSelectMessage,
+  parseWireConfirmMessage,
+  parseWireStatusMessage,
+  buildWireResponseOrder,
+  buildWireOrder,
 } from '@p2p/shared';
 import {
   getOfferById,
@@ -85,6 +91,36 @@ import { getTransaction } from './state';
 
 const router = Router();
 const logger = createLogger('BPP');
+
+/**
+ * Helper: Look up provider's user utility info for CDS publishing
+ */
+async function getProviderUtilityInfo(providerId: string): Promise<{ utilityId: string; utilityCustomerId: string }> {
+  try {
+    const user = await prisma.user.findFirst({
+      where: { providerId },
+      select: { consumerNumber: true, meterNumber: true },
+    });
+    return {
+      utilityId: config.utility.id,
+      utilityCustomerId: user?.consumerNumber || 'UNKNOWN',
+    };
+  } catch {
+    return { utilityId: config.utility.id, utilityCustomerId: 'UNKNOWN' };
+  }
+}
+
+/**
+ * Helper: Enrich a SyncItem array with utility info from DB
+ */
+async function enrichSyncItems(items: Array<{ id: string; provider_id: string; source_type: string; delivery_mode: string; available_qty: number; production_windows: any[]; meter_id: string }>, providerId: string) {
+  const utilityInfo = await getProviderUtilityInfo(providerId);
+  return items.map(item => ({
+    ...item,
+    utility_id: utilityInfo.utilityId,
+    utility_customer_id: utilityInfo.utilityCustomerId,
+  }));
+}
 
 /**
  * Helper: Get buyer ID from transaction state
@@ -139,6 +175,10 @@ router.post('/select', async (req: Request, res: Response) => {
   // Log inbound event
   await logEvent(context.transaction_id, context.message_id, 'select', 'INBOUND', JSON.stringify(message));
 
+  // Parse both Beckn v2 wire format and internal format
+  const parsed = parseWireSelectMessage(content);
+  const wireOrder = (content as any).order; // Keep original wire order for response
+
   // Validate offers and quantities
   const validationErrors: string[] = [];
   const orderItems: OrderItem[] = [];
@@ -147,7 +187,7 @@ router.post('/select', async (req: Request, res: Response) => {
   let currency = 'INR';
   let providerId = '';
 
-  for (const item of content.orderItems) {
+  for (const item of parsed.items) {
     const offer = await getOfferById(item.offer_id);
 
     if (!offer) {
@@ -218,19 +258,15 @@ router.post('/select', async (req: Request, res: Response) => {
         totalQuantity,
       };
 
-      const onSelectMessage: OnSelectMessage = {
+      // Build Beckn v2 wire-format response
+      // Echo back the wire order from the request, or build a new one
+      const onSelectWireOrder = wireOrder
+        ? { ...wireOrder, 'beckn:orderStatus': 'CREATED' }
+        : buildWireResponseOrder({ status: 'CREATED' }, null);
+
+      const onSelectMessage = {
         context: callbackContext,
-        message: {
-          order: {
-            id: uuidv4(),
-            items: content.orderItems,
-            quote,
-            provider: {
-              id: providerId,
-              descriptor: provider ? { name: provider.name } : undefined,
-            },
-          },
-        },
+        message: { order: onSelectWireOrder },
       };
 
       await logEvent(context.transaction_id, callbackContext.message_id, 'on_select', 'OUTBOUND', JSON.stringify(onSelectMessage));
@@ -253,8 +289,11 @@ router.post('/select', async (req: Request, res: Response) => {
  * POST /init - Initialize order (create draft)
  */
 router.post('/init', async (req: Request, res: Response) => {
-  const message = req.body as InitMessage;
+  const message = req.body as any; // Accept both Beckn v2 and internal format
   const { context, message: content } = message;
+  // Parse wire format to get items in internal format
+  const parsedInit = parseWireSelectMessage(content);
+  const wireInitOrder = content.order; // Keep for response echoing
 
   logger.info('Received init request', {
     transaction_id: context.transaction_id,
@@ -335,8 +374,9 @@ router.post('/init', async (req: Request, res: Response) => {
       // Get buyer ID from transaction state
       const { getTransactionState, updateTransactionState } = await import('@p2p/shared');
       const txState = await getTransactionState(context.transaction_id);
-      const buyerId = txState?.buyerId || null;
-      const isBulkMode = txState?.bulkMode && content.order.items.length > 1;
+      const buyerId = txState?.buyerId || parsedInit.buyerId || null;
+      const initItems = parsedInit.items;
+      const isBulkMode = txState?.bulkMode && initItems.length > 1;
 
       // Check buyer trust score - advisory warning if below 20% (no longer blocks)
       if (buyerId) {
@@ -367,17 +407,17 @@ router.post('/init', async (req: Request, res: Response) => {
 
       // ==================== BULK MODE: Create separate orders ====================
       if (isBulkMode) {
-        logger.info(`Bulk mode: Creating ${content.order.items.length} separate orders`, {
+        logger.info(`Bulk mode: Creating ${initItems.length} separate orders`, {
           transaction_id: context.transaction_id,
-          itemCount: content.order.items.length,
+          itemCount: initItems.length,
         });
 
-        const bulkGroupId = context.transaction_id; // Use transaction_id as group identifier
+        const bulkGroupId = context.transaction_id;
         const createdOrders: any[] = [];
         const failedItems: Array<{ offer_id: string; reason: string }> = [];
 
-        for (let i = 0; i < content.order.items.length; i++) {
-          const item = content.order.items[i];
+        for (let i = 0; i < initItems.length; i++) {
+          const item = initItems[i];
           const subTransactionId = `${context.transaction_id}_${i}`;
 
           try {
@@ -507,7 +547,7 @@ router.post('/init', async (req: Request, res: Response) => {
             context: errorCallbackContext,
             error: {
               code: 'BULK_ORDER_FAILED',
-              message: `All ${content.order.items.length} items failed to process`,
+              message: `All ${initItems.length} items failed to process`,
               failedItems,
             },
           };
@@ -524,12 +564,12 @@ router.post('/init', async (req: Request, res: Response) => {
       let totalPrice = 0;
       let totalQuantity = 0;
       let currency = 'INR';
-      let providerId = content.order.provider.id;
+      let providerId = parsedInit.sellerId || content.order?.provider?.id || '';
       let selectedOfferId = '';
       let isExternalOffer = false;
 
       // First pass: calculate prices and validate offers exist
-      for (const item of content.order.items) {
+      for (const item of initItems) {
         // Try to get offer from local database first
         const localOffer = await getOfferById(item.offer_id);
 
@@ -678,9 +718,14 @@ router.post('/init', async (req: Request, res: Response) => {
       const finalOrder = await updateOrderStatus(order.id, 'PENDING') || order;
 
       const callbackContext = createCallbackContext(context, 'on_init');
-      const onInitMessage: OnInitMessage = {
+      // Build wire-format response: echo the incoming order with assigned ID
+      const onInitWireOrder = wireInitOrder
+        ? { ...wireInitOrder, 'beckn:id': finalOrder.id, 'beckn:orderStatus': 'CREATED' }
+        : buildWireResponseOrder(finalOrder, null, finalOrder.id);
+
+      const onInitMessage = {
         context: callbackContext,
-        message: { order: finalOrder },
+        message: { order: onInitWireOrder, _internalOrder: finalOrder },
       };
 
       await logEvent(context.transaction_id, callbackContext.message_id, 'on_init', 'OUTBOUND', JSON.stringify(onInitMessage));
@@ -720,13 +765,16 @@ router.post('/confirm', async (req: Request, res: Response) => {
 
   await logEvent(context.transaction_id, context.message_id, 'confirm', 'INBOUND', JSON.stringify(message));
 
+  // Parse wire format (supports both beckn:id and internal id)
+  const confirmOrderId = parseWireConfirmMessage(content);
+
   // Get existing order
-  let order = await getOrderById(content.order.id) || await getOrderByTransactionId(context.transaction_id);
+  let order = await getOrderById(confirmOrderId) || await getOrderByTransactionId(context.transaction_id);
 
   if (!order) {
     return res.json(createNack(context, {
       code: ErrorCodes.ORDER_NOT_FOUND,
-      message: `Order ${content.order.id} not found`,
+      message: `Order ${confirmOrderId} not found`,
     }));
   }
 
@@ -806,15 +854,16 @@ router.post('/confirm', async (req: Request, res: Response) => {
                   const allOffers = await getProviderOffers(sellerProviderId);
                   
                   // Convert to sync format with UPDATED availableQuantity from database
-                  const syncItems = allItems.map(item => ({
+                  const rawSyncItems = allItems.map(item => ({
                     id: item.id,
                     provider_id: item.provider_id,
                     source_type: item.source_type,
                     delivery_mode: item.delivery_mode,
-                    available_qty: item.available_qty, // This is the updated quantity from database
+                    available_qty: item.available_qty,
                     production_windows: item.production_windows,
                     meter_id: item.meter_id,
                   }));
+                  const syncItems = await enrichSyncItems(rawSyncItems, sellerProviderId);
                   
                   // For offers, use the available block count as the actual available quantity
                   const syncOffers = await Promise.all(allOffers.map(async (offer) => {
@@ -923,9 +972,19 @@ router.post('/confirm', async (req: Request, res: Response) => {
       }); // End withOrderLock
 
       const callbackContext = createCallbackContext(context, 'on_confirm');
-      const onConfirmMessage: OnConfirmMessage = {
+
+      // Build Beckn v2 wire-format response with order ID
+      const wireResponseOrder = buildWireResponseOrder(
+        order!,
+        (content as any).order || null,  // Echo back request order if present
+        order!.id,
+      );
+      const onConfirmMessage = {
         context: callbackContext,
-        message: { order: order! },
+        message: {
+          order: wireResponseOrder,
+          _internalOrder: order!, // Include internal order for BAP callbacks
+        },
       };
 
       await logEvent(context.transaction_id, callbackContext.message_id, 'on_confirm', 'OUTBOUND', JSON.stringify(onConfirmMessage));
@@ -963,8 +1022,11 @@ router.post('/status', async (req: Request, res: Response) => {
 
   await logEvent(context.transaction_id, context.message_id, 'status', 'INBOUND', JSON.stringify(message));
 
+  // Parse wire format (supports both beckn:id and internal order_id)
+  const statusOrderId = parseWireStatusMessage(content);
+
   // Get order
-  const order = await getOrderById(content.order_id) || await getOrderByTransactionId(context.transaction_id);
+  const order = await getOrderById(statusOrderId) || await getOrderByTransactionId(context.transaction_id);
 
   if (!order) {
     return res.json(createNack(context, {
@@ -979,13 +1041,26 @@ router.post('/status', async (req: Request, res: Response) => {
     try {
       const callbackContext = createCallbackContext(context, 'on_status');
 
-      // Stubbed fulfillment for Phase-1
-      const onStatusMessage: OnStatusMessage = {
+      // Build Beckn v2 wire-format response with fulfillment data
+      const wireResponseOrder = buildWireResponseOrder(order, null, order.id);
+      // Add fulfillment to the wire order
+      wireResponseOrder['beckn:fulfillment'] = {
+        '@type': 'beckn:Fulfillment',
+        'beckn:id': uuidv4(),
+        'beckn:type': 'ENERGY_DELIVERY',
+        'beckn:state': {
+          code: order.status === 'ACTIVE' ? 'IN_PROGRESS' : 'PENDING',
+          name: order.status === 'ACTIVE' ? 'Energy delivery in progress' : 'Awaiting confirmation',
+        },
+      };
+
+      const onStatusMessage = {
         context: callbackContext,
         message: {
-          order,
+          order: wireResponseOrder,
+          _internalOrder: order, // Include internal order for BAP callbacks
           fulfillment: {
-            id: uuidv4(),
+            id: wireResponseOrder['beckn:fulfillment']['beckn:id'],
             type: 'ENERGY_DELIVERY',
             state: {
               descriptor: {
@@ -1123,7 +1198,7 @@ router.post('/cancel', async (req: Request, res: Response) => {
               const allOffers = await getProviderOffers(sellerProviderId);
               
               // Convert to sync format with updated availability
-              const syncItems = allItems.map(item => ({
+              const rawCancelSyncItems = allItems.map(item => ({
                 id: item.id,
                 provider_id: item.provider_id,
                 source_type: item.source_type,
@@ -1132,7 +1207,8 @@ router.post('/cancel', async (req: Request, res: Response) => {
                 production_windows: item.production_windows,
                 meter_id: item.meter_id,
               }));
-              
+              const cancelSyncItems = await enrichSyncItems(rawCancelSyncItems, sellerProviderId);
+
               // For offers, use the available block count
               const syncOffers = await Promise.all(allOffers.map(async (offer) => {
                 const availableBlocks = await getAvailableBlockCount(offer.id);
@@ -1148,16 +1224,16 @@ router.post('/cancel', async (req: Request, res: Response) => {
                   settlement_type: offer.offerAttributes.settlementType,
                 };
               }));
-              
+
               const activeOffers = syncOffers.filter(o => o.max_qty > 0);
-              
+
               await publishCatalogToCDS(
                 { id: sellerProviderId, name: providerName },
-                syncItems,
+                cancelSyncItems,
                 activeOffers,
                 activeOffers.length > 0
               );
-              
+
               logger.info(`Catalog republished to CDS after order cancellation`, {
                 providerId: sellerProviderId,
                 releasedBlocks: releasedCount,
@@ -1674,6 +1750,7 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
 
   // Publish to CDS using proper Beckn catalog_publish format (non-blocking)
   if (itemInfo) {
+    const utilityInfo = await getProviderUtilityInfo(provider_id);
     publishOfferToCDS(
       {
         id: provider_id,
@@ -1688,6 +1765,8 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
         available_qty: itemInfo.available_qty,
         production_windows: itemInfo.production_windows,
         meter_id: itemInfo.meter_id,
+        utility_id: utilityInfo.utilityId,
+        utility_customer_id: utilityInfo.utilityCustomerId,
       },
       {
         id: offer.id,
@@ -1851,6 +1930,7 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
   });
   
   if (cdsEnabled) {
+    const directUtilityInfo = await getProviderUtilityInfo(provider_id);
     publishOfferToCDS(
       {
         id: provider_id,
@@ -1865,6 +1945,8 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
         available_qty: item.available_qty,
         production_windows: item.production_windows,
         meter_id: item.meter_id,
+        utility_id: directUtilityInfo.utilityId,
+        utility_customer_id: directUtilityInfo.utilityCustomerId,
       },
       {
         id: offer.id,
@@ -1947,7 +2029,7 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
         const offers = await getProviderOffers(provider_id);
         
         // Convert to sync format
-        const syncItems = items.map(item => ({
+        const rawDelSyncItems = items.map(item => ({
           id: item.id,
           provider_id: item.provider_id,
           source_type: item.source_type,
@@ -1956,7 +2038,8 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
           production_windows: item.production_windows,
           meter_id: item.meter_id,
         }));
-        
+        const delSyncItems = await enrichSyncItems(rawDelSyncItems, provider_id);
+
         const syncOffers = offers.map(offer => ({
           id: offer.id,
           item_id: offer.item_id,
@@ -1968,14 +2051,14 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
           pricing_model: offer.offerAttributes.pricingModel,
           settlement_type: offer.offerAttributes.settlementType,
         }));
-        
+
         // If no offers remain, revoke the catalog (set isActive: false)
         // Otherwise republish with remaining offers
         const isActive = syncOffers.length > 0;
-        
+
         await publishCatalogToCDS(
           { id: provider_id, name: providerName },
-          syncItems,
+          delSyncItems,
           syncOffers,
           isActive
         );
@@ -2248,7 +2331,7 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
         const allItems = await getProviderItems(providerId);
         const allOffers = await getProviderOffers(providerId);
 
-        const syncItems = allItems.map(item => ({
+        const rawSellerCancelSyncItems = allItems.map(item => ({
           id: item.id,
           provider_id: item.provider_id,
           source_type: item.source_type,
@@ -2257,6 +2340,7 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
           production_windows: item.production_windows,
           meter_id: item.meter_id,
         }));
+        const sellerCancelSyncItems = await enrichSyncItems(rawSellerCancelSyncItems, providerId);
 
         const syncOffers = await Promise.all(allOffers.map(async (offer) => {
           const availableBlocks = await getAvailableBlockCount(offer.id);
@@ -2277,7 +2361,7 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
 
         await publishCatalogToCDS(
           { id: providerId, name: providerName },
-          syncItems,
+          sellerCancelSyncItems,
           activeOffers,
           activeOffers.length > 0
         );
@@ -2357,6 +2441,7 @@ router.post('/seller/cds-test-publish', authMiddleware, async (req: Request, res
   };
   
   try {
+    const testUtilityInfo = await getProviderUtilityInfo(provider_id);
     const success = await publishOfferToCDS(
       {
         id: provider_id,
@@ -2371,6 +2456,8 @@ router.post('/seller/cds-test-publish', authMiddleware, async (req: Request, res
         available_qty: 10,
         production_windows: [testTimeWindow],
         meter_id: `der://meter/test-${Date.now()}`,
+        utility_id: testUtilityInfo.utilityId,
+        utility_customer_id: testUtilityInfo.utilityCustomerId,
       },
       {
         id: testOfferId,

@@ -82,3 +82,20 @@ export {
   cors,
   rateLimit,
 } from './security-middleware';
+
+// Beckn v2 wire-format builders/parsers
+export {
+  buildWireOrder,
+  buildWireStatusOrder,
+  buildWireResponseOrder,
+  parseWireSelectMessage,
+  parseWireStatusMessage,
+  parseWireConfirmMessage,
+  parseWireOrderResponse,
+} from './wire-format';
+export type {
+  WireOrder,
+  WireOrderItem,
+  BuildSelectOrderOptions,
+  ParsedSelectItems,
+} from './wire-format';

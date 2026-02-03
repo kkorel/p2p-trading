@@ -9,8 +9,9 @@ export const BECKN_DOMAIN =
 export const BECKN_VERSION = '2.0.0';
 
 // Schema context required for Beckn v2.0 - Array of JSON-LD schema URLs
+// Updated to EnergyTrade v0.3 per Postman spec
 export const BECKN_SCHEMA_CONTEXT: string[] = [
-  'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/p2p-trading/schema/EnergyResource/v0.2/context.jsonld'
+  'https://raw.githubusercontent.com/beckn/protocol-specifications-v2/refs/heads/p2p-trading/schema/EnergyTrade/v0.3/context.jsonld'
 ];
 
 // Location for Beckn context (required by external CDS)
@@ -62,7 +63,8 @@ export type BecknAction =
   | 'status' 
   | 'on_status'
   | 'cancel'
-  | 'on_cancel';
+  | 'on_cancel'
+  | 'catalog_publish';
 
 // ACK response
 export interface BecknAck {

@@ -245,6 +245,7 @@ export const chatApi = {
       sessionId: string;
       messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
       authToken?: string;
+      voiceOutputEnabled?: boolean;
     }>('/chat/send', {
       method: 'POST',
       body: JSON.stringify({ message, sessionId }),
@@ -259,6 +260,41 @@ export const chatApi = {
     }>('/chat/upload', {
       method: 'POST',
       body: JSON.stringify({ pdfBase64, sessionId, fileName }),
+    }),
+
+  /**
+   * Send voice audio for transcription and agent response
+   */
+  voice: (audio: string, mimeType: string, sessionId?: string) =>
+    request<{
+      success: boolean;
+      sessionId: string;
+      transcript: string;
+      language: string;
+      languageName: string;
+      processingTimeMs: number;
+      messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
+      authToken?: string;
+      responseLanguage?: string;
+      voiceOutputEnabled?: boolean;
+    }>('/chat/voice', {
+      method: 'POST',
+      body: JSON.stringify({ audio, mimeType, sessionId }),
+    }),
+
+  /**
+   * Convert text to speech using Sarvam Bulbul model
+   */
+  tts: (text: string, languageCode: string, speaker?: string, pace?: number) =>
+    request<{
+      success: boolean;
+      audio: string; // base64 WAV
+      mimeType: string;
+      durationMs: number;
+      languageCode: string;
+    }>('/chat/tts', {
+      method: 'POST',
+      body: JSON.stringify({ text, languageCode, speaker, pace }),
     }),
 
   getHistory: (sessionId?: string) =>

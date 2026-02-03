@@ -1140,3 +1140,563 @@ export async function getWelcomeBackData(userId: string): Promise<string> {
 
   return parts.join('\n');
 }
+
+/**
+ * Generate a text-based trading dashboard with key metrics.
+ */
+export async function generateDashboard(userId: string, lang?: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      name: true,
+      balance: true,
+      trustScore: true,
+      allowedTradeLimit: true,
+      providerId: true,
+      productionCapacity: true,
+    },
+  });
+  
+  if (!user) {
+    return ht(lang, 'Dashboard not available.', 'Dashboard available nahi hai.');
+  }
+
+  const trustTier = getTrustTier(user.trustScore);
+  
+  // Seller stats
+  let sellerSection = '';
+  if (user.providerId) {
+    const offers = await prisma.catalogOffer.findMany({
+      where: { providerId: user.providerId },
+      select: { maxQty: true, priceValue: true },
+    });
+    
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const recentOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        createdAt: { gte: weekAgo },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+    
+    const allOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+    
+    const weeklyEarnings = recentOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const weeklyKwh = recentOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+    const totalEarnings = allOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const totalKwh = allOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+    const totalListed = offers.reduce((sum, o) => sum + o.maxQty, 0);
+    
+    sellerSection = ht(lang,
+      `\n📊 *Seller Stats*\n` +
+      `Active Listings: ${offers.length} (${totalListed} kWh)\n` +
+      `This Week: ₹${weeklyEarnings.toFixed(0)} earned, ${weeklyKwh.toFixed(1)} kWh\n` +
+      `All-Time: ₹${totalEarnings.toFixed(0)} earned, ${totalKwh.toFixed(1)} kWh`,
+      
+      `\n📊 *Seller Stats*\n` +
+      `Active Listings: ${offers.length} (${totalListed} kWh)\n` +
+      `Is Hafte: ₹${weeklyEarnings.toFixed(0)} kamai, ${weeklyKwh.toFixed(1)} kWh\n` +
+      `Total: ₹${totalEarnings.toFixed(0)} kamai, ${totalKwh.toFixed(1)} kWh`
+    );
+  }
+  
+  // Buyer stats
+  const buyerOrders = await prisma.order.findMany({
+    where: {
+      buyerId: userId,
+      status: { in: ['ACTIVE', 'COMPLETED'] },
+    },
+    select: { totalPrice: true, totalQty: true },
+  });
+  
+  let buyerSection = '';
+  if (buyerOrders.length > 0) {
+    const totalSpent = buyerOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const totalBoughtKwh = buyerOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+    
+    buyerSection = ht(lang,
+      `\n🔋 *Buyer Stats*\n` +
+      `Orders: ${buyerOrders.length}\n` +
+      `Energy Bought: ${totalBoughtKwh.toFixed(1)} kWh\n` +
+      `Total Spent: ₹${totalSpent.toFixed(0)}`,
+      
+      `\n🔋 *Buyer Stats*\n` +
+      `Orders: ${buyerOrders.length}\n` +
+      `Energy Liya: ${totalBoughtKwh.toFixed(1)} kWh\n` +
+      `Total Kharch: ₹${totalSpent.toFixed(0)}`
+    );
+  }
+  
+  // Build dashboard
+  const dashboard = ht(lang,
+    `📊 *Oorja Dashboard*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `👤 ${user.name || 'Trader'}\n` +
+    `💰 Balance: ₹${user.balance.toFixed(0)}\n` +
+    `🌟 Trust: ${trustTier.name} (${(user.trustScore * 100).toFixed(0)}%)\n` +
+    `📈 Trade Limit: ${user.allowedTradeLimit}%` +
+    sellerSection +
+    buyerSection +
+    `\n\n━━━━━━━━━━━━━━━━━━━━\n` +
+    `Quick Actions: "create listing", "buy energy", "earnings"`,
+    
+    `📊 *Oorja Dashboard*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `👤 ${user.name || 'Trader'}\n` +
+    `💰 Balance: ₹${user.balance.toFixed(0)}\n` +
+    `🌟 Trust: ${trustTier.name} (${(user.trustScore * 100).toFixed(0)}%)\n` +
+    `📈 Trade Limit: ${user.allowedTradeLimit}%` +
+    sellerSection +
+    buyerSection +
+    `\n\n━━━━━━━━━━━━━━━━━━━━\n` +
+    `Quick Actions: "listing banao", "bijli khareedu", "kamai dekho"`
+  );
+  
+  return dashboard;
+}
+
+// Trust tier helper
+function getTrustTier(score: number): { name: string; emoji: string } {
+  if (score >= 0.9) return { name: 'Platinum', emoji: '💎' };
+  if (score >= 0.7) return { name: 'Gold', emoji: '🥇' };
+  if (score >= 0.5) return { name: 'Silver', emoji: '🥈' };
+  if (score >= 0.3) return { name: 'Bronze', emoji: '🥉' };
+  return { name: 'Starter', emoji: '🌱' };
+}
+
+/**
+ * Get market insights - current prices, available offers, and trends.
+ * Now with personalized recommendations based on user state.
+ */
+export async function getMarketInsights(lang?: string, userId?: string): Promise<string> {
+  const ht = (en: string, hi: string) => lang === 'hinglish' ? hi : en;
+  
+  // Get user data for personalization if available
+  let userData: {
+    providerId: string | null;
+    hasGeneration: boolean;
+    hasConsumption: boolean;
+    activeListings: number;
+    userListingPrice?: number;
+  } | null = null;
+  
+  if (userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { providerId: true },
+    });
+    
+    const credentials = await prisma.userCredential.findMany({
+      where: { userId },
+      select: { credentialType: true },
+    });
+    
+    const hasGeneration = credentials.some(c => c.credentialType === 'GENERATION_PROFILE');
+    const hasConsumption = credentials.some(c => c.credentialType === 'CONSUMPTION_PROFILE');
+    
+    let activeListings = 0;
+    let userListingPrice: number | undefined;
+    
+    if (user?.providerId) {
+      const listings = await prisma.catalogOffer.findMany({
+        where: { providerId: user.providerId, maxQty: { gt: 0 } },
+        select: { priceValue: true },
+      });
+      activeListings = listings.length;
+      if (listings.length > 0) {
+        userListingPrice = listings[0].priceValue;
+      }
+    }
+    
+    userData = {
+      providerId: user?.providerId || null,
+      hasGeneration,
+      hasConsumption,
+      activeListings,
+      userListingPrice,
+    };
+  }
+  
+  // Get all active offers with availability
+  const offers = await prisma.catalogOffer.findMany({
+    where: { maxQty: { gt: 0 } },
+    include: {
+      provider: { select: { name: true, trustScore: true } },
+      item: { select: { sourceType: true } },
+    },
+    orderBy: { priceValue: 'asc' },
+  });
+  
+  if (offers.length === 0) {
+    let emptyMessage = ht(
+      `📊 *Market Insights*\n\n` +
+      `No active offers right now.\n\n` +
+      `💡 This is a great time to list your solar energy! You could be the first seller and set competitive prices.\n\n` +
+      `DISCOM rate: ₹7.5/kWh\nRecommended P2P price: ₹4-6/kWh`,
+      
+      `📊 *Market Insights*\n\n` +
+      `Abhi koi active offer nahi hai.\n\n` +
+      `💡 Ye bahut accha time hai apni solar energy list karne ka! Aap pehle seller ho sakte ho.\n\n` +
+      `DISCOM rate: ₹7.5/kWh\nP2P recommended price: ₹4-6/kWh`
+    );
+    
+    // Add personalized suggestion
+    if (userData?.hasGeneration) {
+      emptyMessage += ht(
+        `\n\n🎯 *Personalized for You*\nAs a solar producer, this is the perfect time to list energy. No competition means you can set your own prices!`,
+        `\n\n🎯 *Aapke Liye Suggestion*\nSolar producer ke taur pe, ye perfect time hai list karne ka. Koi competition nahi - apna price set karo!`
+      );
+    }
+    
+    return emptyMessage;
+  }
+  
+  // Calculate stats
+  const prices = offers.map(o => o.priceValue);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+  const totalAvailable = offers.reduce((sum, o) => sum + o.maxQty, 0);
+  
+  // Group by energy type
+  const byType: Record<string, { count: number; qty: number; avgPrice: number }> = {};
+  for (const offer of offers) {
+    const type = offer.item?.sourceType || 'SOLAR';
+    if (!byType[type]) byType[type] = { count: 0, qty: 0, avgPrice: 0 };
+    byType[type].count++;
+    byType[type].qty += offer.maxQty;
+    byType[type].avgPrice += offer.priceValue;
+  }
+  for (const type of Object.keys(byType)) {
+    byType[type].avgPrice = byType[type].avgPrice / byType[type].count;
+  }
+  
+  // Find best deals (top 3 cheapest with good trust score)
+  const bestDeals = offers
+    .filter(o => (o.provider?.trustScore || 0) >= 0.3)
+    .slice(0, 3);
+  
+  const discomRate = 7.5;
+  const savings = Math.round(((discomRate - avgPrice) / discomRate) * 100);
+  
+  let insight = ht(
+    `📊 *Market Insights*\n━━━━━━━━━━━━━━━━━━━━\n\n`,
+    `📊 *Market Insights*\n━━━━━━━━━━━━━━━━━━━━\n\n`
+  );
+  
+  insight += ht(
+    `📈 *Current Prices*\n` +
+    `• Range: ₹${minPrice.toFixed(1)} - ₹${maxPrice.toFixed(1)}/kWh\n` +
+    `• Average: ₹${avgPrice.toFixed(1)}/kWh\n` +
+    `• DISCOM: ₹${discomRate}/kWh\n` +
+    `• You save ~${savings}% vs DISCOM!\n\n`,
+    
+    `📈 *Current Prices*\n` +
+    `• Range: ₹${minPrice.toFixed(1)} - ₹${maxPrice.toFixed(1)}/kWh\n` +
+    `• Average: ₹${avgPrice.toFixed(1)}/kWh\n` +
+    `• DISCOM: ₹${discomRate}/kWh\n` +
+    `• DISCOM se ~${savings}% bachao!\n\n`
+  );
+  
+  // Price trend (compared to yesterday - simplified heuristic)
+  const trendEmoji = avgPrice <= 5.5 ? '↘️ falling' : avgPrice >= 6.5 ? '↗️ rising' : '→ stable';
+  insight += ht(
+    `📉 *Price Trend*: ${trendEmoji}\n\n`,
+    `📉 *Price Trend*: ${trendEmoji}\n\n`
+  );
+  
+  insight += ht(
+    `⚡ *Available Energy*\n` +
+    `• ${offers.length} active offers\n` +
+    `• ${totalAvailable.toFixed(0)} kWh total\n`,
+    
+    `⚡ *Available Energy*\n` +
+    `• ${offers.length} active offers\n` +
+    `• ${totalAvailable.toFixed(0)} kWh available\n`
+  );
+  
+  // Add energy type breakdown if multiple types
+  const types = Object.keys(byType);
+  if (types.length > 1) {
+    for (const type of types) {
+      const t = byType[type];
+      insight += `  - ${type}: ${t.count} offers, ${t.qty.toFixed(0)} kWh @ ₹${t.avgPrice.toFixed(1)} avg\n`;
+    }
+  }
+  
+  if (bestDeals.length > 0) {
+    insight += ht(`\n🏆 *Best Deals*\n`, `\n🏆 *Best Deals*\n`);
+    for (const deal of bestDeals) {
+      const trust = getTrustTier(deal.provider?.trustScore || 0);
+      insight += `• ₹${deal.priceValue}/kWh - ${deal.maxQty} kWh ${trust.emoji}\n`;
+    }
+  }
+  
+  // Personalized recommendations
+  if (userData) {
+    insight += ht(`\n🎯 *Personalized for You*\n`, `\n🎯 *Aapke Liye*\n`);
+    
+    if (userData.hasGeneration) {
+      // Seller-focused advice
+      if (userData.userListingPrice) {
+        const priceDiff = userData.userListingPrice - avgPrice;
+        if (priceDiff > 0.5) {
+          insight += ht(
+            `• Your price (₹${userData.userListingPrice}) is ${Math.round((priceDiff / avgPrice) * 100)}% above average. Consider lowering for faster sales.\n`,
+            `• Aapka price (₹${userData.userListingPrice}) average se ${Math.round((priceDiff / avgPrice) * 100)}% zyada hai. Jaldi bikri ke liye kam karo.\n`
+          );
+        } else if (priceDiff < -0.5) {
+          insight += ht(
+            `• Great! Your price (₹${userData.userListingPrice}) is competitive - ${Math.round((-priceDiff / avgPrice) * 100)}% below average!\n`,
+            `• Bahut badhiya! Aapka price (₹${userData.userListingPrice}) competitive hai - ${Math.round((-priceDiff / avgPrice) * 100)}% kam!\n`
+          );
+        } else {
+          insight += ht(
+            `• Your price (₹${userData.userListingPrice}) is right at market average. Well priced!\n`,
+            `• Aapka price (₹${userData.userListingPrice}) market average pe hai. Perfect!\n`
+          );
+        }
+      } else {
+        insight += ht(
+          `• As a seller: Price at ₹${(avgPrice - 0.5).toFixed(1)}-${avgPrice.toFixed(1)} for quick sales\n`,
+          `• Seller ke taur pe: ₹${(avgPrice - 0.5).toFixed(1)}-${avgPrice.toFixed(1)} pe jaldi bikri hogi\n`
+        );
+      }
+    }
+    
+    if (userData.hasConsumption) {
+      // Buyer-focused advice
+      insight += ht(
+        `• As a buyer: Prices are ${savings >= 20 ? 'very low' : savings >= 10 ? 'good' : 'moderate'} right now - ${savings >= 20 ? 'great time to buy!' : savings >= 10 ? 'good time to buy' : 'prices may drop soon'}\n`,
+        `• Buyer ke taur pe: Prices ${savings >= 20 ? 'bahut kam' : savings >= 10 ? 'acche' : 'theek'} hain - ${savings >= 20 ? 'buy karne ka best time!' : savings >= 10 ? 'buy kar sakte ho' : 'prices aur gir sakti'}\n`
+      );
+    }
+  } else {
+    // Generic tips
+    insight += ht(
+      `\n💡 *Tips*\n` +
+      `• Buy now to lock in low prices\n` +
+      `• Sellers: Price at ₹${(avgPrice - 0.5).toFixed(1)}-${avgPrice.toFixed(1)} for quick sales`,
+      
+      `\n💡 *Tips*\n` +
+      `• Abhi khareed lo - prices low hain\n` +
+      `• Sellers: ₹${(avgPrice - 0.5).toFixed(1)}-${avgPrice.toFixed(1)} pe jaldi bikri hogi`
+    );
+  }
+  
+  return insight;
+}
+
+/**
+ * Get combined activity summary - orders, earnings, and wallet in one view.
+ * Perfect for "track orders and earnings" requests.
+ */
+export async function getActivitySummary(userId: string, lang?: string): Promise<string> {
+  const ht = (en: string, hi: string) => lang === 'hinglish' ? hi : en;
+  
+  // Get user balance and provider info
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { balance: true, name: true, providerId: true },
+  });
+  
+  const balance = user?.balance || 0;
+  const userName = user?.name || 'User';
+  const providerId = user?.providerId;
+  
+  // Get today's date range
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const thisWeekStart = new Date(today);
+  thisWeekStart.setDate(thisWeekStart.getDate() - 7);
+  
+  // Get earnings data (as seller through provider)
+  let orders: { totalPrice: number | null; status: string; createdAt: Date }[] = [];
+  if (providerId) {
+    orders = await prisma.order.findMany({
+      where: {
+        providerId: providerId,
+        status: { in: ['CONFIRMED', 'COMPLETED'] },
+      },
+      select: {
+        totalPrice: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+  }
+  
+  // Calculate earnings
+  const completedOrders = orders.filter(o => o.status === 'COMPLETED');
+  const todayEarnings = completedOrders
+    .filter(o => new Date(o.createdAt) >= today)
+    .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+  const weekEarnings = completedOrders
+    .filter(o => new Date(o.createdAt) >= thisWeekStart)
+    .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+  const totalEarnings = completedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+  
+  // Get pending orders (as both buyer and seller)
+  const pendingAsSeller = orders.filter(o => o.status === 'CONFIRMED').length;
+  const pendingAsBuyer = await prisma.order.count({
+    where: {
+      buyerId: userId,
+      status: 'CONFIRMED',
+    },
+  });
+  
+  // Get this month's completed orders
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthCompletedSelling = completedOrders.filter(o => new Date(o.createdAt) >= monthStart).length;
+  const monthCompletedBuying = await prisma.order.count({
+    where: {
+      buyerId: userId,
+      status: 'COMPLETED',
+      createdAt: { gte: monthStart },
+    },
+  });
+  
+  // Get active listings count
+  let activeListings = 0;
+  if (providerId) {
+    activeListings = await prisma.catalogOffer.count({
+      where: {
+        providerId: providerId,
+        maxQty: { gt: 0 },
+      },
+    });
+  }
+  
+  // Build the activity summary
+  const summary = ht(
+    `📊 *Your Activity Summary*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `👋 Hey ${userName}!\n\n` +
+    `💰 *Earnings*\n` +
+    `• Today: ₹${todayEarnings.toFixed(0)}\n` +
+    `• This Week: ₹${weekEarnings.toFixed(0)}\n` +
+    `• Total: ₹${totalEarnings.toFixed(0)}\n\n` +
+    `📦 *Orders*\n` +
+    `• ${pendingAsSeller} pending delivery (selling)\n` +
+    `• ${pendingAsBuyer} pending delivery (buying)\n` +
+    `• ${monthCompletedSelling + monthCompletedBuying} completed this month\n\n` +
+    `📋 *Listings*\n` +
+    `• ${activeListings} active listing${activeListings !== 1 ? 's' : ''}\n\n` +
+    `💼 *Wallet Balance*: ₹${balance.toFixed(0)}`,
+    
+    `📊 *Aapki Activity Summary*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `👋 Namaste ${userName}!\n\n` +
+    `💰 *Kamai*\n` +
+    `• Aaj: ₹${todayEarnings.toFixed(0)}\n` +
+    `• Is Hafte: ₹${weekEarnings.toFixed(0)}\n` +
+    `• Total: ₹${totalEarnings.toFixed(0)}\n\n` +
+    `📦 *Orders*\n` +
+    `• ${pendingAsSeller} delivery pending (bechna)\n` +
+    `• ${pendingAsBuyer} delivery pending (khareedna)\n` +
+    `• ${monthCompletedSelling + monthCompletedBuying} is mahine complete\n\n` +
+    `📋 *Listings*\n` +
+    `• ${activeListings} active listing${activeListings !== 1 ? 's' : ''}\n\n` +
+    `💼 *Wallet Balance*: ₹${balance.toFixed(0)}`
+  );
+  
+  return summary;
+}
+
+/**
+ * Get top deals available in the marketplace.
+ * Returns formatted deals with prices and savings vs DISCOM.
+ */
+export interface TopDeal {
+  offerId: string;
+  quantity: number;
+  pricePerUnit: number;
+  totalPrice: number;
+  providerName: string;
+  trustScore: number;
+  energyType: string;
+  savings: number; // vs DISCOM
+  savingsPercent: number;
+}
+
+export async function getTopDeals(limit: number = 3, lang?: string): Promise<{ deals: TopDeal[], message: string }> {
+  const ht = (en: string, hi: string) => lang === 'hinglish' ? hi : en;
+  const DISCOM_RATE = 7.5; // Peak DISCOM rate for comparison
+  
+  // Get best available offers
+  const offers = await prisma.catalogOffer.findMany({
+    where: { maxQty: { gt: 0 } },
+    include: {
+      provider: { select: { name: true, trustScore: true } },
+      item: { select: { sourceType: true } },
+    },
+    orderBy: { priceValue: 'asc' },
+    take: limit,
+  });
+  
+  if (offers.length === 0) {
+    return {
+      deals: [],
+      message: ht(
+        '😕 No energy offers available right now.\n\nCheck back later or set an alert to be notified when energy is available.',
+        '😕 Abhi koi energy offer nahi hai.\n\nBaad mein check karo ya alert set karo jab energy available ho.'
+      ),
+    };
+  }
+  
+  const deals: TopDeal[] = offers.map(offer => {
+    const savings = DISCOM_RATE - offer.priceValue;
+    const savingsPercent = ((DISCOM_RATE - offer.priceValue) / DISCOM_RATE) * 100;
+    const sourceType = offer.item?.sourceType || 'SOLAR';
+    const energyEmoji = sourceType === 'SOLAR' ? '☀️' : sourceType === 'WIND' ? '💨' : '💧';
+    
+    return {
+      offerId: offer.id,
+      quantity: Math.round(offer.maxQty),
+      pricePerUnit: offer.priceValue,
+      totalPrice: offer.priceValue * offer.maxQty,
+      providerName: offer.provider?.name || 'Verified Seller',
+      trustScore: offer.provider?.trustScore || 0.5,
+      energyType: `${energyEmoji} ${sourceType.charAt(0) + sourceType.slice(1).toLowerCase()}`,
+      savings: savings,
+      savingsPercent: savingsPercent,
+    };
+  });
+  
+  // Build formatted message
+  let message = ht(
+    `⚡ *Top ${deals.length} Green Energy Deals*\n━━━━━━━━━━━━━━━━━━━━\n\n`,
+    `⚡ *Top ${deals.length} Green Energy Deals*\n━━━━━━━━━━━━━━━━━━━━\n\n`
+  );
+  
+  deals.forEach((deal, i) => {
+    const trustStars = '⭐'.repeat(Math.round(deal.trustScore * 5));
+    message += ht(
+      `${i + 1}️⃣ ${deal.energyType} ${deal.quantity} units @ ₹${deal.pricePerUnit}/unit\n` +
+      `   💰 Total: ₹${(deal.pricePerUnit * deal.quantity).toFixed(0)}\n` +
+      `   🏷️ Save ₹${deal.savings.toFixed(1)}/unit vs DISCOM (${deal.savingsPercent.toFixed(0)}% off!)\n` +
+      `   👤 ${deal.providerName} ${trustStars}\n\n`,
+      
+      `${i + 1}️⃣ ${deal.energyType} ${deal.quantity} unit @ ₹${deal.pricePerUnit}/unit\n` +
+      `   💰 Total: ₹${(deal.pricePerUnit * deal.quantity).toFixed(0)}\n` +
+      `   🏷️ DISCOM se ₹${deal.savings.toFixed(1)}/unit bachao (${deal.savingsPercent.toFixed(0)}% off!)\n` +
+      `   👤 ${deal.providerName} ${trustStars}\n\n`
+    );
+  });
+  
+  message += ht(
+    '💡 Reply with the deal number to buy, or specify your needs (e.g. "50 units tomorrow")',
+    '💡 Deal number reply karo ya apni zaroorat batao (jaise "50 unit kal")'
+  );
+  
+  return { deals, message };
+}

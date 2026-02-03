@@ -63,6 +63,21 @@ model User {
   // Chat preferences (persisted across sessions)
   languagePreference String? @map("language_preference") // e.g. 'en-IN', 'hi-IN', 'hinglish'
 
+  // Notification preferences
+  notifyOrderUpdates  Boolean @default(true) @map("notify_order_updates") // Order confirmations, completions
+  notifyPayments      Boolean @default(true) @map("notify_payments") // Payment escrow, release
+  notifyTradingAlerts Boolean @default(false) @map("notify_trading_alerts") // Price alerts, opportunities
+  notifyWeeklyDigest  Boolean @default(false) @map("notify_weekly_digest") // Weekly summary
+  priceAlertThreshold Float?  @map("price_alert_threshold") // Alert when price hits this
+
+  // Trading preferences
+  preferredTradingStart String? @map("preferred_trading_start") // e.g. "06:00"
+  preferredTradingEnd   String? @map("preferred_trading_end") // e.g. "18:00"
+  autoListEnabled       Boolean @default(false) @map("auto_list_enabled") // Auto-create listings
+
+  // WhatsApp integration
+  whatsappWelcomeSent Boolean @default(false) @map("whatsapp_welcome_sent") // First login welcome sent
+
   // Prosumer can be both provider and consumer
   provider   Provider? @relation(fields: [providerId], references: [id])
   providerId String?   @unique @map("provider_id")
@@ -404,10 +419,12 @@ model PaymentRecord {
 enum ChatPlatform {
   TELEGRAM
   WEB
+  WHATSAPP
 }
 
 enum ChatState {
   GREETING
+  ASK_VOICE_PREF
   WAITING_PHONE
   WAITING_OTP
   WAITING_NAME

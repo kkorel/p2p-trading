@@ -32,6 +32,10 @@ import {
   // Secure client for signed Beckn requests
   secureAxios,
   isSigningEnabled,
+  // Beckn v2 wire-format builders
+  buildWireOrder,
+  buildWireStatusOrder,
+  BuildSelectOrderOptions,
   // CDS utilities
   isExternalCDSEnabled,
   // Bulk matcher
@@ -1469,11 +1473,40 @@ router.post('/api/select', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Either offer_id or autoMatch with requestedTimeWindow is required' });
   }
   
+  // Resolve item ID for use in message and attribute lookup
+  const resolvedItemId = selectedItemId || item_id || selectedOffer.item_id;
+
+  // Look up item attributes from catalog for Beckn orderItemAttributes
+  let itemMeterId: string | undefined;
+  if (txState.catalog) {
+    for (const providerCatalog of txState.catalog.providers) {
+      for (const catalogItem of providerCatalog.items) {
+        if (catalogItem.id === resolvedItemId) {
+          itemMeterId = catalogItem.itemAttributes?.meterId;
+          break;
+        }
+      }
+      if (itemMeterId) break;
+    }
+  }
+
+  // Look up provider's utility customer info from DB
+  let utilityCustomerId: string | undefined;
+  try {
+    const providerRecord = await prisma.provider.findUnique({
+      where: { id: selectedOffer.provider_id },
+      include: { user: true },
+    });
+    utilityCustomerId = providerRecord?.user?.consumerNumber || undefined;
+  } catch (e) {
+    // Non-critical — proceed without utilityCustomerId
+  }
+
   // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
   const targetBppUri = selectedOffer.bpp_uri || config.bpp.uri;
   const targetBppId = selectedOffer.bpp_id || selectedOffer.provider_id;
   const isExternalBpp = !!selectedOffer.bpp_uri && selectedOffer.bpp_uri !== config.bpp.uri;
-  
+
   // Create context with correct BPP info
   const context = createContext({
     action: 'select',
@@ -1483,17 +1516,44 @@ router.post('/api/select', async (req: Request, res: Response) => {
     bpp_id: targetBppId,
     bpp_uri: targetBppUri,
   });
-  
-  // Build select message
-  const selectMessage: SelectMessage = {
+
+  // Look up buyer utility info
+  let buyerMeterId: string | undefined;
+  let buyerUtilityCustomerId: string | undefined;
+  const buyerUser = req.user?.id ? await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { meterNumber: true, consumerNumber: true },
+  }) : null;
+  buyerMeterId = buyerUser?.meterNumber || undefined;
+  buyerUtilityCustomerId = buyerUser?.consumerNumber || undefined;
+
+  // Build Beckn v2 wire format order for select
+  const wireOrder = buildWireOrder({
+    sellerId: selectedOffer.provider_id,
+    buyerId: req.user?.id || 'buyer',
+    buyerMeterId,
+    buyerUtilityCustomerId,
+    buyerUtilityId: config.utility?.id,
+    bapId: config.bap.id,
+    bppId: targetBppId,
+    items: [{
+      itemId: resolvedItemId,
+      quantity,
+      offerId: selectedOffer.id,
+      offerPrice: selectedOffer.price.value,
+      offerCurrency: selectedOffer.price.currency,
+      offerProvider: selectedOffer.provider_id,
+      offerItems: [resolvedItemId],
+      offerTimeWindow: selectedOffer.timeWindow,
+      providerMeterId: itemMeterId,
+      providerUtilityCustomerId: utilityCustomerId,
+      providerUtilityId: config.utility?.id,
+    }],
+  });
+
+  const selectMessage = {
     context,
-    message: {
-      orderItems: [{
-        item_id: selectedItemId || item_id || selectedOffer.item_id,
-        offer_id: selectedOffer.id,
-        quantity,
-      }],
-    },
+    message: { order: wireOrder },
   };
   
   logger.info('Sending select request', {
@@ -1633,15 +1693,35 @@ router.post('/api/init', async (req: Request, res: Response) => {
     bpp_uri: targetBppUri,
   });
 
-  // Build init message
-  const initMessage: InitMessage = {
+  // Build init message with Beckn v2 wire format
+  const initWireOrder = buildWireOrder({
+    sellerId: providerId,
+    buyerId: txState.buyerId || 'buyer',
+    bapId: config.bap.id,
+    bppId: targetBppId,
+    buyerUtilityId: config.utility?.id,
+    items: orderItems.map(oi => ({
+      itemId: oi.item_id,
+      quantity: oi.quantity,
+      offerId: oi.offer_id,
+      offerPrice: 0, // Will be calculated by BPP
+      offerCurrency: 'INR',
+      offerProvider: providerId,
+      offerItems: [oi.item_id],
+    })),
+  });
+
+  // Add fulfillment stub for init
+  (initWireOrder as any)['beckn:fulfillment'] = {
+    '@context': 'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/main/schema/core/v2/context.jsonld',
+    '@type': 'beckn:Fulfillment',
+    'beckn:id': `fulfillment-${context.transaction_id.slice(0, 8)}`,
+    'beckn:mode': 'DELIVERY',
+  };
+
+  const initMessage = {
     context,
-    message: {
-      order: {
-        items: orderItems,
-        provider: { id: providerId },
-      },
-    },
+    message: { order: initWireOrder },
   };
 
   logger.info('Sending init request', {
@@ -1778,13 +1858,13 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     bpp_uri: targetBppUri,
   });
 
-  // Build confirm message
-  const confirmMessage: ConfirmMessage = {
+  // Build confirm message with Beckn v2 wire format
+  const confirmMessage = {
     context,
     message: {
-      order: { id: orderId },
+      order: { 'beckn:id': orderId },
     },
-  };
+  } as any;
 
   logger.info('Sending confirm request', {
     transaction_id,
@@ -1901,13 +1981,13 @@ router.post('/api/status', async (req: Request, res: Response) => {
     bpp_uri: targetBppUri,
   });
   
-  // Build status message
-  const statusMessage: StatusMessage = {
+  // Build status message with Beckn v2 wire format
+  const statusMessage = {
     context,
     message: {
-      order_id: orderId,
+      order: { 'beckn:id': orderId },
     },
-  };
+  } as any;
   
   logger.info('Sending status request', {
     transaction_id,

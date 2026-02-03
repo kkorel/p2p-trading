@@ -22,8 +22,7 @@ const logger = createLogger('CDS-PUBLISH');
 // ==================== Constants ====================
 
 const BECKN_CORE_CONTEXT = 'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/main/schema/core/v2/context.jsonld';
-const BECKN_ENERGY_RESOURCE_CONTEXT = 'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/p2p-trading/schema/EnergyResource/v0.2/context.jsonld';
-const BECKN_ENERGY_TRADE_OFFER_CONTEXT = 'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/p2p-trading/schema/EnergyTradeOffer/v0.2/context.jsonld';
+const BECKN_ENERGY_TRADE_CONTEXT = 'https://raw.githubusercontent.com/beckn/protocol-specifications-v2/refs/heads/p2p-trading/schema/EnergyTrade/v0.3/context.jsonld';
 const BECKN_DOMAIN = process.env.BECKN_DOMAIN || 'beckn.one:deg:p2p-trading-interdiscom:2.0.0';
 const BECKN_VERSION = '2.0.0';
 
@@ -43,6 +42,9 @@ export interface SyncItem {
   available_qty: number;
   production_windows: TimeWindow[];
   meter_id: string;
+  // Provider utility attributes (for CDS filtering by utility)
+  utility_id?: string;
+  utility_customer_id?: string;
 }
 
 export interface SyncOffer {
@@ -78,21 +80,7 @@ interface BecknItemAttributes {
   '@context': string;
   '@type': string;
   sourceType: string;
-  deliveryMode: string;
   meterId: string;
-  availableQuantity: number;
-  productionWindow?: Array<{
-    '@type': string;
-    'schema:startTime': string;
-    'schema:endTime': string;
-  }>;
-  certificationStatus?: string;
-  sourceVerification?: {
-    verified: boolean;
-    verificationDate?: string;
-    certificates?: string[];
-  };
-  productionAsynchronous?: boolean;
 }
 
 interface BecknItem {
@@ -105,6 +93,13 @@ interface BecknItem {
   'beckn:provider': {
     'beckn:id': string;
     'beckn:descriptor': BecknDescriptor;
+    'beckn:providerAttributes'?: {
+      '@context': string;
+      '@type': string;
+      meterId: string;
+      utilityId: string;
+      utilityCustomerId: string;
+    };
   };
   'beckn:itemAttributes': BecknItemAttributes;
 }
@@ -113,31 +108,12 @@ interface BecknOfferAttributes {
   '@context': string;
   '@type': string;
   pricingModel: string;
-  settlementType: string;
-  sourceMeterId?: string;
-  wheelingCharges?: {
-    amount: number;
-    currency: string;
-    description?: string;
-  };
-  minimumQuantity?: number;
-  maximumQuantity?: number;
-  validityWindow?: {
+  deliveryWindow?: {
     '@type': string;
     'schema:startTime': string;
     'schema:endTime': string;
   };
-  'beckn:price': {
-    value: number;
-    currency: string;
-    unitText: string;
-  };
-  'beckn:maxQuantity': {
-    unitQuantity: number;
-    unitText: string;
-    unitCode: string;
-  };
-  'beckn:timeWindow'?: {
+  validityWindow?: {
     '@type': string;
     'schema:startTime': string;
     'schema:endTime': string;
@@ -226,12 +202,6 @@ function getCDSPublishUrl(): string {
  * Build a Beckn-compliant item from internal data
  */
 function buildBecknItem(item: SyncItem, providerName: string): BecknItem {
-  const productionWindows = item.production_windows?.map(pw => ({
-    '@type': 'beckn:TimePeriod',
-    'schema:startTime': pw.startTime,
-    'schema:endTime': pw.endTime,
-  })) || [];
-
   return {
     '@context': BECKN_CORE_CONTEXT,
     '@type': 'beckn:Item',
@@ -249,21 +219,20 @@ function buildBecknItem(item: SyncItem, providerName: string): BecknItem {
         '@type': 'beckn:Descriptor',
         'schema:name': providerName,
       },
+      // Per Postman spec: providerAttributes with utility info for CDS filtering
+      'beckn:providerAttributes': {
+        '@context': BECKN_ENERGY_TRADE_CONTEXT,
+        '@type': 'EnergyCustomer',
+        meterId: item.meter_id || `der://meter/${item.id}`,
+        utilityId: item.utility_id || 'UNKNOWN',
+        utilityCustomerId: item.utility_customer_id || 'UNKNOWN',
+      },
     },
     'beckn:itemAttributes': {
-      '@context': BECKN_ENERGY_RESOURCE_CONTEXT,
+      '@context': BECKN_ENERGY_TRADE_CONTEXT,
       '@type': 'EnergyResource',
       sourceType: item.source_type,
-      deliveryMode: item.delivery_mode || 'GRID_INJECTION',
       meterId: item.meter_id || `der://meter/${item.id}`,
-      availableQuantity: item.available_qty,
-      productionWindow: productionWindows.length > 0 ? productionWindows : undefined,
-      certificationStatus: 'Standard',
-      sourceVerification: {
-        verified: true,
-        verificationDate: new Date().toISOString(),
-      },
-      productionAsynchronous: true,
     },
   };
 }
@@ -274,7 +243,7 @@ function buildBecknItem(item: SyncItem, providerName: string): BecknItem {
  * - beckn:price at root level with schema:PriceSpecification format
  * - beckn:offerAttributes with validityWindow, minimumQuantity, maximumQuantity
  */
-function buildBecknOffer(offer: SyncOffer, meterId?: string): BecknOffer {
+function buildBecknOffer(offer: SyncOffer, _meterId?: string): BecknOffer {
   return {
     '@context': BECKN_CORE_CONTEXT,
     '@type': 'beckn:Offer',
@@ -292,30 +261,15 @@ function buildBecknOffer(offer: SyncOffer, meterId?: string): BecknOffer {
       'schema:unitText': 'kWh',
     },
     'beckn:offerAttributes': {
-      '@context': BECKN_ENERGY_TRADE_OFFER_CONTEXT,
+      '@context': BECKN_ENERGY_TRADE_CONTEXT,
       '@type': 'EnergyTradeOffer',
       pricingModel: offer.pricing_model || 'PER_KWH',
-      settlementType: offer.settlement_type || 'INSTANT',
-      sourceMeterId: meterId || `der://meter/${offer.item_id}`,
-      minimumQuantity: 1.0,
-      maximumQuantity: offer.max_qty,
-      validityWindow: offer.time_window ? {
+      deliveryWindow: offer.time_window ? {
         '@type': 'beckn:TimePeriod',
         'schema:startTime': offer.time_window.startTime,
         'schema:endTime': offer.time_window.endTime,
       } : undefined,
-      // Per Postman spec: price, maxQuantity, timeWindow inside offerAttributes
-      'beckn:price': {
-        value: offer.price_value,
-        currency: offer.currency || 'INR',
-        unitText: 'kWh',
-      },
-      'beckn:maxQuantity': {
-        unitQuantity: offer.max_qty,
-        unitText: 'kWh',
-        unitCode: 'KWH',
-      },
-      'beckn:timeWindow': offer.time_window ? {
+      validityWindow: offer.time_window ? {
         '@type': 'beckn:TimePeriod',
         'schema:startTime': offer.time_window.startTime,
         'schema:endTime': offer.time_window.endTime,

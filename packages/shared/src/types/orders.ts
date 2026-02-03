@@ -42,11 +42,29 @@ export interface Order {
   bulkGroupId?: string; // Links orders from same bulk purchase
 }
 
+// Provider attributes for Beckn order items (used in select/init/on_update)
+export interface OrderItemProviderAttributes {
+  '@context'?: string;
+  '@type'?: string;
+  meterId?: string;
+  utility?: string;
+  utilityCustomerId?: string;
+  userType?: string;
+}
+
+// Beckn order item attributes (wraps provider + fulfillment attributes)
+export interface OrderItemAttributes {
+  '@context'?: string;
+  '@type'?: string;
+  providerAttributes?: OrderItemProviderAttributes;
+}
+
 // Order in select request
 export interface SelectOrderItem {
   item_id: string;
   offer_id: string;
   quantity: number;
+  'beckn:orderItemAttributes'?: OrderItemAttributes;
 }
 
 // Fulfillment (stubbed for Phase-1)

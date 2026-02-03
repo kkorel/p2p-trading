@@ -114,6 +114,11 @@ export const config = {
     sellerCancellationPenalty: parseFloat(process.env.SELLER_CANCEL_PENALTY_RATE || '0.05'),
   },
 
+  // Utility (DISCOM) identity for CDS publishing
+  utility: {
+    id: process.env.UTILITY_ID || 'BESCOM-KA',
+  },
+
   // DISCOM configuration
   discom: {
     ratePerKwh: parseFloat(process.env.DISCOM_RATE_PER_KWH || '10'),
