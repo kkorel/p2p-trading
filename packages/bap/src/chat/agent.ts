@@ -1942,19 +1942,40 @@ async function handleUniversalCommand(
 
   // Handle language selection callback (from buttons shown by "language" command)
   if (command.startsWith('lang:')) {
+    // During GREETING state, let the state handler deal with it (proper transition)
+    if (currentState === 'GREETING') return null;
+
     const lang = command.replace('lang:', '');
     const LANG_CONFIRM: Record<string, string> = {
-      'en-IN': 'Language set to English. How can I help?',
-      'hi-IN': 'भाषा हिंदी में सेट हो गई। मैं कैसे मदद कर सकता हूँ?',
-      'bn-IN': 'ভাষা বাংলায় সেট হয়েছে। আমি কীভাবে সাহায্য করতে পারি?',
-      'ta-IN': 'மொழி தமிழில் அமைக்கப்பட்டது. நான் எப்படி உதவ முடியும்?',
-      'te-IN': 'భాష తెలుగులో సెట్ చేయబడింది. నేను ఎలా సహాయం చేయగలను?',
-      'kn-IN': 'ಭಾಷೆ ಕನ್ನಡಕ್ಕೆ ಬದಲಾಗಿದೆ. ನಾನು ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?',
+      'en-IN': 'Language set to English.',
+      'hi-IN': 'भाषा हिंदी में सेट हो गई।',
+      'bn-IN': 'ভাষা বাংলায় সেট হয়েছে।',
+      'ta-IN': 'மொழி தமிழில் அமைக்கப்பட்டது.',
+      'te-IN': 'భాష తెలుగులో సెట్ చేయబడింది.',
+      'kn-IN': 'ಭಾಷೆ ಕನ್ನಡಕ್ಕೆ ಬದಲಾಗಿದೆ.',
     };
+    const confirmText = LANG_CONFIRM[lang] || 'Language updated!';
+
+    // During onboarding: set language, show confirmation, re-prompt current step
+    if (ONBOARDING_STATES.has(currentState)) {
+      const updatedCtx = { ...ctx, language: lang as any };
+      const enterResp = await states[currentState as ChatState].onEnter(
+        { ...updatedCtx, nameAsked: false } // Reset so WAITING_NAME re-shows prompt
+      );
+      return {
+        messages: [
+          { text: confirmText },
+          ...enterResp.messages,
+        ],
+        contextUpdate: { language: lang as any, nameAsked: false },
+      };
+    }
+
+    // General chat: show confirmation with context-appropriate suggestions
     return {
       messages: [{
-        text: LANG_CONFIRM[lang] || 'Language updated! How can I help?',
-        buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+        text: confirmText,
+        buttons: getSmartSuggestions({ ...ctx, language: lang as any }, currentState),
       }],
       contextUpdate: { language: lang as any },
     };
@@ -2251,17 +2272,12 @@ const states: Record<ChatState, StateHandler> = {
         };
       }
 
-      // Free-text: Language was auto-detected by processMessage() before this handler ran
-      // ctx.language is already set - acknowledge AND ask name in one message
+      // Free-text that isn't a language selection — re-show language buttons
       return {
         messages: [{
-          text: h(ctx, 
-            'Hi! Nice to meet you. What is your name?',
-            'Haan! Aapse milke khushi hui. Aapka naam kya hai?'
-          ),
+          text: 'Please select a language to get started:\nAage badhne ke liye bhasha chuno:',
+          buttons: LANG_BUTTONS,
         }],
-        newState: 'WAITING_NAME',
-        contextUpdate: { langPicked: true, nameAsked: true },
       };
     },
   },
@@ -2296,14 +2312,21 @@ const states: Record<ChatState, StateHandler> = {
       };
     },
     async onMessage(ctx, message) {
+      // Ignore callback-style inputs (e.g., action:buy_energy, cmd:help) — re-prompt
+      if (message.includes(':') && !message.includes(' ')) {
+        return {
+          messages: [{ text: h(ctx, 'What is your name?', 'Aapka naam kya hai?') }],
+        };
+      }
+
       // Try LLM-powered name extraction first (handles casual speech like "Uh, Jack, what's yours?")
       let name = await extractNameWithLLM(message);
-      
+
       // Fall back to regex extraction if LLM unavailable or fails
       if (!name) {
         name = extractName(message);
       }
-      
+
       if (!name || name.length < 2) {
         return {
           messages: [{ text: h(ctx, 'Please enter your name.', 'Apna naam batao.') }],
