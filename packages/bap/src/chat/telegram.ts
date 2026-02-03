@@ -1,10 +1,12 @@
 /**
  * Telegram Bot — Oorja agent on Telegram.
  * Uses Telegraf for bot framework. Only starts if TELEGRAM_BOT_TOKEN is set.
+ * Supports text, documents (PDF/JSON), and voice messages.
  */
 
 import { createLogger, prisma } from '@p2p/shared';
 import { processMessage, FileData } from './agent';
+import { transcribeAudio, isSTTAvailable, STTError } from './sarvam-stt';
 
 const logger = createLogger('TelegramBot');
 
@@ -118,6 +120,115 @@ export async function startTelegramBot(): Promise<void> {
       } catch (err: any) {
         logger.error(`Telegram document error: ${err.message}`);
         await ctx.reply('I had trouble processing that file. Please try again.');
+      }
+    });
+
+    // Voice messages — transcribe and process as text
+    bot.on('voice', async (ctx: any) => {
+      try {
+        const chatId = String(ctx.chat.id);
+        const voice = ctx.message.voice;
+
+        // Check if STT is available
+        if (!isSTTAvailable()) {
+          await ctx.reply(
+            "Voice messages are not available right now. Please type your message instead.",
+            { reply_to_message_id: ctx.message.message_id }
+          );
+          return;
+        }
+
+        // Show typing indicator while processing
+        await ctx.sendChatAction('typing');
+
+        // Download the voice file (Telegram uses OGG format)
+        const fileLink = await ctx.telegram.getFileLink(voice.file_id);
+        const axios = (await import('axios')).default;
+        const fileResponse = await axios.get(fileLink.href, { responseType: 'arraybuffer' });
+        const audioBuffer = Buffer.from(fileResponse.data);
+
+        logger.info(`Received voice message: ${(audioBuffer.length / 1024).toFixed(1)}KB, duration: ${voice.duration}s`);
+
+        // Transcribe the audio
+        let transcript: string;
+        let languageName: string;
+        try {
+          const result = await transcribeAudio(audioBuffer, 'audio/ogg');
+          transcript = result.transcript;
+          languageName = result.languageName;
+          logger.info(`Voice transcription [${languageName}]: "${transcript.substring(0, 50)}..."`);
+        } catch (error) {
+          if (error instanceof STTError) {
+            logger.warn(`Voice STT error: ${error.type} - ${error.message}`);
+            await ctx.reply(
+              error.retryable 
+                ? `${error.message} Please try again.`
+                : error.message,
+              { reply_to_message_id: ctx.message.message_id }
+            );
+            return;
+          }
+          throw error;
+        }
+
+        // Process the transcript through the agent
+        const response = await processMessage('TELEGRAM', chatId, transcript);
+        
+        for (const msg of response.messages) {
+          await sendTelegramMessage(ctx, msg.text, msg.buttons);
+        }
+      } catch (err: any) {
+        logger.error(`Telegram voice error: ${err.message}\n${err.stack}`);
+        await ctx.reply('I had trouble understanding that. Please try again or type your message.');
+      }
+    });
+
+    // Audio files (sent as documents with audio mime types)
+    bot.on('audio', async (ctx: any) => {
+      try {
+        const chatId = String(ctx.chat.id);
+        const audio = ctx.message.audio;
+
+        if (!isSTTAvailable()) {
+          await ctx.reply(
+            "Voice messages are not available right now. Please type your message instead.",
+            { reply_to_message_id: ctx.message.message_id }
+          );
+          return;
+        }
+
+        await ctx.sendChatAction('typing');
+
+        const fileLink = await ctx.telegram.getFileLink(audio.file_id);
+        const axios = (await import('axios')).default;
+        const fileResponse = await axios.get(fileLink.href, { responseType: 'arraybuffer' });
+        const audioBuffer = Buffer.from(fileResponse.data);
+
+        const mimeType = audio.mime_type || 'audio/mpeg';
+        logger.info(`Received audio file: ${(audioBuffer.length / 1024).toFixed(1)}KB, mime: ${mimeType}`);
+
+        let transcript: string;
+        try {
+          const result = await transcribeAudio(audioBuffer, mimeType);
+          transcript = result.transcript;
+        } catch (error) {
+          if (error instanceof STTError) {
+            await ctx.reply(
+              error.retryable ? `${error.message} Please try again.` : error.message,
+              { reply_to_message_id: ctx.message.message_id }
+            );
+            return;
+          }
+          throw error;
+        }
+
+        const response = await processMessage('TELEGRAM', chatId, transcript);
+        for (const msg of response.messages) {
+          await sendTelegramMessage(ctx, msg.text, msg.buttons);
+        }
+      } catch (err: any) {
+        logger.error(`Telegram audio error: ${err.message}`);
+        await ctx.reply('I had trouble processing that audio. Please try again.');
       }
     });
 

@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { X, Send, Paperclip, Bot, RotateCcw } from 'lucide-react';
 import { MessageList } from './message-list';
+import { VoiceButton } from './voice-button';
 import { useChatEngine } from '@/hooks/use-chat-engine';
 
 interface ChatOverlayProps {
@@ -22,6 +23,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
     handleButtonClick,
     handleReset,
     handleFileUpload,
+    sendMessageToAgent,
   } = useChatEngine();
 
   return (
@@ -62,7 +64,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
           </div>
 
           {/* Input area */}
-          <div className="border-t border-gray-100 bg-white px-2.5 py-2">
+          <div className="relative border-t border-gray-100 bg-white px-2.5 py-2">
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -83,8 +85,15 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a message..."
+                placeholder="Type or speak..."
                 className="flex-1 py-2 px-3.5 bg-gray-100 rounded-full text-sm outline-none focus:ring-2 focus:ring-teal-200 transition-all"
+                disabled={isLoading}
+              />
+              {/* Voice input button */}
+              <VoiceButton
+                onTranscript={(text) => {
+                  sendMessageToAgent(text);
+                }}
                 disabled={isLoading}
               />
               <button

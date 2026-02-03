@@ -2282,10 +2282,16 @@ export async function processMessage(
           language: (user.languagePreference as any) || undefined,
         };
 
-        session = await prisma.chatSession.create({
-          data: {
+        session = await prisma.chatSession.upsert({
+          where: { platform_platformId: { platform, platformId } },
+          create: {
             platform,
             platformId,
+            state: 'GENERAL_CHAT',
+            contextJson: JSON.stringify(ctx),
+            userId: user.id,
+          },
+          update: {
             state: 'GENERAL_CHAT',
             contextJson: JSON.stringify(ctx),
             userId: user.id,
@@ -2330,10 +2336,16 @@ export async function processMessage(
           startState = 'ASK_INTENT';
         }
 
-        session = await prisma.chatSession.create({
-          data: {
+        session = await prisma.chatSession.upsert({
+          where: { platform_platformId: { platform, platformId } },
+          create: {
             platform,
             platformId,
+            state: startState,
+            contextJson: JSON.stringify(ctx),
+            userId: user.id,
+          },
+          update: {
             state: startState,
             contextJson: JSON.stringify(ctx),
             userId: user.id,
@@ -2362,8 +2374,10 @@ export async function processMessage(
     }
 
     // --- Default: anonymous or unrecognized user — start from greeting ---
-    session = await prisma.chatSession.create({
-      data: { platform, platformId, state: 'GREETING', contextJson: '{}' },
+    session = await prisma.chatSession.upsert({
+      where: { platform_platformId: { platform, platformId } },
+      create: { platform, platformId, state: 'GREETING', contextJson: '{}' },
+      update: { state: 'GREETING', contextJson: '{}' },
     });
 
     await storeMessage(session.id, 'user', userMessage);

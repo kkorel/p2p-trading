@@ -3,6 +3,7 @@
  *
  * POST /chat/send      — Send a text message, get agent reply
  * POST /chat/upload    — Upload a PDF (base64), get agent reply
+ * POST /chat/voice     — Upload audio (base64), transcribe and get agent reply
  * GET  /chat/history   — Get message history for a session
  * POST /chat/reset     — Delete session and start fresh
  */
@@ -11,6 +12,7 @@ import { Router, Request, Response } from 'express';
 import { prisma, createLogger } from '@p2p/shared';
 import { optionalAuthMiddleware } from './middleware';
 import { processMessage, FileData } from './chat/agent';
+import { transcribeBase64Audio, isSTTAvailable, STTError } from './chat/sarvam-stt';
 import { v4 as uuidv4 } from 'uuid';
 
 const logger = createLogger('ChatRoutes');
@@ -110,6 +112,95 @@ router.post('/upload', async (req: Request, res: Response) => {
   } catch (error: any) {
     logger.error(`Chat upload error: ${error.message}`);
     res.status(500).json({ success: false, error: 'Failed to process upload' });
+  }
+});
+
+/**
+ * POST /chat/voice
+ * Body: { audio: string (base64), mimeType: string, sessionId?: string }
+ * 
+ * Transcribes audio using Sarvam AI and sends the transcript to the agent.
+ * Returns both the transcript and the agent's response.
+ */
+router.post('/voice', async (req: Request, res: Response) => {
+  try {
+    const { audio, mimeType, sessionId } = req.body;
+
+    // Validate input
+    if (!audio || typeof audio !== 'string') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'audio (base64) is required',
+        errorType: 'invalid_input',
+      });
+    }
+
+    if (!mimeType || typeof mimeType !== 'string') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'mimeType is required',
+        errorType: 'invalid_input',
+      });
+    }
+
+    // Check if STT is available
+    if (!isSTTAvailable()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Voice input is not available. Please type your message instead.',
+        errorType: 'service_unavailable',
+      });
+    }
+
+    const platformId = resolvePlatformId(req, sessionId);
+
+    // Transcribe the audio
+    let transcription;
+    try {
+      transcription = await transcribeBase64Audio(audio, mimeType);
+    } catch (error) {
+      if (error instanceof STTError) {
+        logger.warn(`STT error: ${error.type} - ${error.message}`);
+        return res.status(error.type === 'rate_limited' ? 429 : 400).json({
+          success: false,
+          error: error.message,
+          errorType: error.type,
+          retryable: error.retryable,
+        });
+      }
+      throw error;
+    }
+
+    logger.info(`Voice transcription: "${transcription.transcript.substring(0, 50)}..." [${transcription.languageName}]`);
+
+    // Send the transcript to the agent
+    const response = await processMessage('WEB', platformId, transcription.transcript, undefined, req.user?.id);
+
+    // Map agent messages to frontend format
+    const messages = response.messages.map((m) => ({
+      role: 'agent' as const,
+      content: m.text,
+      buttons: m.buttons || undefined,
+    }));
+
+    res.json({
+      success: true,
+      sessionId: platformId,
+      transcript: transcription.transcript,
+      language: transcription.languageCode,
+      languageName: transcription.languageName,
+      processingTimeMs: transcription.processingTimeMs,
+      messages,
+      authToken: response.authToken || undefined,
+    });
+  } catch (error: any) {
+    logger.error(`Chat voice error: ${error.message}\n${error.stack}`);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to process voice message',
+      errorType: 'server_error',
+      retryable: true,
+    });
   }
 });
 

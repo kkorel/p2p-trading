@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run db:generate:*)",
+      "Bash(npm run build:web:*)",
+      "Bash(curl:*)",
+      "Bash(npm run kill-ports:*)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}

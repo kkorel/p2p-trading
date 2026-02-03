@@ -261,6 +261,24 @@ export const chatApi = {
       body: JSON.stringify({ pdfBase64, sessionId, fileName }),
     }),
 
+  /**
+   * Send voice audio for transcription and agent response
+   */
+  voice: (audio: string, mimeType: string, sessionId?: string) =>
+    request<{
+      success: boolean;
+      sessionId: string;
+      transcript: string;
+      language: string;
+      languageName: string;
+      processingTimeMs: number;
+      messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
+      authToken?: string;
+    }>('/chat/voice', {
+      method: 'POST',
+      body: JSON.stringify({ audio, mimeType, sessionId }),
+    }),
+
   getHistory: (sessionId?: string) =>
     request<{
       success: boolean;
