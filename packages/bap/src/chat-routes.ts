@@ -11,8 +11,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma, createLogger } from '@p2p/shared';
 import { optionalAuthMiddleware } from './middleware';
-import { processMessage, FileData } from './chat/agent';
+import { processMessage, FileData, VoiceInputOptions } from './chat/agent';
 import { transcribeBase64Audio, isSTTAvailable, STTError } from './chat/sarvam-stt';
+import { synthesizeSpeech, isTTSAvailable, TTSError, type TTSSpeaker } from './chat/sarvam-tts';
 import { v4 as uuidv4 } from 'uuid';
 
 const logger = createLogger('ChatRoutes');
@@ -60,6 +61,7 @@ router.post('/send', async (req: Request, res: Response) => {
       sessionId: platformId,
       messages,
       authToken: response.authToken || undefined,
+      voiceOutputEnabled: response.voiceOutputEnabled,
     });
   } catch (error: any) {
     logger.error(`Chat send error: ${error.message}\n${error.stack}`);
@@ -173,8 +175,12 @@ router.post('/voice', async (req: Request, res: Response) => {
 
     logger.info(`Voice transcription: "${transcription.transcript.substring(0, 50)}..." [${transcription.languageName}]`);
 
-    // Send the transcript to the agent
-    const response = await processMessage('WEB', platformId, transcription.transcript, undefined, req.user?.id);
+    // Send the transcript to the agent with voice language info
+    const voiceOptions: VoiceInputOptions = {
+      detectedLanguage: transcription.languageCode,
+      isVoiceInput: true,
+    };
+    const response = await processMessage('WEB', platformId, transcription.transcript, undefined, req.user?.id, voiceOptions);
 
     // Map agent messages to frontend format
     const messages = response.messages.map((m) => ({
@@ -192,12 +198,91 @@ router.post('/voice', async (req: Request, res: Response) => {
       processingTimeMs: transcription.processingTimeMs,
       messages,
       authToken: response.authToken || undefined,
+      responseLanguage: response.responseLanguage || transcription.languageCode,
+      voiceOutputEnabled: response.voiceOutputEnabled,
     });
   } catch (error: any) {
     logger.error(`Chat voice error: ${error.message}\n${error.stack}`);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to process voice message',
+      errorType: 'server_error',
+      retryable: true,
+    });
+  }
+});
+
+/**
+ * POST /chat/tts
+ * Body: { text: string, languageCode: string, speaker?: string, pace?: number }
+ * 
+ * Converts text to speech using Sarvam Bulbul model.
+ * Returns base64 encoded WAV audio.
+ */
+router.post('/tts', async (req: Request, res: Response) => {
+  try {
+    const { text, languageCode, speaker, pace } = req.body;
+
+    // Validate input
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'text is required',
+        errorType: 'invalid_input',
+      });
+    }
+
+    if (!languageCode || typeof languageCode !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'languageCode is required',
+        errorType: 'invalid_input',
+      });
+    }
+
+    // Check if TTS is available
+    if (!isTTSAvailable()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Voice output is not available.',
+        errorType: 'service_unavailable',
+      });
+    }
+
+    // Synthesize speech
+    let result;
+    try {
+      result = await synthesizeSpeech({
+        text: text.trim(),
+        languageCode,
+        speaker: (speaker as TTSSpeaker) || 'anushka',
+        pace: pace ? parseFloat(pace) : undefined,
+      });
+    } catch (error) {
+      if (error instanceof TTSError) {
+        logger.warn(`TTS error: ${error.type} - ${error.message}`);
+        return res.status(error.type === 'rate_limited' ? 429 : 400).json({
+          success: false,
+          error: error.message,
+          errorType: error.type,
+          retryable: error.retryable,
+        });
+      }
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      audio: result.audio,
+      mimeType: 'audio/wav',
+      durationMs: result.durationMs,
+      languageCode: result.languageCode,
+    });
+  } catch (error: any) {
+    logger.error(`Chat TTS error: ${error.message}\n${error.stack}`);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate speech',
       errorType: 'server_error',
       retryable: true,
     });

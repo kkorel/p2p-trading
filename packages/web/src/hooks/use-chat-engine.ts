@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { chatApi } from '@/lib/api';
 
 const SESSION_KEY = 'oorja_chat_session';
+const ANON_SESSION_KEY = 'oorja_anon_session'; // Temporary session for anonymous users
 
 export interface ChatMessageData {
   role: 'agent' | 'user';
@@ -11,31 +12,33 @@ export interface ChatMessageData {
   buttons?: Array<{ text: string; callbackData?: string }>;
 }
 
-/** Only restore session if user is authenticated (has authToken). */
+/** Get stored session - prioritize authenticated session, then anonymous. */
 function getStoredSessionId(): string | null {
   if (typeof window === 'undefined') return null;
   const hasAuth = !!localStorage.getItem('authToken');
-  if (!hasAuth) {
-    // Not logged in — clear any stale session and start fresh
-    localStorage.removeItem(SESSION_KEY);
-    return null;
+  if (hasAuth) {
+    // Authenticated - use permanent session
+    return localStorage.getItem(SESSION_KEY);
   }
-  return localStorage.getItem(SESSION_KEY);
+  // Anonymous - use temporary session
+  return localStorage.getItem(ANON_SESSION_KEY);
 }
 
-/** Only persist session to localStorage if user is authenticated. */
-function storeSessionId(id: string) {
-  if (typeof window !== 'undefined') {
-    const hasAuth = !!localStorage.getItem('authToken');
-    if (hasAuth) {
-      localStorage.setItem(SESSION_KEY, id);
-    }
+/** Store session ID - always store immediately to prevent duplicates. */
+function storeSessionId(id: string, isAuthenticated: boolean) {
+  if (typeof window === 'undefined') return;
+  if (isAuthenticated) {
+    localStorage.setItem(SESSION_KEY, id);
+    localStorage.removeItem(ANON_SESSION_KEY); // Clean up anon session
+  } else {
+    localStorage.setItem(ANON_SESSION_KEY, id);
   }
 }
 
 function clearStoredSession() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(ANON_SESSION_KEY);
   }
 }
 
@@ -62,25 +65,39 @@ export function useChatEngine() {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(getStoredSessionId);
-  const [initialized, setInitialized] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [responseLanguage, setResponseLanguage] = useState<string>('en-IN');
+  const [resetCounter, setResetCounter] = useState(0); // Triggers re-init after reset
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use refs for initialization state (survives React StrictMode double-mount)
+  const initializedRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const isAuthenticatedRef = useRef(false);
 
-  // Load history or trigger greeting on mount
+  // Load history or trigger greeting on mount (or after reset)
   useEffect(() => {
-    if (initialized) return;
-    setInitialized(true);
+    // Use ref to prevent double-initialization in React StrictMode
+    if (initializedRef.current) return;
+    initializedRef.current = true;
 
     const hasAuth = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
     setIsAuthenticated(hasAuth);
+    isAuthenticatedRef.current = hasAuth;
+
+    // Check for existing session (both auth and anon)
+    const storedSession = getStoredSessionId();
+    if (storedSession) {
+      setSessionId(storedSession);
+      sessionIdRef.current = storedSession;
+    }
 
     (async () => {
       try {
-        const stored = getStoredSessionId();
-        if (stored && hasAuth) {
-          // Authenticated — restore history
-          const history = await chatApi.getHistory(stored);
+        // Try to restore history for any existing session (authenticated or anonymous)
+        if (storedSession) {
+          const history = await chatApi.getHistory(storedSession);
           if (history.messages && history.messages.length > 0) {
             setMessages(
               history.messages.map((m: any) => ({
@@ -89,65 +106,82 @@ export function useChatEngine() {
                 buttons: m.buttons,
               }))
             );
-            return;
+            return; // History loaded, don't trigger greeting
           }
         }
-        // No history or not authenticated — trigger greeting
-        await sendMessageToAgent('hi', true);
+        // No session or no history — trigger greeting
+        await sendMessageToAgentInternal('hi', true);
       } catch {
-        await sendMessageToAgent('hi', true);
+        await sendMessageToAgentInternal('hi', true);
       }
     })();
-  }, [initialized]);
+  }, [resetCounter]);
 
-  const sendMessageToAgent = useCallback(
-    async (text: string, hideUserMessage = false) => {
-      setIsLoading(true);
+  // Internal send function that uses refs to avoid stale closure issues
+  const sendMessageToAgentInternal = async (text: string, hideUserMessage = false) => {
+    setIsLoading(true);
 
-      if (!hideUserMessage) {
-        setMessages((prev) => [...prev, { role: 'user', content: text }]);
+    if (!hideUserMessage) {
+      setMessages((prev) => [...prev, { role: 'user', content: text }]);
+    }
+
+    try {
+      // Use ref for current sessionId to avoid stale closure
+      const currentSessionId = sessionIdRef.current;
+      const res = await chatApi.send(text, currentSessionId || undefined);
+      
+      if (res.sessionId) {
+        // Update both state and ref immediately
+        setSessionId(res.sessionId);
+        sessionIdRef.current = res.sessionId;
+        
+        // Always store sessionId immediately to prevent duplicate sessions
+        const willBeAuthenticated = !!res.authToken || isAuthenticatedRef.current;
+        storeSessionId(res.sessionId, willBeAuthenticated);
       }
 
-      try {
-        const res = await chatApi.send(text, sessionId || undefined);
+      if (res.authToken) {
+        handleAuthToken(res.authToken);
+        setIsAuthenticated(true);
+        isAuthenticatedRef.current = true;
+        // Re-store with auth flag
         if (res.sessionId) {
-          setSessionId(res.sessionId);
-          // Only persist after auth
-          if (res.authToken || isAuthenticated) {
-            storeSessionId(res.sessionId);
-          }
+          storeSessionId(res.sessionId, true);
         }
+      }
 
-        if (res.authToken) {
-          handleAuthToken(res.authToken);
-          setIsAuthenticated(true);
-          // Now persist the sessionId since we just authenticated
-          if (res.sessionId) {
-            localStorage.setItem(SESSION_KEY, res.sessionId);
-          }
-        }
-
-        if (res.messages && res.messages.length > 0) {
-          setMessages((prev) => [
-            ...prev,
-            ...res.messages.map((m: any) => ({
-              role: 'agent' as const,
-              content: m.content,
-              buttons: m.buttons,
-            })),
-          ]);
-        }
-      } catch (err: any) {
-        console.error('[Chat] sendMessageToAgent error:', err);
+      if (res.messages && res.messages.length > 0) {
         setMessages((prev) => [
           ...prev,
-          { role: 'agent', content: 'Sorry, something went wrong. Please try again.' },
+          ...res.messages.map((m: any) => ({
+            role: 'agent' as const,
+            content: m.content,
+            buttons: m.buttons,
+          })),
         ]);
-      } finally {
-        setIsLoading(false);
       }
-    },
-    [sessionId, isAuthenticated]
+
+      // Sync voice preference from server
+      if (res.voiceOutputEnabled !== undefined) {
+        window.dispatchEvent(new CustomEvent('voice:preference', {
+          detail: { enabled: res.voiceOutputEnabled }
+        }));
+      }
+    } catch (err: any) {
+      console.error('[Chat] sendMessageToAgent error:', err);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'agent', content: 'Sorry, something went wrong. Please try again.' },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Stable callback wrapper for external use
+  const sendMessageToAgent = useCallback(
+    (text: string, hideUserMessage = false) => sendMessageToAgentInternal(text, hideUserMessage),
+    []
   );
 
   const handleSend = useCallback(() => {
@@ -178,13 +212,17 @@ export function useChatEngine() {
 
   const handleReset = useCallback(async () => {
     try {
-      await chatApi.reset(sessionId || undefined);
+      const currentSessionId = sessionIdRef.current;
+      await chatApi.reset(currentSessionId || undefined);
     } catch { /* ignore */ }
     setMessages([]);
     setSessionId(null);
+    sessionIdRef.current = null;
     clearStoredSession();
-    setInitialized(false);
-  }, [sessionId]);
+    // Reset initialization flag and trigger re-init
+    initializedRef.current = false;
+    setResetCounter(c => c + 1);
+  }, []);
 
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,19 +244,22 @@ export function useChatEngine() {
 
       try {
         const base64 = await fileToBase64(file);
-        const res = await chatApi.upload(base64, sessionId || undefined, file.name);
+        const currentSessionId = sessionIdRef.current;
+        const res = await chatApi.upload(base64, currentSessionId || undefined, file.name);
+        
         if (res.sessionId) {
           setSessionId(res.sessionId);
-          if (res.authToken || isAuthenticated) {
-            storeSessionId(res.sessionId);
-          }
+          sessionIdRef.current = res.sessionId;
+          const willBeAuthenticated = !!res.authToken || isAuthenticatedRef.current;
+          storeSessionId(res.sessionId, willBeAuthenticated);
         }
 
         if (res.authToken) {
           handleAuthToken(res.authToken);
           setIsAuthenticated(true);
+          isAuthenticatedRef.current = true;
           if (res.sessionId) {
-            localStorage.setItem(SESSION_KEY, res.sessionId);
+            storeSessionId(res.sessionId, true);
           }
         }
 
@@ -242,7 +283,7 @@ export function useChatEngine() {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [sessionId, isAuthenticated]
+    []
   );
 
   return {
@@ -258,5 +299,7 @@ export function useChatEngine() {
     handleReset,
     handleFileUpload,
     sendMessageToAgent,
+    responseLanguage,
+    setResponseLanguage,
   };
 }

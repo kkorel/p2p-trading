@@ -25,7 +25,7 @@ import {
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
 import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase } from './trading-agent';
-import { askLLM, classifyIntent, composeResponse } from './llm-fallback';
+import { askLLM, classifyIntent, composeResponse, extractNameWithLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
 
@@ -50,6 +50,20 @@ export interface AgentResponse {
   newState?: string;
   contextUpdate?: Partial<SessionContext>;
   authToken?: string;
+  /** Language used for the response (for TTS) */
+  responseLanguage?: string;
+  /** User's voice output preference (for auto-play) */
+  voiceOutputEnabled?: boolean;
+}
+
+/**
+ * Options for voice input processing
+ */
+export interface VoiceInputOptions {
+  /** Language detected from voice input (e.g., 'hi-IN', 'ta-IN') */
+  detectedLanguage?: string;
+  /** Whether this message came from voice input */
+  isVoiceInput?: boolean;
 }
 
 interface PendingListing {
@@ -112,10 +126,14 @@ interface SessionContext {
   language?: SarvamLangCode | 'hinglish';
   intent?: 'sell' | 'buy' | 'learn';
   langPicked?: boolean;
+  /** Flag to skip name question in WAITING_NAME.onEnter if already asked */
+  nameAsked?: boolean;
   expectedCredType?: string;
   verifiedCreds?: string[];
   pendingListing?: PendingListing;
   pendingPurchase?: PendingPurchase;
+  /** User's preference for voice output (TTS auto-play) */
+  voiceOutputEnabled?: boolean;
   // Runtime-only — not serialized to contextJson
   _sessionId?: string;
 }
@@ -134,6 +152,7 @@ type ChatState =
   | 'CONFIRM_TRADING'
   | 'GENERAL_CHAT'
   // Legacy states (kept for backward compat with existing sessions)
+  | 'ASK_VOICE_PREF' // Deprecated: voice toggle now in header UI
   | 'OTP_VERIFIED'
   | 'EXPLAIN_VC'
   | 'WAITING_VC_UPLOAD'
@@ -301,6 +320,80 @@ async function getVerifiedCredentials(userId: string): Promise<string[]> {
 // Returns Hinglish text when language is 'hinglish', otherwise English
 function h(ctx: SessionContext, en: string, hi: string): string {
   return ctx.language === 'hinglish' ? hi : en;
+}
+
+/**
+ * Extract the actual name from common phrases like "My name is Jack" or "I'm Jack".
+ * Returns just the name portion, or the full message if no pattern matches.
+ */
+function extractName(message: string): string {
+  let text = message.trim();
+  
+  // Common patterns in English
+  const englishPatterns = [
+    /^(?:my name is|i'm|i am|call me|this is|it's|its)\s+(.+)$/i,
+    /^(.+?)\s+(?:is my name|here)$/i,
+    /^(?:name:?\s*)(.+)$/i,
+  ];
+  
+  // Common patterns in Hindi/Hinglish
+  const hindiPatterns = [
+    /^(?:mera naam|mera name|naam|name)\s+(?:hai\s+)?(.+)$/i,
+    /^(?:main|mai|me)\s+(.+?)\s+(?:hun|hoon|hu)$/i,
+    /^(.+?)\s+(?:mera naam hai|hai mera naam)$/i,
+  ];
+  
+  const allPatterns = [...englishPatterns, ...hindiPatterns];
+  
+  for (const pattern of allPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      // Clean up the extracted name
+      let name = match[1].trim();
+      // Remove trailing punctuation
+      name = name.replace(/[.!?,;:]+$/, '').trim();
+      if (name.length >= 2) {
+        return name;
+      }
+    }
+  }
+  
+  // No explicit pattern matched - try to extract a name from casual speech
+  // Remove filler words and clean up
+  const fillerWords = /^(uh+|um+|hmm+|well|ok|okay|hey|hi|hello|so|yeah|yes|no|oh)[,.\s]+/gi;
+  text = text.replace(fillerWords, '').trim();
+  
+  // Remove trailing questions/phrases like "what's yours?", "and you?", "what about you?"
+  text = text.replace(/[,.\s]+(what'?s?\s+yours|and\s+you|what\s+about\s+you|you\??)\s*\??$/i, '').trim();
+  
+  // Remove surrounding punctuation
+  text = text.replace(/^[,.\s!?]+|[,.\s!?]+$/g, '').trim();
+  
+  // If the result looks like a reasonable name (1-3 words, starts with capital or is short)
+  const words = text.split(/\s+/);
+  if (words.length <= 3 && text.length >= 2 && text.length <= 50) {
+    // Check if it looks like a name (not a full sentence)
+    const hasVerb = /\b(is|am|are|was|were|have|has|do|does|can|will|would|should)\b/i.test(text);
+    if (!hasVerb) {
+      return text;
+    }
+  }
+  
+  // Last resort: try to find a capitalized word that looks like a name
+  const capitalizedWords = text.match(/\b[A-Z][a-z]+\b/g);
+  if (capitalizedWords && capitalizedWords.length > 0) {
+    // Return the first capitalized word (likely a name)
+    return capitalizedWords[0];
+  }
+  
+  // Fallback: return first word if it's reasonable length
+  const firstWord = words[0]?.replace(/[^a-zA-Z\u0900-\u097F]/g, '');
+  if (firstWord && firstWord.length >= 2 && firstWord.length <= 20) {
+    return firstWord;
+  }
+  
+  // Ultimate fallback
+  return text || message.trim();
 }
 
 // --- Listing creation helpers (multi-turn detail gathering) ---
@@ -1125,27 +1218,59 @@ const states: Record<ChatState, StateHandler> = {
         };
       }
 
-      // Free-text — show language picker again (don't auto-transition)
+      // Free-text: Language was auto-detected by processMessage() before this handler ran
+      // ctx.language is already set - acknowledge AND ask name in one message
       return {
-        messages: [
-          {
-            text: 'Apni bhasha chune / Choose your language:',
-            buttons: LANG_BUTTONS,
-          },
-        ],
+        messages: [{
+          text: h(ctx, 
+            'Hi! Nice to meet you. What is your name?',
+            'Haan! Aapse milke khushi hui. Aapka naam kya hai?'
+          ),
+        }],
+        newState: 'WAITING_NAME',
+        contextUpdate: { langPicked: true, nameAsked: true },
+      };
+    },
+  },
+
+  // Legacy: ASK_VOICE_PREF - voice toggle is now in header UI, but handle existing sessions
+  ASK_VOICE_PREF: {
+    async onEnter(ctx) {
+      // Skip this state entirely - just transition to WAITING_NAME
+      return {
+        messages: [],
+        newState: 'WAITING_NAME',
+      };
+    },
+    async onMessage(ctx, message) {
+      // If user somehow sends a message here, just move on
+      return {
+        messages: [],
+        newState: 'WAITING_NAME',
       };
     },
   },
 
   WAITING_NAME: {
     async onEnter(ctx) {
+      // Skip if name was already asked (from GREETING free-text flow)
+      if (ctx.nameAsked) {
+        return { messages: [] };
+      }
       return {
         messages: [{ text: h(ctx, 'What is your name?', 'Aapka naam kya hai?') }],
       };
     },
     async onMessage(ctx, message) {
-      const name = message.trim();
-      if (name.length < 2) {
+      // Try LLM-powered name extraction first (handles casual speech like "Uh, Jack, what's yours?")
+      let name = await extractNameWithLLM(message);
+      
+      // Fall back to regex extraction if LLM unavailable or fails
+      if (!name) {
+        name = extractName(message);
+      }
+      
+      if (!name || name.length < 2) {
         return {
           messages: [{ text: h(ctx, 'Please enter your name.', 'Apna naam batao.') }],
         };
@@ -2222,10 +2347,15 @@ async function translateResponse(
   targetLang: SarvamLangCode | 'hinglish'
 ): Promise<AgentResponse> {
   // Hinglish = English responses (user types Roman Hindi, reads English fine)
-  if (targetLang === 'hinglish') return response;
+  // For TTS purposes, treat hinglish as Hindi (hi-IN)
+  if (targetLang === 'hinglish') {
+    return { ...response, responseLanguage: 'hi-IN' };
+  }
 
   const effectiveLang = targetLang as SarvamLangCode;
-  if (effectiveLang === 'en-IN' || !isTranslationAvailable()) return response;
+  if (effectiveLang === 'en-IN' || !isTranslationAvailable()) {
+    return { ...response, responseLanguage: effectiveLang };
+  }
 
   const translatedMessages: AgentMessage[] = [];
   for (const msg of response.messages) {
@@ -2246,7 +2376,7 @@ async function translateResponse(
     });
   }
 
-  return { ...response, messages: translatedMessages };
+  return { ...response, messages: translatedMessages, responseLanguage: effectiveLang };
 }
 
 // --- Main Entry Point ---
@@ -2256,7 +2386,8 @@ export async function processMessage(
   platformId: string,
   userMessage: string,
   fileData?: FileData,
-  authenticatedUserId?: string
+  authenticatedUserId?: string,
+  voiceOptions?: VoiceInputOptions
 ): Promise<AgentResponse> {
   let session = await prisma.chatSession.findUnique({
     where: { platform_platformId: { platform, platformId } },
@@ -2402,19 +2533,42 @@ export async function processMessage(
   }
 
   // Per-message language detection — dynamically switch language mid-conversation
-  const detectedLang = detectLanguage(userMessage);
+  // For voice input, use the language detected by STT (already translated to English)
+  // For text input, detect language from the text itself
   const isStructuredInput = /^\d+$/.test(userMessage.trim()) || userMessage.trim().length <= 3;
   const isCallbackData = userMessage.includes(':') && !userMessage.includes(' ');
+  
+  let detectedLang: SarvamLangCode | 'hinglish';
+  let processedMessage = userMessage;
+  
+  if (voiceOptions?.isVoiceInput && voiceOptions.detectedLanguage) {
+    // Voice input: STT already translated to English, use the detected language
+    detectedLang = voiceOptions.detectedLanguage as SarvamLangCode;
+    logger.info(`[Voice] Using STT-detected language: ${detectedLang}`);
+    // Message is already in English from STT, no translation needed
+  } else {
+    // Text input: detect language from the text
+    detectedLang = detectLanguage(userMessage);
+    // Translate native-script messages to English for processing
+    if (detectedLang !== 'en-IN' && detectedLang !== 'hinglish' && !isStructuredInput) {
+      processedMessage = await translateToEnglish(userMessage, detectedLang as SarvamLangCode);
+      logger.info(`Translated [${detectedLang} → en-IN]: "${userMessage}" → "${processedMessage}"`);
+    }
+  }
 
   // Determine effective language for this message:
   // 1. Structured input (numbers, callbacks) → keep existing preference
-  // 2. Native Indic script detected → switch to that language
-  // 3. Hinglish detected → switch to hinglish
-  // 4. English detected (no Indic, no Hinglish) → switch to English
+  // 2. Voice input with detected language → use that language
+  // 3. Native Indic script detected → switch to that language
+  // 4. Hinglish detected → switch to hinglish
+  // 5. English detected (no Indic, no Hinglish) → switch to English
   let userLang: SarvamLangCode | 'hinglish';
   if (isStructuredInput || isCallbackData) {
     // Don't change language on button presses or numeric input
     userLang = (ctx.language || 'en-IN') as SarvamLangCode | 'hinglish';
+  } else if (voiceOptions?.isVoiceInput && voiceOptions.detectedLanguage) {
+    // Voice input: always use the STT-detected language
+    userLang = voiceOptions.detectedLanguage as SarvamLangCode;
   } else if (detectedLang === 'hinglish') {
     userLang = 'hinglish';
   } else if (detectedLang !== 'en-IN') {
@@ -2423,13 +2577,6 @@ export async function processMessage(
   } else {
     // English detected — switch to English
     userLang = 'en-IN';
-  }
-
-  // Translate native-script messages to English for processing
-  let processedMessage = userMessage;
-  if (detectedLang !== 'en-IN' && detectedLang !== 'hinglish' && !isStructuredInput) {
-    processedMessage = await translateToEnglish(userMessage, detectedLang as SarvamLangCode);
-    logger.info(`Translated [${detectedLang} → en-IN]: "${userMessage}" → "${processedMessage}"`);
   }
 
   // Update language preference if changed — persist to session and user profile
@@ -2478,7 +2625,8 @@ export async function processMessage(
     }
 
     const effectiveLang = (response.contextUpdate?.language as any) || userLang;
-    return translateResponse({ messages: allMessages, authToken }, effectiveLang);
+    const voiceEnabled = chainCtx.voiceOutputEnabled;
+    return translateResponse({ messages: allMessages, authToken, voiceOutputEnabled: voiceEnabled }, effectiveLang);
   }
 
   if (response.contextUpdate) {
@@ -2490,7 +2638,9 @@ export async function processMessage(
   }
 
   const effectiveLang = (response.contextUpdate?.language as any) || userLang;
-  return translateResponse(response, effectiveLang);
+  const mergedCtx = { ...ctx, ...response.contextUpdate };
+  const voiceEnabled = mergedCtx.voiceOutputEnabled;
+  return translateResponse({ ...response, voiceOutputEnabled: voiceEnabled }, effectiveLang);
 }
 
 // --- Helpers ---

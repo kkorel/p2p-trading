@@ -408,6 +408,7 @@ enum ChatPlatform {
 
 enum ChatState {
   GREETING
+  ASK_VOICE_PREF
   WAITING_PHONE
   WAITING_OTP
   WAITING_NAME

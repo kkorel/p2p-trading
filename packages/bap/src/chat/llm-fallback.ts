@@ -211,6 +211,74 @@ RESPONSE STYLE:
 IMPORTANT: If the data context says the user is "already onboarded" or has "verified credentials", NEVER ask them to upload, provide, or submit any credentials or documents. They have already completed this step. Focus on helping them with trading, earnings, listings, and other platform features instead.`;
 
 /**
+ * Extract a person's name from natural speech using LLM.
+ * Handles casual responses like "Uh, Jack, what's yours?" → "Jack"
+ * Returns null if LLM unavailable or fails.
+ */
+export async function extractNameWithLLM(userMessage: string): Promise<string | null> {
+  if (!OPENROUTER_API_KEY) return null;
+
+  const NAME_EXTRACT_PROMPT = `Extract the person's NAME from this message. The user was asked "What is your name?" and responded with this message.
+
+Rules:
+- Return ONLY the name, nothing else
+- Remove filler words (uh, um, well, etc.)
+- Remove questions they ask back (like "what's yours?", "and you?")
+- If they say "My name is X" or "I'm X" or "Call me X", extract X
+- If they just say a name like "Jack" or "Priya", return that
+- Handle Hindi/Hinglish: "Mera naam Raj hai" → "Raj"
+- If you cannot find a clear name, return "UNCLEAR"
+
+Examples:
+- "Uh, Jack, what's yours?" → "Jack"
+- "My name is Priya" → "Priya"
+- "I'm John, nice to meet you" → "John"
+- "Mera naam Raj hai" → "Raj"
+- "Call me Sam" → "Sam"
+- "Jack" → "Jack"
+- "Hello there" → "UNCLEAR"
+
+User's message: "${userMessage}"
+
+Return ONLY the extracted name (one or two words max) or "UNCLEAR":`;
+
+  try {
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
+      {
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'user', content: NAME_EXTRACT_PROMPT },
+        ],
+        temperature: 0.1,
+        max_tokens: 20,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://p2p-energy-trading.local',
+          'X-Title': 'Oorja Name Extractor',
+        },
+        timeout: 5000,
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content?.trim();
+    if (reply && reply !== 'UNCLEAR' && reply.length >= 2 && reply.length <= 50) {
+      // Clean up any quotes or extra punctuation
+      const cleaned = reply.replace(/^["']|["']$/g, '').trim();
+      logger.debug(`Name extracted: "${userMessage.substring(0, 30)}..." → "${cleaned}"`);
+      return cleaned;
+    }
+    return null;
+  } catch (error: any) {
+    logger.warn(`Name extraction failed: ${error.message}`);
+    return null;
+  }
+}
+
+/**
  * Compose a natural, conversational response using LLM.
  * Takes the user's message, relevant data, and user context.
  * Returns null if LLM unavailable or fails.

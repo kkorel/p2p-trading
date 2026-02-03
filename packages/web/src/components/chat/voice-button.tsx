@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Mic, Loader2, X, AlertCircle, Square, MicOff } from 'lucide-react';
+import { Mic, Loader2, X, AlertCircle, Send, MicOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVoiceInput } from '@/hooks/use-voice-input';
 
@@ -9,8 +9,12 @@ import { useVoiceInput } from '@/hooks/use-voice-input';
  * Props for the VoiceButton component
  */
 export interface VoiceButtonProps {
-  /** Callback when transcription is ready */
-  onTranscript: (text: string) => void;
+  /** Callback when transcription is ready (includes detected language for TTS) */
+  onTranscript: (text: string, language?: string) => void;
+  /** Callback when recording starts (use to stop TTS) */
+  onRecordingStart?: () => void;
+  /** Callback when recording stops */
+  onRecordingStop?: () => void;
   /** Whether the button is disabled */
   disabled?: boolean;
   /** Additional CSS classes */
@@ -30,7 +34,9 @@ export interface VoiceButtonProps {
  * - Designed for all users including non-tech-savvy users
  */
 export function VoiceButton({ 
-  onTranscript, 
+  onTranscript,
+  onRecordingStart,
+  onRecordingStop,
   disabled = false,
   className,
 }: VoiceButtonProps) {
@@ -50,8 +56,14 @@ export function VoiceButton({
   } = useVoiceInput({
     maxDuration: 30,
     minDuration: 0.5,
-    onTranscript: (text: string) => {
-      onTranscript(text);
+    onTranscript: (text: string, language?: string) => {
+      onTranscript(text, language);
+    },
+    onRecordingStart: () => {
+      onRecordingStart?.();
+    },
+    onRecordingStop: () => {
+      onRecordingStop?.();
     },
     onError: () => {
       setShowError(true);
@@ -104,12 +116,12 @@ export function VoiceButton({
   if (isRecording) {
     return (
       <div className="absolute inset-x-0 bottom-0 z-50 animate-fade-in">
-        <div className="bg-[var(--color-danger-light)] border-t-2 border-[var(--color-danger)] px-3 py-3">
+        <div className="bg-[var(--color-primary-light)] border-t-2 border-[var(--color-primary)] px-3 py-3">
           <div className="flex items-center gap-3">
             {/* Cancel button */}
             <button
               onClick={handleCancel}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/80 hover:bg-white text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/80 hover:bg-white text-[var(--color-text-secondary)] hover:text-[var(--color-danger)] transition-colors"
               aria-label="Cancel recording"
             >
               <X className="w-4 h-4" />
@@ -118,14 +130,14 @@ export function VoiceButton({
 
             {/* Recording indicator */}
             <div className="flex items-center gap-2 flex-1">
-              {/* Pulsing red dot */}
+              {/* Pulsing recording dot */}
               <div className="relative">
-                <div className="w-3 h-3 rounded-full bg-[var(--color-danger)] animate-pulse" />
-                <div className="absolute inset-0 w-3 h-3 rounded-full bg-[var(--color-danger)] animate-ping opacity-50" />
+                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                <div className="absolute inset-0 w-3 h-3 rounded-full bg-red-500 animate-ping opacity-50" />
               </div>
 
               {/* Duration */}
-              <span className="font-mono text-base font-semibold text-[var(--color-danger)]">
+              <span className="font-mono text-base font-semibold text-[var(--color-primary-dark)]">
                 {formatDuration(duration)}
               </span>
 
@@ -134,7 +146,7 @@ export function VoiceButton({
                 {[0.15, 0.3, 0.5, 0.7, 0.9, 1.0, 0.85, 0.6, 0.35, 0.2].map((threshold, i) => (
                   <div
                     key={i}
-                    className="w-1 rounded-full bg-[var(--color-danger)] transition-all duration-75"
+                    className="w-1 rounded-full bg-[var(--color-primary)] transition-all duration-75"
                     style={{
                       height: `${Math.max(4, (audioLevel >= threshold * 0.4 ? audioLevel : 0.1) * 20)}px`,
                       opacity: audioLevel >= threshold * 0.25 ? 0.9 : 0.3,
@@ -144,14 +156,14 @@ export function VoiceButton({
               </div>
             </div>
 
-            {/* Large STOP button */}
+            {/* Send button - teal/primary colored */}
             <button
               onClick={handleStopRecording}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--color-danger)] hover:bg-[#dc2626] text-white font-semibold text-base shadow-lg hover:shadow-xl active:scale-95 transition-all"
-              aria-label="Stop recording and send"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white font-semibold text-base shadow-lg hover:shadow-xl active:scale-95 transition-all"
+              aria-label="Send voice message"
             >
-              <Square className="w-4 h-4 fill-current" />
-              <span>STOP</span>
+              <Send className="w-4 h-4" />
+              <span>Send</span>
             </button>
           </div>
         </div>
