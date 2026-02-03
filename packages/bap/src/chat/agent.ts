@@ -325,10 +325,12 @@ async function getVerifiedCredentials(userId: string): Promise<string[]> {
   return creds.map((c) => c.credentialType);
 }
 
-// --- Hinglish helper ---
-// Returns Hinglish text when language is 'hinglish', otherwise English
-function h(ctx: SessionContext, en: string, hi: string): string {
-  return ctx.language === 'hinglish' ? hi : en;
+// --- Language helper ---
+// Returns alt (Hinglish/Roman) text for ANY non-English language.
+// translateResponse() later converts this to native script (Devanagari, Tamil, etc.).
+function h(ctx: SessionContext | { language?: string }, en: string, alt: string): string {
+  if (!ctx.language || ctx.language === 'en-IN') return en;
+  return alt;
 }
 
 // --- App URL for registration redirects ---
@@ -4094,7 +4096,9 @@ export async function processMessage(
       });
     }
     await storeAgentMessages(session.id, universalResponse.messages);
-    return universalResponse;
+    // Translate universal command responses to the user's language
+    const ucLang = (universalResponse.contextUpdate?.language || ctx.language || 'en-IN') as SarvamLangCode | 'hinglish';
+    return translateResponse(universalResponse, ucLang);
   }
 
   // Per-message language detection — dynamically switch language mid-conversation
