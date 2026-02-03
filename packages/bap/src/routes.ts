@@ -32,6 +32,10 @@ import {
   // Secure client for signed Beckn requests
   secureAxios,
   isSigningEnabled,
+  // Beckn v2 wire-format builders
+  buildWireOrder,
+  buildWireStatusOrder,
+  BuildSelectOrderOptions,
   // CDS utilities
   isExternalCDSEnabled,
   // Bulk matcher
@@ -1513,23 +1517,43 @@ router.post('/api/select', async (req: Request, res: Response) => {
     bpp_uri: targetBppUri,
   });
 
-  // Build select message with Beckn orderItemAttributes (providerAttributes)
-  const selectMessage: SelectMessage = {
+  // Look up buyer utility info
+  let buyerMeterId: string | undefined;
+  let buyerUtilityCustomerId: string | undefined;
+  const buyerUser = req.user?.id ? await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { meterNumber: true, consumerNumber: true },
+  }) : null;
+  buyerMeterId = buyerUser?.meterNumber || undefined;
+  buyerUtilityCustomerId = buyerUser?.consumerNumber || undefined;
+
+  // Build Beckn v2 wire format order for select
+  const wireOrder = buildWireOrder({
+    sellerId: selectedOffer.provider_id,
+    buyerId: req.user?.id || 'buyer',
+    buyerMeterId,
+    buyerUtilityCustomerId,
+    buyerUtilityId: config.utility?.id,
+    bapId: config.bap.id,
+    bppId: targetBppId,
+    items: [{
+      itemId: resolvedItemId,
+      quantity,
+      offerId: selectedOffer.id,
+      offerPrice: selectedOffer.price.value,
+      offerCurrency: selectedOffer.price.currency,
+      offerProvider: selectedOffer.provider_id,
+      offerItems: [resolvedItemId],
+      offerTimeWindow: selectedOffer.timeWindow,
+      providerMeterId: itemMeterId,
+      providerUtilityCustomerId: utilityCustomerId,
+      providerUtilityId: config.utility?.id,
+    }],
+  });
+
+  const selectMessage = {
     context,
-    message: {
-      orderItems: [{
-        item_id: resolvedItemId,
-        offer_id: selectedOffer.id,
-        quantity,
-        'beckn:orderItemAttributes': {
-          providerAttributes: {
-            meterId: itemMeterId,
-            utilityCustomerId,
-            userType: 'prosumer',
-          },
-        },
-      }],
-    },
+    message: { order: wireOrder },
   };
   
   logger.info('Sending select request', {
@@ -1669,15 +1693,35 @@ router.post('/api/init', async (req: Request, res: Response) => {
     bpp_uri: targetBppUri,
   });
 
-  // Build init message
-  const initMessage: InitMessage = {
+  // Build init message with Beckn v2 wire format
+  const initWireOrder = buildWireOrder({
+    sellerId: providerId,
+    buyerId: txState.buyerId || 'buyer',
+    bapId: config.bap.id,
+    bppId: targetBppId,
+    buyerUtilityId: config.utility?.id,
+    items: orderItems.map(oi => ({
+      itemId: oi.item_id,
+      quantity: oi.quantity,
+      offerId: oi.offer_id,
+      offerPrice: 0, // Will be calculated by BPP
+      offerCurrency: 'INR',
+      offerProvider: providerId,
+      offerItems: [oi.item_id],
+    })),
+  });
+
+  // Add fulfillment stub for init
+  (initWireOrder as any)['beckn:fulfillment'] = {
+    '@context': 'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/main/schema/core/v2/context.jsonld',
+    '@type': 'beckn:Fulfillment',
+    'beckn:id': `fulfillment-${context.transaction_id.slice(0, 8)}`,
+    'beckn:mode': 'DELIVERY',
+  };
+
+  const initMessage = {
     context,
-    message: {
-      order: {
-        items: orderItems,
-        provider: { id: providerId },
-      },
-    },
+    message: { order: initWireOrder },
   };
 
   logger.info('Sending init request', {
@@ -1814,13 +1858,13 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
     bpp_uri: targetBppUri,
   });
 
-  // Build confirm message
-  const confirmMessage: ConfirmMessage = {
+  // Build confirm message with Beckn v2 wire format
+  const confirmMessage = {
     context,
     message: {
-      order: { id: orderId },
+      order: { 'beckn:id': orderId },
     },
-  };
+  } as any;
 
   logger.info('Sending confirm request', {
     transaction_id,
@@ -1937,13 +1981,13 @@ router.post('/api/status', async (req: Request, res: Response) => {
     bpp_uri: targetBppUri,
   });
   
-  // Build status message
-  const statusMessage: StatusMessage = {
+  // Build status message with Beckn v2 wire format
+  const statusMessage = {
     context,
     message: {
-      order_id: orderId,
+      order: { 'beckn:id': orderId },
     },
-  };
+  } as any;
   
   logger.info('Sending status request', {
     transaction_id,

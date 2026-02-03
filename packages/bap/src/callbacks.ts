@@ -15,6 +15,7 @@ import {
   matchOffers,
   MatchingCriteria,
   config,
+  parseWireOrderResponse,
 } from '@p2p/shared';
 import { logEvent, isDuplicateMessage } from './events';
 import { updateTransaction, getTransaction, createTransaction } from './state';
@@ -349,15 +350,23 @@ router.post('/on_select', async (req: Request, res: Response) => {
   
   await logEvent(context.transaction_id, context.message_id, 'on_select', 'INBOUND', JSON.stringify(message));
   
+  // Parse both Beckn v2 wire format and internal format
+  const parsed = parseWireOrderResponse(content);
+  const internalOrder = (content as any)._internalOrder || content.order;
+
   await updateTransaction(context.transaction_id, {
     status: 'INITIALIZING',
   });
-  
-  logger.info(`Selection confirmed: order ${content.order.id}, quote: ${content.order.quote.price.value} ${content.order.quote.price.currency}`, {
+
+  const orderId = parsed.orderId || internalOrder?.id || 'unknown';
+  const quotePrice = parsed.quote?.price?.value || internalOrder?.quote?.price?.value || 0;
+  const quoteCurrency = parsed.quote?.price?.currency || internalOrder?.quote?.price?.currency || 'INR';
+
+  logger.info(`Selection confirmed: order ${orderId}, quote: ${quotePrice} ${quoteCurrency}`, {
     transaction_id: context.transaction_id,
   });
-  
-  res.json({ status: 'ok', order_id: content.order.id });
+
+  res.json({ status: 'ok', order_id: orderId });
 });
 
 /**
@@ -397,41 +406,49 @@ router.post('/on_init', async (req: Request, res: Response) => {
     return res.json({ status: 'error', error: error.message });
   }
 
+  // Parse both Beckn v2 wire format and internal format
+  const parsedInit = parseWireOrderResponse(content);
+  const internalOrder = (content as any)._internalOrder || content.order;
+
   // Handle bulk orders (multiple separate orders from bulk purchase)
   if (content.bulkOrders && content.bulkOrders.length > 0) {
     await updateTransaction(context.transaction_id, {
-      order: content.order, // Primary order for compatibility
+      order: internalOrder, // Primary order for compatibility
       bulkOrders: content.bulkOrders, // All orders from bulk purchase
       bulkGroupId: content.bulkGroupId,
       status: 'CONFIRMING',
       error: undefined,
     });
 
+    const primaryId = parsedInit.orderId || internalOrder?.id || 'unknown';
     logger.info(`Bulk orders initialized: ${content.bulkOrders.length} orders, group ${content.bulkGroupId}`, {
       transaction_id: context.transaction_id,
-      orderIds: content.bulkOrders.map((o: any) => o.id),
+      orderIds: content.bulkOrders.map((o: any) => o['beckn:id'] || o.id),
     });
 
     return res.json({
       status: 'ok',
-      order_id: content.order.id,
+      order_id: primaryId,
       bulk_orders: content.bulkOrders.length,
       bulk_group_id: content.bulkGroupId,
     });
   }
 
   // Single order (original flow)
+  const orderId = parsedInit.orderId || internalOrder?.id || 'unknown';
+  const orderStatus = parsedInit.status || internalOrder?.status || 'DRAFT';
+
   await updateTransaction(context.transaction_id, {
-    order: content.order,
+    order: internalOrder,
     status: 'CONFIRMING',
     error: undefined, // Clear any previous error
   });
 
-  logger.info(`Order initialized: ${content.order.id}, status: ${content.order.status}`, {
+  logger.info(`Order initialized: ${orderId}, status: ${orderStatus}`, {
     transaction_id: context.transaction_id,
   });
 
-  res.json({ status: 'ok', order_id: content.order.id, order_status: content.order.status });
+  res.json({ status: 'ok', order_id: orderId, order_status: orderStatus });
 });
 
 /**
@@ -454,32 +471,39 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
   
   await logEvent(context.transaction_id, context.message_id, 'on_confirm', 'INBOUND', JSON.stringify(message));
   
+  // Parse both Beckn v2 wire format and internal format
+  const parsedConfirm = parseWireOrderResponse(content);
+  const internalOrder = (content as any)._internalOrder || content.order;
+
   // Get transaction state to retrieve buyer info
   const txState = await getTransaction(context.transaction_id);
-  
+
+  const orderId = parsedConfirm.orderId || internalOrder?.id || 'unknown';
+  const orderStatus = parsedConfirm.status || internalOrder?.status || 'ACTIVE';
+
   await updateTransaction(context.transaction_id, {
-    order: content.order,
+    order: internalOrder,
     status: 'ACTIVE',
   });
-  
-  logger.info(`Order confirmed: ${content.order.id}, status: ${content.order.status}`, {
+
+  logger.info(`Order confirmed: ${orderId}, status: ${orderStatus}`, {
     transaction_id: context.transaction_id,
   });
 
   // Send WhatsApp notifications (async, don't block response)
-  const orderItems = content.order.items || [];
+  const orderItems = parsedConfirm.items || internalOrder?.items || [];
   const firstItem = orderItems[0] as any || {};
-  const quote = content.order.quote as any || {};
-  
+  const quote = parsedConfirm.quote || internalOrder?.quote as any || {};
+
   notifyOrderConfirmed({
-    orderId: content.order.id,
+    orderId,
     transactionId: context.transaction_id,
     buyerId: txState?.buyerId || undefined,
-    sellerId: firstItem?.provider_id,
-    quantity: quote?.breakup?.find((b: any) => b.title === 'energy')?.quantity || 0,
+    sellerId: firstItem?.provider_id || parsedConfirm.providerId,
+    quantity: quote?.breakup?.find((b: any) => b.title === 'energy')?.quantity || quote?.totalQuantity || 0,
     totalPrice: quote?.price?.value || 0,
     pricePerKwh: quote?.breakup?.find((b: any) => b.title === 'energy')?.price?.value || 0,
-    timeWindow: firstItem?.fulfillment?.time?.range 
+    timeWindow: firstItem?.fulfillment?.time?.range
       ? `${firstItem.fulfillment.time.range.start} - ${firstItem.fulfillment.time.range.end}`
       : undefined,
     energyType: firstItem?.descriptor?.name || 'solar',
@@ -492,15 +516,15 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
   import('./ledger').then(async ({ writeTradeToLedger }) => {
     try {
       const buyerId = txState?.buyerId || 'unknown-buyer';
-      const sellerId = content.order.items?.[0]?.provider_id || 'unknown-seller';
-      
+      const sellerId = firstItem?.provider_id || parsedConfirm.providerId || 'unknown-seller';
+
       const ledgerResult = await writeTradeToLedger(
         context.transaction_id,
-        content.order,
+        internalOrder,
         buyerId,
         sellerId
       );
-      
+
       if (ledgerResult.success) {
         logger.info('Trade recorded in ledger', {
           transaction_id: context.transaction_id,
@@ -522,7 +546,7 @@ router.post('/on_confirm', async (req: Request, res: Response) => {
     logger.error('Failed to load ledger module', { error: err.message });
   });
 
-  res.json({ status: 'ok', order_id: content.order.id, order_status: content.order.status });
+  res.json({ status: 'ok', order_id: orderId, order_status: orderStatus });
 });
 
 /**
@@ -544,20 +568,26 @@ router.post('/on_status', async (req: Request, res: Response) => {
   
   await logEvent(context.transaction_id, context.message_id, 'on_status', 'INBOUND', JSON.stringify(message));
   
+  // Parse both Beckn v2 wire format and internal format
+  const parsedStatus = parseWireOrderResponse(content);
+  const internalOrder = (content as any)._internalOrder || content.order;
+
   await updateTransaction(context.transaction_id, {
-    order: content.order,
+    order: internalOrder,
   });
-  
+
+  const orderId = parsedStatus.orderId || internalOrder?.id || 'unknown';
+  const orderStatus = parsedStatus.status || internalOrder?.status || 'unknown';
   const fulfillmentState = content.fulfillment?.state?.descriptor?.name || 'Unknown';
-  
-  logger.info(`Order status: ${content.order.id}, status: ${content.order.status}, fulfillment: ${fulfillmentState}`, {
+
+  logger.info(`Order status: ${orderId}, status: ${orderStatus}, fulfillment: ${fulfillmentState}`, {
     transaction_id: context.transaction_id,
   });
-  
-  res.json({ 
-    status: 'ok', 
-    order_id: content.order.id, 
-    order_status: content.order.status,
+
+  res.json({
+    status: 'ok',
+    order_id: orderId,
+    order_status: orderStatus,
     fulfillment: fulfillmentState,
   });
 });
