@@ -564,8 +564,8 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
     return {
       messages: [{
         text: h(ctx,
-          '📝 *Step 1/4: Energy Type*\n\nWhat type of energy do you want to sell?',
-          '📝 *Step 1/4: Energy Type*\n\nAap konsi energy bechna chahte ho?'
+          'What type of energy do you want to sell?',
+          'Aap konsi energy bechna chahte ho?'
         ),
         buttons: [
           { text: h(ctx, '☀️ Solar', '☀️ Solar'), callbackData: 'listing_type:SOLAR' },
@@ -581,8 +581,8 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
     return {
       messages: [{
         text: h(ctx,
-          `📝 *Step 2/4: Quantity*\n\nHow many units do you want to sell?\n\n💡 Tip: 50 units = enough for 5 homes for 1 day`,
-          `📝 *Step 2/4: Quantity*\n\nKitne unit bechna chahte ho?\n\n💡 Tip: 50 unit = 5 ghar ke liye 1 din ki bijli`
+          `How many units do you want to sell?\n\n💡 Tip: 50 units = enough for 5 homes for 1 day`,
+          `Kitne unit bechna chahte ho?\n\n💡 Tip: 50 unit = 5 ghar ke liye 1 din ki bijli`
         ),
         buttons: [
           { text: '🔋 25 units', callbackData: 'listing_qty:25' },
@@ -601,12 +601,10 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
     return {
       messages: [{
         text: h(ctx,
-          `📝 *Step 3/4: Price*\n\n` +
           `💡 *Smart Pricing*\n` +
           `${marketInsight.en}\n\n` +
           `What price per unit would you like?`,
-          
-          `📝 *Step 3/4: Price*\n\n` +
+
           `💡 *Smart Pricing*\n` +
           `${marketInsight.hi}\n\n` +
           `Per unit kitne Rs mein bechoge?`
@@ -625,8 +623,8 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
     return {
       messages: [{
         text: h(ctx,
-          '📝 *Step 4/4: Time*\n\nWhen do you want to sell?',
-          '📝 *Step 4/4: Time*\n\nKab bechna chahte ho?'
+          'When do you want to sell?',
+          'Kab bechna chahte ho?'
         ),
         buttons: [
           { text: h(ctx, '🌅 Tomorrow 6AM-6PM', '🌅 Kal subah 6-shaam 6'), callbackData: 'listing_time:tomorrow' },
@@ -1514,7 +1512,6 @@ async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPur
 const LANG_BUTTONS = [
   { text: 'English', callbackData: 'lang:en-IN' },
   { text: 'हिंदी', callbackData: 'lang:hi-IN' },
-  { text: 'Hinglish', callbackData: 'lang:hinglish' },
   { text: 'বাংলা', callbackData: 'lang:bn-IN' },
   { text: 'தமிழ்', callbackData: 'lang:ta-IN' },
   { text: 'తెలుగు', callbackData: 'lang:te-IN' },
@@ -1552,40 +1549,16 @@ const CRED_FARMER_NAMES: Record<string, { en: string; hi: string }> = {
   UtilityProgramEnrollmentCredential: { en: 'program enrollment ID', hi: 'program ka ID' },
 };
 
-// --- Progress Indicator Helper ---
+// --- Onboarding state set (for status/suggestion checks) ---
 
-const ONBOARDING_STEPS = [
-  { state: 'GREETING', step: 1, en: 'Choose language', hi: 'Bhasha chuno' },
-  { state: 'WAITING_NAME', step: 2, en: 'Your name', hi: 'Aapka naam' },
-  { state: 'WAITING_PHONE', step: 3, en: 'Phone number', hi: 'Phone number' },
-  { state: 'WAITING_OTP', step: 4, en: 'Verify OTP', hi: 'OTP verify' },
-  { state: 'ASK_DISCOM', step: 5, en: 'Electricity company', hi: 'Bijli company' },
-  { state: 'WAITING_UTILITY_CRED', step: 6, en: 'Upload credential', hi: 'Credential upload' },
-  { state: 'ASK_INTENT', step: 7, en: 'Your goal', hi: 'Aapka goal' },
-];
+const ONBOARDING_STATES = new Set([
+  'GREETING', 'WAITING_NAME', 'WAITING_PHONE', 'WAITING_OTP',
+  'ASK_DISCOM', 'WAITING_UTILITY_CRED', 'ASK_INTENT',
+]);
 
-const TOTAL_STEPS = 7;
-
-/**
- * Generate a progress indicator for onboarding.
- * Returns: "Step 3 of 7: Phone number\n━━━━━○○○ 43%"
- */
-function getProgressIndicator(state: string, ctx: SessionContext): string {
-  const stepInfo = ONBOARDING_STEPS.find(s => s.state === state);
-  if (!stepInfo) return '';
-
-  const { step, en, hi } = stepInfo;
-  const label = h(ctx, en, hi);
-  const percent = Math.round((step / TOTAL_STEPS) * 100);
-  
-  // Create visual progress bar
-  const filledBlocks = Math.floor((step / TOTAL_STEPS) * 7);
-  const emptyBlocks = 7 - filledBlocks;
-  const progressBar = '━'.repeat(filledBlocks) + '○'.repeat(emptyBlocks);
-  
-  const stepText = h(ctx, `Step ${step} of ${TOTAL_STEPS}`, `Step ${step}/${TOTAL_STEPS}`);
-  
-  return `${stepText}: ${label}\n${progressBar} ${percent}%\n\n`;
+// Progress indicator disabled — clean conversational flow
+function getProgressIndicator(_state: string, _ctx: SessionContext): string {
+  return '';
 }
 
 // --- Universal Commands ---
@@ -1707,10 +1680,10 @@ async function handleUniversalCommand(
 
   // Check for status command
   if (UNIVERSAL_COMMANDS.status.includes(normalized)) {
-    const stepInfo = ONBOARDING_STEPS.find(s => s.state === currentState);
+    const isOnboarding = ONBOARDING_STATES.has(currentState);
     let statusText: string;
-    
-    if (stepInfo) {
+
+    if (isOnboarding) {
       const progress = getProgressIndicator(currentState, ctx);
       statusText = h(ctx,
         `📍 *Your Status*\n\n${progress}` +
@@ -1973,7 +1946,6 @@ async function handleUniversalCommand(
     const LANG_CONFIRM: Record<string, string> = {
       'en-IN': 'Language set to English. How can I help?',
       'hi-IN': 'भाषा हिंदी में सेट हो गई। मैं कैसे मदद कर सकता हूँ?',
-      'hinglish': 'Language Hinglish mein set ho gayi. Kya madad karun?',
       'bn-IN': 'ভাষা বাংলায় সেট হয়েছে। আমি কীভাবে সাহায্য করতে পারি?',
       'ta-IN': 'மொழி தமிழில் அமைக்கப்பட்டது. நான் எப்படி உதவ முடியும்?',
       'te-IN': 'భాష తెలుగులో సెట్ చేయబడింది. నేను ఎలా సహాయం చేయగలను?',
@@ -2011,7 +1983,7 @@ function getSmartSuggestions(ctx: SessionContext, currentState: string): Array<{
   const verifiedCreds = ctx.verifiedCreds || [];
   
   // For onboarding states, show help and relevant action
-  if (ONBOARDING_STEPS.find(s => s.state === currentState)) {
+  if (ONBOARDING_STATES.has(currentState)) {
     suggestions.push({ text: h(ctx, 'Help', 'Madad'), callbackData: 'cmd:help' });
     if (STATE_BACK_MAP[currentState]) {
       suggestions.push({ text: h(ctx, 'Back', 'Peeche'), callbackData: 'cmd:back' });
