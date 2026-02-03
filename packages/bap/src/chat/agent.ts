@@ -1595,7 +1595,7 @@ const UNIVERSAL_COMMANDS: Record<string, string[]> = {
   back: ['back', 'peeche', 'previous', 'wapas'],
   cancel: ['cancel', 'band', 'ruko', 'stop', 'abort'],
   status: ['status', 'sthiti', 'where', 'kahan'],
-  language: ['language', 'bhasha', 'lang'],
+  language: ['language', 'bhasha', 'lang', 'change language', 'switch language', 'bhasha badlo', 'bhasha change', 'change lang', 'set language'],
   reset: ['reset', 'restart', 'start over', 'shuru', 'naya'],
   tips: ['tips', 'tip', 'sujhav', 'advice'],
   about: ['about', 'what is oorja', 'oorja kya hai', 'info'],
@@ -1964,6 +1964,27 @@ async function handleUniversalCommand(
       }],
       contextUpdate: { voiceOutputEnabled: false, voicePromptShown: true },
       voiceOutputEnabled: false,
+    };
+  }
+
+  // Handle language selection callback (from buttons shown by "language" command)
+  if (command.startsWith('lang:')) {
+    const lang = command.replace('lang:', '');
+    const LANG_CONFIRM: Record<string, string> = {
+      'en-IN': 'Language set to English. How can I help?',
+      'hi-IN': 'भाषा हिंदी में सेट हो गई। मैं कैसे मदद कर सकता हूँ?',
+      'hinglish': 'Language Hinglish mein set ho gayi. Kya madad karun?',
+      'bn-IN': 'ভাষা বাংলায় সেট হয়েছে। আমি কীভাবে সাহায্য করতে পারি?',
+      'ta-IN': 'மொழி தமிழில் அமைக்கப்பட்டது. நான் எப்படி உதவ முடியும்?',
+      'te-IN': 'భాష తెలుగులో సెట్ చేయబడింది. నేను ఎలా సహాయం చేయగలను?',
+      'kn-IN': 'ಭಾಷೆ ಕನ್ನಡಕ್ಕೆ ಬದಲಾಗಿದೆ. ನಾನು ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?',
+    };
+    return {
+      messages: [{
+        text: LANG_CONFIRM[lang] || 'Language updated! How can I help?',
+        buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+      }],
+      contextUpdate: { language: lang as any },
     };
   }
 
@@ -3472,6 +3493,15 @@ const states: Record<ChatState, StateHandler> = {
 
             // All details provided — discover best offer and show to user
             return await discoverAndShowOffer(ctx, pendingBuy);
+          }
+
+          case 'change_language': {
+            return {
+              messages: [{
+                text: h(ctx, 'Choose your language:', 'Apni bhasha chuno:'),
+                buttons: LANG_BUTTONS,
+              }],
+            };
           }
 
           case 'discom_rates': {

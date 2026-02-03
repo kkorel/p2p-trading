@@ -43,8 +43,8 @@ Important:
 
 export interface ClassifiedIntent {
   intent: 'show_listings' | 'show_earnings' | 'show_balance' | 'show_orders' | 'show_sales'
-    | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'market_insights' 
-    | 'show_dashboard' | 'track_activity' | 'general_qa';
+    | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'market_insights'
+    | 'show_dashboard' | 'track_activity' | 'change_language' | 'general_qa';
   params?: {
     price_per_kwh?: number;
     quantity_kwh?: number;
@@ -69,6 +69,7 @@ Intents:
 - "track_activity": User wants to track BOTH orders AND earnings together (e.g. "track orders and earnings", "track activity", "my activity", "meri activity", "status dekho", "show status", "kya chal raha hai", "activity summary")
 - "discom_rates": User asks about DISCOM/electricity rates or tariffs
 - "trading_tips": User asks for tips on how to earn more or improve trading
+- "change_language": User wants to change/switch their chat language (e.g. "change to Hindi", "switch language", "Tamil mein baat karo", "bhasha badlo", "I want to talk in Bengali")
 - "general_qa": General question about energy trading, Oorja, solar, etc.
 
 IMPORTANT: If the user says they want to "place", "create", "add", "daal", "bana", "list" something — that's "create_listing", NOT "show_listings" or "show_orders".
@@ -304,7 +305,7 @@ export async function composeResponse(
   if (language === 'hinglish') {
     langInstruction = 'Reply in Hinglish (Roman Hindi script, NOT Devanagari).';
   } else if (language && LANG_NAMES[language]) {
-    langInstruction = `Reply in simple English. The user understands ${LANG_NAMES[language]}, so use simple words.`;
+    langInstruction = `Reply in ${LANG_NAMES[language]} using the native script. Keep it simple and conversational.`;
   } else {
     langInstruction = 'Reply in simple English.';
   }

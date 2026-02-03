@@ -329,10 +329,12 @@ async function handleVoiceMessage(
     // Transcribe using Sarvam
     let transcript: string;
     let languageName: string;
+    let detectedLanguageCode: string | undefined;
     try {
       const result = await transcribeAudio(buffer, mimeType);
       transcript = result.transcript;
       languageName = result.languageName;
+      detectedLanguageCode = result.languageCode;
       logger.info(`WhatsApp voice transcription [${languageName}]: "${transcript.substring(0, 50)}..."`);
     } catch (error) {
       if (error instanceof STTError) {
@@ -348,8 +350,11 @@ async function handleVoiceMessage(
       throw error;
     }
 
-    // Process through agent
-    const response = await processMessage('WHATSAPP', chatId, transcript);
+    // Process through agent (pass detected voice language so agent responds in same language)
+    const response = await processMessage('WHATSAPP', chatId, transcript, undefined, undefined, {
+      isVoiceInput: true,
+      detectedLanguage: detectedLanguageCode,
+    });
 
     for (const msg of response.messages) {
       await sendWhatsAppMessage(chatId, msg.text, msg.buttons);
