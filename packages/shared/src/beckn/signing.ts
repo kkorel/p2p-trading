@@ -14,8 +14,9 @@
 
 import crypto from 'crypto';
 
-// Algorithm designation - matches ONIX (ed25519, not xed25519)
-export const BECKN_ALGORITHM = 'ed25519';
+// Algorithm designation - must match what's registered in DeDi keyId
+// Note: xed25519 is used in the keyId (subscriber_id|unique_key_id|xed25519)
+export const BECKN_ALGORITHM = 'xed25519';
 
 // Key pair interface
 export interface BecknKeyPair {
@@ -227,7 +228,7 @@ export function verifySignature(
 export function createSignedHeaders(
   body: object,
   keyPair: BecknKeyPair,
-  ttlSeconds: number = 30
+  ttlSeconds: number = 300  // 5 minutes, matching ONIX
 ): Record<string, string> {
   const bodyString = JSON.stringify(body);
   const authorization = signMessage(bodyString, keyPair, ttlSeconds);
