@@ -30,6 +30,7 @@ export interface WireOrderItem {
       meterId?: string;
       utilityCustomerId?: string;
       utilityId?: string;
+      userType?: string;
     };
     fulfillmentAttributes?: any;
   };
@@ -124,6 +125,7 @@ export function buildWireOrder(opts: BuildSelectOrderOptions, orderStatus = 'CRE
         meterId: item.providerMeterId,
         utilityCustomerId: item.providerUtilityCustomerId,
         utilityId: item.providerUtilityId,
+        userType: 'PROSUMER', // Default to PROSUMER for P2P sellers
       },
     },
     'beckn:acceptedOffer': {

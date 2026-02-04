@@ -81,6 +81,7 @@ interface BecknItemAttributes {
   '@type': string;
   sourceType: string;
   meterId: string;
+  availableQuantity?: number;  // Required for CDS filtering
 }
 
 interface BecknItem {
@@ -131,7 +132,11 @@ interface BecknOffer {
     '@type': string;
     'schema:price': number;
     'schema:priceCurrency': string;
-    'schema:unitText': string;
+    unitText: string;  // No 'schema:' prefix per Postman spec
+    applicableQuantity?: {
+      unitQuantity: number;
+      unitText: string;
+    };
   };
   'beckn:offerAttributes': BecknOfferAttributes;
 }
@@ -187,7 +192,7 @@ export function isExternalCDSEnabled(): boolean {
 function getCDSPublishUrl(): string {
   // Use EXTERNAL_CDS_URL for publishing, or fall back to CDS_URL
   const baseUrl = process.env.EXTERNAL_CDS_URL || process.env.CDS_URL || config.external.cds;
-  
+
   // If URL already ends with /catalog, just append /publish
   // Otherwise append /catalog/publish
   if (baseUrl.endsWith('/catalog')) {
@@ -233,6 +238,7 @@ function buildBecknItem(item: SyncItem, providerName: string): BecknItem {
       '@type': 'EnergyResource',
       sourceType: item.source_type,
       meterId: item.meter_id || `der://meter/${item.id}`,
+      availableQuantity: item.available_qty,  // Required for CDS filtering
     },
   };
 }
@@ -258,7 +264,11 @@ function buildBecknOffer(offer: SyncOffer, _meterId?: string): BecknOffer {
       '@type': 'schema:PriceSpecification',
       'schema:price': offer.price_value,
       'schema:priceCurrency': offer.currency || 'INR',
-      'schema:unitText': 'kWh',
+      unitText: 'kWh',  // No 'schema:' prefix per Postman spec
+      applicableQuantity: {
+        unitQuantity: offer.max_qty,
+        unitText: 'kWh',
+      },
     },
     'beckn:offerAttributes': {
       '@context': BECKN_ENERGY_TRADE_CONTEXT,
@@ -319,10 +329,10 @@ export async function publishCatalogToCDS(
   try {
     // Build catalog ID based on provider
     const catalogId = `catalog-${provider.id}`;
-    
+
     // Build Beckn items
     const becknItems = items.map(item => buildBecknItem(item, provider.name));
-    
+
     // Build Beckn offers with meter IDs from their corresponding items
     const becknOffers = offers.map(offer => {
       const item = items.find(i => i.id === offer.item_id);
@@ -441,7 +451,7 @@ export async function syncProviderToCDS(provider: SyncProvider): Promise<boolean
     logger.debug('External CDS sync disabled, skipping provider sync', { providerId: provider.id });
     return false;
   }
-  
+
   // For provider-only sync, we just log - real sync happens with publishCatalogToCDS
   logger.info('Provider registered (will sync with catalog)', {
     providerId: provider.id,
@@ -459,7 +469,7 @@ export async function syncItemToCDS(item: SyncItem): Promise<boolean> {
     logger.debug('External CDS sync disabled, skipping item sync', { itemId: item.id });
     return false;
   }
-  
+
   // For item-only sync, we just log - real sync happens with publishCatalogToCDS
   logger.info('Item registered (will sync with catalog)', {
     itemId: item.id,
@@ -485,7 +495,7 @@ export async function syncOfferToCDS(offer: SyncOffer): Promise<boolean> {
       id: offer.provider_id,
       name: `Provider ${offer.provider_id}`, // Will be updated with real name in seller-routes
     };
-    
+
     const item: SyncItem = {
       id: offer.item_id,
       provider_id: offer.provider_id,
@@ -559,7 +569,7 @@ export async function syncCompleteOfferToCDS(
   const failedSteps: string[] = [];
 
   const success = await publishOfferToCDS(provider, item, offer);
-  
+
   if (!success) {
     failedSteps.push('catalog_publish');
   }
