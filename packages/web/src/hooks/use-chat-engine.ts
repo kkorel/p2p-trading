@@ -209,6 +209,13 @@ export function useChatEngine() {
   const handleButtonClick = useCallback(
     (callbackData: string, displayText: string) => {
       if (isLoading) return;
+      
+      // Special handling: trigger file upload directly
+      if (callbackData === 'action:trigger_file_upload') {
+        fileInputRef.current?.click();
+        return;
+      }
+      
       setMessages((prev) => [...prev, { role: 'user', content: displayText }]);
       sendMessageToAgent(callbackData, true);
     },

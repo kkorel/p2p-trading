@@ -2004,39 +2004,59 @@ function getSmartSuggestions(ctx: SessionContext, currentState: string): Array<{
   
   // For onboarding states, show help and relevant action
   if (ONBOARDING_STATES.has(currentState)) {
-    suggestions.push({ text: h(ctx, 'Help', 'Madad'), callbackData: 'cmd:help' });
+    suggestions.push({ text: h(ctx, 'Help', 'मदद'), callbackData: 'cmd:help' });
     if (STATE_BACK_MAP[currentState]) {
-      suggestions.push({ text: h(ctx, 'Back', 'Peeche'), callbackData: 'cmd:back' });
+      suggestions.push({ text: h(ctx, 'Back', 'पीछे'), callbackData: 'cmd:back' });
     }
     return suggestions;
   }
   
-  // For GENERAL_CHAT, provide trading-related suggestions
+  // For GENERAL_CHAT, provide trading-related suggestions based on credentials
   if (currentState === 'GENERAL_CHAT') {
     const hasGeneration = verifiedCreds.includes('GENERATION_PROFILE');
     const hasStorage = verifiedCreds.includes('STORAGE_PROFILE');
     const hasConsumption = verifiedCreds.includes('CONSUMPTION_PROFILE');
     
+    // Common: Show electricity info (dashboard)
+    suggestions.push({ 
+      text: h(ctx, '📊 My Electricity Info', '📊 मेरी बिजली की जानकारी'), 
+      callbackData: 'action:dashboard' 
+    });
+    
     // Seller suggestions (has generation or storage credential)
     if (hasGeneration || hasStorage) {
-      suggestions.push({ text: h(ctx, '📊 My Dashboard', '📊 Dashboard'), callbackData: 'action:dashboard' });
-      suggestions.push({ text: h(ctx, '➕ New Listing', '➕ Naya Listing'), callbackData: 'action:create_listing' });
-      suggestions.push({ text: h(ctx, '💰 My Earnings', '💰 Kamai'), callbackData: 'action:show_earnings' });
+      suggestions.push({ 
+        text: h(ctx, '☀️ Sell Electricity', '☀️ बिजली बेचो'), 
+        callbackData: 'action:create_listing' 
+      });
+      suggestions.push({ 
+        text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), 
+        callbackData: 'action:show_earnings' 
+      });
     }
     
     // Buyer suggestions (has consumption credential)
-    if (hasConsumption || (!hasGeneration && !hasStorage)) {
-      suggestions.push({ text: h(ctx, '🔋 Buy Energy', '🔋 Bijli Khareedu'), callbackData: 'action:buy_energy' });
-      suggestions.push({ text: h(ctx, '📦 My Orders', '📦 Orders'), callbackData: 'action:show_orders' });
+    if (hasConsumption && !hasGeneration && !hasStorage) {
+      suggestions.push({ 
+        text: h(ctx, '🔋 Buy Electricity', '🔋 बिजली खरीदो'), 
+        callbackData: 'action:buy_energy' 
+      });
+      suggestions.push({ 
+        text: h(ctx, '📦 My Orders', '📦 मेरे ऑर्डर'), 
+        callbackData: 'action:show_orders' 
+      });
     }
     
-    // Universal suggestions
+    // Universal: Browse marketplace
+    suggestions.push({ 
+      text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), 
+      callbackData: 'action:browse' 
+    });
+    
+    // Cancel button for pending actions
     if (ctx.pendingListing || ctx.pendingPurchase) {
-      suggestions.unshift({ text: h(ctx, '❌ Cancel', '❌ Band'), callbackData: 'cmd:cancel' });
+      suggestions.unshift({ text: h(ctx, '❌ Cancel', '❌ रद्द'), callbackData: 'cmd:cancel' });
     }
-    
-    // Add browse marketplace
-    suggestions.push({ text: h(ctx, '🏪 Browse Market', '🏪 Market Dekho'), callbackData: 'action:browse' });
     
     // Limit to 4 suggestions
     return suggestions.slice(0, 4);
@@ -2350,7 +2370,7 @@ const states: Record<ChatState, StateHandler> = {
       const progress = getProgressIndicator('WAITING_PHONE', ctx);
       return {
         messages: [
-          { text: progress + h(ctx, `Nice to meet you, ${name}! Your phone number?`, `${name}, aapse milke khushi hui! Aapka phone number?`) },
+          { text: progress + h(ctx, `Nice to meet you, ${name}! Your phone number?`, `${name}, आपसे मिलकर खुशी हुई! आपका फ़ोन नंबर?`) },
         ],
       };
     },
@@ -2359,7 +2379,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!validatePhoneNumber(phone)) {
         return {
-          messages: [{ text: h(ctx, 'Please enter a valid 10-digit phone number.', 'Sahi 10-digit phone number daalo.') }],
+          messages: [{ text: h(ctx, 'Please enter a valid 10-digit phone number.', 'सही 10 अंकों का फ़ोन नंबर डालो।') }],
         };
       }
 
@@ -2368,7 +2388,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!result.success) {
         return {
-          messages: [{ text: h(ctx, 'Could not send OTP. Please try again.', 'OTP nahi bhej paye. Dobara try karo.') }],
+          messages: [{ text: h(ctx, 'Could not send OTP. Please try again.', 'कोड नहीं भेज पाए। दोबारा कोशिश करो।') }],
         };
       }
 
@@ -2385,7 +2405,7 @@ const states: Record<ChatState, StateHandler> = {
       const progress = getProgressIndicator('WAITING_OTP', ctx);
       return {
         messages: [
-          { text: progress + h(ctx, `Code sent to ${ctx.phone}. Enter it:`, `${ctx.phone} pe code bheja hai. Yahan daalo:`) },
+          { text: progress + h(ctx, `Code sent to ${ctx.phone}. Enter it:`, `${ctx.phone} पे कोड भेज दिया है। यहाँ डालो:`) },
         ],
       };
     },
@@ -2395,7 +2415,7 @@ const states: Record<ChatState, StateHandler> = {
 
       if (!/^\d{4,6}$/.test(otp)) {
         return {
-          messages: [{ text: h(ctx, 'Enter the 6-digit code.', '6-digit code daalo.') }],
+          messages: [{ text: h(ctx, 'Enter the 6-digit code.', '6 अंकों का कोड डालो।') }],
           contextUpdate: { otpAttempts: attempts },
         };
       }
