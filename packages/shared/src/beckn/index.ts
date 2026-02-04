@@ -52,6 +52,7 @@ export {
   initializeSecureClient,
   getPublicKey as getClientPublicKey,
   getKeyId,
+  getKeyPair,
   isSigningEnabled,
   signedPost,
   createSecureAxiosInstance,

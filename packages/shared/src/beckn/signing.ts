@@ -1,19 +1,21 @@
 /**
  * Beckn HTTP Signature Implementation
  * 
- * Implements XEd25519 signing for Beckn protocol messages as per:
- * https://developers.becknprotocol.io/docs/infrastructure-layer-specification/authentication/subscriber-signing
+ * Implements Ed25519 signing for Beckn protocol messages.
+ * Matches ONIX adapter implementation from beckn-onix.
  * 
  * Uses:
- * - XEd25519 signature scheme (Ed25519 compatible)
- * - BLAKE-512 for digest hashing (fallback to SHA-512 for compatibility)
+ * - Ed25519 signature scheme
+ * - BLAKE2b-512 for digest hashing (via Node.js crypto)
  * - Authorization header format per RFC 7235
+ * 
+ * Reference: beckn-onix/core/module/handler/step.go
  */
 
 import crypto from 'crypto';
 
-// Algorithm designation as per Beckn spec
-export const BECKN_ALGORITHM = 'xed25519';
+// Algorithm designation - matches ONIX (ed25519, not xed25519)
+export const BECKN_ALGORITHM = 'ed25519';
 
 // Key pair interface
 export interface BecknKeyPair {
@@ -46,7 +48,7 @@ export interface VerificationResult {
  */
 export function generateKeyPair(subscriberId: string, uniqueKeyId: string = 'key1'): BecknKeyPair {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
-  
+
   return {
     publicKey: publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
     privateKey: privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64'),
@@ -65,46 +67,47 @@ export function createSigningString(
 ): string {
   const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
   const digest = createDigest(bodyString);
-  
+
   return `(created): ${created}\n(expires): ${expires}\ndigest: BLAKE-512=${digest}`;
 }
 
 /**
  * Create BLAKE2b-512 digest of the request body
- * Note: Using SHA-512 as a fallback since BLAKE2b requires additional setup
+ * Uses Node.js built-in crypto (blake2b512 available since Node 12)
+ * Matches ONIX implementation: signer.go hash() function
  */
 export function createDigest(body: string): string {
-  // Use SHA-512 as BLAKE2b-512 equivalent for this implementation
-  // In production, use BLAKE2b-512 via a library like 'blake2'
-  const hash = crypto.createHash('sha512').update(body).digest('base64');
+  // BLAKE2b-512 per Beckn spec and ONIX implementation
+  const hash = crypto.createHash('blake2b512').update(body).digest('base64');
   return hash;
 }
 
 /**
  * Sign a Beckn message
+ * TTL matches ONIX: 5 minutes (step.go line 46)
  */
 export function signMessage(
   body: string | object,
   keyPair: BecknKeyPair,
-  ttlSeconds: number = 30
+  ttlSeconds: number = 300 // 5 minutes, matching ONIX
 ): string {
   const now = Math.floor(Date.now() / 1000);
   const created = now;
   const expires = now + ttlSeconds;
-  
+
   const signingString = createSigningString(created, expires, body);
-  
+
   // Import the private key
   const privateKeyObj = crypto.createPrivateKey({
     key: Buffer.from(keyPair.privateKey, 'base64'),
     format: 'der',
     type: 'pkcs8',
   });
-  
+
   // Sign the string
   const signature = crypto.sign(null, Buffer.from(signingString), privateKeyObj);
   const signatureBase64 = signature.toString('base64');
-  
+
   // Build the Authorization header value
   return buildAuthorizationHeader({
     keyId: keyPair.keyId,
@@ -131,14 +134,14 @@ export function parseAuthorizationHeader(header: string): SignatureComponents | 
   if (!header.startsWith('Signature ')) {
     return null;
   }
-  
+
   const signaturePart = header.substring('Signature '.length);
   const components: Partial<SignatureComponents> = {};
-  
+
   // Parse key-value pairs
   const regex = /(\w+)="([^"]+)"/g;
   let match;
-  
+
   while ((match = regex.exec(signaturePart)) !== null) {
     const [, key, value] = match;
     switch (key) {
@@ -162,13 +165,13 @@ export function parseAuthorizationHeader(header: string): SignatureComponents | 
         break;
     }
   }
-  
+
   // Validate all required fields are present
-  if (!components.keyId || !components.algorithm || !components.created || 
-      !components.expires || !components.headers || !components.signature) {
+  if (!components.keyId || !components.algorithm || !components.created ||
+    !components.expires || !components.headers || !components.signature) {
     return null;
   }
-  
+
   return components as SignatureComponents;
 }
 
@@ -186,27 +189,27 @@ export function verifySignature(
     if (!components) {
       return { valid: false, error: 'Invalid Authorization header format' };
     }
-    
+
     // Check expiration
     const now = Math.floor(Date.now() / 1000);
     if (now > components.expires) {
       return { valid: false, error: 'Signature has expired', keyId: components.keyId };
     }
-    
+
     // Recreate the signing string
     const signingString = createSigningString(components.created, components.expires, body);
-    
+
     // Import the public key
     const publicKeyObj = crypto.createPublicKey({
       key: Buffer.from(publicKeyBase64, 'base64'),
       format: 'der',
       type: 'spki',
     });
-    
+
     // Verify the signature
     const signatureBuffer = Buffer.from(components.signature, 'base64');
     const isValid = crypto.verify(null, Buffer.from(signingString), publicKeyObj, signatureBuffer);
-    
+
     return {
       valid: isValid,
       keyId: components.keyId,
@@ -229,7 +232,7 @@ export function createSignedHeaders(
   const bodyString = JSON.stringify(body);
   const authorization = signMessage(bodyString, keyPair, ttlSeconds);
   const digest = createDigest(bodyString);
-  
+
   return {
     'Authorization': authorization,
     'X-Gateway-Authorization': authorization,
@@ -266,11 +269,11 @@ export function verifyMessageFromRegistry(
   if (!components) {
     return { valid: false, error: 'Invalid Authorization header format' };
   }
-  
+
   const publicKey = getPublicKey(components.keyId);
   if (!publicKey) {
     return { valid: false, error: `Unknown keyId: ${components.keyId}`, keyId: components.keyId };
   }
-  
+
   return verifySignature(authHeader, body, publicKey);
 }

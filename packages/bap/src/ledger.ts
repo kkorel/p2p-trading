@@ -2,6 +2,7 @@
  * DEG Ledger Integration
  * 
  * Handles writing trade records to the immutable DEG Ledger.
+ * Mimics ONIX degledgerrecorder plugin behavior - uses signed requests.
  * 
  * API Reference: https://github.com/beckn/DEG/blob/main/specification/api/deg_contract_ledger.yaml
  * 
@@ -12,7 +13,7 @@
  */
 
 import axios from 'axios';
-import { config, createLogger, Order, prisma } from '@p2p/shared';
+import { config, createLogger, Order, prisma, createSignedHeaders, getKeyPair } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
@@ -202,11 +203,17 @@ export async function writeTradeToLedger(
         transactionId, orderItemId, ledgerUrl,
       });
 
+      // Use signed headers (matching ONIX degledgerrecorder)
+      const keyPair = getKeyPair();
+      const signedHeaders = keyPair
+        ? createSignedHeaders(request, keyPair)
+        : { 'Content-Type': 'application/json' };
+
       const response = await axios.post<LedgerWriteResponse>(
         `${ledgerUrl}/ledger/put`,
         request,
         {
-          headers: { 'Content-Type': 'application/json' },
+          headers: signedHeaders,
           timeout: 10000,
         }
       );
@@ -283,9 +290,15 @@ async function writeSingleRecord(
     clientReference: `${opts.transactionId}-${opts.orderItemId}-${Date.now()}`,
   };
 
+  // Use signed headers (matching ONIX degledgerrecorder)
+  const keyPair = getKeyPair();
+  const signedHeaders = keyPair
+    ? createSignedHeaders(request, keyPair)
+    : { 'Content-Type': 'application/json' };
+
   const response = await axios.post<LedgerWriteResponse>(
     `${ledgerUrl}/ledger/put`, request,
-    { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+    { headers: signedHeaders, timeout: 10000 }
   );
 
   return response.data.success

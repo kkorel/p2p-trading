@@ -35,21 +35,21 @@ export function initializeSecureClient(config: Partial<SecureClientConfig> = {})
     // In production, this should be loaded from secure storage/env
     const subscriberId = process.env.BECKN_SUBSCRIBER_ID || 'p2p-energy-bap';
     clientKeyPair = generateKeyPair(subscriberId);
-    logger.info('Generated new Beckn signing key pair', { 
+    logger.info('Generated new Beckn signing key pair', {
       keyId: clientKeyPair.keyId,
-      publicKey: clientKeyPair.publicKey.substring(0, 20) + '...' 
+      publicKey: clientKeyPair.publicKey.substring(0, 20) + '...'
     });
   }
-  
+
   signingEnabled = config.enabled ?? (process.env.BECKN_SIGNING_ENABLED === 'true');
   signatureTtl = config.ttlSeconds ?? parseInt(process.env.BECKN_SIGNATURE_TTL || '30', 10);
-  
-  logger.info('Secure Beckn client initialized', { 
-    signingEnabled, 
+
+  logger.info('Secure Beckn client initialized', {
+    signingEnabled,
     signatureTtl,
-    keyId: clientKeyPair.keyId 
+    keyId: clientKeyPair.keyId
   });
-  
+
   return clientKeyPair;
 }
 
@@ -65,6 +65,14 @@ export function getPublicKey(): string | null {
  */
 export function getKeyId(): string | null {
   return clientKeyPair?.keyId || null;
+}
+
+/**
+ * Get the current key pair for signing
+ * Returns null if not initialized
+ */
+export function getKeyPair(): BecknKeyPair | null {
+  return clientKeyPair;
 }
 
 /**
@@ -87,24 +95,24 @@ export async function signedPost<T = any>(
     'Content-Type': 'application/json',
     ...(config?.headers as Record<string, string> || {}),
   };
-  
+
   // Add signature headers if signing is enabled
   if (signingEnabled && clientKeyPair) {
     try {
       const signedHeaders = createSignedHeaders(body, clientKeyPair, signatureTtl);
       headers = { ...headers, ...signedHeaders };
-      logger.debug('Added signature headers to request', { 
-        url, 
-        keyId: clientKeyPair.keyId 
+      logger.debug('Added signature headers to request', {
+        url,
+        keyId: clientKeyPair.keyId
       });
     } catch (error: any) {
-      logger.error('Failed to sign request, sending unsigned', { 
-        url, 
-        error: error.message 
+      logger.error('Failed to sign request, sending unsigned', {
+        url,
+        error: error.message
       });
     }
   }
-  
+
   return axios.post<T>(url, body, { ...config, headers });
 }
 
@@ -113,13 +121,13 @@ export async function signedPost<T = any>(
  */
 export function createSecureAxiosInstance(): AxiosInstance {
   const instance = axios.create();
-  
+
   // Add request interceptor for signing
   instance.interceptors.request.use(
     (config) => {
       if (
-        signingEnabled && 
-        clientKeyPair && 
+        signingEnabled &&
+        clientKeyPair &&
         config.method?.toLowerCase() === 'post' &&
         config.data
       ) {
@@ -138,26 +146,26 @@ export function createSecureAxiosInstance(): AxiosInstance {
     },
     (error) => Promise.reject(error)
   );
-  
+
   // Add response interceptor for logging
   instance.interceptors.response.use(
     (response) => {
-      logger.debug('Response received', { 
-        url: response.config.url, 
-        status: response.status 
+      logger.debug('Response received', {
+        url: response.config.url,
+        status: response.status
       });
       return response;
     },
     (error) => {
-      logger.error('Request failed', { 
-        url: error.config?.url, 
+      logger.error('Request failed', {
+        url: error.config?.url,
         status: error.response?.status,
-        message: error.message 
+        message: error.message
       });
       return Promise.reject(error);
     }
   );
-  
+
   return instance;
 }
 
