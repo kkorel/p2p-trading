@@ -3514,10 +3514,38 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
     }),
     test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, 'external', { transactionId: 'diag-txn', limit: 1 }),
 
-    // External: CDS
+    // External: CDS - Full realistic discover request for debugging
     test('CDS /beckn/discover', '/beckn/discover', 'POST', `${cdsUrl}/discover`, 'external', {
-      context: { ...becknCtx, action: 'discover', bpp_id: undefined, bpp_uri: undefined },
-      message: { intent: { item: { descriptor: { name: 'Energy' } } } },
+      context: {
+        ...becknCtx,
+        action: 'discover',
+        bpp_id: undefined,
+        bpp_uri: undefined,
+        location: {
+          city: { code: 'BLR', name: 'Bangalore' },
+          country: { code: 'IND', name: 'India' },
+        },
+        schema_context: [
+          'https://raw.githubusercontent.com/beckn/protocol-specifications-new/refs/heads/p2p-trading/schema/EnergyResource/v0.2/context.jsonld',
+        ],
+      },
+      message: {
+        filters: {
+          type: 'jsonpath',
+          expression: "$[?('p2p-interdiscom-trading-pilot-network' == @.beckn:networkId && @.beckn:itemAttributes.availableQuantity >= 1)]",
+          expressionType: 'jsonpath',
+        },
+        intent: {
+          item: { descriptor: { name: 'Energy' } },
+          fulfillment: {
+            time: {
+              startTime: new Date(Date.now() + 3600000).toISOString(), // +1 hour
+              endTime: new Date(Date.now() + 18000000).toISOString(),  // +5 hours
+            },
+          },
+          quantity: { value: 5 },
+        },
+      },
     }),
 
     // External: VC Portal
