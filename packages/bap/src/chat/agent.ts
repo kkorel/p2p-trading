@@ -345,6 +345,35 @@ function h(ctx: SessionContext | { language?: string }, en: string, alt: string)
   return alt;
 }
 
+/**
+ * Extract a valid Indian phone number from messy voice transcriptions.
+ * Handles: "Plus 44 7552335216", "07552335216", "91 9876543210", etc.
+ */
+function extractIndianPhone(text: string): string | null {
+  // Remove common voice prefixes and format issues
+  let cleaned = text
+    .toLowerCase()
+    .replace(/plus\s*/gi, '')        // "Plus 44" → "44"
+    .replace(/\+/g, '')              // "+91" → "91"
+    .replace(/^0+/, '')              // Leading zeros
+    .replace(/^91\s*/, '')           // India country code
+    .replace(/^44\s*/, '')           // UK code (common mistranscription)
+    .replace(/^1\s*/, '')            // US code
+    .replace(/[\s\-\(\)\.]/g, '')    // Spaces, dashes, parens, dots
+    .replace(/[^\d]/g, '');          // Remove all non-digits
+
+  // If more than 10 digits, take last 10 (handles "919876543210" → "9876543210")
+  if (cleaned.length > 10) {
+    cleaned = cleaned.slice(-10);
+  }
+
+  // Validate: Indian mobile starts with 6-9, exactly 10 digits
+  if (/^[6-9]\d{9}$/.test(cleaned)) {
+    return cleaned;
+  }
+  return null;
+}
+
 // --- App URL for registration redirects ---
 const APP_URL = 'https://p2p-trading-snowy.vercel.app/';
 
@@ -936,9 +965,24 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
     // Add custom amount option
     buttons.push({ text: h(ctx, '📝 Custom amount', '📝 Custom amount'), callbackData: 'buy_custom' });
 
+    // Build structured offers for premium UI (web only)
+    const structuredOffers = deals.map(deal => ({
+      id: deal.offerId,
+      sellerName: deal.providerName,
+      sellerTrustScore: deal.trustScore,
+      energyType: (deal.energyType.includes('Solar') || deal.energyType.includes('☀️')) ? 'solar' as const :
+        (deal.energyType.includes('Wind') || deal.energyType.includes('💨')) ? 'wind' as const : 'grid' as const,
+      pricePerUnit: deal.pricePerUnit,
+      quantity: deal.quantity,
+      totalPrice: deal.totalPrice,
+      timeWindow: 'Flexible',
+      savingsPercent: Math.round(deal.savingsPercent),
+    }));
+
     return {
       messages: [{
         text: message,
+        offers: structuredOffers, // Premium UI cards for web
         buttons,
       }],
       contextUpdate: { pendingPurchase: { ...pending, topDealsShown: true, awaitingField: 'top_deals' } },
@@ -2422,7 +2466,14 @@ const states: Record<ChatState, StateHandler> = {
       };
     },
     async onMessage(ctx, message) {
-      const phone = message.trim().replace(/[\s\-()]/g, '');
+      // First try to extract a clean phone from voice transcription
+      // Handles: "Plus 44 7552335216", "07552335216", "91 9876543210", etc.
+      let phone = extractIndianPhone(message);
+
+      if (!phone) {
+        // Fallback to basic cleaning for typed input
+        phone = message.trim().replace(/[\s\-()]/g, '');
+      }
 
       if (!validatePhoneNumber(phone)) {
         return {
