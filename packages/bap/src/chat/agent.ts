@@ -665,7 +665,10 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
   // Allow cancellation at any point
   if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop') {
     return {
-      messages: [{ text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.') }],
+      messages: [{
+        text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.'),
+        buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+      }],
       contextUpdate: { pendingListing: undefined },
     };
   }
@@ -878,13 +881,24 @@ async function createListingFromPending(ctx: SessionContext, pending: PendingLis
           `Done! Your listing is live:\n• ${o.quantity} kWh at Rs ${o.pricePerKwh}/unit\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} to ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}\n\nBuyers can now see and buy your energy!`,
           `Ho gaya! Aapki listing live hai:\n• ${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} se ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} tak\n\nBuyers ab aapki energy khareed sakte hain!`
         ),
+        buttons: [
+          { text: h(ctx, '📋 View My Listings', '📋 मेरी लिस्टिंग देखो'), callbackData: 'action:show_listings' },
+          { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
+          { text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), callbackData: 'action:show_earnings' },
+        ],
       }],
       contextUpdate: { pendingListing: undefined },
     };
   }
 
   return {
-    messages: [{ text: h(ctx, `Could not create the listing: ${result.error || 'Unknown error'}. Please try again.`, `लिस्टिंग नहीं बन पाई: ${result.error || 'अज्ञात समस्या'}। दोबारा कोशिश करो।`) }],
+    messages: [{
+      text: h(ctx, `Could not create the listing: ${result.error || 'Unknown error'}. Please try again.`, `लिस्टिंग नहीं बन पाई: ${result.error || 'अज्ञात समस्या'}। दोबारा कोशिश करो।`),
+      buttons: [
+        { text: h(ctx, '☀️ Try Again', '☀️ फिर से कोशिश करो'), callbackData: 'action:create_listing' },
+        { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
+      ],
+    }],
     contextUpdate: { pendingListing: undefined },
   };
 }
@@ -3049,7 +3063,12 @@ const states: Record<ChatState, StateHandler> = {
                   text: h(ctx,
                     `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
                     `Ho gaya! Aapki energy ab sale pe hai:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.\n\nBuyers ab aapki energy khareed sakte hain!`
-                  )
+                  ),
+                  buttons: [
+                    { text: h(ctx, '📋 View My Listings', '📋 मेरी लिस्टिंग देखो'), callbackData: 'action:show_listings' },
+                    { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
+                    { text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), callbackData: 'action:show_earnings' },
+                  ],
                 },
               ],
               newState: 'GENERAL_CHAT',
@@ -3064,7 +3083,8 @@ const states: Record<ChatState, StateHandler> = {
                 text: h(ctx,
                   'Profile set up! You can create offers from the Sell tab or tell me here (e.g. "list 50 kWh at Rs 6").',
                   'Profile ready! Sell tab se ya mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
-                )
+                ),
+                buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
               },
             ],
             newState: 'GENERAL_CHAT',
@@ -3078,7 +3098,8 @@ const states: Record<ChatState, StateHandler> = {
                 text: h(ctx,
                   'Profile is set up! You can create offers by telling me (e.g. "list 50 kWh at Rs 6").',
                   'Profile ready hai! Mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
-                )
+                ),
+                buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
               },
             ],
             newState: 'GENERAL_CHAT',
@@ -3099,7 +3120,8 @@ const states: Record<ChatState, StateHandler> = {
               text: h(ctx,
                 'No problem. You can start selling anytime from the Sell tab or ask me here.',
                 'Koi baat nahi. Kabhi bhi Sell tab se ya mujhse poocho, bechna shuru kar sakte ho.'
-              )
+              ),
+              buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
             },
           ],
           newState: 'GENERAL_CHAT',
@@ -3568,11 +3590,10 @@ const states: Record<ChatState, StateHandler> = {
           ctx.language,
           ctx.name
         );
-        if (composed) return { messages: [{ text: composed }] };
+        if (composed) return { messages: [{ text: composed, buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT') }] };
       }
 
-      // --- Fallback: return raw data if LLM composition failed ---
-      if (fallbackText) return { messages: [{ text: fallbackText }] };
+      if (fallbackText) return { messages: [{ text: fallbackText, buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT') }] };
 
       // --- Keyword fallback (when LLM completely unavailable) ---
       if (!intent && ctx.userId) {
@@ -3580,17 +3601,17 @@ const states: Record<ChatState, StateHandler> = {
 
         if ((lower.includes('listing') || lower.includes('offer')) &&
           (lower.includes('my') || lower.includes('mere') || lower.includes('show') || lower.includes('dikha') || lower.includes('active') || lower.includes('kitna'))) {
-          return { messages: [{ text: await mockTradingAgent.getActiveListings(ctx.userId, ctx.language) }] };
+          return { messages: [{ text: await mockTradingAgent.getActiveListings(ctx.userId, ctx.language), buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT') }] };
         }
         if (lower.includes('earn') || lower.includes('kamai') || lower.includes('kamaya') || lower.includes('income') || lower.includes('munafa')) {
-          return { messages: [{ text: await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language) }] };
+          return { messages: [{ text: await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language), buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT') }] };
         }
         if (lower.includes('balance') || lower.includes('wallet') || lower.includes('paise') || lower.includes('khata')) {
           const user = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { balance: true } });
-          if (user) return { messages: [{ text: h(ctx, `Wallet balance: Rs ${user.balance.toFixed(2)}`, `Wallet balance: Rs ${user.balance.toFixed(2)}`) }] };
+          if (user) return { messages: [{ text: h(ctx, `Wallet balance: Rs ${user.balance.toFixed(2)}`, `Wallet balance: Rs ${user.balance.toFixed(2)}`), buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT') }] };
         }
         if (lower.includes('order') || lower.includes('status')) {
-          return { messages: [{ text: await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language) }] };
+          return { messages: [{ text: await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language), buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT') }] };
         }
         if ((lower.includes('new') || lower.includes('create') || lower.includes('naya') || lower.includes('daal') || lower.includes('bana') || lower.includes('sell') || lower.includes('bech')) &&
           (lower.includes('offer') || lower.includes('listing') || lower.includes('energy') || lower.includes('bijli'))) {
