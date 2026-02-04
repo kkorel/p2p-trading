@@ -3435,9 +3435,13 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
     }
   }
 
+  // Generate valid UUIDs for CDS schema validation
+  const diagMsgId = crypto.randomUUID();
+  const diagTxnId = crypto.randomUUID();
+
   const becknCtx = {
     version: '2.0.0', action: 'select', timestamp: new Date().toISOString(),
-    message_id: 'diag-msg', transaction_id: 'diag-txn',
+    message_id: diagMsgId, transaction_id: diagTxnId,
     bap_id: config.bap.id, bap_uri: config.bap.uri, bpp_id: config.bpp.id, bpp_uri: config.bpp.uri,
     ttl: 'PT30S', domain: 'beckn.one:deg:p2p-trading-interdiscom:2.0.0',
   };
@@ -3508,14 +3512,14 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
 
     // External: DEG Ledger (include all required fields per spec)
     test('Ledger /ledger/put', '/ledger/put', 'POST', `${ledgerUrl}/ledger/put`, 'external', {
-      role: 'BUYER', transactionId: 'diag-txn', orderItemId: 'diag-order',
+      role: 'BUYER', transactionId: diagTxnId, orderItemId: `order-${diagTxnId.slice(0, 8)}`,
       platformIdBuyer: config.bap.id, platformIdSeller: config.bpp.id,
       discomIdBuyer: 'DISCOM_BLR', discomIdSeller: 'DISCOM_BLR',
       buyerId: 'diag-buyer', sellerId: 'diag-seller',
       tradeTime: new Date().toISOString(),
       tradeDetails: [{ tradeType: 'ENERGY', tradeQty: 1, tradeUnit: 'KWH' }],
     }),
-    test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, 'external', { transactionId: 'diag-txn', limit: 1 }),
+    test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, 'external', { transactionId: diagTxnId, limit: 1 }),
 
     // External: CDS - Full realistic discover request for debugging
     test('CDS /beckn/discover', '/beckn/discover', 'POST', `${cdsUrl}/discover`, 'external', {
