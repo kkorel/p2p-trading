@@ -3289,8 +3289,13 @@ const states: Record<ChatState, StateHandler> = {
             message = 'show my orders';
             break;
           case 'browse':
-            message = 'show available energy';
-            break;
+            const browseTable = await mockTradingAgent.getBrowseMarketTable(ctx.language);
+            return {
+              messages: [{
+                text: browseTable,
+                buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+              }],
+            };
           case 'market_insights':
             message = 'market insights';
             break;

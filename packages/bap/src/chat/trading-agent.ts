@@ -1260,8 +1260,7 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
     `📈 Trade Limit: ${user.allowedTradeLimit}%` +
     sellerSection +
     buyerSection +
-    `\n\n━━━━━━━━━━━━━━━━━━━━\n` +
-    `Quick Actions: "create listing", "buy energy", "earnings"`,
+    `\n\n━━━━━━━━━━━━━━━━━━━━`,
     
     `📊 *Oorja Dashboard*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
@@ -1271,8 +1270,7 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
     `📈 Trade Limit: ${user.allowedTradeLimit}%` +
     sellerSection +
     buyerSection +
-    `\n\n━━━━━━━━━━━━━━━━━━━━\n` +
-    `Quick Actions: "listing banao", "bijli khareedu", "kamai dekho"`
+    `\n\n━━━━━━━━━━━━━━━━━━━━`
   );
   
   return dashboard;
@@ -1714,3 +1712,56 @@ export async function getTopDeals(limit: number = 3, lang?: string): Promise<{ d
   
   return { deals, message };
 }
+
+  /**
+   * Get all available offers formatted as a markdown table for "Browse Market".
+   */
+  async getBrowseMarketTable(lang?: string): Promise<string> {
+    const offers = await prisma.catalogOffer.findMany({
+      where: { maxQty: { gt: 0 } },
+      include: {
+        provider: { select: { name: true, trustScore: true } },
+        item: { select: { sourceType: true } },
+      },
+      orderBy: { priceValue: 'asc' },
+      take: 10,
+    });
+
+    if (offers.length === 0) {
+      return ht(lang,
+        'No active offers in the market right now.',
+        'Market mein abhi koi active offer nahi hai.'
+      );
+    }
+
+    // Table Headers
+    const headers = ht(lang,
+      '| Seller | Energy | Price | Qty | Time |',
+      '| Seller | Energy | Rate | Qty | Time |'
+    );
+    const separator = '|---|---|---|---|---|';
+    
+    const rows = offers.map(o => {
+      // Format time window (simplified)
+      const start = new Date(o.timeWindowStart);
+      const end = new Date(o.timeWindowEnd);
+      const timeStr = `${start.getHours()}h-${end.getHours()}h`;
+      
+      const type = o.item?.sourceType === 'SOLAR' ? '☀️' : 
+                   o.item?.sourceType === 'WIND' ? '💨' : '⚡';
+                   
+      const price = `₹${o.priceValue}`;
+      const qty = `${o.maxQty}`; // Shorten for table width
+      const name = (o.provider?.name || 'User').split(' ')[0]; // First name only to save space
+
+      return `| ${name} | ${type} | ${price} | ${qty} | ${timeStr} |`;
+    });
+
+    const title = ht(lang, '🏪 *Market Offers*', '🏪 *Market Offers*');
+    const footer = ht(lang, 
+      '_Type "buy" to purchase_', 
+      '_Kharidne ke liye "buy" likho_'
+    );
+
+    return `${title}\n\n${headers}\n${separator}\n${rows.join('\n')}\n\n${footer}`;
+  },
