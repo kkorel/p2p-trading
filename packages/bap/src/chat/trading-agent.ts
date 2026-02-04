@@ -1734,14 +1734,10 @@ export async function getBrowseMarketTable(lang?: string): Promise<string> {
     );
   }
 
-  // Table Headers
-  const headers = ht(lang,
-    '| Seller | Energy | Price | Qty | Time |',
-    '| Seller | Energy | Rate | Qty | Time |'
-  );
-  const separator = '|---|---|---|---|---|';
+  // Enhanced table with trust stars and savings indicators
+  const DISCOM_RATE = 7; // Reference DISCOM rate for savings calculation
 
-  const rows = offers.map(o => {
+  const rows = offers.map((o, idx) => {
     // Format time window (simplified)
     const start = new Date(o.timeWindowStart);
     const end = new Date(o.timeWindowEnd);
@@ -1751,17 +1747,41 @@ export async function getBrowseMarketTable(lang?: string): Promise<string> {
       o.item?.sourceType === 'WIND' ? '💨' : '⚡';
 
     const price = `₹${o.priceValue}`;
-    const qty = `${o.maxQty}`; // Shorten for table width
-    const name = (o.provider?.name || 'User').split(' ')[0]; // First name only to save space
+    const qty = `${o.maxQty}`;
+    const name = (o.provider?.name || 'User').split(' ')[0];
 
-    return `| ${name} | ${type} | ${price} | ${qty} | ${timeStr} |`;
+    // Trust level indicator (1-5 stars based on trustScore 0-1)
+    const trustScore = o.provider?.trustScore ?? 0.5;
+    const stars = trustScore >= 0.9 ? '⭐⭐⭐' :
+      trustScore >= 0.7 ? '⭐⭐' :
+        trustScore >= 0.5 ? '⭐' : '🆕';
+
+    // Savings percentage vs DISCOM
+    const savingsPercent = Math.round(((DISCOM_RATE - o.priceValue) / DISCOM_RATE) * 100);
+    const savings = savingsPercent > 0 ? `💚${savingsPercent}%` : '';
+
+    // Best deal badge for lowest price
+    const badge = idx === 0 ? '🏆' : '';
+
+    return `| ${badge}${name} | ${stars} | ${type} | ${price} ${savings} | ${qty} | ${timeStr} |`;
   });
 
-  const title = ht(lang, '🏪 *Market Offers*', '🏪 *Market Offers*');
+  // Updated headers with Trust column
+  const headers = ht(lang,
+    '| Seller | Trust | ⚡ | Price | Qty | Time |',
+    '| Seller | Trust | ⚡ | Rate | Qty | Time |'
+  );
+  const separator = '|---|:---:|:---:|---|---|---|';
+
+  const title = ht(lang, '🏪 *Market Offers*', '🏪 *बाजार ऑफर*');
+  const subtitle = ht(lang,
+    '_Sorted by price (lowest first) • 🏆 = Best Deal • 💚 = Savings vs DISCOM_',
+    '_कीमत के हिसाब से (सबसे सस्ता पहले) • 🏆 = सबसे अच्छा • 💚 = बचत_'
+  );
   const footer = ht(lang,
-    '_Type "buy" to purchase_',
-    '_Kharidne ke liye "buy" likho_'
+    '💡 _Type "buy" to purchase or "buy 20 kWh" for specific quantity_',
+    '💡 _Kharidne ke liye "buy" likho ya "buy 20 kWh"_'
   );
 
-  return `${title}\n\n${headers}\n${separator}\n${rows.join('\n')}\n\n${footer}`;
+  return `${title}\n${subtitle}\n\n${headers}\n${separator}\n${rows.join('\n')}\n\n${footer}`;
 }

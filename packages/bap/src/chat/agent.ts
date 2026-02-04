@@ -2283,7 +2283,7 @@ const states: Record<ChatState, StateHandler> = {
         : '';
 
       const messages: AgentMessage[] = [
-        { text: `Namaste! Main Oorja hun.\nMain aapko apne ghar pe banai bijli se paise kamane mein madad karunga. Aur jinhe bijli khareedni hai, unhe sahi daam pe dilaunga.${voiceNote}` },
+        { text: `Namaste! Main Oorja hun.\nMain aapko apne ghar pe banai bijli se paise kamane mein madad karunga. Aur jinhe bijli khareedni hai, unhe sahi daam pe dilaunga.\n\nAgar aapko kisi bhi samay koi bhi sawaal ho, to mujhe pooch lena!${voiceNote}` },
         {
           text: 'Apni bhasha chune / Choose your language:',
           buttons: LANG_BUTTONS,
@@ -2508,7 +2508,7 @@ const states: Record<ChatState, StateHandler> = {
       const name = ctx.name || 'friend';
       if (!ctx.userId) {
         return {
-          messages: [{ text: h(ctx, `Welcome, ${name}!`, `Swagat hai, ${name}!`) }],
+          messages: [{ text: h(ctx, `Welcome, ${name}!`, `स्वागत है, ${name}!`) }],
           newState: 'ASK_DISCOM',
         };
       }
@@ -2530,7 +2530,7 @@ const states: Record<ChatState, StateHandler> = {
         );
 
         return {
-          messages: [{ text: composed || h(ctx, `Welcome back, ${n}!`, `Wapas swagat, ${n}!`) }],
+          messages: [{ text: composed || h(ctx, `Welcome back, ${n}!`, `वापस स्वागत, ${n}!`) }],
           newState: 'GENERAL_CHAT',
           contextUpdate: { verifiedCreds, tradingActive: true },
         };
@@ -2539,14 +2539,14 @@ const states: Record<ChatState, StateHandler> = {
       if (verifiedCreds.includes('UTILITY_CUSTOMER')) {
         const n = ctx.name || user?.name || 'friend';
         return {
-          messages: [{ text: h(ctx, `Welcome back, ${n}!`, `Wapas swagat, ${n}!`) }],
+          messages: [{ text: h(ctx, `Welcome back, ${n}!`, `वापस स्वागत, ${n}!`) }],
           newState: 'ASK_INTENT',
           contextUpdate: { verifiedCreds },
         };
       }
 
       return {
-        messages: [{ text: h(ctx, `Welcome, ${name}!`, `Swagat hai, ${name}!`) }],
+        messages: [{ text: h(ctx, `Welcome, ${name}!`, `स्वागत है, ${name}!`) }],
         newState: 'ASK_DISCOM',
         contextUpdate: { verifiedCreds },
       };
@@ -3483,7 +3483,7 @@ const states: Record<ChatState, StateHandler> = {
                       'Energy bechne ke liye pehle aapka solar generation ka credential chahiye. Ye aapke solar panel ki capacity prove karta hai.\n\nYe aapko apni DISCOM se ya credential portal se mil jaayega.'
                     ),
                     buttons: [
-                      { text: h(ctx, '📄 Upload credential', '📄 Credential upload karo'), callbackData: 'upload_gen_cred' },
+                      { text: h(ctx, '📄 Upload credential', '📄 Credential upload karo'), callbackData: 'action:trigger_file_upload' },
                     ],
                   },
                 ],
@@ -3626,7 +3626,7 @@ const states: Record<ChatState, StateHandler> = {
                     'Energy bechne ke liye pehle aapka solar generation ka credential chahiye.'
                   ),
                   buttons: [
-                    { text: h(ctx, '📄 Upload credential', '📄 Credential upload karo'), callbackData: 'upload_gen_cred' },
+                    { text: h(ctx, '📄 Upload credential', '📄 Credential upload karo'), callbackData: 'action:trigger_file_upload' },
                   ],
                 },
               ],

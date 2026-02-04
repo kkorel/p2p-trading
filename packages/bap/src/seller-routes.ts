@@ -320,7 +320,7 @@ router.post('/init', async (req: Request, res: Response) => {
       try {
         // Check if blocks exist for this order
         const existingBlocks = await getBlocksForOrder(existingOrder.id);
-        
+
         if (existingBlocks.length === 0 && existingOrder.items && existingOrder.items.length > 0) {
           // No blocks claimed - this can happen when init is called twice
           // Try to claim blocks for each item in the order
@@ -328,7 +328,7 @@ router.post('/init', async (req: Request, res: Response) => {
             transaction_id: context.transaction_id,
             order_id: existingOrder.id,
           });
-          
+
           for (const item of existingOrder.items) {
             // Only claim for local offers (not external)
             const localOffer = await getOfferById(item.offer_id);
@@ -339,7 +339,7 @@ router.post('/init', async (req: Request, res: Response) => {
                 existingOrder.id,
                 context.transaction_id
               );
-              
+
               logger.info(`Claimed ${claimedBlocks.length} blocks for existing order`, {
                 transaction_id: context.transaction_id,
                 order_id: existingOrder.id,
@@ -350,7 +350,7 @@ router.post('/init', async (req: Request, res: Response) => {
             }
           }
         }
-        
+
         const callbackContext = createCallbackContext(context, 'on_init');
         const onInitMessage: OnInitMessage = {
           context: callbackContext,
@@ -497,7 +497,7 @@ router.post('/init', async (req: Request, res: Response) => {
             const finalOrder = await updateOrderStatus(order.id, 'PENDING') || order;
             createdOrders.push(finalOrder);
 
-            logger.info(`Bulk order ${i + 1}/${content.order.items.length} created`, {
+            logger.info(`Bulk order ${i + 1}/${initItems.length} created`, {
               order_id: order.id,
               offer_id: item.offer_id,
               quantity: item.quantity,
@@ -600,10 +600,10 @@ router.post('/init', async (req: Request, res: Response) => {
           // External offer - try to get data from transaction state
           isExternalOffer = true;
           selectedOfferId = item.offer_id;
-          
+
           // Get offer details from transaction state (populated during discovery)
           const selectedOffer = txState?.selectedOffer;
-          
+
           if (selectedOffer && selectedOffer.id === item.offer_id) {
             const itemPrice = selectedOffer.price.value * item.quantity;
             totalPrice += itemPrice;
@@ -619,7 +619,7 @@ router.post('/init', async (req: Request, res: Response) => {
               timeWindow: selectedOffer.timeWindow || undefined,
               source_type: 'EXTERNAL',
             });
-            
+
             logger.info('Processing external offer from transaction state', {
               transaction_id: context.transaction_id,
               offer_id: item.offer_id,
@@ -631,7 +631,7 @@ router.post('/init', async (req: Request, res: Response) => {
               transaction_id: context.transaction_id,
               offer_id: item.offer_id,
             });
-            
+
             // Use default values from request
             totalQuantity += item.quantity;
             orderItems.push({
@@ -658,7 +658,7 @@ router.post('/init', async (req: Request, res: Response) => {
       // Only claim blocks for local offers (external offers don't have local blocks)
       if (!isExternalOffer) {
         // Now claim blocks using the real order ID
-        for (const item of content.order.items) {
+        for (const item of initItems) {
           const claimedBlocks = await claimBlocks(item.offer_id, item.quantity, order.id, context.transaction_id);
 
           if (claimedBlocks.length < item.quantity) {
@@ -841,7 +841,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
 
               }
             }
-            
+
             // IMPORTANT: Republish the full catalog to CDS with updated availableQuantity
             // This ensures the external CDS reflects the reduced inventory after a purchase
             if (isExternalCDSEnabled() && order!.items && order!.items.length > 0) {
@@ -852,7 +852,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
                   const providerName = providerInfo?.name || 'Energy Provider';
                   const allItems = await getProviderItems(sellerProviderId);
                   const allOffers = await getProviderOffers(sellerProviderId);
-                  
+
                   // Convert to sync format with UPDATED availableQuantity from database
                   const rawSyncItems = allItems.map(item => ({
                     id: item.id,
@@ -864,7 +864,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
                     meter_id: item.meter_id,
                   }));
                   const syncItems = await enrichSyncItems(rawSyncItems, sellerProviderId);
-                  
+
                   // For offers, use the available block count as the actual available quantity
                   const syncOffers = await Promise.all(allOffers.map(async (offer) => {
                     const availableBlocks = await getAvailableBlockCount(offer.id);
@@ -880,10 +880,10 @@ router.post('/confirm', async (req: Request, res: Response) => {
                       settlement_type: offer.offerAttributes.settlementType,
                     };
                   }));
-                  
+
                   // Filter out offers with 0 available blocks (sold out)
                   const activeOffers = syncOffers.filter(o => o.max_qty > 0);
-                  
+
                   // Republish catalog with updated quantities
                   const publishSuccess = await publishCatalogToCDS(
                     { id: sellerProviderId, name: providerName },
@@ -891,7 +891,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
                     activeOffers,
                     activeOffers.length > 0 // isActive: true if offers remain
                   );
-                  
+
                   if (publishSuccess) {
                     logger.info(`Catalog republished to CDS with updated inventory after order ${order!.id}`, {
                       providerId: sellerProviderId,
@@ -919,7 +919,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
             const platformFee = Math.round(orderTotal * platformFeeRate * 100) / 100;
             const totalDeduction = orderTotal + platformFee; // Total to deduct from buyer
             const buyerId = await getBuyerIdFromTransaction(context.transaction_id);
-            
+
             if (buyerId && orderTotal > 0) {
               await prisma.$transaction(async (tx) => {
                 // 1. Deduct from buyer's balance (energy cost + platform fee)
@@ -927,7 +927,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
                   where: { id: buyerId },
                   data: { balance: { decrement: totalDeduction } },
                 });
-                
+
                 // 2. Update order payment status to ESCROWED
                 await tx.order.update({
                   where: { id: order!.id },
@@ -937,7 +937,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
                     totalPrice: orderTotal, // Store energy cost
                   },
                 });
-                
+
                 // 3. Create payment record
                 const sellerId = await getSellerIdFromProvider(order!.items?.[0]?.provider_id || '');
                 await tx.paymentRecord.create({
@@ -953,7 +953,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
                   },
                 });
               });
-              
+
               logger.info(`Payment escrowed for order ${order!.id}`, {
                 energyCost: orderTotal,
                 platformFee: platformFee,
@@ -1130,7 +1130,7 @@ router.post('/cancel', async (req: Request, res: Response) => {
 
   // Check if we're within 30 minutes of delivery start time
   let deliveryStartTime: Date | null = null;
-  
+
   // Get delivery start time from order items
   if (order.items && order.items.length > 0) {
     const firstItem = order.items[0];
@@ -1196,7 +1196,7 @@ router.post('/cancel', async (req: Request, res: Response) => {
               const providerName = providerInfo?.name || 'Energy Provider';
               const allItems = await getProviderItems(sellerProviderId);
               const allOffers = await getProviderOffers(sellerProviderId);
-              
+
               // Convert to sync format with updated availability
               const rawCancelSyncItems = allItems.map(item => ({
                 id: item.id,
@@ -1816,8 +1816,8 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
   });
 
   if (!user?.productionCapacity || user.productionCapacity <= 0) {
-    return res.status(400).json({ 
-      error: 'Please set your production capacity in Profile before creating offers.' 
+    return res.status(400).json({
+      error: 'Please set your production capacity in Profile before creating offers.'
     });
   }
 
@@ -1924,11 +1924,11 @@ router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: R
   // Publish to CDS using proper Beckn catalog_publish format (non-blocking)
   // Check if CDS publishing is enabled
   const cdsEnabled = isExternalCDSEnabled();
-  logger.info(`CDS publishing ${cdsEnabled ? 'ENABLED' : 'DISABLED'}`, { 
+  logger.info(`CDS publishing ${cdsEnabled ? 'ENABLED' : 'DISABLED'}`, {
     offerId: offer.id,
     USE_EXTERNAL_CDS: process.env.USE_EXTERNAL_CDS,
   });
-  
+
   if (cdsEnabled) {
     const directUtilityInfo = await getProviderUtilityInfo(provider_id);
     publishOfferToCDS(
@@ -2027,7 +2027,7 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
         const providerName = providerInfo?.name || 'Energy Provider';
         const items = await getProviderItems(provider_id);
         const offers = await getProviderOffers(provider_id);
-        
+
         // Convert to sync format
         const rawDelSyncItems = items.map(item => ({
           id: item.id,
@@ -2062,11 +2062,11 @@ router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Re
           syncOffers,
           isActive
         );
-        
+
         if (isActive) {
-          logger.info('Catalog republished to CDS after offer deletion', { 
-            providerId: provider_id, 
-            remainingOffers: syncOffers.length 
+          logger.info('Catalog republished to CDS after offer deletion', {
+            providerId: provider_id,
+            remainingOffers: syncOffers.length
           });
         } else {
           logger.info('Catalog revoked from CDS (no offers remaining)', { providerId: provider_id });
@@ -2154,7 +2154,7 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
     // Check ownership: either providerId matches OR seller has a payment record for this order
     const isOwnerByProvider = providerId && order.providerId === providerId;
     const isOwnerByPayment = order.payments.some((p) => p.sellerId === sellerUserId);
-    
+
     if (!isOwnerByProvider && !isOwnerByPayment) {
       return res.status(403).json({ error: 'You can only cancel orders for your provider' });
     }
@@ -2393,7 +2393,7 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
  */
 router.get('/seller/cds-status', async (req: Request, res: Response) => {
   const enabled = isExternalCDSEnabled();
-  
+
   res.json({
     cds: {
       publishingEnabled: enabled,
@@ -2404,7 +2404,7 @@ router.get('/seller/cds-status', async (req: Request, res: Response) => {
         EXTERNAL_CDS_URL: process.env.EXTERNAL_CDS_URL || 'NOT SET (using default)',
       },
     },
-    message: enabled 
+    message: enabled
       ? 'CDS publishing is ENABLED - offers will be published to external CDS'
       : 'CDS publishing is DISABLED - set USE_EXTERNAL_CDS=true to enable',
   });
@@ -2416,22 +2416,22 @@ router.get('/seller/cds-status', async (req: Request, res: Response) => {
  */
 router.post('/seller/cds-test-publish', authMiddleware, async (req: Request, res: Response) => {
   const provider_id = req.user!.providerId;
-  
+
   if (!provider_id) {
     return res.status(400).json({ error: 'No seller profile found' });
   }
-  
+
   const enabled = isExternalCDSEnabled();
   if (!enabled) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'CDS publishing is not enabled',
       hint: 'Set USE_EXTERNAL_CDS=true in environment variables',
     });
   }
-  
+
   const providerInfo = await getProvider(provider_id);
   const providerName = providerInfo?.name || req.user!.name || 'Test Provider';
-  
+
   // Create test data
   const testItemId = `test-item-${Date.now()}`;
   const testOfferId = `test-offer-${Date.now()}`;
@@ -2439,7 +2439,7 @@ router.post('/seller/cds-test-publish', authMiddleware, async (req: Request, res
     startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
     endTime: new Date(Date.now() + 7200000).toISOString(),   // 2 hours from now
   };
-  
+
   try {
     const testUtilityInfo = await getProviderUtilityInfo(provider_id);
     const success = await publishOfferToCDS(
@@ -2471,10 +2471,10 @@ router.post('/seller/cds-test-publish', authMiddleware, async (req: Request, res
         settlement_type: 'INSTANT',
       }
     );
-    
+
     res.json({
       success,
-      message: success 
+      message: success
         ? 'Test offer published successfully! It should appear in discover results.'
         : 'Publishing returned false - check server logs for details',
       testData: {
