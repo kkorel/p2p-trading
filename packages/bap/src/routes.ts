@@ -3506,10 +3506,13 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
     test('Callback on_discover', '/callbacks/on_discover', 'POST', `${localBase}/callbacks/on_discover`, 'protocol', { context: { ...becknCtx, action: 'on_discover' }, message: { catalog: { providers: [] } } }),
     test('Callback on_update', '/callbacks/on_update', 'POST', `${localBase}/callbacks/on_update`, 'protocol', { context: { ...becknCtx, action: 'on_update' }, message: { order: { 'beckn:orderStatus': 'INPROGRESS' } } }),
 
-    // External: DEG Ledger
+    // External: DEG Ledger (include all required fields per spec)
     test('Ledger /ledger/put', '/ledger/put', 'POST', `${ledgerUrl}/ledger/put`, 'external', {
       role: 'BUYER', transactionId: 'diag-txn', orderItemId: 'diag-order',
       platformIdBuyer: config.bap.id, platformIdSeller: config.bpp.id,
+      discomIdBuyer: 'DISCOM_BLR', discomIdSeller: 'DISCOM_BLR',
+      buyerId: 'diag-buyer', sellerId: 'diag-seller',
+      tradeTime: new Date().toISOString(),
       tradeDetails: [{ tradeType: 'ENERGY', tradeQty: 1, tradeUnit: 'KWH' }],
     }),
     test('Ledger /ledger/get', '/ledger/get', 'POST', `${ledgerUrl}/ledger/get`, 'external', { transactionId: 'diag-txn', limit: 1 }),
