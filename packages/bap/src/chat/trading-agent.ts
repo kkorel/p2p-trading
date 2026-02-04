@@ -1170,13 +1170,13 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
       productionCapacity: true,
     },
   });
-  
+
   if (!user) {
     return ht(lang, 'Dashboard not available.', 'Dashboard available nahi hai.');
   }
 
   const trustTier = getTrustTier(user.trustScore);
-  
+
   // Seller stats
   let sellerSection = '';
   if (user.providerId) {
@@ -1184,7 +1184,7 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
       where: { providerId: user.providerId },
       select: { maxQty: true, priceValue: true },
     });
-    
+
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const recentOrders = await prisma.order.findMany({
@@ -1195,7 +1195,7 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
       },
       select: { totalPrice: true, totalQty: true },
     });
-    
+
     const allOrders = await prisma.order.findMany({
       where: {
         providerId: user.providerId,
@@ -1203,26 +1203,26 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
       },
       select: { totalPrice: true, totalQty: true },
     });
-    
+
     const weeklyEarnings = recentOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
     const weeklyKwh = recentOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
     const totalEarnings = allOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
     const totalKwh = allOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
     const totalListed = offers.reduce((sum, o) => sum + o.maxQty, 0);
-    
+
     sellerSection = ht(lang,
       `\n📊 *Seller Stats*\n` +
       `Active Listings: ${offers.length} (${totalListed} kWh)\n` +
       `This Week: ₹${weeklyEarnings.toFixed(0)} earned, ${weeklyKwh.toFixed(1)} kWh\n` +
       `All-Time: ₹${totalEarnings.toFixed(0)} earned, ${totalKwh.toFixed(1)} kWh`,
-      
+
       `\n📊 *Seller Stats*\n` +
       `Active Listings: ${offers.length} (${totalListed} kWh)\n` +
       `Is Hafte: ₹${weeklyEarnings.toFixed(0)} kamai, ${weeklyKwh.toFixed(1)} kWh\n` +
       `Total: ₹${totalEarnings.toFixed(0)} kamai, ${totalKwh.toFixed(1)} kWh`
     );
   }
-  
+
   // Buyer stats
   const buyerOrders = await prisma.order.findMany({
     where: {
@@ -1231,25 +1231,25 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
     },
     select: { totalPrice: true, totalQty: true },
   });
-  
+
   let buyerSection = '';
   if (buyerOrders.length > 0) {
     const totalSpent = buyerOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
     const totalBoughtKwh = buyerOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
-    
+
     buyerSection = ht(lang,
       `\n🔋 *Buyer Stats*\n` +
       `Orders: ${buyerOrders.length}\n` +
       `Energy Bought: ${totalBoughtKwh.toFixed(1)} kWh\n` +
       `Total Spent: ₹${totalSpent.toFixed(0)}`,
-      
+
       `\n🔋 *Buyer Stats*\n` +
       `Orders: ${buyerOrders.length}\n` +
       `Energy Liya: ${totalBoughtKwh.toFixed(1)} kWh\n` +
       `Total Kharch: ₹${totalSpent.toFixed(0)}`
     );
   }
-  
+
   // Build dashboard
   const dashboard = ht(lang,
     `📊 *Oorja Dashboard*\n` +
@@ -1261,7 +1261,7 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
     sellerSection +
     buyerSection +
     `\n\n━━━━━━━━━━━━━━━━━━━━`,
-    
+
     `📊 *Oorja Dashboard*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
     `👤 ${user.name || 'Trader'}\n` +
@@ -1272,7 +1272,7 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
     buyerSection +
     `\n\n━━━━━━━━━━━━━━━━━━━━`
   );
-  
+
   return dashboard;
 }
 
@@ -1291,7 +1291,7 @@ function getTrustTier(score: number): { name: string; emoji: string } {
  */
 export async function getMarketInsights(lang?: string, userId?: string): Promise<string> {
   const ht = (en: string, hi: string) => lang === 'hi-IN' ? hi : en;
-  
+
   // Get user data for personalization if available
   let userData: {
     providerId: string | null;
@@ -1300,24 +1300,24 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
     activeListings: number;
     userListingPrice?: number;
   } | null = null;
-  
+
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { providerId: true },
     });
-    
+
     const credentials = await prisma.userCredential.findMany({
       where: { userId },
       select: { credentialType: true },
     });
-    
+
     const hasGeneration = credentials.some(c => c.credentialType === 'GENERATION_PROFILE');
     const hasConsumption = credentials.some(c => c.credentialType === 'CONSUMPTION_PROFILE');
-    
+
     let activeListings = 0;
     let userListingPrice: number | undefined;
-    
+
     if (user?.providerId) {
       const listings = await prisma.catalogOffer.findMany({
         where: { providerId: user.providerId, maxQty: { gt: 0 } },
@@ -1328,7 +1328,7 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
         userListingPrice = listings[0].priceValue;
       }
     }
-    
+
     userData = {
       providerId: user?.providerId || null,
       hasGeneration,
@@ -1337,7 +1337,7 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
       userListingPrice,
     };
   }
-  
+
   // Get all active offers with availability
   const offers = await prisma.catalogOffer.findMany({
     where: { maxQty: { gt: 0 } },
@@ -1347,20 +1347,20 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
     },
     orderBy: { priceValue: 'asc' },
   });
-  
+
   if (offers.length === 0) {
     let emptyMessage = ht(
       `📊 *Market Insights*\n\n` +
       `No active offers right now.\n\n` +
       `💡 This is a great time to list your solar energy! You could be the first seller and set competitive prices.\n\n` +
       `DISCOM rate: ₹7.5/kWh\nRecommended P2P price: ₹4-6/kWh`,
-      
+
       `📊 *Market Insights*\n\n` +
       `Abhi koi active offer nahi hai.\n\n` +
       `💡 Ye bahut accha time hai apni solar energy list karne ka! Aap pehle seller ho sakte ho.\n\n` +
       `DISCOM rate: ₹7.5/kWh\nP2P recommended price: ₹4-6/kWh`
     );
-    
+
     // Add personalized suggestion
     if (userData?.hasGeneration) {
       emptyMessage += ht(
@@ -1368,17 +1368,17 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
         `\n\n🎯 *Aapke Liye Suggestion*\nSolar producer ke taur pe, ye perfect time hai list karne ka. Koi competition nahi - apna price set karo!`
       );
     }
-    
+
     return emptyMessage;
   }
-  
+
   // Calculate stats
   const prices = offers.map(o => o.priceValue);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
   const totalAvailable = offers.reduce((sum, o) => sum + o.maxQty, 0);
-  
+
   // Group by energy type
   const byType: Record<string, { count: number; qty: number; avgPrice: number }> = {};
   for (const offer of offers) {
@@ -1391,51 +1391,51 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
   for (const type of Object.keys(byType)) {
     byType[type].avgPrice = byType[type].avgPrice / byType[type].count;
   }
-  
+
   // Find best deals (top 3 cheapest with good trust score)
   const bestDeals = offers
     .filter(o => (o.provider?.trustScore || 0) >= 0.3)
     .slice(0, 3);
-  
+
   const discomRate = 7.5;
   const savings = Math.round(((discomRate - avgPrice) / discomRate) * 100);
-  
+
   let insight = ht(
     `📊 *Market Insights*\n━━━━━━━━━━━━━━━━━━━━\n\n`,
     `📊 *Market Insights*\n━━━━━━━━━━━━━━━━━━━━\n\n`
   );
-  
+
   insight += ht(
     `📈 *Current Prices*\n` +
     `• Range: ₹${minPrice.toFixed(1)} - ₹${maxPrice.toFixed(1)}/kWh\n` +
     `• Average: ₹${avgPrice.toFixed(1)}/kWh\n` +
     `• DISCOM: ₹${discomRate}/kWh\n` +
     `• You save ~${savings}% vs DISCOM!\n\n`,
-    
+
     `📈 *Current Prices*\n` +
     `• Range: ₹${minPrice.toFixed(1)} - ₹${maxPrice.toFixed(1)}/kWh\n` +
     `• Average: ₹${avgPrice.toFixed(1)}/kWh\n` +
     `• DISCOM: ₹${discomRate}/kWh\n` +
     `• DISCOM se ~${savings}% bachao!\n\n`
   );
-  
+
   // Price trend (compared to yesterday - simplified heuristic)
   const trendEmoji = avgPrice <= 5.5 ? '↘️ falling' : avgPrice >= 6.5 ? '↗️ rising' : '→ stable';
   insight += ht(
     `📉 *Price Trend*: ${trendEmoji}\n\n`,
     `📉 *Price Trend*: ${trendEmoji}\n\n`
   );
-  
+
   insight += ht(
     `⚡ *Available Energy*\n` +
     `• ${offers.length} active offers\n` +
     `• ${totalAvailable.toFixed(0)} kWh total\n`,
-    
+
     `⚡ *Available Energy*\n` +
     `• ${offers.length} active offers\n` +
     `• ${totalAvailable.toFixed(0)} kWh available\n`
   );
-  
+
   // Add energy type breakdown if multiple types
   const types = Object.keys(byType);
   if (types.length > 1) {
@@ -1444,7 +1444,7 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
       insight += `  - ${type}: ${t.count} offers, ${t.qty.toFixed(0)} kWh @ ₹${t.avgPrice.toFixed(1)} avg\n`;
     }
   }
-  
+
   if (bestDeals.length > 0) {
     insight += ht(`\n🏆 *Best Deals*\n`, `\n🏆 *Best Deals*\n`);
     for (const deal of bestDeals) {
@@ -1452,11 +1452,11 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
       insight += `• ₹${deal.priceValue}/kWh - ${deal.maxQty} kWh ${trust.emoji}\n`;
     }
   }
-  
+
   // Personalized recommendations
   if (userData) {
     insight += ht(`\n🎯 *Personalized for You*\n`, `\n🎯 *Aapke Liye*\n`);
-    
+
     if (userData.hasGeneration) {
       // Seller-focused advice
       if (userData.userListingPrice) {
@@ -1484,7 +1484,7 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
         );
       }
     }
-    
+
     if (userData.hasConsumption) {
       // Buyer-focused advice
       insight += ht(
@@ -1498,13 +1498,13 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
       `\n💡 *Tips*\n` +
       `• Buy now to lock in low prices\n` +
       `• Sellers: Price at ₹${(avgPrice - 0.5).toFixed(1)}-${avgPrice.toFixed(1)} for quick sales`,
-      
+
       `\n💡 *Tips*\n` +
       `• Abhi khareed lo - prices low hain\n` +
       `• Sellers: ₹${(avgPrice - 0.5).toFixed(1)}-${avgPrice.toFixed(1)} pe jaldi bikri hogi`
     );
   }
-  
+
   return insight;
 }
 
@@ -1514,23 +1514,23 @@ export async function getMarketInsights(lang?: string, userId?: string): Promise
  */
 export async function getActivitySummary(userId: string, lang?: string): Promise<string> {
   const ht = (en: string, hi: string) => lang === 'hi-IN' ? hi : en;
-  
+
   // Get user balance and provider info
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { balance: true, name: true, providerId: true },
   });
-  
+
   const balance = user?.balance || 0;
   const userName = user?.name || 'User';
   const providerId = user?.providerId;
-  
+
   // Get today's date range
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const thisWeekStart = new Date(today);
   thisWeekStart.setDate(thisWeekStart.getDate() - 7);
-  
+
   // Get earnings data (as seller through provider)
   let orders: { totalPrice: number | null; status: string; createdAt: Date }[] = [];
   if (providerId) {
@@ -1546,7 +1546,7 @@ export async function getActivitySummary(userId: string, lang?: string): Promise
       },
     });
   }
-  
+
   // Calculate earnings
   const completedOrders = orders.filter(o => o.status === 'COMPLETED');
   const todayEarnings = completedOrders
@@ -1556,7 +1556,7 @@ export async function getActivitySummary(userId: string, lang?: string): Promise
     .filter(o => new Date(o.createdAt) >= thisWeekStart)
     .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
   const totalEarnings = completedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-  
+
   // Get pending orders (as both buyer and seller)
   const pendingAsSeller = orders.filter(o => o.status === 'CONFIRMED').length;
   const pendingAsBuyer = await prisma.order.count({
@@ -1565,7 +1565,7 @@ export async function getActivitySummary(userId: string, lang?: string): Promise
       status: 'CONFIRMED',
     },
   });
-  
+
   // Get this month's completed orders
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const monthCompletedSelling = completedOrders.filter(o => new Date(o.createdAt) >= monthStart).length;
@@ -1576,7 +1576,7 @@ export async function getActivitySummary(userId: string, lang?: string): Promise
       createdAt: { gte: monthStart },
     },
   });
-  
+
   // Get active listings count
   let activeListings = 0;
   if (providerId) {
@@ -1587,7 +1587,7 @@ export async function getActivitySummary(userId: string, lang?: string): Promise
       },
     });
   }
-  
+
   // Build the activity summary
   const summary = ht(
     `📊 *Your Activity Summary*\n` +
@@ -1604,7 +1604,7 @@ export async function getActivitySummary(userId: string, lang?: string): Promise
     `📋 *Listings*\n` +
     `• ${activeListings} active listing${activeListings !== 1 ? 's' : ''}\n\n` +
     `💼 *Wallet Balance*: ₹${balance.toFixed(0)}`,
-    
+
     `📊 *Aapki Activity Summary*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
     `👋 Namaste ${userName}!\n\n` +
@@ -1620,7 +1620,7 @@ export async function getActivitySummary(userId: string, lang?: string): Promise
     `• ${activeListings} active listing${activeListings !== 1 ? 's' : ''}\n\n` +
     `💼 *Wallet Balance*: ₹${balance.toFixed(0)}`
   );
-  
+
   return summary;
 }
 
@@ -1643,7 +1643,7 @@ export interface TopDeal {
 export async function getTopDeals(limit: number = 3, lang?: string): Promise<{ deals: TopDeal[], message: string }> {
   const ht = (en: string, hi: string) => lang === 'hi-IN' ? hi : en;
   const DISCOM_RATE = 7.5; // Peak DISCOM rate for comparison
-  
+
   // Get best available offers
   const offers = await prisma.catalogOffer.findMany({
     where: { maxQty: { gt: 0 } },
@@ -1654,7 +1654,7 @@ export async function getTopDeals(limit: number = 3, lang?: string): Promise<{ d
     orderBy: { priceValue: 'asc' },
     take: limit,
   });
-  
+
   if (offers.length === 0) {
     return {
       deals: [],
@@ -1664,13 +1664,13 @@ export async function getTopDeals(limit: number = 3, lang?: string): Promise<{ d
       ),
     };
   }
-  
+
   const deals: TopDeal[] = offers.map(offer => {
     const savings = DISCOM_RATE - offer.priceValue;
     const savingsPercent = ((DISCOM_RATE - offer.priceValue) / DISCOM_RATE) * 100;
     const sourceType = offer.item?.sourceType || 'SOLAR';
     const energyEmoji = sourceType === 'SOLAR' ? '☀️' : sourceType === 'WIND' ? '💨' : '💧';
-    
+
     return {
       offerId: offer.id,
       quantity: Math.round(offer.maxQty),
@@ -1683,13 +1683,13 @@ export async function getTopDeals(limit: number = 3, lang?: string): Promise<{ d
       savingsPercent: savingsPercent,
     };
   });
-  
+
   // Build formatted message
   let message = ht(
     `⚡ *Top ${deals.length} Green Energy Deals*\n━━━━━━━━━━━━━━━━━━━━\n\n`,
     `⚡ *Top ${deals.length} Green Energy Deals*\n━━━━━━━━━━━━━━━━━━━━\n\n`
   );
-  
+
   deals.forEach((deal, i) => {
     const trustStars = '⭐'.repeat(Math.round(deal.trustScore * 5));
     message += ht(
@@ -1697,71 +1697,71 @@ export async function getTopDeals(limit: number = 3, lang?: string): Promise<{ d
       `   💰 Total: ₹${(deal.pricePerUnit * deal.quantity).toFixed(0)}\n` +
       `   🏷️ Save ₹${deal.savings.toFixed(1)}/unit vs DISCOM (${deal.savingsPercent.toFixed(0)}% off!)\n` +
       `   👤 ${deal.providerName} ${trustStars}\n\n`,
-      
+
       `${i + 1}️⃣ ${deal.energyType} ${deal.quantity} unit @ ₹${deal.pricePerUnit}/unit\n` +
       `   💰 Total: ₹${(deal.pricePerUnit * deal.quantity).toFixed(0)}\n` +
       `   🏷️ DISCOM se ₹${deal.savings.toFixed(1)}/unit bachao (${deal.savingsPercent.toFixed(0)}% off!)\n` +
       `   👤 ${deal.providerName} ${trustStars}\n\n`
     );
   });
-  
+
   message += ht(
     '💡 Reply with the deal number to buy, or specify your needs (e.g. "50 units tomorrow")',
     '💡 Deal number reply karo ya apni zaroorat batao (jaise "50 unit kal")'
   );
-  
+
   return { deals, message };
 }
 
-  /**
-   * Get all available offers formatted as a markdown table for "Browse Market".
-   */
-  async getBrowseMarketTable(lang?: string): Promise<string> {
-    const offers = await prisma.catalogOffer.findMany({
-      where: { maxQty: { gt: 0 } },
-      include: {
-        provider: { select: { name: true, trustScore: true } },
-        item: { select: { sourceType: true } },
-      },
-      orderBy: { priceValue: 'asc' },
-      take: 10,
-    });
+/**
+ * Get all available offers formatted as a markdown table for "Browse Market".
+ */
+export async function getBrowseMarketTable(lang?: string): Promise<string> {
+  const offers = await prisma.catalogOffer.findMany({
+    where: { maxQty: { gt: 0 } },
+    include: {
+      provider: { select: { name: true, trustScore: true } },
+      item: { select: { sourceType: true } },
+    },
+    orderBy: { priceValue: 'asc' },
+    take: 10,
+  });
 
-    if (offers.length === 0) {
-      return ht(lang,
-        'No active offers in the market right now.',
-        'Market mein abhi koi active offer nahi hai.'
-      );
-    }
-
-    // Table Headers
-    const headers = ht(lang,
-      '| Seller | Energy | Price | Qty | Time |',
-      '| Seller | Energy | Rate | Qty | Time |'
+  if (offers.length === 0) {
+    return ht(lang,
+      'No active offers in the market right now.',
+      'Market mein abhi koi active offer nahi hai.'
     );
-    const separator = '|---|---|---|---|---|';
-    
-    const rows = offers.map(o => {
-      // Format time window (simplified)
-      const start = new Date(o.timeWindowStart);
-      const end = new Date(o.timeWindowEnd);
-      const timeStr = `${start.getHours()}h-${end.getHours()}h`;
-      
-      const type = o.item?.sourceType === 'SOLAR' ? '☀️' : 
-                   o.item?.sourceType === 'WIND' ? '💨' : '⚡';
-                   
-      const price = `₹${o.priceValue}`;
-      const qty = `${o.maxQty}`; // Shorten for table width
-      const name = (o.provider?.name || 'User').split(' ')[0]; // First name only to save space
+  }
 
-      return `| ${name} | ${type} | ${price} | ${qty} | ${timeStr} |`;
-    });
+  // Table Headers
+  const headers = ht(lang,
+    '| Seller | Energy | Price | Qty | Time |',
+    '| Seller | Energy | Rate | Qty | Time |'
+  );
+  const separator = '|---|---|---|---|---|';
 
-    const title = ht(lang, '🏪 *Market Offers*', '🏪 *Market Offers*');
-    const footer = ht(lang, 
-      '_Type "buy" to purchase_', 
-      '_Kharidne ke liye "buy" likho_'
-    );
+  const rows = offers.map(o => {
+    // Format time window (simplified)
+    const start = new Date(o.timeWindowStart);
+    const end = new Date(o.timeWindowEnd);
+    const timeStr = `${start.getHours()}h-${end.getHours()}h`;
 
-    return `${title}\n\n${headers}\n${separator}\n${rows.join('\n')}\n\n${footer}`;
-  },
+    const type = o.item?.sourceType === 'SOLAR' ? '☀️' :
+      o.item?.sourceType === 'WIND' ? '💨' : '⚡';
+
+    const price = `₹${o.priceValue}`;
+    const qty = `${o.maxQty}`; // Shorten for table width
+    const name = (o.provider?.name || 'User').split(' ')[0]; // First name only to save space
+
+    return `| ${name} | ${type} | ${price} | ${qty} | ${timeStr} |`;
+  });
+
+  const title = ht(lang, '🏪 *Market Offers*', '🏪 *Market Offers*');
+  const footer = ht(lang,
+    '_Type "buy" to purchase_',
+    '_Kharidne ke liye "buy" likho_'
+  );
+
+  return `${title}\n\n${headers}\n${separator}\n${rows.join('\n')}\n\n${footer}`;
+}

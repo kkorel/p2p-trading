@@ -24,7 +24,7 @@ import {
   getIssuerId,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
-import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, getMarketInsights, getActivitySummary, getTopDeals } from './trading-agent';
+import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, getMarketInsights, getActivitySummary, getTopDeals, getBrowseMarketTable } from './trading-agent';
 import { askLLM, classifyIntent, composeResponse, extractNameWithLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
@@ -343,7 +343,7 @@ const APP_URL = 'https://p2p-trading-snowy.vercel.app/';
 function getUnverifiedWhatsAppResponse(userMessage: string): AgentResponse {
   const detectedLang = detectLanguage(userMessage);
   const isHindi = detectedLang === 'hi-IN';
-  
+
   const message = isHindi
     ? `नमस्ते! मैं ऊर्जा हूँ, आपका बिजली व्यापार सहायक।
 
@@ -382,23 +382,23 @@ See you soon!`;
  */
 function extractName(message: string): string {
   let text = message.trim();
-  
+
   // Common patterns in English
   const englishPatterns = [
     /^(?:my name is|i'm|i am|call me|this is|it's|its)\s+(.+)$/i,
     /^(.+?)\s+(?:is my name|here)$/i,
     /^(?:name:?\s*)(.+)$/i,
   ];
-  
+
   // Common patterns in Hindi
   const hindiPatterns = [
     /^(?:mera naam|mera name|naam|name)\s+(?:hai\s+)?(.+)$/i,
     /^(?:main|mai|me)\s+(.+?)\s+(?:hun|hoon|hu)$/i,
     /^(.+?)\s+(?:mera naam hai|hai mera naam)$/i,
   ];
-  
+
   const allPatterns = [...englishPatterns, ...hindiPatterns];
-  
+
   for (const pattern of allPatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
@@ -411,18 +411,18 @@ function extractName(message: string): string {
       }
     }
   }
-  
+
   // No explicit pattern matched - try to extract a name from casual speech
   // Remove filler words and clean up
   const fillerWords = /^(uh+|um+|hmm+|well|ok|okay|hey|hi|hello|so|yeah|yes|no|oh)[,.\s]+/gi;
   text = text.replace(fillerWords, '').trim();
-  
+
   // Remove trailing questions/phrases like "what's yours?", "and you?", "what about you?"
   text = text.replace(/[,.\s]+(what'?s?\s+yours|and\s+you|what\s+about\s+you|you\??)\s*\??$/i, '').trim();
-  
+
   // Remove surrounding punctuation
   text = text.replace(/^[,.\s!?]+|[,.\s!?]+$/g, '').trim();
-  
+
   // If the result looks like a reasonable name (1-3 words, starts with capital or is short)
   const words = text.split(/\s+/);
   if (words.length <= 3 && text.length >= 2 && text.length <= 50) {
@@ -432,20 +432,20 @@ function extractName(message: string): string {
       return text;
     }
   }
-  
+
   // Last resort: try to find a capitalized word that looks like a name
   const capitalizedWords = text.match(/\b[A-Z][a-z]+\b/g);
   if (capitalizedWords && capitalizedWords.length > 0) {
     // Return the first capitalized word (likely a name)
     return capitalizedWords[0];
   }
-  
+
   // Fallback: return first word if it's reasonable length
   const firstWord = words[0]?.replace(/[^a-zA-Z\u0900-\u097F]/g, '');
   if (firstWord && firstWord.length >= 2 && firstWord.length <= 20) {
     return firstWord;
   }
-  
+
   // Ultimate fallback
   return text || message.trim();
 }
@@ -485,11 +485,11 @@ function getMarketPriceInsight(energyType: string): MarketPriceInsight {
 
   return {
     en: `Current market: ₹${data.min}-${data.max}/kWh (avg ₹${data.avg})\n` +
-        `DISCOM rate: ₹${data.discom}/kWh\n` +
-        `Your buyers save ~${savings}% vs DISCOM!`,
+      `DISCOM rate: ₹${data.discom}/kWh\n` +
+      `Your buyers save ~${savings}% vs DISCOM!`,
     hi: `Market rate: ₹${data.min}-${data.max}/kWh (avg ₹${data.avg})\n` +
-        `DISCOM rate: ₹${data.discom}/kWh\n` +
-        `Buyers ko ~${savings}% bachega DISCOM se!`,
+      `DISCOM rate: ₹${data.discom}/kWh\n` +
+      `Buyers ko ~${savings}% bachega DISCOM se!`,
     low: data.min,
     recommended: data.avg,
     high: data.max,
@@ -596,7 +596,7 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
   if (pending.pricePerKwh == null) {
     // Get market pricing insights
     const marketInsight = getMarketPriceInsight(pending.energyType || 'SOLAR');
-    
+
     return {
       messages: [{
         text: h(ctx,
@@ -691,8 +691,8 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
     case 'choose_mode': {
       // Handle mode selection: Quick Sell vs Detailed
       if (message === 'listing_mode:quick' || lower.includes('quick') || numInput === 1) {
-        const updated: PendingListing = { 
-          ...pending, 
+        const updated: PendingListing = {
+          ...pending,
           quickSellMode: true,
           energyType: QUICK_SELL_DEFAULTS.energyType,
           awaitingField: undefined as any,
@@ -700,8 +700,8 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
         const next = askNextListingDetail(ctx, updated);
         return next || { messages: [], contextUpdate: { pendingListing: updated } };
       } else if (message === 'listing_mode:detailed' || lower.includes('detail') || numInput === 2) {
-        const updated: PendingListing = { 
-          ...pending, 
+        const updated: PendingListing = {
+          ...pending,
           quickSellMode: false,
           awaitingField: undefined as any,
         };
@@ -760,7 +760,7 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
       } else {
         num = parseFloat(message.replace(/[^\d.]/g, ''));
       }
-      
+
       if (!num || num <= 0) {
         return {
           messages: [{ text: h(ctx, 'Please enter a valid number of units.', 'Sahi unit number daalo.') }],
@@ -899,16 +899,16 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
   // Show top deals first (if not already shown and user hasn't specified quantity yet)
   if (!pending.topDealsShown && pending.quantity == null) {
     const { deals, message } = await getTopDeals(3, ctx.language);
-    
+
     // Build buttons for top deals
     const buttons = deals.slice(0, 3).map((deal, i) => ({
       text: `${i + 1}️⃣ Buy ${deal.quantity} units @ ₹${deal.pricePerUnit}`,
       callbackData: `buy_deal:${deal.offerId}:${deal.quantity}`,
     }));
-    
+
     // Add custom amount option
     buttons.push({ text: h(ctx, '📝 Custom amount', '📝 Custom amount'), callbackData: 'buy_custom' });
-    
+
     return {
       messages: [{
         text: message,
@@ -917,7 +917,7 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
       contextUpdate: { pendingPurchase: { ...pending, topDealsShown: true, awaitingField: 'top_deals' } },
     };
   }
-  
+
   if (pending.quantity == null) {
     return {
       messages: [{
@@ -989,10 +989,12 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
       return {
         messages: [
           searchMsg,
-          { text: h(ctx,
-            'Your session has expired. Please log in again using /start.',
-            'Aapka session expire ho gaya. /start se dobara login karo.'
-          ) },
+          {
+            text: h(ctx,
+              'Your session has expired. Please log in again using /start.',
+              'Aapka session expire ho gaya. /start se dobara login karo.'
+            )
+          },
         ],
         contextUpdate: { pendingPurchase: undefined },
       };
@@ -1088,9 +1090,9 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
 
   const fulfillLine = summary && !summary.fullyFulfilled
     ? h(ctx,
-        `\n(Partial: ${summary.shortfall} kWh short of ${pending.quantity} kWh requested)`,
-        `\n(Partial: ${pending.quantity} mein se ${summary.shortfall} kWh nahi mili)`
-      )
+      `\n(Partial: ${summary.shortfall} kWh short of ${pending.quantity} kWh requested)`,
+      `\n(Partial: ${pending.quantity} mein se ${summary.shortfall} kWh nahi mili)`
+    )
     : '';
 
   const timeWindow = offers[0]?.timeWindow || 'Flexible';
@@ -1174,16 +1176,16 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         const parts = message.replace('buy_deal:', '').split(':');
         const offerId = parts[0];
         const quantity = parseInt(parts[1], 10);
-        
+
         // Skip regular flow, go directly to purchase this specific deal
-        const updated = { 
-          ...pending, 
+        const updated = {
+          ...pending,
           selectedDealId: offerId,
           quantity: quantity,
           timeDesc: 'tomorrow', // Default time for quick deal purchase
           awaitingField: 'confirm_offer' as const,
         };
-        
+
         return {
           messages: [{
             text: h(ctx,
@@ -1209,14 +1211,14 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           const { deals } = await getTopDeals(3, ctx.language);
           if (numInput <= deals.length) {
             const deal = deals[numInput - 1];
-            const updated = { 
-              ...pending, 
+            const updated = {
+              ...pending,
               selectedDealId: deal.offerId,
               quantity: deal.quantity,
               timeDesc: 'tomorrow',
               awaitingField: 'confirm_offer' as const,
             };
-            
+
             return {
               messages: [{
                 text: h(ctx,
@@ -1232,7 +1234,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
             };
           }
         }
-        
+
         // Invalid selection - re-show deals
         const { deals, message: dealsMessage } = await getTopDeals(3, ctx.language);
         const buttons = deals.slice(0, 3).map((deal, i) => ({
@@ -1240,7 +1242,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           callbackData: `buy_deal:${deal.offerId}:${deal.quantity}`,
         }));
         buttons.push({ text: h(ctx, '📝 Custom amount', '📝 Custom amount'), callbackData: 'buy_custom' });
-        
+
         return {
           messages: [{
             text: h(ctx, 'Please select a deal number (1-3) or choose Custom:', 'Deal number chuno (1-3) ya Custom chuno:') + '\n\n' + dealsMessage,
@@ -1430,10 +1432,12 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         return {
           messages: [
             confirmMsg,
-            { text: h(ctx,
-              `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`,
-              `Purchase nahi ho payi: ${result.error || 'Unknown error'}. Dobara try karo.`
-            ) },
+            {
+              text: h(ctx,
+                `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`,
+                `Purchase nahi ho payi: ${result.error || 'Unknown error'}. Dobara try karo.`
+              )
+            },
           ],
           contextUpdate: { pendingPurchase: undefined },
         };
@@ -1636,7 +1640,7 @@ async function handleUniversalCommand(
       `• "sell 50 units at Rs 6"\n` +
       `• "buy 30 units"\n\n` +
       `_Type a number (1-7) or command!_`,
-      
+
       `📋 *Oorja Madad Menu*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
       `☀️ *Trading Commands*\n` +
@@ -1659,8 +1663,8 @@ async function handleUniversalCommand(
       `• "30 unit kharido"\n\n` +
       `_Number (1-7) ya command type karo!_`
     );
-    return { 
-      messages: [{ 
+    return {
+      messages: [{
         text: helpText,
         buttons: [
           { text: '☀️ 1. Sell Energy', callbackData: 'action:create_listing' },
@@ -1668,10 +1672,10 @@ async function handleUniversalCommand(
           { text: '📊 3. Market Prices', callbackData: 'action:market_insights' },
           { text: '📋 4. Dashboard', callbackData: 'action:dashboard' },
         ],
-      }] 
+      }]
     };
   }
-  
+
   // Check for help number shortcuts (1-7)
   if (HELP_SHORTCUTS[normalized]) {
     return { messages: [{ text: '' }], contextUpdate: { _helpShortcut: HELP_SHORTCUTS[normalized] } };
@@ -1689,7 +1693,7 @@ async function handleUniversalCommand(
         `Name: ${ctx.name || 'Not set'}\n` +
         `Phone: ${ctx.phone || 'Not set'}\n` +
         `Verified: ${ctx.userId ? 'Yes ✓' : 'No'}`,
-        
+
         `📍 *Aapka Status*\n\n${progress}` +
         `Naam: ${ctx.name || 'Nahi hai'}\n` +
         `Phone: ${ctx.phone || 'Nahi hai'}\n` +
@@ -1703,7 +1707,7 @@ async function handleUniversalCommand(
         `Phone: ${ctx.phone || 'Not set'}\n` +
         `Verified: ${ctx.userId ? 'Yes ✓' : 'No'}\n` +
         `Trading: ${ctx.tradingActive ? 'Active ✓' : 'Not started'}`,
-        
+
         `📍 *Aapka Status*\n\n` +
         `State: ${currentState}\n` +
         `Naam: ${ctx.name || 'Nahi hai'}\n` +
@@ -1718,7 +1722,7 @@ async function handleUniversalCommand(
   // Check for back command
   if (UNIVERSAL_COMMANDS.back.includes(normalized)) {
     const previousState = STATE_BACK_MAP[currentState];
-    
+
     if (!previousState) {
       return {
         messages: [{
@@ -1738,7 +1742,7 @@ async function handleUniversalCommand(
 
     const enterResp = await states[previousState as ChatState].onEnter(ctx);
     const backMsg = h(ctx, '⬅️ Going back...', '⬅️ Peeche ja rahe hain...');
-    
+
     return {
       messages: [{ text: backMsg }, ...enterResp.messages],
       newState: previousState,
@@ -1757,7 +1761,7 @@ async function handleUniversalCommand(
         contextUpdate: { pendingListing: undefined, pendingPurchase: undefined },
       };
     }
-    
+
     return {
       messages: [{
         text: h(ctx,
@@ -1774,7 +1778,7 @@ async function handleUniversalCommand(
     if (ctx._resetPending) {
       return null; // Let the state handler deal with it
     }
-    
+
     const confirmText = h(ctx,
       `🔄 *Reset Confirmation*\n\n` +
       `This will:\n` +
@@ -1782,7 +1786,7 @@ async function handleUniversalCommand(
       `• Clear current conversation\n` +
       `• Start fresh\n\n` +
       `Are you sure?`,
-      
+
       `🔄 *Reset Confirmation*\n\n` +
       `Ye hoga:\n` +
       `• Pending actions cancel\n` +
@@ -1790,7 +1794,7 @@ async function handleUniversalCommand(
       `• Naya shuru\n\n` +
       `Pakka hai?`
     );
-    
+
     return {
       messages: [{
         text: confirmText,
@@ -1821,7 +1825,7 @@ async function handleUniversalCommand(
       `📊 *General:*\n` +
       `• Complete profile for higher limits\n` +
       `• Add more credentials to unlock features`,
-      
+
       `💡 *Trading Tips*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
       `☀️ *Sellers ke liye:*\n` +
@@ -1858,7 +1862,7 @@ async function handleUniversalCommand(
       `3. DISCOM delivers through grid\n` +
       `4. Payment released after delivery\n\n` +
       `🌍 Empowering India's green energy future!`,
-      
+
       `🌱 *Oorja ke baare mein*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
       `Oorja India ka pehla P2P energy trading platform hai.\n\n` +
@@ -1893,7 +1897,7 @@ async function handleUniversalCommand(
       `• "cancel" - Stop current action\n` +
       `• "status" - See where you are\n\n` +
       `We're here to help! 🙏`,
-      
+
       `📞 *Support & Contact*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
       `*Madad chahiye?*\n` +
@@ -2001,7 +2005,7 @@ async function handleUniversalCommand(
 function getSmartSuggestions(ctx: SessionContext, currentState: string): Array<{ text: string; callbackData?: string }> {
   const suggestions: Array<{ text: string; callbackData?: string }> = [];
   const verifiedCreds = ctx.verifiedCreds || [];
-  
+
   // For onboarding states, show help and relevant action
   if (ONBOARDING_STATES.has(currentState)) {
     suggestions.push({ text: h(ctx, 'Help', 'मदद'), callbackData: 'cmd:help' });
@@ -2010,58 +2014,58 @@ function getSmartSuggestions(ctx: SessionContext, currentState: string): Array<{
     }
     return suggestions;
   }
-  
+
   // For GENERAL_CHAT, provide trading-related suggestions based on credentials
   if (currentState === 'GENERAL_CHAT') {
     const hasGeneration = verifiedCreds.includes('GENERATION_PROFILE');
     const hasStorage = verifiedCreds.includes('STORAGE_PROFILE');
     const hasConsumption = verifiedCreds.includes('CONSUMPTION_PROFILE');
-    
+
     // Common: Show electricity info (dashboard)
-    suggestions.push({ 
-      text: h(ctx, '📊 My Electricity Info', '📊 मेरी बिजली की जानकारी'), 
-      callbackData: 'action:dashboard' 
+    suggestions.push({
+      text: h(ctx, '📊 My Electricity Info', '📊 मेरी बिजली की जानकारी'),
+      callbackData: 'action:dashboard'
     });
-    
+
     // Seller suggestions (has generation or storage credential)
     if (hasGeneration || hasStorage) {
-      suggestions.push({ 
-        text: h(ctx, '☀️ Sell Electricity', '☀️ बिजली बेचो'), 
-        callbackData: 'action:create_listing' 
+      suggestions.push({
+        text: h(ctx, '☀️ Sell Electricity', '☀️ बिजली बेचो'),
+        callbackData: 'action:create_listing'
       });
-      suggestions.push({ 
-        text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), 
-        callbackData: 'action:show_earnings' 
+      suggestions.push({
+        text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'),
+        callbackData: 'action:show_earnings'
       });
     }
-    
+
     // Buyer suggestions (has consumption credential)
     if (hasConsumption && !hasGeneration && !hasStorage) {
-      suggestions.push({ 
-        text: h(ctx, '🔋 Buy Electricity', '🔋 बिजली खरीदो'), 
-        callbackData: 'action:buy_energy' 
+      suggestions.push({
+        text: h(ctx, '🔋 Buy Electricity', '🔋 बिजली खरीदो'),
+        callbackData: 'action:buy_energy'
       });
-      suggestions.push({ 
-        text: h(ctx, '📦 My Orders', '📦 मेरे ऑर्डर'), 
-        callbackData: 'action:show_orders' 
+      suggestions.push({
+        text: h(ctx, '📦 My Orders', '📦 मेरे ऑर्डर'),
+        callbackData: 'action:show_orders'
       });
     }
-    
+
     // Universal: Browse marketplace
-    suggestions.push({ 
-      text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), 
-      callbackData: 'action:browse' 
+    suggestions.push({
+      text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'),
+      callbackData: 'action:browse'
     });
-    
+
     // Cancel button for pending actions
     if (ctx.pendingListing || ctx.pendingPurchase) {
       suggestions.unshift({ text: h(ctx, '❌ Cancel', '❌ रद्द'), callbackData: 'cmd:cancel' });
     }
-    
+
     // Limit to 4 suggestions
     return suggestions.slice(0, 4);
   }
-  
+
   return suggestions;
 }
 
@@ -2090,13 +2094,13 @@ function getConfusedResponse(ctx: SessionContext, userMessage: string): AgentRes
   const verifiedCreds = ctx.verifiedCreds || [];
   const hasGeneration = verifiedCreds.includes('GENERATION_PROFILE');
   const hasConsumption = verifiedCreds.includes('CONSUMPTION_PROFILE');
-  
+
   // Build the friendly message
   const intro = h(ctx,
     "🤔 Hmm, I didn't quite get that.",
     "🤔 Hmm, mujhe samajh nahi aaya."
   );
-  
+
   // Context-aware suggestion based on user state
   let contextSuggestion = '';
   if (ctx.pendingListing) {
@@ -2120,23 +2124,23 @@ function getConfusedResponse(ctx: SessionContext, userMessage: string): AgentRes
       "\n💡 Bijli pe bachana chahte ho? Main aapke liye best green energy deals dhundh sakta hun!"
     );
   }
-  
+
   const menuIntro = h(ctx,
     "\n\nHere's what I can help with:",
     "\n\nMain yeh madad kar sakta hun:"
   );
-  
+
   // Quick numbered options with emojis
   const quickOptions = h(ctx,
     "\n1️⃣ Sell energy\n2️⃣ Buy energy\n3️⃣ Check prices\n4️⃣ My dashboard",
     "\n1️⃣ Energy becho\n2️⃣ Energy kharido\n3️⃣ Daam dekho\n4️⃣ Dashboard"
   );
-  
+
   const helpHint = h(ctx,
     "\n\nType a number (1-4) or say 'help' for all commands!",
     "\n\nNumber type karo (1-4) ya 'madad' bolo sabhi commands ke liye!"
   );
-  
+
   // Build buttons with emojis
   const buttons = [
     { text: h(ctx, '☀️ Sell Energy', '☀️ Energy Becho'), callbackData: 'action:create_listing' },
@@ -2144,7 +2148,7 @@ function getConfusedResponse(ctx: SessionContext, userMessage: string): AgentRes
     { text: h(ctx, '📊 Market Prices', '📊 Daam Dekho'), callbackData: 'action:market_insights' },
     { text: h(ctx, '📋 Dashboard', '📋 Dashboard'), callbackData: 'action:dashboard' },
   ];
-  
+
   return {
     messages: [{
       text: intro + contextSuggestion + menuIntro + quickOptions + helpHint,
@@ -2159,7 +2163,7 @@ function getConfusedResponse(ctx: SessionContext, userMessage: string): AgentRes
  */
 function fuzzyMatchCommand(input: string): string | null {
   const normalized = input.toLowerCase().trim();
-  
+
   // Common typos and abbreviations
   const fuzzyMap: Record<string, string> = {
     // Sell variations
@@ -2171,7 +2175,7 @@ function fuzzyMatchCommand(input: string): string | null {
     'bech': 'action:create_listing',
     'bechna': 'action:create_listing',
     'bikri': 'action:create_listing',
-    
+
     // Buy variations
     'bye': 'action:buy_energy',
     'buye': 'action:buy_energy',
@@ -2180,7 +2184,7 @@ function fuzzyMatchCommand(input: string): string | null {
     'khareed': 'action:buy_energy',
     'kharido': 'action:buy_energy',
     'lena': 'action:buy_energy',
-    
+
     // Help variations
     'hep': 'cmd:help',
     'halp': 'cmd:help',
@@ -2188,7 +2192,7 @@ function fuzzyMatchCommand(input: string): string | null {
     'madad': 'cmd:help',
     'madat': 'cmd:help',
     'sahayata': 'cmd:help',
-    
+
     // Market/prices variations
     'price': 'action:market_insights',
     'prices': 'action:market_insights',
@@ -2200,14 +2204,14 @@ function fuzzyMatchCommand(input: string): string | null {
     'market': 'action:market_insights',
     'bazaar': 'action:market_insights',
     'bajar': 'action:market_insights',
-    
+
     // Dashboard variations
     'dash': 'action:dashboard',
     'dashbord': 'action:dashboard',
     'overview': 'action:dashboard',
     'summary': 'action:dashboard',
     'status': 'action:dashboard',
-    
+
     // Balance variations
     'bal': 'action:show_balance',
     'paise': 'action:show_balance',
@@ -2215,43 +2219,43 @@ function fuzzyMatchCommand(input: string): string | null {
     'wallet': 'action:show_balance',
     'rupee': 'action:show_balance',
     'rupay': 'action:show_balance',
-    
+
     // Orders variations
     'ordres': 'action:show_orders',
     'ordr': 'action:show_orders',
     'order': 'action:show_orders',
-    
+
     // Earnings variations
     'earn': 'action:show_earnings',
     'earnigs': 'action:show_earnings',
     'kamai': 'action:show_earnings',
     'munafa': 'action:show_earnings',
     'profit': 'action:show_earnings',
-    
+
     // Cancel variations
     'cancle': 'cmd:cancel',
     'cansel': 'cmd:cancel',
     'ruko': 'cmd:cancel',
     'band': 'cmd:cancel',
-    
+
     // Back variations
     'bak': 'cmd:back',
     'peeche': 'cmd:back',
     'wapas': 'cmd:back',
   };
-  
+
   // Direct match
   if (fuzzyMap[normalized]) {
     return fuzzyMap[normalized];
   }
-  
+
   // Partial match (for words that are part of a longer message)
   for (const [typo, command] of Object.entries(fuzzyMap)) {
     if (normalized === typo || normalized.startsWith(typo + ' ') || normalized.endsWith(' ' + typo)) {
       return command;
     }
   }
-  
+
   return null;
 }
 
@@ -2259,10 +2263,10 @@ const states: Record<ChatState, StateHandler> = {
   GREETING: {
     async onEnter(ctx) {
       // For web users, mention the speaker button in the greeting
-      const voiceNote = ctx._platform === 'WEB' 
+      const voiceNote = ctx._platform === 'WEB'
         ? '\n\n🔊 Agar meri messages sunna chahte ho, speaker button dabao.'
         : '';
-      
+
       const messages: AgentMessage[] = [
         { text: `Namaste! Main Oorja hun.\nMain aapko apne ghar pe banai bijli se paise kamane mein madad karunga. Aur jinhe bijli khareedni hai, unhe sahi daam pe dilaunga.${voiceNote}` },
         {
@@ -2461,12 +2465,12 @@ const states: Record<ChatState, StateHandler> = {
           `Hi ${userName}! Welcome to Oorja. You just registered on our website. You can continue chatting here on WhatsApp anytime! Just message me to pick up where you left off.`,
           `Namaste ${userName}! Oorja mein aapka swagat hai. Aapne website pe register kiya. Aap WhatsApp pe bhi baat kar sakte ho! Bas message bhejo.`
         );
-        
+
         // Fire-and-forget - don't block the response
         sendProactiveMessage(ctx.phone, welcomeMsg).catch(err => {
           logger.warn(`Failed to send WhatsApp welcome: ${err.message}`);
         });
-        
+
         logger.info(`Sent WhatsApp welcome to new web user: ${ctx.phone}`);
       }
 
@@ -2990,10 +2994,12 @@ const states: Record<ChatState, StateHandler> = {
 
         return {
           messages: [
-            { text: h(ctx,
-              'I\'ll help you find the best energy deals from local producers at fair prices. Your profile is ready!',
-              'Main aapko local producers se sahi daam pe bijli dilaunga. Aapka profile ready hai!'
-            ) },
+            {
+              text: h(ctx,
+                'I\'ll help you find the best energy deals from local producers at fair prices. Your profile is ready!',
+                'Main aapko local producers se sahi daam pe bijli dilaunga. Aapka profile ready hai!'
+              )
+            },
           ],
           newState: 'GENERAL_CHAT',
         };
@@ -3007,10 +3013,12 @@ const states: Record<ChatState, StateHandler> = {
 
       return {
         messages: [
-          { text: h(ctx,
-            'Your profile is set up! You can browse energy offers or ask me anything.',
-            'Aapka profile ready hai! Energy offers dekh sakte ho ya mujhse kuch bhi poocho.'
-          ) },
+          {
+            text: h(ctx,
+              'Your profile is set up! You can browse energy offers or ask me anything.',
+              'Aapka profile ready hai! Energy offers dekh sakte ho ya mujhse kuch bhi poocho.'
+            )
+          },
         ],
         newState: 'GENERAL_CHAT',
       };
@@ -3019,7 +3027,7 @@ const states: Record<ChatState, StateHandler> = {
       // Handle numeric input (WhatsApp: 1 = Yes, 2 = No)
       if (message.trim() === '1') message = 'yes';
       else if (message.trim() === '2') message = 'no';
-      
+
       const lower = message.toLowerCase().trim();
       const isYes = ['yes', 'y', 'haan', 'ha', 'ok', 'sure', 'start', 'yes, start!', 'haan, shuru karo!'].includes(lower);
       const isNo = ['no', 'n', 'nahi', 'nope', 'not now', 'later', 'baad mein', 'abhi nahi'].includes(lower);
@@ -3037,10 +3045,12 @@ const states: Record<ChatState, StateHandler> = {
             const o = offerResult.offer;
             return {
               messages: [
-                { text: h(ctx,
-                  `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
-                  `Ho gaya! Aapki energy ab sale pe hai:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.\n\nBuyers ab aapki energy khareed sakte hain!`
-                ) },
+                {
+                  text: h(ctx,
+                    `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
+                    `Ho gaya! Aapki energy ab sale pe hai:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.\n\nBuyers ab aapki energy khareed sakte hain!`
+                  )
+                },
               ],
               newState: 'GENERAL_CHAT',
               contextUpdate: { tradingActive: true },
@@ -3050,10 +3060,12 @@ const states: Record<ChatState, StateHandler> = {
           logger.warn(`createDefaultOffer returned error for user ${ctx.userId}: ${offerResult.error}`);
           return {
             messages: [
-              { text: h(ctx,
-                'Profile set up! You can create offers from the Sell tab or tell me here (e.g. "list 50 kWh at Rs 6").',
-                'Profile ready! Sell tab se ya mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
-              ) },
+              {
+                text: h(ctx,
+                  'Profile set up! You can create offers from the Sell tab or tell me here (e.g. "list 50 kWh at Rs 6").',
+                  'Profile ready! Sell tab se ya mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
+                )
+              },
             ],
             newState: 'GENERAL_CHAT',
             contextUpdate: { tradingActive: true },
@@ -3062,10 +3074,12 @@ const states: Record<ChatState, StateHandler> = {
           logger.error(`CONFIRM_TRADING yes handler failed: ${error.message}`);
           return {
             messages: [
-              { text: h(ctx,
-                'Profile is set up! You can create offers by telling me (e.g. "list 50 kWh at Rs 6").',
-                'Profile ready hai! Mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
-              ) },
+              {
+                text: h(ctx,
+                  'Profile is set up! You can create offers by telling me (e.g. "list 50 kWh at Rs 6").',
+                  'Profile ready hai! Mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
+                )
+              },
             ],
             newState: 'GENERAL_CHAT',
             contextUpdate: { tradingActive: true },
@@ -3077,14 +3091,16 @@ const states: Record<ChatState, StateHandler> = {
         await prisma.user.update({
           where: { id: ctx.userId! },
           data: { profileComplete: true },
-        }).catch(() => {});
+        }).catch(() => { });
 
         return {
           messages: [
-            { text: h(ctx,
-              'No problem. You can start selling anytime from the Sell tab or ask me here.',
-              'Koi baat nahi. Kabhi bhi Sell tab se ya mujhse poocho, bechna shuru kar sakte ho.'
-            ) },
+            {
+              text: h(ctx,
+                'No problem. You can start selling anytime from the Sell tab or ask me here.',
+                'Koi baat nahi. Kabhi bhi Sell tab se ya mujhse poocho, bechna shuru kar sakte ho.'
+              )
+            },
           ],
           newState: 'GENERAL_CHAT',
         };
@@ -3124,19 +3140,19 @@ const states: Record<ChatState, StateHandler> = {
   GENERAL_CHAT: {
     async onEnter(ctx) {
       const messages: AgentMessage[] = [];
-      
+
       // Show smart suggestions when entering general chat
       const suggestions = getSmartSuggestions(ctx, 'GENERAL_CHAT');
       if (suggestions.length > 0) {
         messages.push({
-          text: h(ctx, 
+          text: h(ctx,
             'How can I help you today?',
             'Aaj kya madad karun?'
           ),
           buttons: suggestions,
         });
       }
-      
+
       return { messages };
     },
     async onMessage(ctx, message) {
@@ -3208,8 +3224,8 @@ const states: Record<ChatState, StateHandler> = {
                 { text: '📋 Dashboard', callbackData: 'action:dashboard' },
               ],
             }],
-            contextUpdate: { 
-              pendingListing: undefined, 
+            contextUpdate: {
+              pendingListing: undefined,
               pendingPurchase: undefined,
               _resetPending: undefined,
             },
@@ -3289,7 +3305,7 @@ const states: Record<ChatState, StateHandler> = {
             message = 'show my orders';
             break;
           case 'browse':
-            const browseTable = await mockTradingAgent.getBrowseMarketTable(ctx.language);
+            const browseTable = await getBrowseMarketTable(ctx.language);
             return {
               messages: [{
                 text: browseTable,
@@ -3563,7 +3579,7 @@ const states: Record<ChatState, StateHandler> = {
         const lower = message.toLowerCase();
 
         if ((lower.includes('listing') || lower.includes('offer')) &&
-            (lower.includes('my') || lower.includes('mere') || lower.includes('show') || lower.includes('dikha') || lower.includes('active') || lower.includes('kitna'))) {
+          (lower.includes('my') || lower.includes('mere') || lower.includes('show') || lower.includes('dikha') || lower.includes('active') || lower.includes('kitna'))) {
           return { messages: [{ text: await mockTradingAgent.getActiveListings(ctx.userId, ctx.language) }] };
         }
         if (lower.includes('earn') || lower.includes('kamai') || lower.includes('kamaya') || lower.includes('income') || lower.includes('munafa')) {
@@ -3577,7 +3593,7 @@ const states: Record<ChatState, StateHandler> = {
           return { messages: [{ text: await mockTradingAgent.getOrdersSummary(ctx.userId, ctx.language) }] };
         }
         if ((lower.includes('new') || lower.includes('create') || lower.includes('naya') || lower.includes('daal') || lower.includes('bana') || lower.includes('sell') || lower.includes('bech')) &&
-            (lower.includes('offer') || lower.includes('listing') || lower.includes('energy') || lower.includes('bijli'))) {
+          (lower.includes('offer') || lower.includes('listing') || lower.includes('energy') || lower.includes('bijli'))) {
           // Credential gate for keyword fallback too
           if (!verifiedCreds.includes('GENERATION_PROFILE')) {
             return {
@@ -3603,10 +3619,10 @@ const states: Record<ChatState, StateHandler> = {
         }
         // Buy keyword fallback (includes "best deal", "find deal")
         if (((lower.includes('buy') || lower.includes('kharid') || lower.includes('chahiye') || lower.includes('purchase') || lower.includes('leni')) &&
-            (lower.includes('energy') || lower.includes('bijli') || lower.includes('unit') || lower.includes('kwh'))) ||
-            (lower.includes('best') && lower.includes('deal')) ||
-            (lower.includes('find') && (lower.includes('deal') || lower.includes('offer'))) ||
-            (lower.includes('acch') && lower.includes('deal'))) {
+          (lower.includes('energy') || lower.includes('bijli') || lower.includes('unit') || lower.includes('kwh'))) ||
+          (lower.includes('best') && lower.includes('deal')) ||
+          (lower.includes('find') && (lower.includes('deal') || lower.includes('offer'))) ||
+          (lower.includes('acch') && lower.includes('deal'))) {
           // Credential gate for keyword fallback too
           if (!verifiedCreds.includes('CONSUMPTION_PROFILE')) {
             return {
@@ -3639,7 +3655,7 @@ const states: Record<ChatState, StateHandler> = {
         logger.info(`[Agent] Fuzzy matched "${message}" -> "${fuzzyMatch}"`);
         return states.GENERAL_CHAT.onMessage(ctx, fuzzyMatch);
       }
-      
+
       // Last resort - friendly "I don't understand" with smart suggestions
       logger.info(`[Agent] Unmatched message in GENERAL_CHAT: "${message.substring(0, 50)}..."`);
       return getConfusedResponse(ctx, message);
@@ -3853,15 +3869,15 @@ export async function processMessage(
 
     // --- WhatsApp: Require app verification before chatting ---
     const isWhatsAppMessage = platform === 'WHATSAPP' && (platformId.includes('@s.whatsapp.net') || platformId.includes('@lid'));
-    
+
     if (isWhatsAppMessage) {
       // Extract phone number from WhatsApp JID (standard format)
       // For LID format, we need to look up by recent activity
       const isLidFormat = platformId.includes('@lid');
       const whatsappPhone = isLidFormat ? null : platformId.replace('@s.whatsapp.net', '');
-      
+
       let existingUser: { id: string; name: string | null; profileComplete: boolean; phone: string | null; languagePreference: string | null } | null = null;
-      
+
       if (whatsappPhone) {
         // Standard format: Try to find existing user by phone
         existingUser = await prisma.user.findFirst({
@@ -3880,7 +3896,7 @@ export async function processMessage(
         const existingLidSession = await prisma.chatSession.findUnique({
           where: { platform_platformId: { platform: 'WHATSAPP', platformId } },
         });
-        
+
         if (existingLidSession?.userId) {
           existingUser = await prisma.user.findUnique({
             where: { id: existingLidSession.userId },
@@ -3903,10 +3919,10 @@ export async function processMessage(
             orderBy: { updatedAt: 'desc' },
             take: 5,
           });
-          
+
           // Filter out users without phone (can't do NOT null in Prisma updateMany/findMany easily)
           const usersWithPhone = recentWelcomedUsers.filter(u => u.phone);
-          
+
           if (usersWithPhone.length === 1) {
             // Only one recent user - high confidence this is them
             existingUser = usersWithPhone[0];
@@ -3922,9 +3938,9 @@ export async function processMessage(
       // VERIFIED USER: Has completed profile on the app
       if (existingUser?.profileComplete) {
         logger.info(`WhatsApp verified user: ${existingUser.id} for phone ${whatsappPhone || existingUser.phone || 'LID:' + platformId}`);
-        
+
         const verifiedCreds = await getVerifiedCredentials(existingUser.id);
-        
+
         // --- Cross-platform sync: Check for active sessions on other platforms ---
         const otherSessions = await prisma.chatSession.findMany({
           where: {
@@ -3935,14 +3951,14 @@ export async function processMessage(
           orderBy: { updatedAt: 'desc' },
           take: 1,
         });
-        
+
         let syncedContext: Partial<SessionContext> = {};
         let syncMessage: string | null = null;
-        
+
         if (otherSessions.length > 0) {
           const otherSession = otherSessions[0];
           const otherCtx = JSON.parse(otherSession.contextJson) as SessionContext;
-          
+
           // Sync pending operations
           if (otherCtx.pendingListing) {
             syncedContext.pendingListing = otherCtx.pendingListing;
@@ -3957,15 +3973,15 @@ export async function processMessage(
               `Maine dekha ${otherSession.platform === 'WEB' ? 'website' : 'dusre device'} pe aap bijli khareed rahe the. Yahan continue karein?`
             );
           }
-          
+
           // Sync language preference
           if (otherCtx.language && !existingUser.languagePreference) {
             syncedContext.language = otherCtx.language;
           }
-          
+
           logger.info(`Cross-platform sync: Synced context from ${otherSession.platform} session`);
         }
-        
+
         const ctx: SessionContext = {
           userId: existingUser.id,
           name: existingUser.name || undefined,
@@ -4003,9 +4019,9 @@ export async function processMessage(
         const fallbackWelcome = savedLang === 'hi-IN'
           ? `Wapas aaye ${existingUser.name || 'dost'}! WhatsApp pe swagat hai. Aaj kya madad karun?`
           : `Welcome back, ${existingUser.name || 'friend'}! Great to see you on WhatsApp. How can I help?`;
-        
+
         const messages: AgentMessage[] = [{ text: welcomeMsg || fallbackWelcome }];
-        
+
         // Add sync message if there's a pending operation
         if (syncMessage) {
           messages.push({
@@ -4016,7 +4032,7 @@ export async function processMessage(
             ],
           });
         }
-        
+
         await storeAgentMessages(session.id, messages);
         return { messages };
       }
@@ -4063,7 +4079,7 @@ export async function processMessage(
       });
       isVerified = user?.profileComplete === true;
     }
-    
+
     if (!isVerified) {
       logger.info(`WhatsApp session exists but user not verified - redirecting to app`);
       // Clear the old session
@@ -4088,7 +4104,7 @@ export async function processMessage(
     currentState,
     session.id
   );
-  
+
   if (universalResponse) {
     // Update context if needed
     if (universalResponse.contextUpdate) {
@@ -4109,10 +4125,10 @@ export async function processMessage(
   // For text input, detect language from the text itself
   const isStructuredInput = /^\d+$/.test(userMessage.trim()) || userMessage.trim().length <= 3;
   const isCallbackData = userMessage.includes(':') && !userMessage.includes(' ');
-  
+
   let detectedLang: SarvamLangCode;
   let processedMessage = userMessage;
-  
+
   if (voiceOptions?.isVoiceInput && voiceOptions.detectedLanguage) {
     // Voice input: STT already returns transcript in native script
     detectedLang = voiceOptions.detectedLanguage as SarvamLangCode;
@@ -4162,7 +4178,7 @@ export async function processMessage(
       prisma.user.update({
         where: { id: ctx.userId },
         data: { languagePreference: userLang },
-      }).catch(() => {}); // Fire-and-forget, non-critical
+      }).catch(() => { }); // Fire-and-forget, non-critical
     }
   } else {
     logger.debug(`[Language] Kept: "${userLang}" (detected: ${detectedLang})`);
