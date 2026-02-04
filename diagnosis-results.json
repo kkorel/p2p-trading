@@ -1,0 +1,415 @@
+{
+  "requestId": "diag-1770072067724-59k9jm",
+  "timestamp": "2026-02-02T22:41:09.103Z",
+  "summary": { "total": 19, "passed": 13, "failed": 6, "health": "DEGRADED" },
+  "auth": { "authenticated": false },
+  "database": { "ok": true, "latencyMs": 20 },
+  "config": {
+    "bapId": "bap.p2p-trading.beckn",
+    "bapUri": "https://p2p-trading-production-c4e8.up.railway.app",
+    "bppId": "bpp.p2p-trading.beckn",
+    "bppUri": "https://p2p-trading-production-c4e8.up.railway.app",
+    "cdsUri": "https://34.93.141.21.sslip.io/beckn",
+    "externalCds": "https://34.93.141.21.sslip.io/beckn/catalog",
+    "ledgerUrl": "https://34.93.166.38.sslip.io",
+    "vcPortal": "https://open-vcs.up.railway.app",
+    "useExternalCds": true,
+    "enableLedgerWrites": true,
+    "matchingWeights": { "price": 0.4, "trust": 0.35, "timeWindowFit": 0.25 },
+    "env": "production"
+  },
+  "criticalFailures": [
+    { "name": "Ledger /ledger/put", "error": "HTTP 400" },
+    { "name": "CDS /beckn/discover", "error": "HTTP 400" }
+  ],
+  "results": [
+    {
+      "name": "Health Check",
+      "endpoint": "/health",
+      "method": "GET",
+      "category": "internal",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 131,
+      "response": "{\"status\":\"ok\",\"service\":\"prosumer\",\"roles\":[\"bap\",\"bpp\"],\"postgres\":\"connected\",\"redis\":\"connected\",\"timestamp\":\"2026-02-02T22:41:07.873Z\"}"
+    },
+    {
+      "name": "API Discover",
+      "endpoint": "/api/discover",
+      "method": "POST",
+      "category": "internal",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 1348,
+      "response": "{\"transaction_id\":\"bb5d51be-1ba4-4e7b-82dd-26759e3cd7e6\",\"status\":\"success\",\"catalog\":{\"providers\":[{\"id\":\"provider-728b0de6\",\"descriptor\":{\"name\":\"Aryan Energy\"},\"items\":[{\"id\":\"item-solar-3ef7ec\",\"descriptor\":{\"name\":\"SOLAR from Aryan Energy\"},\"itemAttributes\":{\"sourceType\":\"SOLAR\",\"deliveryMode\":"
+    },
+    {
+      "name": "API Select (no txn)",
+      "endpoint": "/api/select",
+      "method": "POST",
+      "category": "internal",
+      "status": 400,
+      "ok": false,
+      "latencyMs": 135,
+      "response": "{\"error\":\"No catalog found for transaction. Run discover first.\"}"
+    },
+    {
+      "name": "API Init (no txn)",
+      "endpoint": "/api/init",
+      "method": "POST",
+      "category": "internal",
+      "status": 400,
+      "ok": false,
+      "latencyMs": 135,
+      "response": "{\"error\":\"Transaction not found\"}"
+    },
+    {
+      "name": "API Confirm (no txn)",
+      "endpoint": "/api/confirm",
+      "method": "POST",
+      "category": "internal",
+      "status": 400,
+      "ok": false,
+      "latencyMs": 137,
+      "response": "{\"error\":\"Transaction not found\"}"
+    },
+    {
+      "name": "API Status (no txn)",
+      "endpoint": "/api/status",
+      "method": "POST",
+      "category": "internal",
+      "status": 400,
+      "ok": false,
+      "latencyMs": 138,
+      "response": "{\"error\":\"Transaction not found\"}"
+    },
+    {
+      "name": "Seller Offers",
+      "endpoint": "/seller/offers",
+      "method": "GET",
+      "category": "internal",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 440,
+      "response": "{\"offers\":[{\"id\":\"offer-510ecdd6\",\"item_id\":\"item-solar-3ef7ec\",\"provider_id\":\"provider-728b0de6\",\"offerAttributes\":{\"pricingModel\":\"PER_KWH\",\"settlementType\":\"DAILY\"},\"price\":{\"value\":6,\"currency\":\"INR\"},\"maxQuantity\":162,\"timeWindow\":{\"startTime\":\"2026-02-02T06:00:00.000Z\",\"endTime\":\"2026-02-02T18"
+    },
+    {
+      "name": "Seller Items",
+      "endpoint": "/seller/items",
+      "method": "GET",
+      "category": "internal",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 258,
+      "response": "{\"items\":[{\"id\":\"item-solar-3181b3\",\"provider_id\":\"provider-55e68ed3\",\"source_type\":\"SOLAR\",\"delivery_mode\":\"SCHEDULED\",\"available_qty\":81,\"production_windows\":[],\"meter_id\":\"\"},{\"id\":\"item-solar-c3de88\",\"provider_id\":\"provider-ee500b85\",\"source_type\":\"SOLAR\",\"delivery_mode\":\"SCHEDULED\",\"available_q"
+    },
+    {
+      "name": "Seller CDS Status",
+      "endpoint": "/seller/cds-status",
+      "method": "GET",
+      "category": "internal",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 56,
+      "response": "{\"cds\":{\"publishingEnabled\":true,\"externalCdsUrl\":\"https://34.93.141.21.sslip.io/beckn/catalog\",\"useExternalCds\":\"true\",\"envCheck\":{\"USE_EXTERNAL_CDS\":\"true\",\"EXTERNAL_CDS_URL\":\"https://34.93.141.21.sslip.io/beckn/catalog\"}},\"message\":\"CDS publishing is ENABLED - offers will be published to external"
+    },
+    {
+      "name": "BPP /select",
+      "endpoint": "/select",
+      "method": "POST",
+      "category": "protocol",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 144,
+      "response": "{\"context\":{\"version\":\"2.0.0\",\"action\":\"select\",\"timestamp\":\"2026-02-02T22:41:07.724Z\",\"message_id\":\"diag-msg\",\"transaction_id\":\"diag-txn\",\"bap_id\":\"bap.p2p-trading.beckn\",\"bap_uri\":\"https://p2p-trading-production-c4e8.up.railway.app\",\"bpp_id\":\"bpp.p2p-trading.beckn\",\"bpp_uri\":\"https://p2p-trading-p"
+    },
+    {
+      "name": "BPP /init",
+      "endpoint": "/init",
+      "method": "POST",
+      "category": "protocol",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 146,
+      "response": "{\"context\":{\"version\":\"2.0.0\",\"action\":\"init\",\"timestamp\":\"2026-02-02T22:41:07.724Z\",\"message_id\":\"diag-msg\",\"transaction_id\":\"diag-txn\",\"bap_id\":\"bap.p2p-trading.beckn\",\"bap_uri\":\"https://p2p-trading-production-c4e8.up.railway.app\",\"bpp_id\":\"bpp.p2p-trading.beckn\",\"bpp_uri\":\"https://p2p-trading-pro"
+    },
+    {
+      "name": "BPP /confirm",
+      "endpoint": "/confirm",
+      "method": "POST",
+      "category": "protocol",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 148,
+      "response": "{\"context\":{\"version\":\"2.0.0\",\"action\":\"confirm\",\"timestamp\":\"2026-02-02T22:41:07.724Z\",\"message_id\":\"diag-msg\",\"transaction_id\":\"diag-txn\",\"bap_id\":\"bap.p2p-trading.beckn\",\"bap_uri\":\"https://p2p-trading-production-c4e8.up.railway.app\",\"bpp_id\":\"bpp.p2p-trading.beckn\",\"bpp_uri\":\"https://p2p-trading-"
+    },
+    {
+      "name": "BPP /status",
+      "endpoint": "/status",
+      "method": "POST",
+      "category": "protocol",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 150,
+      "response": "{\"context\":{\"version\":\"2.0.0\",\"action\":\"status\",\"timestamp\":\"2026-02-02T22:41:07.724Z\",\"message_id\":\"diag-msg\",\"transaction_id\":\"diag-txn\",\"bap_id\":\"bap.p2p-trading.beckn\",\"bap_uri\":\"https://p2p-trading-production-c4e8.up.railway.app\",\"bpp_id\":\"bpp.p2p-trading.beckn\",\"bpp_uri\":\"https://p2p-trading-p"
+    },
+    {
+      "name": "Callback on_discover",
+      "endpoint": "/callbacks/on_discover",
+      "method": "POST",
+      "category": "protocol",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 199,
+      "response": "{\"status\":\"ok\",\"message\":\"duplicate ignored\"}"
+    },
+    {
+      "name": "Callback on_update",
+      "endpoint": "/callbacks/on_update",
+      "method": "POST",
+      "category": "protocol",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 200,
+      "response": "{\"status\":\"ok\",\"message\":\"duplicate ignored\"}"
+    },
+    {
+      "name": "Ledger /ledger/put",
+      "endpoint": "/ledger/put",
+      "method": "POST",
+      "category": "external",
+      "status": 400,
+      "ok": false,
+      "latencyMs": 1196,
+      "response": "{\"code\":\"SCH_FIELD_NOT_ALLOWED\",\"message\":\"Invalid request body\",\"details\":{\"recordName\":\"diag-txn_diag-order\",\"transactionId\":\"diag-txn\",\"orderItemId\":\"diag-order\",\"operation\":\"putLedgerRecord\"}}"
+    },
+    {
+      "name": "Ledger /ledger/get",
+      "endpoint": "/ledger/get",
+      "method": "POST",
+      "category": "external",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 973,
+      "response": "{\"records\":[],\"count\":0}"
+    },
+    {
+      "name": "CDS /beckn/discover",
+      "endpoint": "/beckn/discover",
+      "method": "POST",
+      "category": "external",
+      "status": 400,
+      "ok": false,
+      "latencyMs": 648,
+      "response": "{\"transaction_id\":\"diag-txn\",\"timestamp\":\"2026-02-02T22:41:08.333827687Z\",\"ack_status\":\"NACK\",\"error\":{\"code\":\"SEC_SIGNATURE_MISSING\",\"paths\":\"authorization\",\"message\":\"Missing Authorization or X-Gateway-Authorization header\"}}"
+    },
+    {
+      "name": "VC Portal reachable",
+      "endpoint": "/",
+      "method": "GET",
+      "category": "external",
+      "status": 200,
+      "ok": true,
+      "latencyMs": 1182,
+      "response": "<!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" href=\"/_next/static/media/4473ecc91f70f139-s.p.woff\" as=\"font\" crossorigin=\"\" type=\"font/woff\"/><link rel=\"preload\" href=\"/_next/static/media/463dafcda"
+    }
+  ],
+  "byCategory": {
+    "internal": [
+      {
+        "name": "Health Check",
+        "endpoint": "/health",
+        "method": "GET",
+        "category": "internal",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 131,
+        "response": "{\"status\":\"ok\",\"service\":\"prosumer\",\"roles\":[\"bap\",\"bpp\"],\"postgres\":\"connected\",\"redis\":\"connected\",\"timestamp\":\"2026-02-02T22:41:07.873Z\"}"
+      },
+      {
+        "name": "API Discover",
+        "endpoint": "/api/discover",
+        "method": "POST",
+        "category": "internal",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 1348,
+        "response": "{\"transaction_id\":\"bb5d51be-1ba4-4e7b-82dd-26759e3cd7e6\",\"status\":\"success\",\"catalog\":{\"providers\":[{\"id\":\"provider-728b0de6\",\"descriptor\":{\"name\":\"Aryan Energy\"},\"items\":[{\"id\":\"item-solar-3ef7ec\",\"descriptor\":{\"name\":\"SOLAR from Aryan Energy\"},\"itemAttributes\":{\"sourceType\":\"SOLAR\",\"deliveryMode\":"
+      },
+      {
+        "name": "API Select (no txn)",
+        "endpoint": "/api/select",
+        "method": "POST",
+        "category": "internal",
+        "status": 400,
+        "ok": false,
+        "latencyMs": 135,
+        "response": "{\"error\":\"No catalog found for transaction. Run discover first.\"}"
+      },
+      {
+        "name": "API Init (no txn)",
+        "endpoint": "/api/init",
+        "method": "POST",
+        "category": "internal",
+        "status": 400,
+        "ok": false,
+        "latencyMs": 135,
+        "response": "{\"error\":\"Transaction not found\"}"
+      },
+      {
+        "name": "API Confirm (no txn)",
+        "endpoint": "/api/confirm",
+        "method": "POST",
+        "category": "internal",
+        "status": 400,
+        "ok": false,
+        "latencyMs": 137,
+        "response": "{\"error\":\"Transaction not found\"}"
+      },
+      {
+        "name": "API Status (no txn)",
+        "endpoint": "/api/status",
+        "method": "POST",
+        "category": "internal",
+        "status": 400,
+        "ok": false,
+        "latencyMs": 138,
+        "response": "{\"error\":\"Transaction not found\"}"
+      },
+      {
+        "name": "Seller Offers",
+        "endpoint": "/seller/offers",
+        "method": "GET",
+        "category": "internal",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 440,
+        "response": "{\"offers\":[{\"id\":\"offer-510ecdd6\",\"item_id\":\"item-solar-3ef7ec\",\"provider_id\":\"provider-728b0de6\",\"offerAttributes\":{\"pricingModel\":\"PER_KWH\",\"settlementType\":\"DAILY\"},\"price\":{\"value\":6,\"currency\":\"INR\"},\"maxQuantity\":162,\"timeWindow\":{\"startTime\":\"2026-02-02T06:00:00.000Z\",\"endTime\":\"2026-02-02T18"
+      },
+      {
+        "name": "Seller Items",
+        "endpoint": "/seller/items",
+        "method": "GET",
+        "category": "internal",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 258,
+        "response": "{\"items\":[{\"id\":\"item-solar-3181b3\",\"provider_id\":\"provider-55e68ed3\",\"source_type\":\"SOLAR\",\"delivery_mode\":\"SCHEDULED\",\"available_qty\":81,\"production_windows\":[],\"meter_id\":\"\"},{\"id\":\"item-solar-c3de88\",\"provider_id\":\"provider-ee500b85\",\"source_type\":\"SOLAR\",\"delivery_mode\":\"SCHEDULED\",\"available_q"
+      },
+      {
+        "name": "Seller CDS Status",
+        "endpoint": "/seller/cds-status",
+        "method": "GET",
+        "category": "internal",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 56,
+        "response": "{\"cds\":{\"publishingEnabled\":true,\"externalCdsUrl\":\"https://34.93.141.21.sslip.io/beckn/catalog\",\"useExternalCds\":\"true\",\"envCheck\":{\"USE_EXTERNAL_CDS\":\"true\",\"EXTERNAL_CDS_URL\":\"https://34.93.141.21.sslip.io/beckn/catalog\"}},\"message\":\"CDS publishing is ENABLED - offers will be published to external"
+      }
+    ],
+    "protocol": [
+      {
+        "name": "BPP /select",
+        "endpoint": "/select",
+        "method": "POST",
+        "category": "protocol",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 144,
+        "response": "{\"context\":{\"version\":\"2.0.0\",\"action\":\"select\",\"timestamp\":\"2026-02-02T22:41:07.724Z\",\"message_id\":\"diag-msg\",\"transaction_id\":\"diag-txn\",\"bap_id\":\"bap.p2p-trading.beckn\",\"bap_uri\":\"https://p2p-trading-production-c4e8.up.railway.app\",\"bpp_id\":\"bpp.p2p-trading.beckn\",\"bpp_uri\":\"https://p2p-trading-p"
+      },
+      {
+        "name": "BPP /init",
+        "endpoint": "/init",
+        "method": "POST",
+        "category": "protocol",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 146,
+        "response": "{\"context\":{\"version\":\"2.0.0\",\"action\":\"init\",\"timestamp\":\"2026-02-02T22:41:07.724Z\",\"message_id\":\"diag-msg\",\"transaction_id\":\"diag-txn\",\"bap_id\":\"bap.p2p-trading.beckn\",\"bap_uri\":\"https://p2p-trading-production-c4e8.up.railway.app\",\"bpp_id\":\"bpp.p2p-trading.beckn\",\"bpp_uri\":\"https://p2p-trading-pro"
+      },
+      {
+        "name": "BPP /confirm",
+        "endpoint": "/confirm",
+        "method": "POST",
+        "category": "protocol",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 148,
+        "response": "{\"context\":{\"version\":\"2.0.0\",\"action\":\"confirm\",\"timestamp\":\"2026-02-02T22:41:07.724Z\",\"message_id\":\"diag-msg\",\"transaction_id\":\"diag-txn\",\"bap_id\":\"bap.p2p-trading.beckn\",\"bap_uri\":\"https://p2p-trading-production-c4e8.up.railway.app\",\"bpp_id\":\"bpp.p2p-trading.beckn\",\"bpp_uri\":\"https://p2p-trading-"
+      },
+      {
+        "name": "BPP /status",
+        "endpoint": "/status",
+        "method": "POST",
+        "category": "protocol",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 150,
+        "response": "{\"context\":{\"version\":\"2.0.0\",\"action\":\"status\",\"timestamp\":\"2026-02-02T22:41:07.724Z\",\"message_id\":\"diag-msg\",\"transaction_id\":\"diag-txn\",\"bap_id\":\"bap.p2p-trading.beckn\",\"bap_uri\":\"https://p2p-trading-production-c4e8.up.railway.app\",\"bpp_id\":\"bpp.p2p-trading.beckn\",\"bpp_uri\":\"https://p2p-trading-p"
+      },
+      {
+        "name": "Callback on_discover",
+        "endpoint": "/callbacks/on_discover",
+        "method": "POST",
+        "category": "protocol",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 199,
+        "response": "{\"status\":\"ok\",\"message\":\"duplicate ignored\"}"
+      },
+      {
+        "name": "Callback on_update",
+        "endpoint": "/callbacks/on_update",
+        "method": "POST",
+        "category": "protocol",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 200,
+        "response": "{\"status\":\"ok\",\"message\":\"duplicate ignored\"}"
+      }
+    ],
+    "external": [
+      {
+        "name": "Ledger /ledger/put",
+        "endpoint": "/ledger/put",
+        "method": "POST",
+        "category": "external",
+        "status": 400,
+        "ok": false,
+        "latencyMs": 1196,
+        "response": "{\"code\":\"SCH_FIELD_NOT_ALLOWED\",\"message\":\"Invalid request body\",\"details\":{\"recordName\":\"diag-txn_diag-order\",\"transactionId\":\"diag-txn\",\"orderItemId\":\"diag-order\",\"operation\":\"putLedgerRecord\"}}"
+      },
+      {
+        "name": "Ledger /ledger/get",
+        "endpoint": "/ledger/get",
+        "method": "POST",
+        "category": "external",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 973,
+        "response": "{\"records\":[],\"count\":0}"
+      },
+      {
+        "name": "CDS /beckn/discover",
+        "endpoint": "/beckn/discover",
+        "method": "POST",
+        "category": "external",
+        "status": 400,
+        "ok": false,
+        "latencyMs": 648,
+        "response": "{\"transaction_id\":\"diag-txn\",\"timestamp\":\"2026-02-02T22:41:08.333827687Z\",\"ack_status\":\"NACK\",\"error\":{\"code\":\"SEC_SIGNATURE_MISSING\",\"paths\":\"authorization\",\"message\":\"Missing Authorization or X-Gateway-Authorization header\"}}"
+      },
+      {
+        "name": "VC Portal reachable",
+        "endpoint": "/",
+        "method": "GET",
+        "category": "external",
+        "status": 200,
+        "ok": true,
+        "latencyMs": 1182,
+        "response": "<!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" href=\"/_next/static/media/4473ecc91f70f139-s.p.woff\" as=\"font\" crossorigin=\"\" type=\"font/woff\"/><link rel=\"preload\" href=\"/_next/static/media/463dafcda"
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+- [ ] Generated keys & uploaded public keys to DeDi?
+- [ ] Able to run local testnet with own keys?
+- [ ] Able to publish and discover own catalogs?
+- [ ] Successfully consume issued VCs and exercise VC verification APIs
+- [ ] Reconfirm local setup compatibility with the latest DevKit and schema updates
+- [ ] Replace sandbox app with own application in the local setup
+- [ ] Host own (or sandbox) app on a public endpoint (ngrok acceptable)
+- [ ] Publish catalogs to the network
+- [ ] Update catalogs (deactivate / modify quantity)
+- [ ] Discover catalogs published by other Network Participants
+- [ ] Select offers, initiate orders, and confirm trades
+- [ ] View corresponding trades recorded in the P2P transaction ledger
+- [ ] Observe settlement events and generate appropriate on_status responses
+- [ ] Stretch: Build basic enrollment and transaction UI / mobile app
+- [ ] Stretch: Demonstrate or record a full end-to-end, cross-platform user journey
+- [ ] View trades automatically recorded in the P2P transaction ledger after on_confirm
+- [ ] Observe settlement events and generate appropriate on_status responses
+- [ ] Stretch: Build basic enrollment and transaction UI / mobile app
+- [ ] Stretch: Demonstrate or record a full end-to-end, cross-platform user journey
+- [ ] Faced issue with discovery service? (create an issue in DEG repo if so)

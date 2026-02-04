@@ -345,18 +345,18 @@ function getUnverifiedWhatsAppResponse(userMessage: string): AgentResponse {
   const isHindi = detectedLang === 'hi-IN';
   
   const message = isHindi
-    ? `Namaste! Main Oorja hun, aapka P2P energy trading assistant.
+    ? `नमस्ते! मैं ऊर्जा हूँ, आपका बिजली व्यापार सहायक।
 
-Meri services use karne ke liye, pehle app pe register karo:
+मेरी सेवाएँ इस्तेमाल करने के लिए, पहले ऐप पर रजिस्टर करो:
 ${APP_URL}
 
-Register hone ke baad, main aapki madad kar sakta hun:
-• Solar energy bechna
-• Sasti green energy khareedna
-• Orders aur earnings track karna
-• Market insights lena
+रजिस्टर होने के बाद, मैं आपकी मदद कर सकता हूँ:
+• सोलर बिजली बेचना
+• सस्ती हरी बिजली खरीदना
+• ऑर्डर और कमाई ट्रैक करना
+• बाज़ार की जानकारी लेना
 
-Jaldi milte hain!`
+जल्दी मिलते हैं!`
     : `Namaste! I'm Oorja, your P2P energy trading assistant.
 
 To use my services, please register on our app first:
@@ -511,11 +511,11 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
       messages: [{
         text: h(ctx,
           '☀️ *Sell Your Energy*\n\nHow would you like to proceed?\n\n⚡ *Sell Automatically* - One step with smart defaults\n📝 *Detailed* - Customize all options',
-          '☀️ *Energy Becho*\n\nKaise proceed karna chahte ho?\n\n⚡ *Automatic Sell* - Ek step mein smart defaults ke saath\n📝 *Detailed* - Sab options customize karo'
+          '☀️ *बिजली बेचो*\n\nकैसे आगे बढ़ना चाहते हो?\n\n⚡ *ऑटोमैटिक* - एक क्लिक में\n📝 *विस्तार से* - सब कुछ अपने हिसाब से'
         ),
         buttons: [
-          { text: h(ctx, '⚡ Sell Automatically', '⚡ Automatic Sell'), callbackData: 'listing_mode:quick' },
-          { text: h(ctx, '📝 Detailed Options', '📝 Detailed Options'), callbackData: 'listing_mode:detailed' },
+          { text: h(ctx, '⚡ Sell Automatically', '⚡ ऑटोमैटिक'), callbackData: 'listing_mode:quick' },
+          { text: h(ctx, '📝 Detailed Options', '📝 विस्तार से'), callbackData: 'listing_mode:detailed' },
         ],
       }],
       contextUpdate: { pendingListing: { ...pending, awaitingField: 'choose_mode' } },
@@ -535,12 +535,12 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
             `• Price: ₹${QUICK_SELL_DEFAULTS.pricePerKwh}/unit (market recommended)\n` +
             `• Time: Tomorrow 6AM-6PM\n\n` +
             `📊 *Just tell me: How many units do you want to sell?*`,
-            `⚡ *Automatic Sell*\n\n` +
-            `Smart defaults use kar rahe:\n` +
-            `• Type: ☀️ Solar\n` +
-            `• Rate: ₹${QUICK_SELL_DEFAULTS.pricePerKwh}/unit (market recommended)\n` +
-            `• Time: Kal subah 6-shaam 6\n\n` +
-            `📊 *Bas batao: Kitne unit bechna hai?*`
+            `⚡ *ऑटोमैटिक सेल*\n\n` +
+            `स्मार्ट सेटिंग्स:\n` +
+            `• प्रकार: ☀️ सोलर\n` +
+            `• दाम: ₹${QUICK_SELL_DEFAULTS.pricePerKwh}/यूनिट (बाज़ार अनुसार)\n` +
+            `• समय: कल सुबह 6 से शाम 6\n\n` +
+            `📊 *बस बताओ: कितने यूनिट बेचने हैं?*`
           ),
           buttons: [
             { text: '🔋 25 units', callbackData: 'listing_qty:25' },
@@ -580,8 +580,8 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
     return {
       messages: [{
         text: h(ctx,
-          `How many units do you want to sell?\n\n💡 Tip: 50 units = enough for 5 homes for 1 day`,
-          `Kitne unit bechna chahte ho?\n\n💡 Tip: 50 unit = 5 ghar ke liye 1 din ki bijli`
+          `How many units do you want to sell?`,
+          `कितने यूनिट बेचना चाहते हो?`
         ),
         buttons: [
           { text: '🔋 25 units', callbackData: 'listing_qty:25' },
@@ -606,7 +606,7 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
 
           `💡 *Smart Pricing*\n` +
           `${marketInsight.hi}\n\n` +
-          `Per unit kitne Rs mein bechoge?`
+          `प्रति यूनिट कितने रुपये में बेचोगे?`
         ),
         buttons: [
           { text: `⚡ ₹${marketInsight.low}/unit (Quick sale)`, callbackData: `listing_price:${marketInsight.low}` },
@@ -644,8 +644,8 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
         `Aapki listing:\n• ${pending.quantity} kWh ${typeLabel} energy\n• Rs ${pending.pricePerKwh}/unit\n• Time: ${timeLabel}\n\nBana dun?`
       ),
       buttons: [
-        { text: h(ctx, '✅ Yes, create it!', '✅ Haan, bana do!'), callbackData: 'listing_confirm:yes' },
-        { text: h(ctx, '❌ No, cancel', '❌ Nahi, cancel karo'), callbackData: 'listing_confirm:no' },
+        { text: h(ctx, '✅ Yes, create it!', '✅ हाँ, बना दो!'), callbackData: 'listing_confirm:yes' },
+        { text: h(ctx, '❌ No, cancel', '❌ नहीं, रद्द करो'), callbackData: 'listing_confirm:no' },
       ],
     }],
     contextUpdate: { pendingListing: { ...pending, awaitingField: 'confirm' } },
@@ -857,7 +857,7 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
 async function createListingFromPending(ctx: SessionContext, pending: PendingListing): Promise<AgentResponse> {
   if (!ctx.userId || !pending.pricePerKwh || !pending.quantity) {
     return {
-      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
       contextUpdate: { pendingListing: undefined },
     };
   }
@@ -884,7 +884,7 @@ async function createListingFromPending(ctx: SessionContext, pending: PendingLis
   }
 
   return {
-    messages: [{ text: h(ctx, `Could not create the listing: ${result.error || 'Unknown error'}. Please try again.`, `Listing nahi ban payi: ${result.error || 'Unknown error'}. Dobara try karo.`) }],
+    messages: [{ text: h(ctx, `Could not create the listing: ${result.error || 'Unknown error'}. Please try again.`, `लिस्टिंग नहीं बन पाई: ${result.error || 'अज्ञात समस्या'}। दोबारा कोशिश करो।`) }],
     contextUpdate: { pendingListing: undefined },
   };
 }
@@ -966,7 +966,7 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
 async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchase): Promise<AgentResponse> {
   if (!ctx.userId || !pending.quantity) {
     return {
-      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
       contextUpdate: { pendingPurchase: undefined },
     };
   }
@@ -1023,7 +1023,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
       text: h(ctx, errorText, errorText),
       buttons: [
         { text: h(ctx, '🔄 Try different time', '🔄 Alag time'), callbackData: 'purchase_time:retry' },
-        { text: h(ctx, '❌ Cancel', '❌ Cancel karo'), callbackData: 'purchase_offer_confirm:no' },
+        { text: h(ctx, '❌ Cancel', '❌ रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
       ],
     });
 
@@ -1051,8 +1051,8 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
             `Offer mil gaya!\n\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh Rs ${offer.price}/unit pe\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nYe khareedna hai?`
           ),
           buttons: [
-            { text: h(ctx, '✅ Yes, buy it!', '✅ Haan, khareed lo!'), callbackData: 'purchase_offer_confirm:yes' },
-            { text: h(ctx, '❌ No, cancel', '❌ Nahi, cancel karo'), callbackData: 'purchase_offer_confirm:no' },
+            { text: h(ctx, '✅ Yes, buy it!', '✅ हाँ, खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
+            { text: h(ctx, '❌ No, cancel', '❌ नहीं, रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
           ],
         },
       ],
@@ -1104,8 +1104,8 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
           `${offers.length} sellers se best deals mile!\n\n${offerLines}\n\n${totalLine}\nTime: ${timeWindow}${fulfillLine}\n\nYe deal accept karna hai?`
         ),
         buttons: [
-          { text: h(ctx, '✅ Yes, buy all!', '✅ Haan, sab khareed lo!'), callbackData: 'purchase_offer_confirm:yes' },
-          { text: h(ctx, '❌ No, cancel', '❌ Nahi, cancel karo'), callbackData: 'purchase_offer_confirm:no' },
+          { text: h(ctx, '✅ Yes, buy all!', '✅ हाँ, सब खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
+          { text: h(ctx, '❌ No, cancel', '❌ नहीं, रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
         ],
       },
     ],
@@ -1191,8 +1191,8 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
               `✅ *Purchase Confirm Karo*\n\nAapne chuna:\n• ${quantity} unit\n• Time: Kal\n\nKhareedna hai?`
             ),
             buttons: [
-              { text: h(ctx, '✅ Yes, buy it!', '✅ Haan, khareed lo!'), callbackData: 'purchase_offer_confirm:yes' },
-              { text: h(ctx, '❌ No, cancel', '❌ Nahi, cancel karo'), callbackData: 'purchase_offer_confirm:no' },
+              { text: h(ctx, '✅ Yes, buy it!', '✅ हाँ, खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
+              { text: h(ctx, '❌ No, cancel', '❌ नहीं, रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
             ],
           }],
           contextUpdate: { pendingPurchase: updated },
@@ -1224,8 +1224,8 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
                   `✅ *Purchase Confirm Karo*\n\nAapne Deal #${numInput} chuna:\n• ${deal.quantity} unit @ ₹${deal.pricePerUnit}/unit\n• Total: ₹${(deal.quantity * deal.pricePerUnit).toFixed(0)}\n• Time: Kal\n\nKhareedna hai?`
                 ),
                 buttons: [
-                  { text: h(ctx, '✅ Yes, buy it!', '✅ Haan, khareed lo!'), callbackData: 'purchase_offer_confirm:yes' },
-                  { text: h(ctx, '❌ No, cancel', '❌ Nahi, cancel karo'), callbackData: 'purchase_offer_confirm:no' },
+                  { text: h(ctx, '✅ Yes, buy it!', '✅ हाँ, खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
+                  { text: h(ctx, '❌ No, cancel', '❌ नहीं, रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
                 ],
               }],
               contextUpdate: { pendingPurchase: updated },
@@ -1355,7 +1355,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         const hasOffer = pending.discoveredOffer || (pending.discoveredOffers && pending.discoveredOffers.length > 0);
         if (!ctx.userId || !pending.transactionId || !hasOffer || !pending.quantity) {
           return {
-            messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+            messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
             contextUpdate: { pendingPurchase: undefined },
           };
         }
@@ -1465,7 +1465,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
 async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPurchase): Promise<AgentResponse> {
   if (!ctx.userId || !pending.quantity) {
     return {
-      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+      messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
       contextUpdate: { pendingPurchase: undefined },
     };
   }
@@ -2905,7 +2905,7 @@ const states: Record<ChatState, StateHandler> = {
 
         if (!result.success) {
           return {
-            messages: [{ text: result.error || h(ctx, 'Could not verify. Please try again.', 'Verify nahi ho paya. Dobara try karo.') }],
+            messages: [{ text: result.error || h(ctx, 'Could not verify. Please try again.', 'वेरिफाई नहीं हो पाई। दोबारा कोशिश करो।') }],
           };
         }
 
@@ -2922,7 +2922,7 @@ const states: Record<ChatState, StateHandler> = {
       } catch (error: any) {
         logger.error(`Optional cred verification failed: ${error.message}`);
         return {
-          messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+          messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
         };
       }
     },
