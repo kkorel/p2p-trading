@@ -4104,21 +4104,23 @@ export async function processMessage(
 
   // Determine effective language for this message:
   // 1. Structured input (numbers, callbacks) → keep existing preference
-  // 2. Voice input with detected language → use that language
-  // 3. Native Indic script detected → switch to that language
-  // 4. English detected → switch to English
+  // 2. Voice input → KEEP existing preference (don't switch based on detected language)
+  // 3. Native Indic script detected in TEXT → switch to that language
+  // 4. English detected in TEXT → switch to English
   let userLang: SarvamLangCode;
   if (isStructuredInput || isCallbackData) {
     // Don't change language on button presses or numeric input
     userLang = (ctx.language || 'en-IN') as SarvamLangCode;
-  } else if (voiceOptions?.isVoiceInput && voiceOptions.detectedLanguage) {
-    // Voice input: always use the STT-detected language
-    userLang = voiceOptions.detectedLanguage as SarvamLangCode;
+  } else if (voiceOptions?.isVoiceInput) {
+    // Voice input: KEEP existing language preference
+    // User may say English words (like names) but expects response in their chosen language
+    userLang = (ctx.language || 'en-IN') as SarvamLangCode;
+    logger.info(`[Voice] Keeping existing language preference: ${userLang} (detected: ${detectedLang})`);
   } else if (detectedLang !== 'en-IN') {
-    // Native Indic script (Devanagari, Bengali, etc.)
+    // Native Indic script typed (Devanagari, Bengali, etc.) → switch to that language
     userLang = detectedLang;
   } else {
-    // English detected—switch to English
+    // English typed → switch to English
     userLang = 'en-IN';
   }
 

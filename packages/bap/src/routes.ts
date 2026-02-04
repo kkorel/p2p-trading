@@ -710,12 +710,15 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     logger.info('Using LOCAL catalog (external CDS disabled)', { transaction_id: txnId });
     
     // Query local offers from database with available blocks
+    const now = new Date();
     const localOffers = await prisma.catalogOffer.findMany({
       where: {
         // Apply source type filter if specified
         ...(sourceType ? { item: { sourceType: sourceType } } : {}),
         // Exclude user's own provider
         ...(excludeProviderId ? { providerId: { not: excludeProviderId } } : {}),
+        // Filter out expired offers (end time must be in the future)
+        timeWindowEnd: { gt: now },
         // Only offers with available blocks
         blocks: {
           some: { status: 'AVAILABLE' },
@@ -1029,10 +1032,13 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     // Fall back to local catalog so user still gets results
     logger.info('Falling back to LOCAL catalog after CDS failure', { transaction_id: txnId });
     try {
+      const now = new Date();
       const localOffers = await prisma.catalogOffer.findMany({
         where: {
           ...(sourceType ? { item: { sourceType: sourceType } } : {}),
           ...(excludeProviderId ? { providerId: { not: excludeProviderId } } : {}),
+          // Filter out expired offers
+          timeWindowEnd: { gt: now },
           blocks: { some: { status: 'AVAILABLE' } },
         },
         include: {
