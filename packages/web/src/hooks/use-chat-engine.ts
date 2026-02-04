@@ -6,10 +6,24 @@ import { chatApi } from '@/lib/api';
 const SESSION_KEY = 'oorja_chat_session';
 const ANON_SESSION_KEY = 'oorja_anon_session'; // Temporary session for anonymous users
 
+export interface OfferData {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  trustScore: number;
+  energyType: 'SOLAR' | 'WIND' | 'HYDRO' | 'MIXED';
+  quantityKWh: number;
+  pricePerKwh: number;
+  discomRate: number;
+  startTime: string;
+  endTime: string;
+}
+
 export interface ChatMessageData {
   role: 'agent' | 'user';
   content: string;
   buttons?: Array<{ text: string; callbackData?: string }>;
+  offers?: OfferData[];
 }
 
 /** Get stored session - prioritize authenticated session, then anonymous. */
@@ -70,7 +84,7 @@ export function useChatEngine() {
   const [responseLanguage, setResponseLanguage] = useState<string>('en-IN');
   const [resetCounter, setResetCounter] = useState(0); // Triggers re-init after reset
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Use refs for initialization state (survives React StrictMode double-mount)
   const initializedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
@@ -134,12 +148,12 @@ export function useChatEngine() {
       // Use ref for current sessionId to avoid stale closure
       const currentSessionId = sessionIdRef.current;
       const res = await chatApi.send(text, currentSessionId || undefined);
-      
+
       if (res.sessionId) {
         // Update both state and ref immediately
         setSessionId(res.sessionId);
         sessionIdRef.current = res.sessionId;
-        
+
         // Always store sessionId immediately to prevent duplicate sessions
         const willBeAuthenticated = !!res.authToken || isAuthenticatedRef.current;
         storeSessionId(res.sessionId, willBeAuthenticated);
@@ -209,13 +223,13 @@ export function useChatEngine() {
   const handleButtonClick = useCallback(
     (callbackData: string, displayText: string) => {
       if (isLoading) return;
-      
+
       // Special handling: trigger file upload directly
       if (callbackData === 'action:trigger_file_upload') {
         fileInputRef.current?.click();
         return;
       }
-      
+
       setMessages((prev) => [...prev, { role: 'user', content: displayText }]);
       sendMessageToAgent(callbackData, true);
     },
@@ -244,21 +258,23 @@ export function useChatEngine() {
       const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
       const isJson = file.type === 'application/json' || file.name.endsWith('.json');
       if (!isPdf && !isJson) {
+        const isHindi = responseLanguage === 'hi-IN';
         setMessages((prev) => [
           ...prev,
-          { role: 'agent', content: 'Please upload a PDF or JSON file.' },
+          { role: 'agent', content: isHindi ? 'Sirf PDF ya JSON file upload karo.' : 'Please upload a PDF or JSON file.' },
         ]);
         return;
       }
 
       setIsLoading(true);
-      setMessages((prev) => [...prev, { role: 'user', content: `Uploaded: ${file.name}` }]);
+      const isHindi = responseLanguage === 'hi-IN';
+      setMessages((prev) => [...prev, { role: 'user', content: isHindi ? `Upload हो गया: ${file.name}` : `Uploaded: ${file.name}` }]);
 
       try {
         const base64 = await fileToBase64(file);
         const currentSessionId = sessionIdRef.current;
         const res = await chatApi.upload(base64, currentSessionId || undefined, file.name);
-        
+
         if (res.sessionId) {
           setSessionId(res.sessionId);
           sessionIdRef.current = res.sessionId;
@@ -286,9 +302,10 @@ export function useChatEngine() {
           ]);
         }
       } catch {
+        const isHindiErr = responseLanguage === 'hi-IN';
         setMessages((prev) => [
           ...prev,
-          { role: 'agent', content: 'Failed to process the file. Please try again.' },
+          { role: 'agent', content: isHindiErr ? 'File process nahi ho payi. Dobara try karo.' : 'Failed to process the file. Please try again.' },
         ]);
       } finally {
         setIsLoading(false);

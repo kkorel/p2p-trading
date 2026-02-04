@@ -4,12 +4,14 @@ import { useEffect, useRef, useMemo } from 'react';
 import { Bot, User, Check } from 'lucide-react';
 import type { ChatMessageData } from '@/hooks/use-chat-engine';
 import { InlineSpeakerButton } from './speaker-button';
+import { OfferList } from './offer-list';
 
 export type { ChatMessageData };
 
 interface MessageListProps {
   messages: ChatMessageData[];
   onButtonClick?: (callbackData: string, displayText: string) => void;
+  onSelectOffer?: (offerId: string) => void;
   isLoading?: boolean;
   /** Language code for TTS (e.g., 'hi-IN', 'en-IN'). Defaults to 'en-IN' */
   responseLanguage?: string;
@@ -22,9 +24,10 @@ function isVoicePrefButton(callbackData?: string): boolean {
   return callbackData === 'voice_pref:yes' || callbackData === 'voice_pref:no';
 }
 
-export function MessageList({ 
-  messages, 
-  onButtonClick, 
+export function MessageList({
+  messages,
+  onButtonClick,
+  onSelectOffer,
   isLoading,
   responseLanguage = 'en-IN',
   showSpeaker = true,
@@ -34,7 +37,7 @@ export function MessageList({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
-  
+
   // Find which voice preference was selected (if any) by looking at user messages
   const selectedVoicePref = useMemo(() => {
     for (const msg of messages) {
@@ -59,9 +62,8 @@ export function MessageList({
         >
           {/* Avatar */}
           <div
-            className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
-              msg.role === 'agent' ? 'bg-teal-100 text-teal-600' : 'bg-blue-100 text-blue-600'
-            }`}
+            className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${msg.role === 'agent' ? 'bg-teal-100 text-teal-600' : 'bg-blue-100 text-blue-600'
+              }`}
           >
             {msg.role === 'agent' ? <Bot size={16} /> : <User size={16} />}
           </div>
@@ -69,14 +71,13 @@ export function MessageList({
           {/* Bubble */}
           <div className="max-w-[80%] flex flex-col gap-1.5">
             <div
-              className={`relative px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === 'agent'
+              className={`relative px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'agent'
                   ? 'bg-gray-100 text-gray-900 rounded-2xl rounded-bl-md'
                   : 'bg-teal-600 text-white rounded-2xl rounded-br-md'
-              }`}
+                }`}
             >
               {msg.content}
-              
+
               {/* Speaker button for agent messages */}
               {msg.role === 'agent' && showSpeaker && msg.content.length > 0 && (
                 <span className="inline-block ml-1.5 align-middle">
@@ -88,6 +89,17 @@ export function MessageList({
               )}
             </div>
 
+            {/* Offer cards for buy flow */}
+            {msg.role === 'agent' && msg.offers && msg.offers.length > 0 && (
+              <div className="mt-2">
+                <OfferList
+                  offers={msg.offers}
+                  onSelectOffer={(id) => onSelectOffer?.(id)}
+                  language={responseLanguage}
+                />
+              </div>
+            )}
+
             {/* Inline buttons */}
             {msg.role === 'agent' && msg.buttons && msg.buttons.length > 0 && (
               <div className="flex flex-wrap gap-1.5 ml-1">
@@ -95,19 +107,18 @@ export function MessageList({
                   const isVoiceBtn = isVoicePrefButton(btn.callbackData);
                   const isSelected = isVoiceBtn && btn.callbackData === selectedVoicePref;
                   const isVoiceDisabled = isVoiceBtn && selectedVoicePref !== null;
-                  
+
                   if (isVoiceBtn) {
                     // Voice preference buttons - show locked state with selection indicator
                     return (
                       <div
                         key={j}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                          isSelected
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${isSelected
                             ? 'bg-teal-600 text-white'
                             : isVoiceDisabled
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                               : 'text-teal-700 bg-teal-50 border border-teal-200'
-                        }`}
+                          }`}
                         title={isVoiceDisabled ? 'Voice setting now controlled from header' : undefined}
                       >
                         {isSelected && <Check size={12} className="shrink-0" />}
@@ -115,7 +126,7 @@ export function MessageList({
                       </div>
                     );
                   }
-                  
+
                   // Regular buttons
                   return (
                     <button

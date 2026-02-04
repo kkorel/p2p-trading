@@ -43,14 +43,16 @@ Important:
 
 export interface ClassifiedIntent {
   intent: 'show_listings' | 'show_earnings' | 'show_balance' | 'show_orders' | 'show_sales'
-    | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'market_insights'
-    | 'show_dashboard' | 'track_activity' | 'change_language' | 'general_qa';
+  | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'market_insights'
+  | 'show_dashboard' | 'track_activity' | 'change_language' | 'sign_out' | 'edit_profile' | 'general_qa';
   params?: {
     price_per_kwh?: number;
     quantity_kwh?: number;
     max_price?: number;
     time_description?: string;
     time_period?: string;
+    field?: 'name' | 'phone';
+    new_value?: string;
   };
 }
 
@@ -70,6 +72,8 @@ Intents:
 - "discom_rates": User asks about DISCOM/electricity rates or tariffs
 - "trading_tips": User asks for tips on how to earn more or improve trading
 - "change_language": User wants to change/switch their chat language (e.g. "change to Hindi", "switch language", "Tamil mein baat karo", "bhasha badlo", "I want to talk in Bengali")
+- "sign_out": User wants to logout/sign out of the app (e.g. "sign out", "logout", "log me out", "log out please", "baahar niklo", "sign off")
+- "edit_profile": User wants to change their name or profile details (e.g. "change my name to Raj", "edit profile", "update my name", "mera naam badlo", "call me Priya")
 - "general_qa": General question about energy trading, Oorja, solar, etc.
 
 IMPORTANT: If the user says they want to "place", "create", "add", "daal", "bana", "list" something — that's "create_listing", NOT "show_listings" or "show_orders".

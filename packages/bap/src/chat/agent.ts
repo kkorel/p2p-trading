@@ -29,6 +29,7 @@ import { askLLM, classifyIntent, composeResponse, extractNameWithLLM } from './l
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
 import { sendProactiveMessage, isWhatsAppConnected, getWhatsAppBotNumber } from './whatsapp';
+import { normalizeVoiceInput } from './voice-normalizer';
 
 const logger = createLogger('OorjaAgent');
 
@@ -2683,7 +2684,7 @@ const states: Record<ChatState, StateHandler> = {
 
         if (!result.success) {
           return {
-            messages: [{ text: result.error || 'Could not verify this credential. Please try again.' }],
+            messages: [{ text: h(ctx, result.error || 'Could not verify this credential. Please try again.', result.error || 'Credential verify nahi ho paya. Dobara try karo.') }],
           };
         }
 
@@ -2703,7 +2704,7 @@ const states: Record<ChatState, StateHandler> = {
       } catch (error: any) {
         logger.error(`Utility cred verification failed: ${error.message}`);
         return {
-          messages: [{ text: 'Something went wrong verifying this. Please try again.' }],
+          messages: [{ text: h(ctx, 'Something went wrong verifying this. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
         };
       }
     },
@@ -4154,6 +4155,13 @@ export async function processMessage(
     // Voice input: STT already returns transcript in native script
     detectedLang = voiceOptions.detectedLanguage as SarvamLangCode;
     logger.info(`[Voice] Using STT-detected language: ${detectedLang}`);
+
+    // Normalize voice transcript: merge split phone numbers, remove filler words
+    const normalizedMessage = await normalizeVoiceInput(userMessage);
+    if (normalizedMessage !== userMessage) {
+      logger.info(`[Voice] Normalized: "${userMessage}" → "${normalizedMessage}"`);
+      processedMessage = normalizedMessage;
+    }
   } else {
     // Text input: detect language from the text
     detectedLang = detectLanguage(userMessage);
