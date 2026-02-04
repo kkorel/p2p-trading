@@ -69,42 +69,42 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
   if (rawMessage.catalog?.providers) {
     return rawMessage.catalog;
   }
-  
+
   // Check for external format with catalogs array
   const catalogs = rawMessage.catalogs || rawMessage.message?.catalogs || [];
-  
+
   if (!catalogs.length) {
     logger.debug('No catalogs found in response');
     return { providers: [] };
   }
-  
+
   const providers: any[] = [];
-  
+
   for (const catalog of catalogs) {
     const providerId = catalog['beckn:providerId'] || catalog.providerId || catalog['beckn:id'] || catalog.id;
-    const providerName = catalog['beckn:descriptor']?.['schema:name'] || 
-                         catalog.descriptor?.name ||
-                         catalog['beckn:bppId'] ||
-                         'Unknown Provider';
-    
+    const providerName = catalog['beckn:descriptor']?.['schema:name'] ||
+      catalog.descriptor?.name ||
+      catalog['beckn:bppId'] ||
+      'Unknown Provider';
+
     // IMPORTANT: Extract BPP routing info for proper Beckn flows
     const bppId = catalog['beckn:bppId'] || catalog.bppId || providerId;
     const bppUri = catalog['beckn:bppUri'] || catalog.bppUri || null;
-    
+
     const rawItems = catalog['beckn:items'] || catalog.items || [];
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
-    
+
     // Log raw data for debugging
     console.log(`[TRANSFORM-DEBUG] Provider ${providerId}: rawItems=${rawItems.length}, catalogOffers=${catalogOffers.length}`);
     logger.info(`Processing catalog: provider=${providerId}, items=${rawItems.length}, offers=${catalogOffers.length}`);
-    
+
     const transformedItems: any[] = [];
-    
+
     // Helper function to extract offer data
     const extractOfferData = (offer: any, itemId: string, itemAttrs: any = {}) => {
       const offerId = offer['beckn:id'] || offer.id;
       const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
-      
+
       // Extract price from multiple possible formats:
       // 1. offer['beckn:price']['schema:price'] (new format at root)
       // 2. offerAttrs['beckn:price']['value'] (old format inside offerAttributes)
@@ -113,16 +113,16 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
       const attrPrice = offerAttrs['beckn:price'] || offerAttrs.price || {};
       const priceValue = attrPrice.value ?? offerPrice['schema:price'] ?? attrPrice['schema:price'] ?? offerPrice.value ?? 0;
       const priceCurrency = attrPrice.currency || offerPrice['schema:priceCurrency'] || attrPrice['schema:priceCurrency'] || offerPrice.currency || 'INR';
-      
+
       // Extract time window from multiple possible locations
       const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || offerAttrs.validityWindow || {};
       const startTime = timeWindow['schema:startTime'] || timeWindow.startTime || null;
       const endTime = timeWindow['schema:endTime'] || timeWindow.endTime || null;
-      
+
       // Extract max quantity from multiple possible formats
       const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
       const maxQuantity = maxQty.unitQuantity || maxQty || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
-      
+
       logger.debug('Extracted offer', {
         offerId,
         price: priceValue,
@@ -131,7 +131,7 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
         endTime,
         bppUri,
       });
-      
+
       return {
         id: offerId,
         item_id: itemId,
@@ -150,23 +150,23 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
         } : null,
       };
     };
-    
+
     // Process items if they exist
     if (rawItems.length > 0) {
       for (const item of rawItems) {
         const itemId = item['beckn:id'] || item.id;
         const itemAttrs = item['beckn:itemAttributes'] || item.itemAttributes || {};
-        
+
         const itemOffers: any[] = [];
-        
+
         for (const offer of catalogOffers) {
           const offerItems = offer['beckn:items'] || offer.items || [];
-          
+
           if (offerItems.includes(itemId) || offerItems.length === 0) {
             itemOffers.push(extractOfferData(offer, itemId, itemAttrs));
           }
         }
-        
+
         transformedItems.push({
           id: itemId,
           offers: itemOffers,
@@ -185,21 +185,21 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
         providerId,
         offerCount: catalogOffers.length,
       });
-      
+
       // Group offers by their item references
       const offersByItem = new Map<string, any[]>();
-      
+
       for (const offer of catalogOffers) {
         const offerItemIds = offer['beckn:items'] || offer.items || [];
         // Use first item ID or generate a synthetic one
         const itemId = offerItemIds[0] || `synthetic-item-${providerId}`;
-        
+
         if (!offersByItem.has(itemId)) {
           offersByItem.set(itemId, []);
         }
         offersByItem.get(itemId)!.push(extractOfferData(offer, itemId, {}));
       }
-      
+
       // Create items from grouped offers
       for (const [itemId, offers] of offersByItem) {
         transformedItems.push({
@@ -213,7 +213,7 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
         });
       }
     }
-    
+
     providers.push({
       id: providerId,
       descriptor: { name: providerName },
@@ -223,11 +223,11 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
       items: transformedItems,
     });
   }
-  
+
   // Count total offers
-  const totalOffers = providers.reduce((sum, p) => 
+  const totalOffers = providers.reduce((sum, p) =>
     sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
-  
+
   logger.info(`Transformed ${catalogs.length} catalogs into ${providers.length} providers`, {
     totalOffers,
     providerDetails: providers.map(p => ({
@@ -248,17 +248,17 @@ function timeWindowsOverlap(offerWindow: TimeWindow | null | undefined, requeste
   if (!requestedWindow || !requestedWindow.startTime || !requestedWindow.endTime) {
     return true;
   }
-  
+
   // If offer has no time window, it's considered always available (matches any window)
   if (!offerWindow || !offerWindow.startTime || !offerWindow.endTime) {
     return true;
   }
-  
+
   const offerStart = new Date(offerWindow.startTime).getTime();
   const offerEnd = new Date(offerWindow.endTime).getTime();
   const requestStart = new Date(requestedWindow.startTime).getTime();
   const requestEnd = new Date(requestedWindow.endTime).getTime();
-  
+
   // Check for overlap: offer window must intersect with requested window
   // Two windows overlap if one starts before the other ends AND ends after the other starts
   return offerStart < requestEnd && offerEnd > requestStart;
@@ -271,18 +271,18 @@ function filterCatalogByTimeWindow(catalog: { providers: any[] }, requestedWindo
   if (!requestedWindow) {
     return catalog; // No filtering needed
   }
-  
+
   const filteredProviders = catalog.providers.map(provider => {
     const filteredItems = provider.items.map((item: any) => {
-      const filteredOffers = (item.offers || []).filter((offer: any) => 
+      const filteredOffers = (item.offers || []).filter((offer: any) =>
         timeWindowsOverlap(offer.timeWindow, requestedWindow)
       );
       return { ...item, offers: filteredOffers };
     }).filter((item: any) => item.offers && item.offers.length > 0); // Remove items with no matching offers
-    
+
     return { ...provider, items: filteredItems };
   }).filter(provider => provider.items.length > 0); // Remove providers with no matching items
-  
+
   return { providers: filteredProviders };
 }
 
@@ -369,20 +369,20 @@ function updateDemoBalance(id: string, delta: number): void {
 function transferMoney(fromId: string, toId: string, amount: number, description: string): boolean {
   const from = demoAccounts.get(fromId);
   const to = demoAccounts.get(toId);
-  
+
   if (!from || !to) {
     logger.error(`Transfer failed: account not found (from=${fromId}, to=${toId})`);
     return false;
   }
-  
+
   if (from.balance < amount) {
     logger.error(`Transfer failed: insufficient balance (${from.name} has ₹${from.balance}, needs ₹${amount})`);
     return false;
   }
-  
+
   from.balance = roundMoney(from.balance - amount);
   to.balance = roundMoney(to.balance + amount);
-  
+
   // Record the transaction
   const tx: DemoTransaction = {
     id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -395,12 +395,12 @@ function transferMoney(fromId: string, toId: string, amount: number, description
     timestamp: new Date().toISOString(),
   };
   demoTransactions.unshift(tx); // Add to beginning (newest first)
-  
+
   // Keep only last 20 transactions
   if (demoTransactions.length > 20) {
     demoTransactions = demoTransactions.slice(0, 20);
   }
-  
+
   logger.info(`[TRANSFER] ${description}: ₹${amount.toFixed(2)} | ${from.name} (₹${from.balance.toFixed(2)}) → ${to.name} (₹${to.balance.toFixed(2)})`);
   return true;
 }
@@ -474,7 +474,7 @@ function toRecord(row: any): SettlementRecord {
 
 async function getSettlementRecord(tradeId: string): Promise<SettlementRecord | null> {
   const record = await prisma.settlementRecord.findUnique({
-    where: {tradeId},
+    where: { tradeId },
   });
   return record ? toRecord(record) : null;
 }
@@ -531,7 +531,7 @@ async function updateSettlementRecord(tradeId: string, fields: Partial<Settlemen
   }
 
   await prisma.settlementRecord.update({
-    where: {tradeId},
+    where: { tradeId },
     data: updateData,
   });
 }
@@ -586,12 +586,12 @@ function buildPayoutInstruction(record: SettlementRecord, outcome: SettlementOut
  * Uses optional auth to filter out user's own offers
  */
 router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: Response) => {
-  const { 
-    sourceType, 
-    deliveryMode, 
-    minQuantity, 
+  const {
+    sourceType,
+    deliveryMode,
+    minQuantity,
     timeWindow,
-    transaction_id 
+    transaction_id
   } = req.body as {
     sourceType?: SourceType;
     deliveryMode?: DeliveryMode;
@@ -599,7 +599,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     timeWindow?: TimeWindow;
     transaction_id?: string;
   };
-  
+
   const txnId = transaction_id || uuidv4();
 
   // Trade rules: validate minimum quantity (1 kWh)
@@ -629,12 +629,12 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       return res.status(400).json({ success: false, error: tradeCheck.reason });
     }
   }
-  
+
   // Get user's provider ID to exclude their own offers
   const excludeProviderId = req.user?.providerId || null;
   // Get user's ID for order association
   const buyerId = req.user?.id || null;
-  
+
   // Create transaction state with discovery criteria for matching
   await createTransaction(txnId);
   await updateTransaction(txnId, {
@@ -674,9 +674,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
 
   // Build JSONPath expression
   const expression = `$[?(${filterParts.join(' && ')})]`;
-  
+
   console.log(`[DISCOVER-DEBUG] Filter expression: ${expression}`);
-  
+
   // Create context with location for external CDS
   const context = createContext({
     action: 'discover',
@@ -684,7 +684,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     bap_id: config.bap.id,
     bap_uri: config.bap.uri,
   });
-  
+
   // Build discover message with both filters and intent
   // Filters: JSONPath expression for basic filtering
   // Intent: Time window and quantity for time-based matching
@@ -704,11 +704,11 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       } : undefined,
     },
   };
-  
+
   // Check if we should use local catalog instead of external CDS
   if (!isExternalCDSEnabled()) {
     logger.info('Using LOCAL catalog (external CDS disabled)', { transaction_id: txnId });
-    
+
     // Query local offers from database with available blocks
     const now = new Date();
     const localOffers = await prisma.catalogOffer.findMany({
@@ -732,13 +732,13 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         },
       },
     });
-    
+
     // Filter by minimum quantity (available blocks)
     const filteredOffers = localOffers.filter(offer => {
       const availableQty = offer.blocks.length;
       return !minQuantity || availableQty >= minQuantity;
     });
-    
+
     // Transform to catalog format (matching the format expected by frontend)
     const providerMap = new Map<string, any>();
     for (const offer of filteredOffers) {
@@ -752,9 +752,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
           items: [],
         });
       }
-      
+
       const provider = providerMap.get(offer.providerId)!;
-      
+
       // Find or create item entry
       let itemEntry = provider.items.find((i: any) => i.id === offer.itemId);
       if (!itemEntry) {
@@ -774,7 +774,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         };
         provider.items.push(itemEntry);
       }
-      
+
       // Add offer (include item_id and provider_id so select flow can route correctly)
       itemEntry.offers.push({
         id: offer.id,
@@ -797,23 +797,23 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     }
 
     const catalog = { providers: Array.from(providerMap.values()) };
-    
+
     // Store in transaction state
     await updateTransaction(txnId, { catalog });
-    
+
     // Calculate totals
     const totalProviders = catalog.providers.length;
     const totalItems = catalog.providers.reduce((sum, p) => sum + p.items.length, 0);
-    const totalOffers = catalog.providers.reduce((sum, p) => 
+    const totalOffers = catalog.providers.reduce((sum, p) =>
       sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
-    
+
     logger.info('Local catalog discovery complete', {
       transaction_id: txnId,
       providers: totalProviders,
       items: totalItems,
       offers: totalOffers,
     });
-    
+
     return res.json({
       transaction_id: txnId,
       status: 'success',
@@ -821,7 +821,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       source: 'local',
     });
   }
-  
+
   // External CDS is enabled - proceed with network discovery
   // Get the CDS discover URL from external CDS configuration
   // EXTERNAL_CDS_URL (e.g., .../beckn/catalog) → use .../beckn/discover
@@ -833,7 +833,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     }
     return `${externalUrl}/discover`;
   };
-  
+
   const cdsDiscoverUrl = getCdsDiscoverUrl();
 
   // Log full request for debugging CDS issues
@@ -865,9 +865,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     // Check if the CDS returned catalog data synchronously in the response
     // External CDS may return data in ack.message.catalogs instead of via callback
     const syncCatalog = response.data?.ack?.message?.catalogs ||
-                        response.data?.message?.catalogs ||
-                        response.data?.catalogs;
-    
+      response.data?.message?.catalogs ||
+      response.data?.catalogs;
+
     let processedCatalog: { providers: any[] } | null = null;
 
     if (syncCatalog && syncCatalog.length > 0) {
@@ -875,10 +875,10 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         transaction_id: txnId,
         catalogCount: syncCatalog.length,
       });
-      
+
       // Log ALL catalogs returned by CDS
       console.log(`[CDS-DEBUG] Total catalogs returned: ${syncCatalog.length}`);
-      
+
       for (let i = 0; i < syncCatalog.length; i++) {
         const cat = syncCatalog[i];
         const items = cat['beckn:items'] || cat.items || [];
@@ -886,9 +886,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         const catalogId = cat['beckn:id'] || cat.id;
         const providerId = cat['beckn:providerId'] || cat.providerId;
         const bppId = cat['beckn:bppId'] || cat.bppId;
-        
+
         console.log(`[CDS-DEBUG] Catalog[${i}]: id=${catalogId}, providerId=${providerId}, bppId=${bppId}, items=${items.length}, offers=${offers.length}`);
-        
+
         // Log offer details if any
         if (offers.length > 0) {
           for (const offer of offers) {
@@ -896,38 +896,38 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
             console.log(`[CDS-DEBUG]   Offer: ${offerId}`);
           }
         }
-        
+
         logger.info(`Catalog[${i}]: id=${catalogId}, provider=${providerId}, items=${items.length}, offers=${offers.length}`);
       }
-      
+
       // Transform and store the synchronous catalog response
       const catalog = transformExternalCatalogFormat({ catalogs: syncCatalog });
-      
+
       // Get the provider ID to exclude (user's own provider)
       const currentTxState = await getTransaction(txnId);
       const excludeProviderId = currentTxState?.excludeProviderId;
       const requestedTimeWindow = currentTxState?.discoveryCriteria?.timeWindow;
-      
+
       // Filter out user's own provider from catalog
       let filteredProviders = catalog.providers.filter(p => p.id !== excludeProviderId);
-      
+
       // Apply time window filtering if a time window was requested
       if (requestedTimeWindow) {
-        const beforeCount = filteredProviders.reduce((sum, p) => 
+        const beforeCount = filteredProviders.reduce((sum, p) =>
           sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
-        
+
         const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, requestedTimeWindow);
         filteredProviders = timeFilteredCatalog.providers;
-        
-        const afterCount = filteredProviders.reduce((sum, p) => 
+
+        const afterCount = filteredProviders.reduce((sum, p) =>
           sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
-        
+
         logger.info(`Time window filter: ${beforeCount} offers → ${afterCount} offers`, {
           transaction_id: txnId,
           requestedWindow: requestedTimeWindow,
         });
       }
-      
+
       // Refresh local offer availability from actual block counts
       // This ensures discovery reflects the true current availability, not stale CDS data
       for (const providerCatalog of filteredProviders) {
@@ -939,7 +939,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
               // Get real-time block availability
               const availableBlocks = await getAvailableBlockCount(offer.id);
               offer.maxQuantity = availableBlocks;
-              
+
               logger.debug(`Refreshed local offer availability: ${offer.id} = ${availableBlocks} blocks`, {
                 transaction_id: txnId,
               });
@@ -953,11 +953,11 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       }
       // Filter out providers with no items
       filteredProviders = filteredProviders.filter(p => p.items && p.items.length > 0);
-      
+
       // Extract providers and offers for matching
       const providers = new Map<string, Provider>();
       const allOffers: CatalogOffer[] = [];
-      
+
       for (const providerCatalog of filteredProviders) {
         providers.set(providerCatalog.id, {
           id: providerCatalog.id,
@@ -966,12 +966,12 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
           total_orders: 0,
           successful_orders: 0,
         });
-        
+
         for (const item of providerCatalog.items || []) {
           allOffers.push(...(item.offers || []));
         }
       }
-      
+
       // Always run matching algorithm to calculate scores for all offers
       let matchingResults = null;
       if (allOffers.length > 0) {
@@ -980,7 +980,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
           requestedTimeWindow: currentTxState?.discoveryCriteria?.timeWindow,
           maxPrice: currentTxState?.discoveryCriteria?.maxPrice,
         };
-        
+
         try {
           matchingResults = matchOffers(allOffers, providers, criteria);
           logger.info(`Matching: scored ${matchingResults.allOffers.length} offers, ${matchingResults.eligibleCount} eligible`, {
@@ -990,7 +990,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
           logger.error(`Matching algorithm error: ${matchError.message}`, { transaction_id: txnId });
         }
       }
-      
+
       // Update transaction state with the catalog
       await updateTransaction(txnId, {
         catalog: { providers: filteredProviders },
@@ -998,7 +998,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         matchingResults,
         status: 'SELECTING',
       });
-      
+
       logger.info(`Synchronous catalog processed: ${filteredProviders.length} providers, ${allOffers.length} offers`, {
         transaction_id: txnId,
       });
@@ -1471,14 +1471,14 @@ router.post('/api/select', async (req: Request, res: Response) => {
       }
       if (selectedOffer) break;
     }
-    
+
     if (!selectedOffer) {
       return res.status(400).json({ error: `Offer ${offer_id} not found in catalog` });
     }
   } else {
     return res.status(400).json({ error: 'Either offer_id or autoMatch with requestedTimeWindow is required' });
   }
-  
+
   // Resolve item ID for use in message and attribute lookup
   const resolvedItemId = selectedItemId || item_id || selectedOffer.item_id;
 
@@ -1561,7 +1561,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
     context,
     message: { order: wireOrder },
   };
-  
+
   logger.info('Sending select request', {
     transaction_id,
     message_id: context.message_id,
@@ -1570,9 +1570,9 @@ router.post('/api/select', async (req: Request, res: Response) => {
     targetBppUri,
     isExternalBpp,
   });
-  
+
   await logEvent(transaction_id, context.message_id, 'select', 'OUTBOUND', JSON.stringify(selectMessage));
-  
+
   // Update state - store the offer and quantity, and CLEAR the old order to allow a new one
   // This is critical for allowing multiple purchases from the same discovery
   await updateTransaction(transaction_id, {
@@ -1585,20 +1585,20 @@ router.post('/api/select', async (req: Request, res: Response) => {
     selectedOffers: undefined,
     bulkSelection: undefined,
   });
-  
+
   try {
     // Route to the correct BPP based on offer's bpp_uri
     const bppEndpoint = isExternalBpp ? targetBppUri : `${config.urls.bpp}/select`;
     const targetUrl = isExternalBpp ? `${targetBppUri}/select` : bppEndpoint;
-    
+
     logger.info(`Routing select to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
-    
+
     // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
     // Use plain axios for local BPP (no signature needed)
-    const response = isExternalBpp 
+    const response = isExternalBpp
       ? await secureAxios.post(targetUrl, selectMessage)
       : await axios.post(targetUrl, selectMessage);
-    
+
     res.json({
       status: 'ok',
       transaction_id,
@@ -1617,7 +1617,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
       ack: response.data,
     });
   } catch (error: any) {
-    logger.error(`Select request failed: ${error.message}`, { 
+    logger.error(`Select request failed: ${error.message}`, {
       transaction_id,
       status: error.response?.status,
       data: error.response?.data,
@@ -1962,21 +1962,21 @@ router.post('/api/confirm', async (req: Request, res: Response) => {
  */
 router.post('/api/status', async (req: Request, res: Response) => {
   const { transaction_id, order_id } = req.body as { transaction_id: string; order_id?: string };
-  
+
   const txState = await getTransaction(transaction_id);
-  
+
   if (!txState) {
     return res.status(400).json({ error: 'Transaction not found' });
   }
-  
+
   const orderId = order_id || txState.order?.id || '';
-  
+
   // Determine BPP routing - use offer's bpp_uri if available (external), otherwise use local BPP
   const offer = txState.selectedOffer;
   const targetBppUri = offer?.bpp_uri || config.bpp.uri;
   const targetBppId = offer?.bpp_id || offer?.provider_id || config.bpp.id;
   const isExternalBpp = !!offer?.bpp_uri && offer.bpp_uri !== config.bpp.uri;
-  
+
   // Create context with correct BPP info
   const context = createContext({
     action: 'status',
@@ -1986,7 +1986,7 @@ router.post('/api/status', async (req: Request, res: Response) => {
     bpp_id: targetBppId,
     bpp_uri: targetBppUri,
   });
-  
+
   // Build status message with Beckn v2 wire format
   const statusMessage = {
     context,
@@ -1994,7 +1994,7 @@ router.post('/api/status', async (req: Request, res: Response) => {
       order: { 'beckn:id': orderId },
     },
   } as any;
-  
+
   logger.info('Sending status request', {
     transaction_id,
     message_id: context.message_id,
@@ -2002,20 +2002,20 @@ router.post('/api/status', async (req: Request, res: Response) => {
     targetBppUri,
     isExternalBpp,
   });
-  
+
   await logEvent(transaction_id, context.message_id, 'status', 'OUTBOUND', JSON.stringify(statusMessage));
-  
+
   try {
     // Route to the correct BPP based on offer's bpp_uri
     const targetUrl = isExternalBpp ? `${targetBppUri}/status` : `${config.urls.bpp}/status`;
-    
+
     logger.info(`Routing status to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
-    
+
     // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
-    const response = isExternalBpp 
+    const response = isExternalBpp
       ? await secureAxios.post(targetUrl, statusMessage)
       : await axios.post(targetUrl, statusMessage);
-    
+
     res.json({
       status: 'ok',
       transaction_id,
@@ -2023,7 +2023,7 @@ router.post('/api/status', async (req: Request, res: Response) => {
       ack: response.data,
     });
   } catch (error: any) {
-    logger.error(`Status request failed: ${error.message}`, { 
+    logger.error(`Status request failed: ${error.message}`, {
       transaction_id,
       status: error.response?.status,
       data: error.response?.data,
@@ -2055,11 +2055,11 @@ router.get('/api/transactions', async (req: Request, res: Response) => {
  */
 router.get('/api/transactions/:id', async (req: Request, res: Response) => {
   const txState = await getTransaction(req.params.id);
-  
+
   if (!txState) {
     return res.status(404).json({ error: 'Transaction not found' });
   }
-  
+
   res.json(txState);
 });
 
@@ -2264,7 +2264,7 @@ router.post('/api/settlement/verify-outcome', async (req: Request, res: Response
     try {
       verificationResult = await verifyCredential(credential, verificationOptions);
       finalOutcome = verificationResult.verified ? 'SUCCESS' : 'FAIL';
-      
+
       const vc = credential as VerifiableCredential;
       vcMetadata = {
         vcId: vc.id || `vc-${Date.now()}`,
@@ -2385,44 +2385,44 @@ router.post('/api/settlement/confirm-payout', async (req: Request, res: Response
  */
 router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
   const { tradeId, scenario } = req.body as { tradeId?: string; scenario?: 'SUCCESS' | 'FAIL' };
-  
+
   if (!tradeId) {
     return res.status(400).json({ error: 'tradeId is required' });
   }
-  
+
   const finalOutcome: SettlementOutcome = scenario === 'FAIL' ? 'FAIL' : 'SUCCESS';
-  
+
   const record = await getSettlementRecord(tradeId);
   if (!record) {
     return res.status(404).json({ error: 'Settlement record not found. Initiate settlement first.' });
   }
-  
+
   // If already in progress or completed, just return current state
   if (record.status === 'RELEASED' || record.status === 'REFUNDED') {
     return res.json({ status: 'ok', message: 'Settlement already completed', record });
   }
-  
+
   logger.info('=== [AUTO-RUN] Starting automated settlement simulation', { tradeId, scenario: finalOutcome });
-  
+
   // Respond immediately - processing happens async
   res.json({ status: 'ok', message: 'Auto-run started', tradeId, scenario: finalOutcome });
-  
+
   // Run the simulation in background
   (async () => {
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
     const genUtr = () => `UTR${Date.now()}${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
     const genPayout = () => `PAYOUT${Date.now()}${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
-    
+
     try {
       // Step 1-4: Escrow funding (3 seconds)
       // Transfer: Buyer -> Escrow (total = principal + fee)
       if (record.status === 'INITIATED') {
         logger.info('=== [AUTO-RUN STEP 2-4] Simulating buyer -> escrow transfer...', { tradeId, amount: record.total });
         await delay(3000);
-        
+
         // BALANCE TRANSFER: Buyer pays total (principal + fee) to Escrow
         transferMoney('buyer', 'escrow', record.total, 'Buyer → Escrow (funding)');
-        
+
         const fundedReceipt = genUtr();
         await updateSettlementRecord(tradeId, {
           status: 'FUNDED',
@@ -2431,7 +2431,7 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
         });
         logger.info('=== [AUTO-RUN STEP 2-4] Escrow funded', { tradeId, receipt: fundedReceipt, amount: record.total });
       }
-      
+
       // Step 5-6: Verification - wait longer so escrow balance is visible (5 seconds)
       logger.info('=== [AUTO-RUN STEP 5] Simulating trade verification (escrow holding funds)...', { tradeId, outcome: finalOutcome });
       await delay(5000);
@@ -2440,11 +2440,11 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
         verifiedAt: nowIso(),
       });
       logger.info('=== [AUTO-RUN STEP 5-6] Verification complete', { tradeId, outcome: finalOutcome });
-      
+
       // Step 7-9: Payout (3 seconds)
       logger.info('=== [AUTO-RUN STEP 7-9] Simulating escrow -> ' + (finalOutcome === 'SUCCESS' ? 'seller' : 'buyer refund') + '...', { tradeId });
       await delay(3000);
-      
+
       if (finalOutcome === 'SUCCESS') {
         // BALANCE TRANSFER: Escrow pays principal to Seller, fee stays as platform revenue
         transferMoney('escrow', 'seller', record.principal, 'Escrow → Seller (principal)');
@@ -2453,7 +2453,7 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
         // BALANCE TRANSFER: Escrow refunds total (principal + fee) to Buyer
         transferMoney('escrow', 'buyer', record.total, 'Escrow → Buyer (refund)');
       }
-      
+
       const payoutReceipt = genPayout();
       const newStatus: SettlementStatus = finalOutcome === 'SUCCESS' ? 'RELEASED' : 'REFUNDED';
       await updateSettlementRecord(tradeId, {
@@ -2462,7 +2462,7 @@ router.post('/api/settlement/auto-run', async (req: Request, res: Response) => {
         payoutAt: nowIso(),
       });
       logger.info('=== [AUTO-RUN COMPLETE] Settlement finished', { tradeId, status: newStatus, receipt: payoutReceipt });
-      
+
     } catch (error: any) {
       logger.error('=== [AUTO-RUN ERROR] Settlement simulation failed', { tradeId, error: error.message });
     }
@@ -2534,12 +2534,12 @@ router.post('/api/demo/accounts/reset', (req: Request, res: Response) => {
 router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
   // Reset in-memory transactions
   await clearAllTransactions();
-  
+
   // Reset demo accounts
   initializeDemoAccounts();
-  
+
   logger.info('=== DEMO RESET === All data cleared, accounts reset');
-  
+
   res.json({
     status: 'ok',
     message: 'Full demo reset complete',
@@ -2554,7 +2554,7 @@ router.post('/api/demo/reset-all', async (req: Request, res: Response) => {
 router.post('/api/db/reset', async (req: Request, res: Response) => {
   try {
     logger.info('=== DATABASE RESET STARTED ===');
-    
+
     // Clear in correct order for foreign key constraints
     const deleteCounts = {
       offerBlocks: 0,
@@ -2567,43 +2567,43 @@ router.post('/api/db/reset', async (req: Request, res: Response) => {
       discomFeedback: 0,
       trustScoreHistory: 0,
     };
-    
+
     // 1. Clear offer blocks
     const blocks = await prisma.offerBlock.deleteMany();
     deleteCounts.offerBlocks = blocks.count;
-    
+
     // 2. Clear payment records
     const payments = await prisma.paymentRecord.deleteMany();
     deleteCounts.paymentRecords = payments.count;
-    
+
     // 3. Clear DISCOM feedback
     const feedback = await prisma.discomFeedback.deleteMany();
     deleteCounts.discomFeedback = feedback.count;
-    
+
     // 4. Clear orders
     const orders = await prisma.order.deleteMany();
     deleteCounts.orders = orders.count;
-    
+
     // 5. Clear events
     const events = await prisma.event.deleteMany();
     deleteCounts.events = events.count;
-    
+
     // 6. Clear catalog offers
     const offers = await prisma.catalogOffer.deleteMany();
     deleteCounts.catalogOffers = offers.count;
-    
+
     // 7. Clear catalog items
     const items = await prisma.catalogItem.deleteMany();
     deleteCounts.catalogItems = items.count;
-    
+
     // 8. Clear settlement records
     const settlements = await prisma.settlementRecord.deleteMany();
     deleteCounts.settlementRecords = settlements.count;
-    
+
     // 9. Clear trust score history
     const trustHistory = await prisma.trustScoreHistory.deleteMany();
     deleteCounts.trustScoreHistory = trustHistory.count;
-    
+
     // 10. Reset user balances, trust scores, and meter verification (but keep accounts)
     await prisma.user.updateMany({
       data: {
@@ -2617,16 +2617,16 @@ router.post('/api/db/reset', async (req: Request, res: Response) => {
         providerId: null, // Unlink providers (they were deleted)
       },
     });
-    
+
     // 11. Clear providers
     const providers = await prisma.provider.deleteMany();
-    
+
     // 12. Clear Redis transaction states
     await clearAllTransactions();
-    
+
     // 13. Reset demo accounts
     initializeDemoAccounts();
-    
+
     // 14. Clean up uploaded meter PDF files
     try {
       const fs = await import('fs');
@@ -2642,9 +2642,9 @@ router.post('/api/db/reset', async (req: Request, res: Response) => {
     } catch (cleanupErr: any) {
       logger.warn(`Could not clean meter PDFs: ${cleanupErr.message}`);
     }
-    
+
     logger.info('=== DATABASE RESET COMPLETE ===', deleteCounts);
-    
+
     res.json({
       status: 'ok',
       message: 'Database reset complete',
@@ -2675,7 +2675,7 @@ router.post('/api/vc/verify', async (req: Request, res: Response) => {
 
   try {
     const result = await verifyCredential(credential, options);
-    
+
     logger.info('VC verification completed', {
       verified: result.verified,
       credentialId: result.credentialId,
@@ -2710,7 +2710,7 @@ router.post('/api/vc/verify-json', async (req: Request, res: Response) => {
 
   try {
     const result = await parseAndVerifyCredential(json, options);
-    
+
     logger.info('VC JSON verification completed', {
       verified: result.verified,
       credentialId: result.credentialId,
@@ -2743,7 +2743,7 @@ router.post('/api/vc/verify-generation-profile', async (req: Request, res: Respo
 
   try {
     const result = await verifyGenerationProfile(credential, options);
-    
+
     // If provider ID verification is requested, add that check
     if (expectedProviderId && result.verified) {
       const providerCheck = validateProviderMatch(
@@ -2751,7 +2751,7 @@ router.post('/api/vc/verify-generation-profile', async (req: Request, res: Respo
         expectedProviderId
       );
       result.checks.push(providerCheck);
-      
+
       // Update verified status if provider check failed
       if (providerCheck.status === 'failed') {
         result.verified = false;
@@ -2815,10 +2815,10 @@ router.post('/api/vc/verify-and-settle/:tradeId', async (req: Request, res: Resp
     // Verify the credential
     const verificationResult = await verifyCredential(credential, options);
     const vc = credential as VerifiableCredential;
-    
+
     // Determine settlement outcome based on verification
     const outcome: SettlementOutcome = verificationResult.verified ? 'SUCCESS' : 'FAIL';
-    
+
     // Check if settlement has expired
     const expired = new Date(record.expiresAt!).getTime() < Date.now();
     if (expired) {
@@ -2919,8 +2919,8 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
     const userId = req.user!.id;
 
     const orders = await (prisma.order as any).findMany({
-      where: {buyerId: userId},
-      orderBy: {createdAt: 'desc'},
+      where: { buyerId: userId },
+      orderBy: { createdAt: 'desc' },
       include: {
         provider: true,
         selectedOffer: {
@@ -3017,8 +3017,8 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
         const itemId = items[0]?.item_id || selectedOffer?.itemId;
         if (itemId) {
           const catalogItem = await prisma.catalogItem.findUnique({
-            where: {id: itemId},
-            select: {sourceType: true},
+            where: { id: itemId },
+            select: { sourceType: true },
           });
           sourceType = catalogItem?.sourceType || 'UNKNOWN';
         }
@@ -3042,7 +3042,7 @@ router.get('/api/my-orders', authMiddleware, async (req: Request, res: Response)
           price: quote.price,
           totalQuantity: totalQty,
         } :
-                             undefined,
+          undefined,
         paymentStatus: order.paymentStatus || 'PENDING',
         cancellation: order.status === 'CANCELLED' ? {
           cancelledAt: order.cancelledAt?.toISOString(),
@@ -3385,6 +3385,7 @@ interface DiagnosticTest {
   status: number | null;
   ok: boolean;
   latencyMs: number;
+  requestBody?: any; // Added for debugging
   response?: string;
   error?: string;
   hint?: string;
@@ -3427,10 +3428,10 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
       const latency = Date.now() - start;
       const responseStr = typeof resp.data === 'string' ? resp.data.substring(0, 300) : JSON.stringify(resp.data).substring(0, 300);
       const ok = resp.status >= 200 && resp.status < 300;
-      return { name, endpoint, method, category, status: resp.status, ok, latencyMs: latency, response: responseStr, hint: ok ? undefined : getHint(name, resp.status) };
+      return { name, endpoint, method, category, status: resp.status, ok, latencyMs: latency, requestBody: body, response: responseStr, hint: ok ? undefined : getHint(name, resp.status) };
     } catch (err: any) {
       const hint = getHint(name, null, err.code || err.message);
-      return { name, endpoint, method, category, status: null, ok: false, latencyMs: Date.now() - start, error: err.code || err.message, hint };
+      return { name, endpoint, method, category, status: null, ok: false, latencyMs: Date.now() - start, requestBody: body, error: err.code || err.message, hint };
     }
   }
 

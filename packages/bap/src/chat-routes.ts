@@ -54,6 +54,7 @@ router.post('/send', async (req: Request, res: Response) => {
       role: 'agent' as const,
       content: m.text,
       buttons: m.buttons || undefined,
+      offers: m.offers || undefined,
     }));
 
     res.json({
@@ -133,16 +134,16 @@ router.post('/voice', async (req: Request, res: Response) => {
 
     // Validate input
     if (!audio || typeof audio !== 'string') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: 'audio (base64) is required',
         errorType: 'invalid_input',
       });
     }
 
     if (!mimeType || typeof mimeType !== 'string') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: 'mimeType is required',
         errorType: 'invalid_input',
       });
@@ -206,8 +207,8 @@ router.post('/voice', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error(`Chat voice error: ${error.message}\n${error.stack}`);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Failed to process voice message',
       errorType: 'server_error',
       retryable: true,

@@ -45,6 +45,18 @@ export interface AgentMessage {
   text: string;
   buttons?: Array<{ text: string; callbackData?: string }>;
   delay?: number;
+  /** Structured offers for premium buy UI */
+  offers?: Array<{
+    id: string;
+    sellerName: string;
+    sellerTrustScore: number;
+    energyType: 'solar' | 'wind' | 'grid';
+    pricePerUnit: number;
+    quantity: number;
+    totalPrice: number;
+    timeWindow: string;
+    savingsPercent?: number;
+  }>;
 }
 
 export interface AgentResponse {
@@ -1095,6 +1107,21 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
   }
 
   // --- Multi-offer display ---
+  const DISCOM_RATE = 7; // Reference rate for savings calc
+
+  // Build structured offers for premium UI
+  const structuredOffers = offers.map(o => ({
+    id: o.offerId,
+    sellerName: o.providerName,
+    sellerTrustScore: 0.7, // Default trust score
+    energyType: 'solar' as const, // Default to solar
+    pricePerUnit: o.price,
+    quantity: o.quantity,
+    totalPrice: o.subtotal || (o.price * o.quantity),
+    timeWindow: o.timeWindow || 'Flexible',
+    savingsPercent: Math.round(((DISCOM_RATE - o.price) / DISCOM_RATE) * 100),
+  }));
+
   const offerLines = offers.map((o, i) =>
     `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`
   ).join('\n\n');
@@ -1120,6 +1147,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
           `Found best deals from ${offers.length} sellers!\n\n${offerLines}\n\n${totalLine}\nTime: ${timeWindow}${fulfillLine}\n\nAccept this deal?`,
           `${offers.length} sellers se best deals mile!\n\n${offerLines}\n\n${totalLine}\nTime: ${timeWindow}${fulfillLine}\n\nYe deal accept karna hai?`
         ),
+        offers: structuredOffers,
         buttons: [
           { text: h(ctx, '✅ Yes, buy all!', '✅ हाँ, सब खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
           { text: h(ctx, '❌ No, cancel', '❌ नहीं, रद्द करो'), callbackData: 'purchase_offer_confirm:no' },

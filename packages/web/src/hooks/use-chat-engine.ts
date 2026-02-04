@@ -237,6 +237,12 @@ export function useChatEngine() {
   );
 
   const handleReset = useCallback(async () => {
+    // Preserve language preference across reset
+    const savedLanguage = responseLanguage;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('oorja_language', savedLanguage);
+    }
+
     try {
       const currentSessionId = sessionIdRef.current;
       await chatApi.reset(currentSessionId || undefined);
@@ -245,10 +251,14 @@ export function useChatEngine() {
     setSessionId(null);
     sessionIdRef.current = null;
     clearStoredSession();
+
+    // Restore language preference
+    setResponseLanguage(savedLanguage);
+
     // Reset initialization flag and trigger re-init
     initializedRef.current = false;
     setResetCounter(c => c + 1);
-  }, []);
+  }, [responseLanguage]);
 
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
