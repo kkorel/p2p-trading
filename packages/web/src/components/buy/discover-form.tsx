@@ -56,12 +56,26 @@ export function DiscoverForm({
     const qty = parseInt(data.quantity, 10);
     if (isNaN(qty) || qty < 1) return;
 
+    // datetime-local gives value like "2026-02-05T14:00" (no timezone)
+    // Treat user's input as the intended UTC time to avoid timezone confusion
+    // Append :00.000Z to make it a proper ISO string in UTC
+    const startTimeUTC = data.startTime + ':00.000Z';
+    const endTimeUTC = data.endTime + ':00.000Z';
+
+    console.log('[DEBUG] Time conversion:', {
+      rawStart: data.startTime,
+      rawEnd: data.endTime,
+      startTimeUTC,
+      endTimeUTC,
+      browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+
     await onSmartBuy({
       sourceType: sourceType || undefined,
       quantity: qty,
       timeWindow: {
-        startTime: new Date(data.startTime).toISOString(),
-        endTime: new Date(data.endTime).toISOString(),
+        startTime: startTimeUTC,
+        endTime: endTimeUTC,
       },
     });
   };
@@ -165,14 +179,14 @@ export function DiscoverForm({
 function getDefaultStartTime(): string {
   const now = new Date();
   now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 1);
+  now.setHours(now.getHours() + 4); // T+4 hours
   return toLocalISOString(now);
 }
 
 function getDefaultEndTime(): string {
   const now = new Date();
   now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 5);
+  now.setHours(now.getHours() + 8); // T+8 hours
   return toLocalISOString(now);
 }
 
