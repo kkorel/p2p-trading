@@ -1328,6 +1328,163 @@ router.post('/cancel', async (req: Request, res: Response) => {
   }, config.callbackDelay);
 });
 
+/**
+ * POST /publish - Beckn catalog publish (BPP publishes catalog to CDS)
+ * Handles Beckn v2 wire format catalog_publish action
+ *
+ * Used by:
+ * - BPP to push catalog updates to the network CDS
+ * - Testing via Postman BPP collection
+ */
+router.post('/publish', async (req: Request, res: Response) => {
+  const { context, message } = req.body;
+
+  logger.info('Received catalog publish request', {
+    action: context?.action,
+    message_id: context?.message_id,
+    bpp_id: context?.bpp_id,
+    catalog_count: message?.catalogs?.length || 0,
+  });
+
+  if (!context || !message) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Missing context or message in request body',
+    });
+  }
+
+  // Check for duplicate
+  if (context.message_id && await isDuplicateMessage(context.message_id)) {
+    logger.warn('Duplicate publish message ignored', { message_id: context.message_id });
+    return res.json(createAck(context));
+  }
+
+  // Log the event
+  if (context.transaction_id && context.message_id) {
+    await logEvent(context.transaction_id, context.message_id, 'catalog_publish', 'INBOUND', JSON.stringify(req.body));
+  }
+
+  // Extract catalogs from message
+  const catalogs = message.catalogs || [];
+
+  if (catalogs.length === 0) {
+    return res.json(createNack(context, {
+      code: 'INVALID_REQUEST',
+      message: 'No catalogs provided in publish request',
+    }));
+  }
+
+  res.json(createAck(context));
+
+  // Process catalogs asynchronously
+  setTimeout(async () => {
+    try {
+      for (const catalog of catalogs) {
+        const catalogId = catalog['beckn:id'] || catalog.id;
+        const isActive = catalog['beckn:isActive'] !== false; // Default to active
+
+        const rawItems = catalog['beckn:items'] || catalog.items || [];
+        const rawOffers = catalog['beckn:offers'] || catalog.offers || [];
+
+        logger.info(`Processing catalog ${catalogId}`, {
+          items_count: rawItems.length,
+          offers_count: rawOffers.length,
+          is_active: isActive,
+        });
+
+        // Extract provider info from first item
+        const firstItem = rawItems[0];
+        if (!firstItem) {
+          logger.warn(`No items in catalog ${catalogId}, skipping`);
+          continue;
+        }
+
+        const providerInfo = firstItem['beckn:provider'] || firstItem.provider || {};
+        const providerAttrs = providerInfo['beckn:providerAttributes'] || providerInfo.providerAttributes || {};
+        const providerId = providerInfo['beckn:id'] || providerInfo.id || 'unknown-provider';
+        const providerName = providerInfo['beckn:descriptor']?.['schema:name'] ||
+                            providerInfo.descriptor?.name || 'Energy Provider';
+
+        // Build SyncProvider
+        const syncProvider = {
+          id: providerId,
+          name: providerName,
+          trust_score: 0.5,
+        };
+
+        // Build SyncItems
+        const syncItems = rawItems.map((item: any) => {
+          const itemId = item['beckn:id'] || item.id;
+          const itemAttrs = item['beckn:itemAttributes'] || item.itemAttributes || {};
+          const itemProvider = item['beckn:provider'] || item.provider || {};
+          const itemProviderAttrs = itemProvider['beckn:providerAttributes'] || itemProvider.providerAttributes || {};
+
+          return {
+            id: itemId,
+            provider_id: providerId,
+            source_type: itemAttrs.sourceType || 'SOLAR',
+            delivery_mode: 'GRID_INJECTION',
+            available_qty: 100,
+            production_windows: [],
+            meter_id: itemAttrs.meterId || itemProviderAttrs.meterId || 'unknown-meter',
+            utility_id: itemProviderAttrs.utilityId,
+            utility_customer_id: itemProviderAttrs.utilityCustomerId,
+          };
+        });
+
+        // Build SyncOffers
+        const syncOffers = rawOffers.map((offer: any) => {
+          const offerId = offer['beckn:id'] || offer.id;
+          const offerProviderId = offer['beckn:provider'] || offer.provider || providerId;
+          const offerItemIds = offer['beckn:items'] || offer.items || [];
+          const price = offer['beckn:price'] || offer.price || {};
+          const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
+          const deliveryWindow = offerAttrs.deliveryWindow || {};
+
+          return {
+            id: offerId,
+            item_id: offerItemIds[0] || syncItems[0]?.id,
+            provider_id: offerProviderId,
+            price_value: price['schema:price'] || price.value || 0,
+            currency: price['schema:priceCurrency'] || price.currency || 'INR',
+            max_qty: price.applicableQuantity?.unitQuantity || 100,
+            time_window: {
+              startTime: deliveryWindow['schema:startTime'] || deliveryWindow.startTime,
+              endTime: deliveryWindow['schema:endTime'] || deliveryWindow.endTime,
+            },
+            pricing_model: offerAttrs.pricingModel || 'PER_KWH',
+          };
+        });
+
+        // Publish or revoke catalog
+        try {
+          const success = await publishCatalogToCDS(syncProvider, syncItems, syncOffers, isActive);
+          if (success) {
+            logger.info(`${isActive ? 'Published' : 'Revoked'} catalog ${catalogId}`, {
+              provider_id: providerId,
+              items: syncItems.length,
+              offers: syncOffers.length,
+            });
+          } else {
+            logger.warn(`Failed to ${isActive ? 'publish' : 'revoke'} catalog ${catalogId}`);
+          }
+        } catch (err: any) {
+          logger.error(`Error ${isActive ? 'publishing' : 'revoking'} catalog ${catalogId}: ${err.message}`);
+        }
+      }
+
+      logger.info('Catalog publish processing completed', {
+        transaction_id: context.transaction_id,
+        catalogs_processed: catalogs.length,
+      });
+    } catch (error: any) {
+      logger.error(`Catalog publish processing failed: ${error.message}`, {
+        transaction_id: context.transaction_id,
+      });
+    }
+  }, config.callbackDelay);
+});
+
 // ==================== CDS SYNC HELPERS ====================
 // Note: CDS sync functions now imported from @p2p/shared
 // They automatically use secureAxios with Beckn signing when USE_EXTERNAL_CDS=true

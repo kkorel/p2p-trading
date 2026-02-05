@@ -61,11 +61,15 @@ app.use('/chat', chatRoutes);
 // Consumer API routes (BAP)
 app.use('/', routes);
 
-// Callback endpoints for receiving async responses
-app.use('/callbacks', callbacks);
+// BAP Callback endpoints for receiving async responses from BPP/CDS
+// Mount at BOTH root (for DeDi: bap.digioorga.org) and /callbacks (legacy)
+app.use('/', callbacks);           // DeDi registration: bap.digioorga.org → /on_select, /on_init, etc.
+app.use('/callbacks', callbacks);  // Legacy: /callbacks/on_select, etc.
 
-// Seller/Provider routes (BPP) - includes Beckn protocol routes and seller management APIs
-app.use('/', sellerRoutes);
+// BPP Protocol routes - Beckn action handlers (select, init, confirm, etc.)
+// Mount at BOTH /callbacks (for DeDi: bpp.digioorga.org/callbacks) and root (legacy)
+app.use('/callbacks', sellerRoutes);  // DeDi registration: bpp.digioorga.org/callbacks → /callbacks/select
+app.use('/', sellerRoutes);           // Legacy: /select, /init, etc.
 
 // Health check - verifies database and cache connectivity
 app.get('/health', async (req, res) => {
