@@ -32,6 +32,8 @@ import {
   // Secure client for signed Beckn requests
   secureAxios,
   isSigningEnabled,
+  getKeyPair,
+  createSignedHeaders,
   // Beckn v2 wire-format builders
   buildWireOrder,
   buildWireStatusOrder,
@@ -120,8 +122,13 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
       const endTime = timeWindow['schema:endTime'] || timeWindow.endTime || null;
 
       // Extract max quantity from multiple possible formats
-      const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
-      const maxQuantity = maxQty.unitQuantity || maxQty || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
+      // CDS may use: beckn:maxQuantity, maxQuantity, applicableQuantity, etc.
+      const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity ||
+                     offerAttrs.applicableQuantity || offerAttrs['beckn:applicableQuantity'] || {};
+      const maxQuantity = maxQty.unitQuantity || maxQty.value || (typeof maxQty === 'number' ? maxQty : null) ||
+                         offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
+
+      console.log(`[OFFER-DEBUG] Offer ${offerId}: maxQty=${JSON.stringify(maxQty)}, extracted maxQuantity=${maxQuantity}`);
 
       logger.debug('Extracted offer', {
         offerId,
@@ -946,13 +953,26 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
             }
           }
           // Filter out offers with 0 availability
+          const beforeFilter = item.offers?.length || 0;
           item.offers = (item.offers || []).filter((o: any) => o.maxQuantity > 0);
+          const afterFilter = item.offers?.length || 0;
+          if (beforeFilter !== afterFilter) {
+            console.log(`[FILTER-DEBUG] Item ${item.id}: filtered ${beforeFilter} -> ${afterFilter} offers (removed ${beforeFilter - afterFilter} with maxQuantity <= 0)`);
+          }
         }
         // Filter out items with no offers
+        const itemsBefore = providerCatalog.items?.length || 0;
         providerCatalog.items = (providerCatalog.items || []).filter((i: any) => i.offers && i.offers.length > 0);
+        const itemsAfter = providerCatalog.items?.length || 0;
+        if (itemsBefore !== itemsAfter) {
+          console.log(`[FILTER-DEBUG] Provider ${providerCatalog.id}: filtered ${itemsBefore} -> ${itemsAfter} items`);
+        }
       }
       // Filter out providers with no items
+      const providersBefore = filteredProviders.length;
       filteredProviders = filteredProviders.filter(p => p.items && p.items.length > 0);
+      const providersAfter = filteredProviders.length;
+      console.log(`[FILTER-DEBUG] Final: ${providersBefore} providers -> ${providersAfter} providers with offers`);
 
       // Extract providers and offers for matching
       const providers = new Map<string, Provider>();
@@ -3422,9 +3442,19 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
   ): Promise<DiagnosticTest> {
     const start = Date.now();
     try {
+      // For external endpoints (CDS, Ledger), use signed headers like ONIX
+      let finalHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...headers };
+      if (category === 'external' && method === 'POST' && body) {
+        const keyPair = getKeyPair();
+        if (keyPair) {
+          const signedHeaders = createSignedHeaders(body, keyPair);
+          finalHeaders = { ...finalHeaders, ...signedHeaders };
+        }
+      }
+
       const resp = method === 'GET'
-        ? await axios.get(url, { timeout: 8000, headers, validateStatus: () => true })
-        : await axios.post(url, body, { timeout: 8000, headers: { 'Content-Type': 'application/json', ...headers }, validateStatus: () => true });
+        ? await axios.get(url, { timeout: 8000, headers: finalHeaders, validateStatus: () => true })
+        : await axios.post(url, body, { timeout: 8000, headers: finalHeaders, validateStatus: () => true });
       const latency = Date.now() - start;
       const responseStr = typeof resp.data === 'string' ? resp.data.substring(0, 300) : JSON.stringify(resp.data).substring(0, 300);
       const ok = resp.status >= 200 && resp.status < 300;
