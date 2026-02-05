@@ -179,14 +179,14 @@ export function DiscoverForm({
 function getDefaultStartTime(): string {
   const now = new Date();
   now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 4); // T+4 hours
+  now.setHours(now.getHours() + 5); // T+5 hours (rounded up)
   return toLocalISOString(now);
 }
 
 function getDefaultEndTime(): string {
   const now = new Date();
   now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 8); // T+8 hours
+  now.setHours(now.getHours() + 9); // T+9 hours
   return toLocalISOString(now);
 }
 
