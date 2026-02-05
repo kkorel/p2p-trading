@@ -675,9 +675,8 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   if (deliveryMode) {
     filterParts.push(`@.beckn:itemAttributes.deliveryMode == '${deliveryMode}'`);
   }
-  if (minQuantity) {
-    filterParts.push(`@.beckn:itemAttributes.availableQuantity >= ${minQuantity}`);
-  }
+  // Note: Don't filter by availableQuantity - CDS manages this internally
+  // Quantity filtering is done via intent.quantity instead
 
   // Build JSONPath expression
   const expression = `$[?(${filterParts.join(' && ')})]`;
@@ -3569,7 +3568,7 @@ router.get('/api/diagnosis', async (req: Request, res: Response) => {
       message: {
         filters: {
           type: 'jsonpath',
-          expression: "$[?('p2p-interdiscom-trading-pilot-network' == @.beckn:networkId && @.beckn:itemAttributes.availableQuantity >= 1)]",
+          expression: "$[?('p2p-interdiscom-trading-pilot-network' == @.beckn:networkId)]",
           expressionType: 'jsonpath',
         },
         intent: {

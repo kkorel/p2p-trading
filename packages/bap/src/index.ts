@@ -12,12 +12,13 @@
 
 import express from 'express';
 import path from 'path';
-import { 
-  config, 
-  createLogger, 
+import {
+  config,
+  createLogger,
   validateEnv,
   applySecurityMiddleware,
   initializeSecureClient,
+  initializeBppKeys,
   initializeVerification,
   validateBecknMessage,
   logBecknSignature,
@@ -124,30 +125,48 @@ async function start() {
     logger.info(`Starting in ${config.env.nodeEnv} mode (DEV_MODE=${config.env.isDevMode})`);
 
     // Initialize Beckn signing (for outgoing requests)
+    // Supports dual keys: BAP keys for buyer operations, BPP keys for seller operations
     const signingEnabled = process.env.BECKN_SIGNING_ENABLED === 'true';
     if (signingEnabled) {
-      // Load key pair from environment variables if available
-      let keyPair = undefined;
+      // Load BAP key pair from environment variables (BECKN_* vars)
+      let bapKeyPair = undefined;
       if (process.env.BECKN_KEY_ID && process.env.BECKN_PUBLIC_KEY && process.env.BECKN_PRIVATE_KEY) {
-        keyPair = {
+        bapKeyPair = {
           keyId: process.env.BECKN_KEY_ID,
           publicKey: process.env.BECKN_PUBLIC_KEY,
           privateKey: process.env.BECKN_PRIVATE_KEY,
         };
-        logger.info('Loaded Beckn signing keys from environment', {
-          keyId: keyPair.keyId,
-          publicKeyPreview: keyPair.publicKey.substring(0, 20) + '...'
+        logger.info('Loaded BAP signing keys from environment', {
+          keyId: bapKeyPair.keyId,
+          publicKeyPreview: bapKeyPair.publicKey.substring(0, 20) + '...'
         });
       } else {
-        logger.warn('Beckn keys not found in environment, will generate new ones (NOT RECOMMENDED for production)');
+        logger.warn('BAP keys not found in environment, will generate new ones (NOT RECOMMENDED for production)');
       }
 
-      const loadedKeyPair = initializeSecureClient({
-        keyPair,
+      const loadedBapKeyPair = initializeSecureClient({
+        keyPair: bapKeyPair,
         enabled: true,
         ttlSeconds: parseInt(process.env.BECKN_SIGNATURE_TTL || '30', 10),
       });
-      logger.info('Beckn message signing enabled', { keyId: loadedKeyPair.keyId });
+      logger.info('BAP message signing enabled', { keyId: loadedBapKeyPair.keyId });
+
+      // Load BPP key pair from environment variables (BPP_KEY_ID, BPP_PUBLIC_KEY, BPP_PRIVATE_KEY)
+      // Used for catalog_publish and other seller operations
+      if (process.env.BPP_KEY_ID && process.env.BPP_PUBLIC_KEY && process.env.BPP_PRIVATE_KEY) {
+        const bppKeyPair = {
+          keyId: process.env.BPP_KEY_ID,
+          publicKey: process.env.BPP_PUBLIC_KEY,
+          privateKey: process.env.BPP_PRIVATE_KEY,
+        };
+        initializeBppKeys(bppKeyPair);
+        logger.info('Loaded BPP signing keys from environment', {
+          keyId: bppKeyPair.keyId,
+          publicKeyPreview: bppKeyPair.publicKey.substring(0, 20) + '...'
+        });
+      } else {
+        logger.warn('BPP keys not found (BPP_KEY_ID, BPP_PUBLIC_KEY, BPP_PRIVATE_KEY) - catalog_publish will use BAP keys');
+      }
     } else {
       logger.info('Beckn message signing disabled (set BECKN_SIGNING_ENABLED=true to enable)');
     }

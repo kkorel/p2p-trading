@@ -50,13 +50,19 @@ export {
 // Secure HTTP client
 export {
   initializeSecureClient,
+  initializeBppKeys,
   getPublicKey as getClientPublicKey,
   getKeyId,
   getKeyPair,
+  getBapKeyPair,
+  getBppKeyPair,
   isSigningEnabled,
   signedPost,
+  signedPostAsBpp,
+  signedPostWithKey,
   createSecureAxiosInstance,
   secureAxios,
+  secureAxiosBpp,
 } from './secure-client';
 
 // Verification middleware

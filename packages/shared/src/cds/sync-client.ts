@@ -15,7 +15,7 @@ import axios from 'axios';
 import { config } from '../config';
 import { createLogger } from '../utils/logger';
 import { TimeWindow, BECKN_SCHEMA_CONTEXT, BECKN_DEFAULT_LOCATION, BecknLocation } from '../types/beckn';
-import { secureAxios } from '../beckn/secure-client';
+import { secureAxiosBpp } from '../beckn/secure-client';
 
 const logger = createLogger('CDS-PUBLISH');
 
@@ -238,7 +238,7 @@ function buildBecknItem(item: SyncItem, providerName: string): BecknItem {
       '@type': 'EnergyResource',
       sourceType: item.source_type,
       meterId: item.meter_id || `der://meter/${item.id}`,
-      availableQuantity: item.available_qty,  // Required for CDS filtering
+      // Note: Do NOT include availableQuantity here - CDS manages this field internally
     },
   };
 }
@@ -377,8 +377,8 @@ export async function publishCatalogToCDS(
       context_bpp_uri: publishMessage.context.bpp_uri,
     });
 
-    // Use secureAxios for CDS publish (external CDS requires Beckn HTTP signatures)
-    const response = await secureAxios.post(url, publishMessage, {
+    // Use secureAxiosBpp for CDS publish (BPP keys for catalog_publish)
+    const response = await secureAxiosBpp.post(url, publishMessage, {
       timeout: 30000, // 30 second timeout
     });
 
