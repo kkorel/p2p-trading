@@ -137,20 +137,12 @@ export default function BuyPage() {
   }, []);
 
   // Browse mode: discover all offers for manual selection
-  const handleBrowse = useCallback(async () => {
-    // Use default time window for browse
-    const now = new Date();
-    const startTime = new Date(now);
-    startTime.setMinutes(0, 0, 0);
-    startTime.setHours(startTime.getHours() + 1);
-
-    const endTime = new Date(startTime);
-    endTime.setHours(endTime.getHours() + 4);
-
-    const timeWindow = {
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-    };
+  const handleBrowse = useCallback(async (params: {
+    sourceType?: string;
+    timeWindow: { startTime: string; endTime: string };
+  }) => {
+    // Use the time window from the form
+    const timeWindow = params.timeWindow;
 
     setIsLoading(true);
     setBrowseMode(true);
@@ -162,6 +154,7 @@ export default function BuyPage() {
 
     try {
       const result = await buyerApi.discover({
+        sourceType: params.sourceType,
         minQuantity: 1,
         timeWindow,
       });

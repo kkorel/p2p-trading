@@ -25,7 +25,10 @@ interface DiscoverFormProps {
     quantity: number;
     timeWindow: { startTime: string; endTime: string };
   }) => Promise<void>;
-  onBrowse?: () => void;
+  onBrowse?: (data: {
+    sourceType?: string;
+    timeWindow: { startTime: string; endTime: string };
+  }) => void;
   isLoading: boolean;
 }
 
@@ -163,7 +166,14 @@ export function DiscoverForm({
         {onBrowse && (
           <button
             type="button"
-            onClick={onBrowse}
+            onClick={() => {
+              const startTimeUTC = startTimeValue + ':00.000Z';
+              const endTimeUTC = watch('endTime') + ':00.000Z';
+              onBrowse({
+                sourceType: sourceType || undefined,
+                timeWindow: { startTime: startTimeUTC, endTime: endTimeUTC },
+              });
+            }}
             disabled={isLoading}
             className="flex items-center justify-center gap-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors"
           >

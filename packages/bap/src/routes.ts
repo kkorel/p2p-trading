@@ -84,16 +84,29 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
 
   for (const catalog of catalogs) {
     const providerId = catalog['beckn:providerId'] || catalog.providerId || catalog['beckn:id'] || catalog.id;
-    const providerName = catalog['beckn:descriptor']?.['schema:name'] ||
-      catalog.descriptor?.name ||
-      catalog['beckn:bppId'] ||
-      'Unknown Provider';
 
     // IMPORTANT: Extract BPP routing info for proper Beckn flows
     const bppId = catalog['beckn:bppId'] || catalog.bppId || providerId;
     const bppUri = catalog['beckn:bppUri'] || catalog.bppUri || null;
 
     const rawItems = catalog['beckn:items'] || catalog.items || [];
+
+    // Extract provider name from items if available (where actual seller name is stored)
+    // Fall back to catalog descriptor or BPP ID
+    let providerName = 'Unknown Provider';
+    if (rawItems.length > 0) {
+      const firstItem = rawItems[0];
+      const itemProvider = firstItem['beckn:provider'] || firstItem.provider || {};
+      const itemProviderDescriptor = itemProvider['beckn:descriptor'] || itemProvider.descriptor || {};
+      providerName = itemProviderDescriptor['schema:name'] || itemProviderDescriptor.name || providerName;
+    }
+    // Fall back to catalog descriptor if no item provider name
+    if (providerName === 'Unknown Provider') {
+      providerName = catalog['beckn:descriptor']?.['schema:name'] ||
+        catalog.descriptor?.name ||
+        catalog['beckn:bppId'] ||
+        'Unknown Provider';
+    }
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
 
     // Log raw data for debugging
@@ -122,11 +135,13 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
       const endTime = timeWindow['schema:endTime'] || timeWindow.endTime || null;
 
       // Extract max quantity from multiple possible formats
-      // CDS may use: beckn:maxQuantity, maxQuantity, applicableQuantity, etc.
+      // CDS may use: beckn:maxQuantity, maxQuantity, applicableQuantity (in offerAttrs or price)
+      // Also check price.applicableQuantity which is where we publish it
+      const priceApplicableQty = offerPrice.applicableQuantity || offerPrice['schema:applicableQuantity'] || {};
       const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity ||
-                     offerAttrs.applicableQuantity || offerAttrs['beckn:applicableQuantity'] || {};
+                     offerAttrs.applicableQuantity || offerAttrs['beckn:applicableQuantity'] || priceApplicableQty || {};
       const maxQuantity = maxQty.unitQuantity || maxQty.value || (typeof maxQty === 'number' ? maxQty : null) ||
-                         offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
+                         priceApplicableQty.unitQuantity || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
 
       console.log(`[OFFER-DEBUG] Offer ${offerId}: maxQty=${JSON.stringify(maxQty)}, extracted maxQuantity=${maxQuantity}`);
 

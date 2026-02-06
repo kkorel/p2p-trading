@@ -1419,12 +1419,16 @@ router.post('/publish', async (req: Request, res: Response) => {
           const itemProvider = item['beckn:provider'] || item.provider || {};
           const itemProviderAttrs = itemProvider['beckn:providerAttributes'] || itemProvider.providerAttributes || {};
 
+          // Extract available quantity from item attributes
+          const availableQty = itemAttrs.availableQuantity || itemAttrs['beckn:availableQuantity'] ||
+                               itemAttrs.quantity?.value || 10; // Default to 10, not 100
+
           return {
             id: itemId,
             provider_id: providerId,
             source_type: itemAttrs.sourceType || 'SOLAR',
             delivery_mode: 'GRID_INJECTION',
-            available_qty: 100,
+            available_qty: availableQty,
             production_windows: [],
             meter_id: itemAttrs.meterId || itemProviderAttrs.meterId || 'unknown-meter',
             utility_id: itemProviderAttrs.utilityId,
@@ -1441,13 +1445,18 @@ router.post('/publish', async (req: Request, res: Response) => {
           const offerAttrs = offer['beckn:offerAttributes'] || offer.offerAttributes || {};
           const deliveryWindow = offerAttrs.deliveryWindow || {};
 
+          // Extract max quantity from multiple possible sources
+          const maxQty = price.applicableQuantity?.unitQuantity ||
+                         offerAttrs.maxQuantity || offerAttrs['beckn:maxQuantity'] ||
+                         offerAttrs.applicableQuantity?.unitQuantity || 10; // Default to 10, not 100
+
           return {
             id: offerId,
             item_id: offerItemIds[0] || syncItems[0]?.id,
             provider_id: offerProviderId,
             price_value: price['schema:price'] || price.value || 0,
             currency: price['schema:priceCurrency'] || price.currency || 'INR',
-            max_qty: price.applicableQuantity?.unitQuantity || 100,
+            max_qty: maxQty,
             time_window: {
               startTime: deliveryWindow['schema:startTime'] || deliveryWindow.startTime,
               endTime: deliveryWindow['schema:endTime'] || deliveryWindow.endTime,

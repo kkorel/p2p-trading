@@ -58,17 +58,29 @@ function transformExternalCatalog(rawMessage: any): { providers: any[] } {
   for (const catalog of catalogs) {
     // Extract provider ID - try multiple possible locations
     const providerId = catalog['beckn:providerId'] || catalog.providerId || catalog['beckn:id'] || catalog.id;
-    const providerName = catalog['beckn:descriptor']?.['schema:name'] || 
-                         catalog.descriptor?.name ||
-                         catalog['beckn:bppId'] ||
-                         'Unknown Provider';
-    
+
     // IMPORTANT: Extract BPP routing info for proper Beckn flows
     const bppId = catalog['beckn:bppId'] || catalog.bppId || providerId;
     const bppUri = catalog['beckn:bppUri'] || catalog.bppUri || null;
-    
+
     // Extract items - handle beckn: prefix
     const rawItems = catalog['beckn:items'] || catalog.items || [];
+
+    // Extract provider name from items if available (where actual seller name is stored)
+    let providerName = 'Unknown Provider';
+    if (rawItems.length > 0) {
+      const firstItem = rawItems[0];
+      const itemProvider = firstItem['beckn:provider'] || firstItem.provider || {};
+      const itemProviderDescriptor = itemProvider['beckn:descriptor'] || itemProvider.descriptor || {};
+      providerName = itemProviderDescriptor['schema:name'] || itemProviderDescriptor.name || providerName;
+    }
+    // Fall back to catalog descriptor if no item provider name
+    if (providerName === 'Unknown Provider') {
+      providerName = catalog['beckn:descriptor']?.['schema:name'] ||
+        catalog.descriptor?.name ||
+        catalog['beckn:bppId'] ||
+        'Unknown Provider';
+    }
     
     // Extract offers - can be at catalog level or in items
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
@@ -93,8 +105,10 @@ function transformExternalCatalog(rawMessage: any): { providers: any[] } {
       const priceCurrency = attrPrice.currency || offerPrice['schema:priceCurrency'] || attrPrice['schema:priceCurrency'] || offerPrice.currency || 'INR';
       
       const timeWindow = offerAttrs['beckn:timeWindow'] || offerAttrs.timeWindow || offerAttrs.validityWindow || {};
-      const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || {};
-      
+      // Extract max quantity from multiple possible sources including price.applicableQuantity
+      const priceApplicableQty = offerPrice.applicableQuantity || offerPrice['schema:applicableQuantity'] || {};
+      const maxQty = offerAttrs['beckn:maxQuantity'] || offerAttrs.maxQuantity || priceApplicableQty || {};
+
       return {
         id: offerId,
         item_id: itemId,
@@ -106,7 +120,7 @@ function transformExternalCatalog(rawMessage: any): { providers: any[] } {
           value: typeof priceValue === 'number' ? priceValue : parseFloat(priceValue) || 0,
           currency: priceCurrency,
         },
-        maxQuantity: maxQty.unitQuantity || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100,
+        maxQuantity: maxQty.unitQuantity || priceApplicableQty.unitQuantity || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 10,
         timeWindow: {
           startTime: timeWindow['schema:startTime'] || timeWindow.startTime,
           endTime: timeWindow['schema:endTime'] || timeWindow.endTime,
