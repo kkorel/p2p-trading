@@ -1538,6 +1538,14 @@ router.get('/seller/my-profile', authMiddleware, async (req: Request, res: Respo
     const items = await getProviderItems(providerId);
     const offers = await getProviderOffers(providerId);
 
+    // Debug: Log what we're finding
+    logger.info('Seller profile data', {
+      userId: req.user!.id,
+      providerId,
+      itemCount: items.length,
+      offerCount: offers.length,
+    });
+
     // Create a map of item_id to source_type for quick lookup
     const itemSourceMap = new Map(items.map(item => [item.id, item.source_type]));
 
@@ -2592,6 +2600,72 @@ router.get('/seller/cds-status', async (req: Request, res: Response) => {
         : !signingOn
           ? 'CDS publishing enabled but SIGNING is OFF - set BECKN_SIGNING_ENABLED=true'
           : 'CDS publishing enabled but BPP keys missing - set BPP_KEY_ID, BPP_PUBLIC_KEY, BPP_PRIVATE_KEY',
+  });
+});
+
+/**
+ * GET /seller/debug-data - Debug endpoint to check data consistency
+ * Shows offers and blocks for the authenticated user's provider
+ */
+router.get('/seller/debug-data', authMiddleware, async (req: Request, res: Response) => {
+  const providerId = req.user!.providerId;
+  const userId = req.user!.id;
+
+  // Get all offers for this provider
+  const offers = await prisma.catalogOffer.findMany({
+    where: { providerId: providerId || undefined },
+    include: {
+      blocks: {
+        select: { id: true, status: true },
+      },
+    },
+  });
+
+  // Get all blocks for this provider (regardless of offer)
+  const allBlocks = await prisma.offerBlock.findMany({
+    where: { providerId: providerId || undefined },
+    select: { id: true, offerId: true, status: true },
+  });
+
+  // Get orphaned blocks (blocks without a valid offer)
+  const offerIds = offers.map(o => o.id);
+  const orphanedBlocks = allBlocks.filter(b => !offerIds.includes(b.offerId));
+
+  // Get orders for this provider
+  const orders = await prisma.order.findMany({
+    where: { providerId: providerId || undefined },
+    select: { id: true, status: true, totalQty: true },
+  });
+
+  res.json({
+    user: {
+      id: userId,
+      providerId,
+      name: req.user!.name,
+    },
+    offers: offers.map(o => ({
+      id: o.id,
+      maxQty: o.maxQty,
+      priceValue: o.priceValue,
+      blocksCount: o.blocks.length,
+      availableBlocks: o.blocks.filter(b => b.status === 'AVAILABLE').length,
+      soldBlocks: o.blocks.filter(b => b.status === 'SOLD').length,
+    })),
+    blocksTotal: allBlocks.length,
+    blocksAvailable: allBlocks.filter(b => b.status === 'AVAILABLE').length,
+    blocksSold: allBlocks.filter(b => b.status === 'SOLD').length,
+    orphanedBlocks: orphanedBlocks.length,
+    orders: orders.map(o => ({
+      id: o.id,
+      status: o.status,
+      totalQty: o.totalQty,
+    })),
+    summary: {
+      offersCount: offers.length,
+      totalBlocksInOffers: offers.reduce((sum, o) => sum + o.blocks.length, 0),
+      availableInOffers: offers.reduce((sum, o) => sum + o.blocks.filter(b => b.status === 'AVAILABLE').length, 0),
+      soldInOrders: orders.filter(o => ['PENDING', 'ACTIVE', 'COMPLETED'].includes(o.status)).reduce((sum, o) => sum + (o.totalQty || 0), 0),
+    },
   });
 });
 
