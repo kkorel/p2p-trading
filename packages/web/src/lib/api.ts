@@ -77,15 +77,51 @@ export const authApi = {
       body: JSON.stringify({ phone }),
     }),
 
-  verifyOtp: (phone: string, otp: string, name?: string) =>
+  verifyOtp: async (phone: string, otp: string, name?: string): Promise<VerifyOtpResponse> => {
+    const res = await fetch('/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, otp, name }),
+    });
+
+    const data = await res.json();
+
+    // Handle 403 - requires VCs for signup
+    if (res.status === 403 && data.requiresVC) {
+      return {
+        success: false,
+        requiresVC: data.requiresVC,
+        userId: data.userId,
+        isNewUser: data.isNewUser,
+        message: data.message,
+      };
+    }
+
+    if (!res.ok) {
+      throw new ApiError(data.error || data.message || 'Verification failed', res.status);
+    }
+
+    return {
+      success: true,
+      token: data.token,
+      user: data.user,
+      isNewUser: data.isNewUser,
+    };
+  },
+
+  // Pre-auth VC upload (for signup flow before user has a session)
+  verifyCredentialPreauth: (userId: string, pdfBase64?: string, credential?: any) =>
     request<{
       success: boolean;
-      token: string;
-      user: User;
-      isNewUser: boolean;
-    }>('/auth/verify-otp', {
+      credentialType: string;
+      verification: { verified: boolean; checks: any[]; extractionMethod: string };
+      extractedClaims: any;
+      credentials: Array<{ type: string; verified: boolean; verifiedAt: string | null }>;
+      signupReady: boolean;
+      missing: { utilityVC: boolean; roleVC: boolean };
+    }>('/auth/verify-credential-preauth', {
       method: 'POST',
-      body: JSON.stringify({ phone, otp, name }),
+      body: JSON.stringify({ userId, pdfBase64, credential }),
     }),
 
   getMe: () =>
@@ -495,6 +531,11 @@ export interface User {
   productionCapacity?: number | null;
   meterVerifiedCapacity?: number | null;
 }
+
+// Response type for verifyOtp - can be success or requiresVC
+export type VerifyOtpResponse =
+  | { success: true; token: string; user: User; isNewUser: boolean }
+  | { success: false; requiresVC: string[]; userId: string; isNewUser: boolean; message: string };
 
 export interface Provider {
   id: string;

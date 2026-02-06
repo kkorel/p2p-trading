@@ -117,6 +117,32 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       });
     }
 
+    // Check for required VCs (minimum 2: Utility + one role VC)
+    const userVCs = await prisma.userCredential.findMany({
+      where: { userId: result.userId!, verified: true }
+    });
+
+    const hasUtilityVC = userVCs.some(vc => vc.credentialType === 'UTILITY_CUSTOMER');
+    const hasRoleVC = userVCs.some(vc =>
+      ['GENERATION_PROFILE', 'STORAGE_PROFILE', 'CONSUMPTION_PROFILE'].includes(vc.credentialType)
+    );
+
+    const missingVCs: string[] = [];
+    if (!hasUtilityVC) missingVCs.push('UTILITY_CUSTOMER');
+    if (!hasRoleVC) missingVCs.push('GENERATION_PROFILE or STORAGE_PROFILE or CONSUMPTION_PROFILE');
+
+    if (missingVCs.length > 0) {
+      logger.info(`User ${result.userId} missing required VCs: ${missingVCs.join(', ')}`);
+      return res.status(403).json({
+        success: false,
+        error: 'Credentials required for signup',
+        requiresVC: missingVCs,
+        userId: result.userId,
+        isNewUser: result.isNewUser,
+        message: 'Upload Utility VC and at least one role credential (Generation/Storage for selling, Consumption for buying)',
+      });
+    }
+
     // Create session
     const session = await createSession({
       userId: result.userId!,
@@ -174,6 +200,268 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       success: false,
       error: 'Authentication failed. Please try again.',
     });
+  }
+});
+
+/**
+ * POST /auth/verify-credential-preauth
+ * Upload VC before having a session (during signup flow when 2 VCs are required)
+ * Uses userId from verify-otp 403 response instead of auth token
+ */
+router.post('/verify-credential-preauth', async (req: Request, res: Response) => {
+  try {
+    const { userId, pdfBase64, credential: jsonCredential } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId is required (from verify-otp response)',
+      });
+    }
+
+    if (!pdfBase64 && !jsonCredential) {
+      return res.status(400).json({
+        success: false,
+        error: 'Either a PDF file (base64) or a JSON credential is required',
+      });
+    }
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, consumerNumber: true, installationAddress: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found. Please restart the signup process.',
+      });
+    }
+
+    let credential: Record<string, any>;
+    let extractionMethod: 'json' | 'llm' | 'direct' = 'direct';
+
+    if (jsonCredential && typeof jsonCredential === 'object') {
+      credential = jsonCredential;
+    } else if (pdfBase64 && typeof pdfBase64 === 'string') {
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+      const { extractVCFromPdf } = await import('./vc-pdf-analyzer');
+      const extraction = await extractVCFromPdf(pdfBuffer);
+      if (!extraction.success || !extraction.credential) {
+        return res.status(400).json({
+          success: false,
+          error: extraction.error || 'Could not extract a VC from this PDF.',
+        });
+      }
+      credential = extraction.credential;
+      extractionMethod = extraction.extractionMethod;
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid input.' });
+    }
+
+    const {
+      verifyCredential: vcVerify,
+      detectCredentialType,
+      extractNormalizedGenerationClaims,
+      extractNormalizedUtilityCustomerClaims,
+      extractNormalizedConsumptionProfileClaims,
+      extractNormalizedStorageProfileClaims,
+      extractNormalizedProgramEnrollmentClaims,
+      extractCapacity,
+      getIssuerId,
+      getIssuanceDate,
+    } = await import('@p2p/shared');
+
+    // Auto-detect credential type
+    const credType = detectCredentialType(credential as any);
+    if (!credType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not detect credential type. Supported: UtilityCustomerCredential, ConsumptionProfileCredential, GenerationProfileCredential, StorageProfileCredential, UtilityProgramEnrollmentCredential',
+      });
+    }
+
+    // Run verification
+    const verificationResult = await vcVerify(credential);
+
+    // Map DEG type to Prisma enum
+    const PRISMA_TYPE_MAP: Record<string, string> = {
+      'UtilityCustomerCredential': 'UTILITY_CUSTOMER',
+      'ConsumptionProfileCredential': 'CONSUMPTION_PROFILE',
+      'GenerationProfileCredential': 'GENERATION_PROFILE',
+      'StorageProfileCredential': 'STORAGE_PROFILE',
+      'UtilityProgramEnrollmentCredential': 'PROGRAM_ENROLLMENT',
+    };
+    const prismaCredType = PRISMA_TYPE_MAP[credType];
+
+    // Extract claims and build User update
+    let claims: Record<string, any> = {};
+    const userUpdate: Record<string, any> = {};
+
+    switch (credType) {
+      case 'UtilityCustomerCredential': {
+        claims = extractNormalizedUtilityCustomerClaims(credential as any);
+        if (claims.fullName && !user.name) userUpdate.name = claims.fullName;
+        if (claims.consumerNumber) userUpdate.consumerNumber = claims.consumerNumber;
+        if (claims.meterNumber) userUpdate.meterNumber = claims.meterNumber;
+        if (claims.installationAddress) userUpdate.installationAddress = claims.installationAddress;
+        if (claims.serviceConnectionDate) {
+          userUpdate.serviceConnectionDate = new Date(claims.serviceConnectionDate);
+        }
+        break;
+      }
+      case 'ConsumptionProfileCredential': {
+        claims = extractNormalizedConsumptionProfileClaims(credential as any);
+        if (claims.premisesType) userUpdate.premisesType = claims.premisesType;
+        if (claims.connectionType) userUpdate.connectionType = claims.connectionType;
+        if (claims.sanctionedLoadKW) userUpdate.sanctionedLoadKW = claims.sanctionedLoadKW;
+        if (claims.tariffCategoryCode) userUpdate.tariffCategoryCode = claims.tariffCategoryCode;
+        break;
+      }
+      case 'GenerationProfileCredential': {
+        claims = extractNormalizedGenerationClaims(credential as any);
+        const capacityKW = extractCapacity(credential as any);
+        if (capacityKW && capacityKW > 0) {
+          const AVG_PEAK_SUN_HOURS = 4.5;
+          const DAYS_PER_MONTH = 30;
+          userUpdate.productionCapacity = capacityKW * AVG_PEAK_SUN_HOURS * DAYS_PER_MONTH;
+        }
+        break;
+      }
+      case 'StorageProfileCredential': {
+        claims = extractNormalizedStorageProfileClaims(credential as any);
+        if (claims.storageCapacityKWh) userUpdate.storageCapacityKWh = claims.storageCapacityKWh;
+        if (claims.powerRatingKW) userUpdate.storagePowerRatingKW = claims.powerRatingKW;
+        if (claims.storageType) userUpdate.storageType = claims.storageType;
+        break;
+      }
+      case 'UtilityProgramEnrollmentCredential': {
+        claims = extractNormalizedProgramEnrollmentClaims(credential as any);
+        if (claims.programName) userUpdate.programName = claims.programName;
+        if (claims.programCode) userUpdate.programCode = claims.programCode;
+        if (claims.enrollmentDate) {
+          userUpdate.programEnrollmentDate = new Date(claims.enrollmentDate);
+        }
+        if (claims.validUntil) {
+          userUpdate.programValidUntil = new Date(claims.validUntil);
+        }
+        break;
+      }
+    }
+
+    // Upsert UserCredential record
+    const issuerId = getIssuerId(credential.issuer || '');
+    const issuanceDateStr = getIssuanceDate(credential as any);
+
+    await prisma.userCredential.upsert({
+      where: {
+        userId_credentialType: {
+          userId: userId,
+          credentialType: prismaCredType as any,
+        },
+      },
+      create: {
+        userId: userId,
+        credentialType: prismaCredType as any,
+        rawJson: JSON.stringify(credential),
+        verified: verificationResult.verified,
+        verifiedAt: verificationResult.verified ? new Date() : null,
+        extractedClaims: JSON.stringify(claims),
+        issuerId: issuerId || null,
+        issuanceDate: issuanceDateStr ? new Date(issuanceDateStr) : null,
+      },
+      update: {
+        rawJson: JSON.stringify(credential),
+        verified: verificationResult.verified,
+        verifiedAt: verificationResult.verified ? new Date() : null,
+        extractedClaims: JSON.stringify(claims),
+        issuerId: issuerId || null,
+        issuanceDate: issuanceDateStr ? new Date(issuanceDateStr) : null,
+      },
+    });
+
+    // Update User fields
+    if (Object.keys(userUpdate).length > 0) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: userUpdate,
+      });
+    }
+
+    // Auto-create Provider for Generation/Storage VCs
+    if ((credType === 'GenerationProfileCredential' || credType === 'StorageProfileCredential') && verificationResult.verified) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { providerId: true, name: true, consumerNumber: true, installationAddress: true },
+      });
+
+      if (!currentUser?.providerId) {
+        const providerId = `provider-${userId}`;
+        await prisma.provider.create({
+          data: {
+            id: providerId,
+            name: currentUser?.name || 'Energy Provider',
+            // From Generation VC
+            generationType: claims.generationType || claims.sourceType || null,
+            capacityKW: claims.capacityKW || null,
+            generationMeterNumber: claims.meterNumber || null,
+            commissioningDate: claims.commissioningDate ? new Date(claims.commissioningDate) : null,
+            // From Storage VC
+            storageCapacityKWh: claims.storageCapacityKWh || null,
+            storagePowerRatingKW: claims.powerRatingKW || null,
+            storageType: claims.storageType || null,
+            // From Utility VC (via User)
+            consumerNumber: currentUser?.consumerNumber || null,
+            installationAddress: currentUser?.installationAddress || null,
+          },
+        });
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { providerId },
+        });
+
+        logger.info(`Auto-created Provider ${providerId} for user ${userId} from ${credType}`);
+      }
+    }
+
+    // Fetch all credentials to return status
+    const allCredentials = await prisma.userCredential.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const hasUtilityVC = allCredentials.some(c => c.credentialType === 'UTILITY_CUSTOMER' && c.verified);
+    const hasRoleVC = allCredentials.some(c =>
+      ['GENERATION_PROFILE', 'STORAGE_PROFILE', 'CONSUMPTION_PROFILE'].includes(c.credentialType) && c.verified
+    );
+
+    logger.info(`Pre-auth: User ${userId} verified ${credType}: method=${extractionMethod}, verified=${verificationResult.verified}`);
+
+    res.json({
+      success: true,
+      credentialType: credType,
+      verification: {
+        verified: verificationResult.verified,
+        checks: verificationResult.checks,
+        extractionMethod,
+      },
+      extractedClaims: claims,
+      credentials: allCredentials.map(c => ({
+        type: c.credentialType,
+        verified: c.verified,
+        verifiedAt: c.verifiedAt,
+      })),
+      signupReady: hasUtilityVC && hasRoleVC,
+      missing: {
+        utilityVC: !hasUtilityVC,
+        roleVC: !hasRoleVC,
+      },
+    });
+  } catch (error: any) {
+    logger.error(`Pre-auth verify credential error: ${error}`);
+    res.status(500).json({ success: false, error: 'Failed to verify credential.' });
   }
 });
 
@@ -1018,7 +1306,7 @@ router.post('/verify-credential', authMiddleware, async (req: Request, res: Resp
     // Get current user to check existing values before overwriting
     const currentUser = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      select: { name: true },
+      select: { name: true, providerId: true, consumerNumber: true, installationAddress: true },
     });
 
     switch (credType) {
@@ -1112,6 +1400,45 @@ router.post('/verify-credential', authMiddleware, async (req: Request, res: Resp
         where: { id: req.user!.id },
         data: userUpdate,
       });
+    }
+
+    // Auto-create Provider for Generation/Storage VCs
+    if ((credType === 'GenerationProfileCredential' || credType === 'StorageProfileCredential') && verificationResult.verified) {
+      if (!currentUser?.providerId) {
+        const providerId = `provider-${req.user!.id}`;
+
+        // Fetch latest user data for Provider creation
+        const latestUser = await prisma.user.findUnique({
+          where: { id: req.user!.id },
+          select: { name: true, consumerNumber: true, installationAddress: true },
+        });
+
+        await prisma.provider.create({
+          data: {
+            id: providerId,
+            name: latestUser?.name || 'Energy Provider',
+            // From Generation VC
+            generationType: claims.generationType || claims.sourceType || null,
+            capacityKW: claims.capacityKW || null,
+            generationMeterNumber: claims.meterNumber || null,
+            commissioningDate: claims.commissioningDate ? new Date(claims.commissioningDate) : null,
+            // From Storage VC
+            storageCapacityKWh: claims.storageCapacityKWh || null,
+            storagePowerRatingKW: claims.powerRatingKW || null,
+            storageType: claims.storageType || null,
+            // From Utility VC (via User)
+            consumerNumber: latestUser?.consumerNumber || null,
+            installationAddress: latestUser?.installationAddress || null,
+          },
+        });
+
+        await prisma.user.update({
+          where: { id: req.user!.id },
+          data: { providerId },
+        });
+
+        logger.info(`Auto-created Provider ${providerId} for user ${req.user!.id} from ${credType}`);
+      }
     }
 
     // Fetch updated user + all credentials

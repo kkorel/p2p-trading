@@ -95,6 +95,48 @@ const router = Router();
 const logger = createLogger('BPP');
 
 /**
+ * Middleware: Require Generation or Storage VC to access seller operations
+ */
+async function requireSellerVC(req: Request, res: Response, next: () => void): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+      return;
+    }
+
+    const sellerVC = await prisma.userCredential.findFirst({
+      where: {
+        userId,
+        credentialType: { in: ['GENERATION_PROFILE', 'STORAGE_PROFILE'] },
+        verified: true,
+      },
+    });
+
+    if (!sellerVC) {
+      res.status(403).json({
+        success: false,
+        error: 'Seller credential required',
+        requiresVC: ['GENERATION_PROFILE', 'STORAGE_PROFILE'],
+        message: 'Upload a Generation Profile or Storage Profile VC to sell energy',
+      });
+      return;
+    }
+
+    next();
+  } catch (error: any) {
+    logger.error(`requireSellerVC middleware error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify seller credentials',
+    });
+  }
+}
+
+/**
  * Helper: Look up provider's user utility info for CDS publishing
  */
 async function getProviderUtilityInfo(providerId: string): Promise<{ utilityId: string; utilityCustomerId: string }> {
@@ -1777,7 +1819,7 @@ router.get('/seller/providers/:id', async (req: Request, res: Response) => {
  * POST /seller/items - Add a new catalog item (energy listing)
  * Uses authenticated user's provider
  */
-router.post('/seller/items', authMiddleware, async (req: Request, res: Response) => {
+router.post('/seller/items', authMiddleware, requireSellerVC, async (req: Request, res: Response) => {
   const {
     source_type,
     delivery_mode,
@@ -1860,7 +1902,7 @@ router.put('/seller/items/:id/quantity', async (req: Request, res: Response) => 
  * POST /seller/offers - Add a new offer for an item
  * Uses authenticated user's provider
  */
-router.post('/seller/offers', authMiddleware, async (req: Request, res: Response) => {
+router.post('/seller/offers', authMiddleware, requireSellerVC, async (req: Request, res: Response) => {
   const {
     item_id,
     price_per_kwh,
@@ -1969,7 +2011,7 @@ router.post('/seller/offers', authMiddleware, async (req: Request, res: Response
  * POST /seller/offers/direct - Create an offer directly (auto-creates item)
  * Simplified flow for prosumers - no need to create a listing first
  */
-router.post('/seller/offers/direct', authMiddleware, async (req: Request, res: Response) => {
+router.post('/seller/offers/direct', authMiddleware, requireSellerVC, async (req: Request, res: Response) => {
   const {
     source_type,
     price_per_kwh,
@@ -2173,7 +2215,7 @@ router.get('/seller/offers', async (req: Request, res: Response) => {
  * DELETE /seller/offers/:id - Delete an offer
  * Only allows deleting own offers
  */
-router.delete('/seller/offers/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/seller/offers/:id', authMiddleware, requireSellerVC, async (req: Request, res: Response) => {
   const provider_id = req.user!.providerId;
 
   if (!provider_id) {

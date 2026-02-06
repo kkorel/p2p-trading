@@ -1809,8 +1809,25 @@ router.post('/api/init', async (req: Request, res: Response) => {
  * POST /api/confirm - Confirm order
  * Supports both single order and bulk orders (confirms all orders in bulk group)
  */
-router.post('/api/confirm', async (req: Request, res: Response) => {
+router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) => {
   const { transaction_id, order_id } = req.body as { transaction_id: string; order_id?: string };
+
+  // Check for Consumption VC before allowing purchase
+  const consumptionVC = await prisma.userCredential.findFirst({
+    where: {
+      userId: req.user!.id,
+      credentialType: 'CONSUMPTION_PROFILE',
+      verified: true,
+    },
+  });
+
+  if (!consumptionVC) {
+    return res.status(403).json({
+      error: 'Consumption credential required',
+      requiresVC: 'CONSUMPTION_PROFILE',
+      message: 'Upload a Consumption Profile VC to purchase energy',
+    });
+  }
 
   const txState = await getTransaction(transaction_id);
 

@@ -9,7 +9,22 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi, type User } from '@/lib/api';
+import { authApi, type User, type VerifyOtpResponse } from '@/lib/api';
+
+// Custom error for when VCs are required for signup
+export class VCRequiredError extends Error {
+  requiresVC: string[];
+  userId: string;
+  isNewUser: boolean;
+
+  constructor(response: { requiresVC: string[]; userId: string; isNewUser: boolean; message: string }) {
+    super(response.message);
+    this.name = 'VCRequiredError';
+    this.requiresVC = response.requiresVC;
+    this.userId = response.userId;
+    this.isNewUser = response.isNewUser;
+  }
+}
 
 interface AuthContextType {
   user: User | null;
@@ -73,6 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (phone: string, otp: string, name?: string) => {
     const result = await authApi.verifyOtp(phone, otp, name);
+
+    // Check if VCs are required
+    if (!result.success) {
+      throw new VCRequiredError(result);
+    }
+
     localStorage.setItem('authToken', result.token);
     setUser(result.user);
   };

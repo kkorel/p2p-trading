@@ -156,6 +156,21 @@ model Provider {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
+  // From GenerationProfileCredential
+  generationType        String?   @map("generation_type")         // Solar, Wind, MicroHydro, Other
+  capacityKW            Float?    @map("capacity_kw")             // Installed generation capacity
+  generationMeterNumber String?   @map("generation_meter_number") // Meter for generation asset
+  commissioningDate     DateTime? @map("commissioning_date")      // When system was activated
+
+  // From StorageProfileCredential
+  storageCapacityKWh    Float?    @map("storage_capacity_kwh")
+  storagePowerRatingKW  Float?    @map("storage_power_rating_kw")
+  storageType           String?   @map("storage_type")            // LithiumIon, LeadAcid, FlowBattery, Other
+
+  // From UtilityCustomerCredential (via linked User)
+  consumerNumber        String?   @map("consumer_number")
+  installationAddress   String?   @map("installation_address")
+
   // Link to user (prosumer who created this provider profile)
   user User?
 

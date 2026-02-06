@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
+import { useAuth, VCRequiredError } from '@/contexts/auth-context';
 import { authApi } from '@/lib/api';
 import { Zap, Sun, Leaf, TrendingUp, Loader2, ArrowLeft } from 'lucide-react';
 import { PhoneInput } from '@/components/ui/phone-input';
@@ -26,6 +27,7 @@ const features = [
 
 export function LoginScreen() {
   const { login } = useAuth();
+  const router = useRouter();
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -120,6 +122,18 @@ export function LoginScreen() {
       const phoneToUse = (fullPhone || phone).trim();
       await login(phoneToUse, otp.trim(), nameToUse);
     } catch (err: any) {
+      // Check if VCs are required for signup
+      if (err instanceof VCRequiredError) {
+        // Store pending auth data for onboarding flow
+        sessionStorage.setItem('pendingUserId', err.userId);
+        sessionStorage.setItem('pendingPhone', (fullPhone || phone).trim());
+        sessionStorage.setItem('pendingOtp', otp.trim());
+        sessionStorage.setItem('pendingName', name.trim());
+        sessionStorage.setItem('requiredVCs', JSON.stringify(err.requiresVC));
+        // Redirect to credentials onboarding page
+        router.push('/onboarding/credentials');
+        return;
+      }
       setError(err.message || 'Verification failed');
       setIsLoading(false);
     }
