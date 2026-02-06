@@ -38,8 +38,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { user } = await authApi.getMe();
       setUser(user);
-    } catch (error) {
-      localStorage.removeItem('authToken');
+    } catch (error: any) {
+      // Only remove token on 401 (unauthorized), not on network/server errors
+      // This prevents logout on temporary server issues (502, 503, network errors)
+      if (error?.status === 401) {
+        localStorage.removeItem('authToken');
+      } else {
+        console.warn('Auth check failed (server issue, keeping token):', error?.message);
+      }
     } finally {
       setIsLoading(false);
     }

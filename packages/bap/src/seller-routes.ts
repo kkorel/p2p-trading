@@ -48,6 +48,8 @@ import {
   parseWireStatusMessage,
   buildWireResponseOrder,
   buildWireOrder,
+  getBppKeyPair,
+  isSigningEnabled,
 } from '@p2p/shared';
 import {
   getOfferById,
@@ -2559,6 +2561,8 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
  */
 router.get('/seller/cds-status', async (req: Request, res: Response) => {
   const enabled = isExternalCDSEnabled();
+  const signingOn = isSigningEnabled();
+  const bppKeys = getBppKeyPair();
 
   res.json({
     cds: {
@@ -2570,9 +2574,24 @@ router.get('/seller/cds-status', async (req: Request, res: Response) => {
         EXTERNAL_CDS_URL: process.env.EXTERNAL_CDS_URL || 'NOT SET (using default)',
       },
     },
-    message: enabled
-      ? 'CDS publishing is ENABLED - offers will be published to external CDS'
-      : 'CDS publishing is DISABLED - set USE_EXTERNAL_CDS=true to enable',
+    signing: {
+      enabled: signingOn,
+      bppKeysConfigured: !!bppKeys,
+      bppKeyId: bppKeys?.keyId || 'NOT CONFIGURED',
+      envCheck: {
+        BECKN_SIGNING_ENABLED: process.env.BECKN_SIGNING_ENABLED || 'NOT SET',
+        BPP_KEY_ID: process.env.BPP_KEY_ID ? 'SET' : 'NOT SET',
+        BPP_PUBLIC_KEY: process.env.BPP_PUBLIC_KEY ? 'SET' : 'NOT SET',
+        BPP_PRIVATE_KEY: process.env.BPP_PRIVATE_KEY ? 'SET' : 'NOT SET',
+      },
+    },
+    message: enabled && signingOn && bppKeys
+      ? 'CDS publishing is ENABLED with BPP signing - offers will be published to external CDS'
+      : !enabled
+        ? 'CDS publishing is DISABLED - set USE_EXTERNAL_CDS=true to enable'
+        : !signingOn
+          ? 'CDS publishing enabled but SIGNING is OFF - set BECKN_SIGNING_ENABLED=true'
+          : 'CDS publishing enabled but BPP keys missing - set BPP_KEY_ID, BPP_PUBLIC_KEY, BPP_PRIVATE_KEY',
   });
 });
 
