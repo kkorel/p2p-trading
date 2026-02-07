@@ -328,10 +328,13 @@ export function useChatEngine() {
 
       // Update response language and persist to localStorage
       if (res.responseLanguage) {
+        console.log(`[sendMessageToAgent] Updating responseLanguage: ${res.responseLanguage}`);
         setResponseLanguage(res.responseLanguage);
         if (typeof window !== 'undefined') {
           localStorage.setItem('oorja_language', res.responseLanguage);
         }
+      } else {
+        console.log(`[sendMessageToAgent] No responseLanguage in response`);
       }
 
       // Sync voice preference from server
