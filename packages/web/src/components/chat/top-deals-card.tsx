@@ -41,7 +41,12 @@ const ENERGY_EMOJI: Record<string, string> = {
 
 export function TopDealsCard({ data, language, onQuickBuy, onCustomAmount }: TopDealsCardProps) {
   const isHindi = language === 'hi-IN';
-  const maxSavings = Math.max(...data.deals.map(d => d.savingsPercent));
+  const maxSavings = data.deals.length > 0 ? Math.max(...data.deals.map(d => d.savingsPercent)) : 0;
+
+  // Don't render if no deals
+  if (data.deals.length === 0) {
+    return null;
+  }
 
   return (
     <div className="bg-gradient-to-br from-teal-50 to-white rounded-2xl border border-teal-200 shadow-sm overflow-hidden my-2">

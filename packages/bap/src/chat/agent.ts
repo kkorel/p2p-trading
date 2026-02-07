@@ -1128,8 +1128,27 @@ async function createListingFromPending(ctx: SessionContext, pending: PendingLis
  * Returns an AgentResponse if something is missing, or null if all details are present.
  */
 async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurchase): Promise<AgentResponse | null> {
-  // Show top deals first (if not already shown and user hasn't specified quantity yet)
-  if (!pending.topDealsShown && pending.quantity == null) {
+  // Ask for quantity FIRST (before showing deals)
+  if (pending.quantity == null) {
+    return {
+      messages: [{
+        text: h(ctx,
+          '📝 *How much energy do you need?*\n\nTell me how many units you want to buy.\n\n💡 Tip: 50 units = enough for 5 homes for 1 day',
+          '📝 *कितनी बिजली चाहिए?*\n\nबताओ कितनी यूनिट खरीदनी है।\n\n💡 टिप: 50 यूनिट = 5 घरों के लिए 1 दिन की बिजली'
+        ),
+        buttons: [
+          { text: h(ctx, '🔋 10 units', '🔋 10 यूनिट'), callbackData: 'purchase_qty:10' },
+          { text: h(ctx, '🔋 25 units', '🔋 25 यूनिट'), callbackData: 'purchase_qty:25' },
+          { text: h(ctx, '🔋 50 units', '🔋 50 यूनिट'), callbackData: 'purchase_qty:50' },
+          { text: h(ctx, '🔋 100 units', '🔋 100 यूनिट'), callbackData: 'purchase_qty:100' },
+        ],
+      }],
+      contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'quantity' } },
+    };
+  }
+
+  // Show top deals AFTER quantity is known (if not already shown)
+  if (!pending.topDealsShown) {
     const { deals, message } = await getTopDeals(3, ctx.language);
 
     // Build buttons for top deals (fallback for WhatsApp/Telegram)
@@ -1163,23 +1182,6 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
         buttons, // Fallback for WhatsApp/Telegram
       }],
       contextUpdate: { pendingPurchase: { ...pending, topDealsShown: true, awaitingField: 'top_deals' } },
-    };
-  }
-
-  if (pending.quantity == null) {
-    return {
-      messages: [{
-        text: h(ctx,
-          '📝 *Custom Purchase*\n\nHow many units of energy do you want to buy?\n\n💡 Tip: 50 units = enough for 5 homes for 1 day',
-          '📝 *अपनी मात्रा*\n\nकितनी यूनिट बिजली खरीदनी है?\n\n💡 टिप: 50 यूनिट = 5 घरों के लिए 1 दिन की बिजली'
-        ),
-        buttons: [
-          { text: '🔋 10 units', callbackData: 'purchase_qty:10' },
-          { text: '🔋 25 units', callbackData: 'purchase_qty:25' },
-          { text: '🔋 50 units', callbackData: 'purchase_qty:50' },
-        ],
-      }],
-      contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'quantity' } },
     };
   }
 
