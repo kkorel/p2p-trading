@@ -976,11 +976,12 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
           }],
           contextUpdate: { pendingListing: undefined },
         };
-      } else if (message === 'listing_mode:detailed' || lower.includes('detail') || lower.includes('vistar') || numInput === 2) {
+      } else if (message === 'listing_mode:detailed' || lower.includes('detail') || lower.includes('vistar') || lower.includes('one') || lower.includes('once') || numInput === 2) {
+        // One-time listing - set awaitingField to 'energy_type' to skip the initial menu and proceed
         const updated: PendingListing = {
           ...pending,
           quickSellMode: false,
-          awaitingField: undefined as any,
+          awaitingField: 'energy_type',
         };
         const next = askNextListingDetail(ctx, updated);
         return next || { messages: [], contextUpdate: { pendingListing: updated } };
@@ -1545,12 +1546,43 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         const next = await askNextPurchaseDetail(ctx, updated);
         return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
       }
-      // Handle "Buy Automatically" selection - return null to let it flow to setup_auto_buy intent
+      // Handle "Buy Automatically" selection - start auto-buy setup flow
       if (message === 'action:setup_auto_buy' || lower.includes('auto') || lower.includes('automatic') || numInput === 1) {
-        // Clear pending purchase and return null to let GENERAL_CHAT handler process setup_auto_buy
+        // Start step-by-step auto-buy flow with buttons based on sanctioned load
+        const userData = await prisma.user.findUnique({
+          where: { id: ctx.userId! },
+          select: { sanctionedLoadKW: true },
+        });
+
+        // Calculate suggested quantities based on sanctioned load
+        const sanctionedKW = userData?.sanctionedLoadKW || 5; // Default 5 kW
+        const dailyUsageEstimate = Math.round(sanctionedKW * 4); // ~4 hours peak usage estimate
+        const suggestedQuantities = [
+          Math.round(dailyUsageEstimate * 0.5), // Half usage
+          dailyUsageEstimate,                    // Full estimate
+          Math.round(dailyUsageEstimate * 1.5), // 1.5x
+          Math.round(dailyUsageEstimate * 2),   // Double
+        ].filter(q => q > 0);
+
+        const quantities = suggestedQuantities.length >= 3
+          ? suggestedQuantities.slice(0, 4)
+          : [10, 20, 30, 50];
+
         return {
-          messages: [],
-          contextUpdate: { pendingPurchase: undefined, _helpShortcut: 'action:setup_auto_buy' },
+          messages: [{
+            text: h(ctx,
+              `🤖 *Set Up Auto-Buy*\n\nI'll buy energy for you at the best prices!\n\nBased on your ${sanctionedKW} kW connection, how many units do you need daily?`,
+              `🤖 *ऑटो-बाय सेटअप*\n\nमैं आपके लिए सबसे सस्ते दाम पर बिजली खरीदूंगा!\n\nआपके ${sanctionedKW} kW कनेक्शन के हिसाब से, रोज़ कितनी यूनिट चाहिए?`
+            ),
+            buttons: quantities.map(q => ({
+              text: `${q} units`,
+              callbackData: `autobuy_qty:${q}`,
+            })),
+          }],
+          contextUpdate: {
+            pendingPurchase: undefined,
+            pendingAutoBuy: { awaitingField: 'quantity', suggestedQuantities: quantities },
+          },
         };
       }
       // Invalid selection - re-prompt
