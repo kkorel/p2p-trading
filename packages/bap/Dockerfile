@@ -77,4 +77,4 @@ EXPOSE 4000
 ENV NODE_ENV=production
 ENV PORT=4000
 
-CMD ["sh", "-c", "npx prisma db push --schema=./packages/shared/prisma/schema.prisma --skip-generate && node packages/bap/dist/bap/src/index.js"]
+CMD ["sh", "-c", "npx prisma db push --schema=./packages/shared/prisma/schema.prisma --skip-generate --accept-data-loss && node packages/bap/dist/bap/src/index.js"]
