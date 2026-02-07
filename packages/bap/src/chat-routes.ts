@@ -171,6 +171,8 @@ router.post('/send', async (req: Request, res: Response) => {
       matchedOffers: m.matchedOffers || undefined,
       orderConfirmation: m.orderConfirmation || undefined,
       earnings: m.earnings || undefined,
+      slider: m.slider || undefined,
+      autoTradeStatus: m.autoTradeStatus || undefined,
     }));
 
     res.json({
@@ -228,6 +230,8 @@ router.post('/upload', async (req: Request, res: Response) => {
       matchedOffers: m.matchedOffers || undefined,
       orderConfirmation: m.orderConfirmation || undefined,
       earnings: m.earnings || undefined,
+      slider: m.slider || undefined,
+      autoTradeStatus: m.autoTradeStatus || undefined,
     }));
 
     res.json({
@@ -338,6 +342,8 @@ router.post('/voice', async (req: Request, res: Response) => {
       matchedOffers: m.matchedOffers || undefined,
       orderConfirmation: m.orderConfirmation || undefined,
       earnings: m.earnings || undefined,
+      slider: m.slider || undefined,
+      autoTradeStatus: m.autoTradeStatus || undefined,
     }));
 
     res.json({
@@ -497,6 +503,8 @@ router.get('/history', async (req: Request, res: Response) => {
         matchedOffers: meta?.matchedOffers || undefined,
         orderConfirmation: meta?.orderConfirmation || undefined,
         earnings: meta?.earnings || undefined,
+        slider: meta?.slider || undefined,
+        autoTradeStatus: meta?.autoTradeStatus || undefined,
         createdAt: m.createdAt,
       };
     });
