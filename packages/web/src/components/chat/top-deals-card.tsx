@@ -116,7 +116,7 @@ export function TopDealsCard({ data, language, onQuickBuy, onCustomAmount }: Top
                 </div>
                 <button
                   onClick={() => onQuickBuy?.(deal.offerId, deal.quantity)}
-                  className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium rounded-md transition-colors"
                 >
                   {getLabel('quickBuy', isHindi)}
                 </button>
