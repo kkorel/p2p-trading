@@ -491,6 +491,12 @@ router.get('/history', async (req: Request, res: Response) => {
         content: m.content,
         buttons: meta?.buttons || undefined,
         dashboard: meta?.dashboard || undefined,
+        listings: meta?.listings || undefined,
+        offerCreated: meta?.offerCreated || undefined,
+        topDeals: meta?.topDeals || undefined,
+        matchedOffers: meta?.matchedOffers || undefined,
+        orderConfirmation: meta?.orderConfirmation || undefined,
+        earnings: meta?.earnings || undefined,
         createdAt: m.createdAt,
       };
     });
