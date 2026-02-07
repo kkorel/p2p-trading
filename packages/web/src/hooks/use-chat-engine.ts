@@ -138,6 +138,46 @@ export interface EarningsCardData {
   walletBalance: number;
 }
 
+/** Slider input configuration */
+export interface SliderData {
+  type: 'quantity' | 'price';
+  min: number;
+  max: number;
+  step: number;
+  defaultValue: number;
+  unit: string;
+  callbackPrefix: string;
+}
+
+/** Auto-trade status data */
+export interface AutoTradeStatusData {
+  seller?: {
+    enabled: boolean;
+    capacityKwh: number;
+    pricePerKwh: number;
+    energyType: string;
+    lastRun?: {
+      executedAt: string;
+      status: string;
+      listedQuantity: number;
+      weatherMultiplier: number;
+    };
+  };
+  buyer?: {
+    enabled: boolean;
+    targetQuantity: number;
+    maxPrice: number;
+    preferredTime: string | null;
+    lastRun?: {
+      executedAt: string;
+      status: string;
+      quantityBought: number;
+      pricePerUnit: number;
+      totalSpent: number;
+    };
+  };
+}
+
 export interface ChatMessageData {
   role: 'agent' | 'user';
   content: string;
@@ -150,6 +190,8 @@ export interface ChatMessageData {
   matchedOffers?: MatchedOffersCardData;
   orderConfirmation?: OrderConfirmationCardData;
   earnings?: EarningsCardData;
+  slider?: SliderData;
+  autoTradeStatus?: AutoTradeStatusData;
 }
 
 /** Get stored session - prioritize authenticated session, then anonymous. */

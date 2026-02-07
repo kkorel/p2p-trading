@@ -12,6 +12,8 @@ import { TopDealsCard } from './top-deals-card';
 import { MatchedOffersCard } from './matched-offers-card';
 import { OrderConfirmationCard } from './order-confirmation-card';
 import { EarningsCard } from './earnings-card';
+import { SliderInput } from '../ui/slider-input';
+import { AutoTradeStatusCard } from './auto-trade-status-card';
 
 export type { ChatMessageData };
 
@@ -185,6 +187,28 @@ export function MessageList({
               <EarningsCard
                 data={msg.earnings}
                 language={responseLanguage}
+              />
+            )}
+
+            {/* Auto-trade status card */}
+            {msg.role === 'agent' && msg.autoTradeStatus && (
+              <AutoTradeStatusCard
+                data={msg.autoTradeStatus}
+                language={responseLanguage}
+              />
+            )}
+
+            {/* Slider input for quantity/price selection */}
+            {msg.role === 'agent' && msg.slider && (
+              <SliderInput
+                type={msg.slider.type}
+                min={msg.slider.min}
+                max={msg.slider.max}
+                step={msg.slider.step}
+                defaultValue={msg.slider.defaultValue}
+                unit={msg.slider.unit}
+                callbackPrefix={msg.slider.callbackPrefix}
+                onSelect={(callbackData) => onButtonClick?.(callbackData, '')}
               />
             )}
 

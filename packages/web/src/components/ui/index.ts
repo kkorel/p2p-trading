@@ -8,3 +8,4 @@ export { EmptyState } from './empty-state';
 export { BottomSheet } from './bottom-sheet';
 export { ToastProvider, useToast, type ToastType } from './toast';
 export { ConfirmProvider, useConfirm } from './confirm-dialog';
+export { SliderInput, type SliderInputProps } from './slider-input';
