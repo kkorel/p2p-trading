@@ -4,10 +4,22 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build artifacts
-dist
-build
+# Build artifacts (keep dist for local, Docker builds fresh)
 *.tsbuildinfo
+
+# Large folders not needed for backend build
+beckn-onix
+settlement-phase4
+Postmans
+p2p-postman
+Gaurdrails
+out
+
+# Web package contents (not needed for bap build, but keep dir for dummy package.json)
+packages/web/src
+packages/web/public
+packages/web/.next
+packages/web/node_modules
 
 # Test files
 **/*.test.ts

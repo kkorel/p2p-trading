@@ -1,50 +1,78 @@
-FROM node:20-alpine
+# Stage 1: Dependencies (cached layer)
+FROM node:20-alpine AS deps
 
-# Install OpenSSL for Prisma
 RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# Copy root package files
+# Copy only package files first for better caching
 COPY package*.json ./
-COPY tsconfig.base.json ./
+COPY packages/shared/package*.json ./packages/shared/
+COPY packages/bap/package*.json ./packages/bap/
 
-# Copy only needed packages
-COPY packages/shared ./packages/shared
-COPY packages/bap ./packages/bap
-
-# Create dummy package.json for other workspaces to satisfy npm
+# Create dummy web workspace
 RUN mkdir -p packages/web
 RUN echo '{"name":"@p2p/web","version":"1.0.0","private":true}' > packages/web/package.json
 
-# Install dependencies
+# Install dependencies (this layer is cached if package*.json unchanged)
 RUN npm ci --ignore-scripts
 
-# Generate Prisma client for Linux
+# Stage 2: Build
+FROM deps AS builder
+
+WORKDIR /app
+
+# Copy tsconfig
+COPY tsconfig.base.json ./
+
+# Copy source files
+COPY packages/shared ./packages/shared
+COPY packages/bap ./packages/bap
+
+# Generate Prisma client
 RUN npx prisma generate --schema=./packages/shared/prisma/schema.prisma
 
-# Build shared first, then bap
-RUN echo "=== Building shared package ===" && npm run build --workspace=@p2p/shared || (echo "Shared build failed!" && exit 1)
-RUN echo "=== Building bap package ===" && npm run build --workspace=@p2p/bap || (echo "BAP build failed!" && exit 1)
+# Build shared then bap
+RUN npm run build --workspace=@p2p/shared
+RUN npm run build --workspace=@p2p/bap
 
-# Fix: Update shared package.json to point to compiled JS for production
+# Fix shared package.json for production
 RUN cd packages/shared && \
     sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' package.json && \
     sed -i 's|"types": "src/index.ts"|"types": "dist/index.d.ts"|' package.json
 
-# Copy Prisma generated client to dist (compiled code expects it at ../generated relative to dist/db)
+# Copy Prisma generated client to dist
 RUN cp -r packages/shared/src/generated packages/shared/dist/generated
 
-# Verify build output exists
-RUN echo "=== Checking build output ===" && ls -la packages/bap/ && ls -la packages/bap/dist/ && echo "Build successful: dist folder exists"
+# Stage 3: Production (slim final image)
+FROM node:20-alpine AS runner
 
-# Expose port
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+# Copy only what's needed for production
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/bap/package.json ./packages/bap/
+
+# Create dummy web workspace
+RUN mkdir -p packages/web
+RUN echo '{"name":"@p2p/web","version":"1.0.0","private":true}' > packages/web/package.json
+
+# Install production dependencies only
+RUN npm ci --omit=dev --ignore-scripts
+
+# Copy built artifacts
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/bap/dist ./packages/bap/dist
+COPY --from=builder /app/packages/shared/prisma ./packages/shared/prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
 EXPOSE 4000
 
-# Set environment
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Start script: push schema to database then start app
-# db push syncs schema to database (creates tables if they don't exist)
 CMD ["sh", "-c", "npx prisma db push --schema=./packages/shared/prisma/schema.prisma --skip-generate && node packages/bap/dist/bap/src/index.js"]
