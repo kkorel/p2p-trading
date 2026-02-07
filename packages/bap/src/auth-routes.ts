@@ -284,6 +284,21 @@ router.post('/complete-signup', async (req: Request, res: Response) => {
       });
     }
 
+    // Mark profile as complete since VCs are verified
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { profileComplete: true },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            trustScore: true,
+          },
+        },
+      },
+    });
+
     // Create session
     const session = await createSession({
       userId,
@@ -296,7 +311,7 @@ router.post('/complete-signup', async (req: Request, res: Response) => {
       logger.warn(`Background WhatsApp welcome failed: ${err.message}`);
     });
 
-    logger.info(`User ${userId} completed signup with VCs`);
+    logger.info(`User ${userId} completed signup with VCs, profileComplete=true`);
 
     res.json({
       success: true,
@@ -304,18 +319,18 @@ router.post('/complete-signup', async (req: Request, res: Response) => {
       token: session.token,
       expiresAt: session.expiresAt,
       user: {
-        id: user.id,
-        phone: user.phone,
-        name: user.name,
-        profileComplete: user.profileComplete,
-        balance: user.balance,
-        providerId: user.providerId,
-        provider: user.provider,
-        trustScore: user.trustScore,
-        allowedTradeLimit: user.allowedTradeLimit,
-        meterDataAnalyzed: user.meterDataAnalyzed,
-        productionCapacity: user.productionCapacity,
-        meterVerifiedCapacity: user.meterVerifiedCapacity,
+        id: updatedUser.id,
+        phone: updatedUser.phone,
+        name: updatedUser.name,
+        profileComplete: updatedUser.profileComplete,
+        balance: updatedUser.balance,
+        providerId: updatedUser.providerId,
+        provider: updatedUser.provider,
+        trustScore: updatedUser.trustScore,
+        allowedTradeLimit: updatedUser.allowedTradeLimit,
+        meterDataAnalyzed: updatedUser.meterDataAnalyzed,
+        productionCapacity: updatedUser.productionCapacity,
+        meterVerifiedCapacity: updatedUser.meterVerifiedCapacity,
       },
     });
   } catch (error: any) {
