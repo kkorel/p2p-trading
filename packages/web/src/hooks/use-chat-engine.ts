@@ -207,7 +207,13 @@ export function useChatEngine() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [responseLanguage, setResponseLanguage] = useState<string>('en-IN');
+  const [responseLanguage, setResponseLanguage] = useState<string>(() => {
+    // Load saved language preference from localStorage
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('oorja_language') || 'en-IN';
+    }
+    return 'en-IN';
+  });
   const [resetCounter, setResetCounter] = useState(0); // Triggers re-init after reset
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -251,6 +257,13 @@ export function useChatEngine() {
                 buttons: m.buttons,
               }))
             );
+            // Restore language from session
+            if (history.responseLanguage) {
+              setResponseLanguage(history.responseLanguage);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('oorja_language', history.responseLanguage);
+              }
+            }
             return; // History loaded, don't trigger greeting
           }
         }
@@ -535,9 +548,12 @@ export function useChatEngine() {
         ]);
       }
 
-      // Update response language
+      // Update response language and persist to localStorage
       if (result.responseLanguage) {
         setResponseLanguage(result.responseLanguage);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('oorja_language', result.responseLanguage);
+        }
       }
 
       // Sync voice preference from server

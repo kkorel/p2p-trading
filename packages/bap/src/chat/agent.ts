@@ -863,7 +863,7 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
               },
               buttons: [
                 { text: h(ctx, '📋 My Listings', '📋 मेरी लिस्टिंग'), callbackData: 'action:show_listings' },
-                { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
+                { text: h(ctx, '🔋 Buy Energy', '🔋 बिजली खरीदो'), callbackData: 'action:buy_energy' },
                 { text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), callbackData: 'action:show_earnings' },
               ],
             }],
@@ -1065,7 +1065,7 @@ async function createListingFromPending(ctx: SessionContext, pending: PendingLis
         },
         buttons: [
           { text: h(ctx, '📋 View My Listings', '📋 मेरी लिस्टिंग देखो'), callbackData: 'action:show_listings' },
-          { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
+          { text: h(ctx, '🔋 Buy Energy', '🔋 बिजली खरीदो'), callbackData: 'action:buy_energy' },
           { text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), callbackData: 'action:show_earnings' },
         ],
       }],
@@ -1078,7 +1078,7 @@ async function createListingFromPending(ctx: SessionContext, pending: PendingLis
       text: h(ctx, `Could not create the listing: ${result.error || 'Unknown error'}. Please try again.`, `लिस्टिंग नहीं बन पाई: ${result.error || 'अज्ञात समस्या'}। दोबारा कोशिश करो।`),
       buttons: [
         { text: h(ctx, '☀️ Try Again', '☀️ फिर से कोशिश करो'), callbackData: 'action:create_listing' },
-        { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
+        { text: h(ctx, '🔋 Buy Energy', '🔋 बिजली खरीदो'), callbackData: 'action:buy_energy' },
       ],
     }],
     contextUpdate: { pendingListing: undefined },
@@ -3476,7 +3476,7 @@ const states: Record<ChatState, StateHandler> = {
                   ),
                   buttons: [
                     { text: h(ctx, '📋 View My Listings', '📋 मेरी लिस्टिंग देखो'), callbackData: 'action:show_listings' },
-                    { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
+                    { text: h(ctx, '🔋 Buy Energy', '🔋 बिजली खरीदो'), callbackData: 'action:buy_energy' },
                     { text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), callbackData: 'action:show_earnings' },
                   ],
                 },

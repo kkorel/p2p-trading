@@ -349,6 +349,7 @@ export const chatApi = {
       success: boolean;
       messages: Array<{ role: 'agent' | 'user'; content: string; buttons?: Array<{ text: string; callbackData?: string }>; createdAt: string }>;
       state: string | null;
+      responseLanguage?: string;
     }>(`/chat/history${sessionId ? `?sessionId=${sessionId}` : ''}`),
 
   reset: (sessionId?: string) =>

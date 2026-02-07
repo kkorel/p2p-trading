@@ -462,11 +462,20 @@ router.get('/history', async (req: Request, res: Response) => {
 
     const session = await prisma.chatSession.findUnique({
       where: { platform_platformId: { platform: 'WEB', platformId } },
-      select: { id: true, state: true },
+      select: { id: true, state: true, contextJson: true },
     });
 
     if (!session) {
       return res.json({ success: true, messages: [], state: null });
+    }
+
+    // Extract language from session context
+    let responseLanguage: string | undefined;
+    if (session.contextJson) {
+      try {
+        const ctx = JSON.parse(session.contextJson);
+        responseLanguage = ctx.language;
+      } catch { /* ignore parse errors */ }
     }
 
     const messages = await prisma.chatMessage.findMany({
@@ -486,7 +495,7 @@ router.get('/history', async (req: Request, res: Response) => {
       };
     });
 
-    res.json({ success: true, messages: formatted, state: session.state });
+    res.json({ success: true, messages: formatted, state: session.state, responseLanguage });
   } catch (error: any) {
     logger.error(`Chat history error: ${error.message}`);
     res.status(500).json({ success: false, error: 'Failed to load history' });
