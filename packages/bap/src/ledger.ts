@@ -13,7 +13,7 @@
  */
 
 import axios from 'axios';
-import { config, createLogger, Order, prisma } from '@p2p/shared';
+import { config, createLogger, Order, prisma, secureAxiosBpp } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
@@ -199,8 +199,11 @@ export async function writeTradeToLedger(
         clientReference: `${transactionId}-${orderItemId}-${Date.now()}`,
       };
 
-      // Plain POST without signing (per Postman collection - ledger doesn't use Beckn signing)
-      const response = await axios.post<LedgerWriteResponse>(
+      // Log full request before sending
+      logger.info('[LEDGER-PUT] Full request:', JSON.stringify(request, null, 2));
+
+      // POST with BPP signing (ledger requires Beckn signature)
+      const response = await secureAxiosBpp.post<LedgerWriteResponse>(
         `${ledgerUrl}/ledger/put`,
         request,
         {
@@ -281,8 +284,11 @@ async function writeSingleRecord(
     clientReference: `${opts.transactionId}-${opts.orderItemId}-${Date.now()}`,
   };
 
-  // Plain POST without signing (per Postman collection - ledger doesn't use Beckn signing)
-  const response = await axios.post<LedgerWriteResponse>(
+  // Log full request before sending
+  logger.info('[LEDGER-PUT] Full request:', JSON.stringify(request, null, 2));
+
+  // POST with BPP signing (ledger requires Beckn signature)
+  const response = await secureAxiosBpp.post<LedgerWriteResponse>(
     `${ledgerUrl}/ledger/put`,
     request,
     {
