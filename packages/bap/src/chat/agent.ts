@@ -1734,10 +1734,10 @@ const DISCOM_CRED_LINKS: Record<string, string> = {
 };
 
 const CRED_FARMER_NAMES: Record<string, { en: string; hi: string }> = {
-  GenerationProfileCredential: { en: 'solar generation ID', hi: 'solar ka ID' },
-  ConsumptionProfileCredential: { en: 'electricity consumption ID', hi: 'bijli consumption ka ID' },
-  StorageProfileCredential: { en: 'battery storage ID', hi: 'battery ka ID' },
-  UtilityProgramEnrollmentCredential: { en: 'program enrollment ID', hi: 'program ka ID' },
+  GenerationProfileCredential: { en: 'solar generation ID', hi: 'सोलर जनरेशन आईडी' },
+  ConsumptionProfileCredential: { en: 'electricity consumption ID', hi: 'बिजली खपत आईडी' },
+  StorageProfileCredential: { en: 'battery storage ID', hi: 'बैटरी स्टोरेज आईडी' },
+  UtilityProgramEnrollmentCredential: { en: 'program enrollment ID', hi: 'प्रोग्राम एनरोलमेंट आईडी' },
 };
 
 // --- Onboarding state set (for status/suggestion checks) ---
@@ -2911,7 +2911,7 @@ const states: Record<ChatState, StateHandler> = {
         });
 
         return {
-          messages: [{ text: h(ctx, `Verified! ${result.summary}`, `Verify ho gaya! ${result.summary}`) }],
+          messages: [{ text: h(ctx, `Verified! ${result.summary}`, `वेरिफाई हो गया! ${result.summary}`) }],
           newState: 'ASK_INTENT',
           contextUpdate: {
             verifiedCreds: [...(ctx.verifiedCreds || []), 'UTILITY_CUSTOMER'],
@@ -2920,7 +2920,7 @@ const states: Record<ChatState, StateHandler> = {
       } catch (error: any) {
         logger.error(`Utility cred verification failed: ${error.message}`);
         return {
-          messages: [{ text: h(ctx, 'Something went wrong verifying this. Please try again.', 'Kuch gadbad ho gayi. Dobara try karo.') }],
+          messages: [{ text: h(ctx, 'Something went wrong verifying this. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
         };
       }
     },
@@ -2930,17 +2930,17 @@ const states: Record<ChatState, StateHandler> = {
     async onEnter(ctx) {
       const progress = getProgressIndicator('ASK_INTENT', ctx);
       const intentButtons = [
-        { text: h(ctx, 'Sell solar energy', 'Solar se bijli bechna'), callbackData: 'intent:solar' },
-        { text: h(ctx, 'Battery storage', 'Battery mein store karna'), callbackData: 'intent:battery' },
-        { text: h(ctx, 'Buy energy', 'Bijli khareedna'), callbackData: 'intent:buy' },
-        { text: h(ctx, 'Just browse', 'Bas dekhna hai'), callbackData: 'intent:skip' },
+        { text: h(ctx, 'Sell solar energy', '☀️ सोलर से बिजली बेचना'), callbackData: 'intent:solar' },
+        { text: h(ctx, 'Battery storage', '🔋 बैटरी में स्टोर करना'), callbackData: 'intent:battery' },
+        { text: h(ctx, 'Buy energy', '⚡ बिजली खरीदना'), callbackData: 'intent:buy' },
+        { text: h(ctx, 'Just browse', '👀 बस देखना है'), callbackData: 'intent:skip' },
       ];
       return {
         messages: [
           {
             text: progress + h(ctx,
               'What would you like to do?',
-              'Ab batao, aapko kya karna hai?'
+              'अब बताओ, आपको क्या करना है?'
             ),
             buttons: intentButtons,
           },
@@ -3031,13 +3031,13 @@ const states: Record<ChatState, StateHandler> = {
           {
             text: h(ctx,
               'Please choose what you\'d like to do:',
-              'Choose karo, aapko kya karna hai:'
+              'चुनो, आपको क्या करना है:'
             ),
             buttons: [
-              { text: h(ctx, '☀️ Sell solar energy', '☀️ Solar se bijli bechna'), callbackData: 'intent:solar' },
-              { text: h(ctx, '🔋 Battery storage', '🔋 Battery mein store karna'), callbackData: 'intent:battery' },
-              { text: h(ctx, '⚡ Buy energy', '⚡ Bijli khareedna'), callbackData: 'intent:buy' },
-              { text: h(ctx, '👀 Just browse', '👀 Bas dekhna hai'), callbackData: 'intent:skip' },
+              { text: h(ctx, '☀️ Sell solar energy', '☀️ सोलर से बिजली बेचना'), callbackData: 'intent:solar' },
+              { text: h(ctx, '🔋 Battery storage', '🔋 बैटरी में स्टोर करना'), callbackData: 'intent:battery' },
+              { text: h(ctx, '⚡ Buy energy', '⚡ बिजली खरीदना'), callbackData: 'intent:buy' },
+              { text: h(ctx, '👀 Just browse', '👀 बस देखना है'), callbackData: 'intent:skip' },
             ],
           },
         ],
@@ -3095,7 +3095,7 @@ const states: Record<ChatState, StateHandler> = {
           {
             text: h(ctx,
               `Your electricity company would have given you a ${farmerName.en} online. You can get it here:\n${credLink}\n\nUpload it here (PDF or JSON).`,
-              `Aapki bijli company ne aapko ${farmerName.hi} diya hoga online. Is link par mil jaayega:\n${credLink}\n\nUpload karo (PDF ya JSON).`
+              `आपकी बिजली कंपनी ने आपको ${farmerName.hi} ऑनलाइन दिया होगा। इस लिंक पर मिल जाएगा:\n${credLink}\n\nअपलोड करो (पीडीएफ या जेएसओएन)।`
             ),
           },
         ],
@@ -3108,7 +3108,7 @@ const states: Record<ChatState, StateHandler> = {
           return {
             messages: [
               { text: kbAnswer },
-              { text: h(ctx, 'Upload the ID when ready.', 'Jab ready ho tab ID upload karo.'), delay: 300 },
+              { text: h(ctx, 'Upload the ID when ready.', 'जब तैयार हो तब आईडी अपलोड करो।'), delay: 300 },
             ],
           };
         }
@@ -3121,15 +3121,15 @@ const states: Record<ChatState, StateHandler> = {
           };
         }
 
-        const farmerName = CRED_FARMER_NAMES[ctx.expectedCredType || ''] || { en: 'ID', hi: 'ID' };
+        const farmerName = CRED_FARMER_NAMES[ctx.expectedCredType || ''] || { en: 'ID', hi: 'आईडी' };
         return {
           messages: [
             {
               text: h(ctx,
                 `Please upload your ${farmerName.en} (PDF or JSON).`,
-                `Apna ${farmerName.hi} upload karo (PDF ya JSON).`
+                `अपना ${farmerName.hi} अपलोड करो (पीडीएफ या जेएसओएन)।`
               ),
-              buttons: [{ text: h(ctx, '⏭️ Skip this', '⏭️ Ye skip karo'), callbackData: 'skip' }],
+              buttons: [{ text: h(ctx, '⏭️ Skip this', '⏭️ ये स्किप करो'), callbackData: 'skip' }],
             },
           ],
         };
@@ -3148,7 +3148,7 @@ const states: Record<ChatState, StateHandler> = {
         const updatedCreds = [...new Set([...(ctx.verifiedCreds || []), dbType])];
 
         return {
-          messages: [{ text: h(ctx, `Verified! ${result.summary}`, `Verify ho gaya! ${result.summary}`) }],
+          messages: [{ text: h(ctx, `Verified! ${result.summary}`, `वेरिफाई हो गया! ${result.summary}`) }],
           newState: 'CONFIRM_TRADING',
           contextUpdate: {
             verifiedCreds: updatedCreds,

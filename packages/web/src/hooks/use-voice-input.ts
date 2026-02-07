@@ -75,6 +75,8 @@ export interface VoiceResult {
   authToken?: string;
   responseLanguage?: string;
   voiceOutputEnabled?: boolean;
+  /** Auto-play TTS when input was voice */
+  autoVoice?: boolean;
 }
 
 /**
@@ -475,6 +477,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
               authToken: data.authToken,
               responseLanguage: data.responseLanguage,
               voiceOutputEnabled: data.voiceOutputEnabled,
+              autoVoice: data.autoVoice, // Auto-play TTS when input was voice
             });
           } else {
             // Fallback to onTranscript for backwards compatibility

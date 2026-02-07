@@ -374,18 +374,23 @@ export async function extractOtpWithLLM(userMessage: string, questionContext?: s
 
 Rules:
 - Return ONLY the 4-6 digit OTP code, nothing else
+- IGNORE filler words like: यहां, यह है, है, code, my code is, here, etc.
+- IGNORE punctuation like commas, periods, question marks
 - Convert Hindi number words to digits:
   शून्य/सुन्ना=0, एक=1, दो=2, तीन=3, चार=4, पाँच/पांच=5, छः/छह=6, सात=7, आठ=8, नौ=9
 - Convert English number words to digits: zero=0, one=1, two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9
-- Handle spaces between digits: "1 2 3 4 5 6" → "123456"
+- Handle any separator (spaces, commas, dashes) between numbers
 - Handle mixed Hindi-English: "एक two तीन four पाँच six" → "123456"
 - If you cannot find a valid 4-6 digit code, return "UNCLEAR"
 
 Examples:
+- "यहां एक, दो, तीन, चार, पांच, छह।" → "123456"
 - "एक दो तीन चार पाँच छः" → "123456"
+- "एक, दो, तीन, चार, पांच, छह" → "123456"
 - "1 2 3 4 5 6" → "123456"
 - "one two three four five six" → "123456"
 - "मेरा कोड है 789012" → "789012"
+- "here is the code: एक दो तीन चार पाँच छः" → "123456"
 - "कोड नहीं मिला" → "UNCLEAR"
 - "hello" → "UNCLEAR"
 

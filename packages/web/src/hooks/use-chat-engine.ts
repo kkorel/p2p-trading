@@ -260,6 +260,19 @@ export function useChatEngine() {
     setResetCounter(c => c + 1);
   }, [responseLanguage]);
 
+  // Localized messages for file upload
+  const getUploadMessages = useCallback((lang: string) => {
+    const messages: Record<string, { invalidFile: string; uploaded: string; error: string }> = {
+      'en-IN': { invalidFile: 'Please upload a PDF or JSON file.', uploaded: 'Uploaded:', error: 'Failed to process the file. Please try again.' },
+      'hi-IN': { invalidFile: 'सिर्फ पीडीएफ या जेएसओएन फाइल अपलोड करो।', uploaded: 'अपलोड हो गया:', error: 'फाइल प्रोसेस नहीं हो पाई। दोबारा कोशिश करो।' },
+      'bn-IN': { invalidFile: 'শুধুমাত্র PDF বা JSON ফাইল আপলোড করুন।', uploaded: 'আপলোড হয়েছে:', error: 'ফাইল প্রক্রিয়া করা যায়নি। আবার চেষ্টা করুন।' },
+      'ta-IN': { invalidFile: 'PDF அல்லது JSON கோப்பை மட்டும் பதிவேற்றவும்।', uploaded: 'பதிவேற்றப்பட்டது:', error: 'கோப்பை செயலாக்க முடியவில்லை। மீண்டும் முயற்சிக்கவும்।' },
+      'te-IN': { invalidFile: 'PDF లేదా JSON ఫైల్ మాత్రమే అప్‌లోడ్ చేయండి।', uploaded: 'అప్‌లోడ్ అయింది:', error: 'ఫైల్ ప్రాసెస్ కాలేదు. మళ్ళీ ప్రయత్నించండి.' },
+      'kn-IN': { invalidFile: 'PDF ಅಥವಾ JSON ಫೈಲ್ ಮಾತ್ರ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ।', uploaded: 'ಅಪ್‌ಲೋಡ್ ಆಯಿತು:', error: 'ಫೈಲ್ ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲು ವಿಫಲವಾಯಿತು. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.' },
+    };
+    return messages[lang] || messages['en-IN'];
+  }, []);
+
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -267,18 +280,18 @@ export function useChatEngine() {
 
       const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
       const isJson = file.type === 'application/json' || file.name.endsWith('.json');
+      const msgs = getUploadMessages(responseLanguage);
+
       if (!isPdf && !isJson) {
-        const isHindi = responseLanguage === 'hi-IN';
         setMessages((prev) => [
           ...prev,
-          { role: 'agent', content: isHindi ? 'Sirf PDF ya JSON file upload karo.' : 'Please upload a PDF or JSON file.' },
+          { role: 'agent', content: msgs.invalidFile },
         ]);
         return;
       }
 
       setIsLoading(true);
-      const isHindi = responseLanguage === 'hi-IN';
-      setMessages((prev) => [...prev, { role: 'user', content: isHindi ? `Upload हो गया: ${file.name}` : `Uploaded: ${file.name}` }]);
+      setMessages((prev) => [...prev, { role: 'user', content: `${msgs.uploaded} ${file.name}` }]);
 
       try {
         const base64 = await fileToBase64(file);
@@ -312,17 +325,16 @@ export function useChatEngine() {
           ]);
         }
       } catch {
-        const isHindiErr = responseLanguage === 'hi-IN';
         setMessages((prev) => [
           ...prev,
-          { role: 'agent', content: isHindiErr ? 'File process nahi ho payi. Dobara try karo.' : 'Failed to process the file. Please try again.' },
+          { role: 'agent', content: msgs.error },
         ]);
       } finally {
         setIsLoading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    []
+    [responseLanguage, getUploadMessages]
   );
 
   // Handle voice result directly (avoids double processing)

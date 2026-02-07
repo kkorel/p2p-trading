@@ -71,7 +71,7 @@ export function MessageList({
           {/* Bubble */}
           <div className="max-w-[80%] flex flex-col gap-1.5">
             <div
-              className={`relative px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'agent'
+              className={`relative px-3.5 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap ${msg.role === 'agent'
                   ? 'bg-gray-100 text-gray-900 rounded-2xl rounded-bl-md'
                   : 'bg-teal-600 text-white rounded-2xl rounded-br-md'
                 }`}
