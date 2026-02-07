@@ -326,6 +326,14 @@ export function useChatEngine() {
         ]);
       }
 
+      // Update response language and persist to localStorage
+      if (res.responseLanguage) {
+        setResponseLanguage(res.responseLanguage);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('oorja_language', res.responseLanguage);
+        }
+      }
+
       // Sync voice preference from server
       if (res.voiceOutputEnabled !== undefined) {
         window.dispatchEvent(new CustomEvent('voice:preference', {

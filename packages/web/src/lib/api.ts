@@ -293,6 +293,7 @@ export const chatApi = {
       messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
       authToken?: string;
       voiceOutputEnabled?: boolean;
+      responseLanguage?: string;
     }>('/chat/send', {
       method: 'POST',
       body: JSON.stringify({ message, sessionId }),

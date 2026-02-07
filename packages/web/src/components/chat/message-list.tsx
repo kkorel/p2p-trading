@@ -184,8 +184,8 @@ export function MessageList({
               </div>
             )}
 
-            {/* Inline buttons */}
-            {msg.role === 'agent' && msg.buttons && msg.buttons.length > 0 && (
+            {/* Inline buttons - hide when premium UI cards are present (they have their own buttons) */}
+            {msg.role === 'agent' && msg.buttons && msg.buttons.length > 0 && !(msg.topDeals || msg.matchedOffers) && (
               <div className="flex flex-wrap gap-1.5 ml-1">
                 {msg.buttons.map((btn, j) => {
                   const isVoiceBtn = isVoicePrefButton(btn.callbackData);
