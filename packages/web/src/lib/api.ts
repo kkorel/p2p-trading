@@ -124,6 +124,17 @@ export const authApi = {
       body: JSON.stringify({ userId, pdfBase64, credential }),
     }),
 
+  // Complete signup after VCs uploaded (no OTP needed)
+  completeSignup: (userId: string) =>
+    request<{
+      success: boolean;
+      token: string;
+      user: User;
+    }>('/auth/complete-signup', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
   getMe: () =>
     request<{ user: User }>('/auth/me'),
 

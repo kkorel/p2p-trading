@@ -11,7 +11,9 @@
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
       "Bash(git push:*)",
-      "Bash(railway variables:*)"
+      "Bash(railway variables:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npx prisma migrate dev:*)"
     ]
   }
 }

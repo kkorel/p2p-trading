@@ -225,6 +225,109 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /auth/complete-signup
+ * Complete signup after VCs have been uploaded (no OTP needed)
+ * Called after user uploads required VCs during onboarding
+ */
+router.post('/complete-signup', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId is required',
+      });
+    }
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            trustScore: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found. Please restart signup.',
+      });
+    }
+
+    // Check for required VCs
+    const userVCs = await prisma.userCredential.findMany({
+      where: { userId, verified: true }
+    });
+
+    const hasUtilityVC = userVCs.some(vc => vc.credentialType === 'UTILITY_CUSTOMER');
+    const hasRoleVC = userVCs.some(vc =>
+      ['GENERATION_PROFILE', 'STORAGE_PROFILE', 'CONSUMPTION_PROFILE'].includes(vc.credentialType)
+    );
+
+    if (!hasUtilityVC || !hasRoleVC) {
+      const missingVCs: string[] = [];
+      if (!hasUtilityVC) missingVCs.push('UTILITY_CUSTOMER');
+      if (!hasRoleVC) missingVCs.push('GENERATION_PROFILE or STORAGE_PROFILE or CONSUMPTION_PROFILE');
+
+      return res.status(403).json({
+        success: false,
+        error: 'Required credentials still missing',
+        requiresVC: missingVCs,
+        userId,
+      });
+    }
+
+    // Create session
+    const session = await createSession({
+      userId,
+      deviceInfo: req.headers['user-agent'],
+      ipAddress: req.ip || req.socket.remoteAddress,
+    });
+
+    // Send proactive WhatsApp welcome (fire-and-forget)
+    sendFirstLoginWelcome(userId).catch(err => {
+      logger.warn(`Background WhatsApp welcome failed: ${err.message}`);
+    });
+
+    logger.info(`User ${userId} completed signup with VCs`);
+
+    res.json({
+      success: true,
+      message: 'Signup completed successfully',
+      token: session.token,
+      expiresAt: session.expiresAt,
+      user: {
+        id: user.id,
+        phone: user.phone,
+        name: user.name,
+        profileComplete: user.profileComplete,
+        balance: user.balance,
+        providerId: user.providerId,
+        provider: user.provider,
+        trustScore: user.trustScore,
+        allowedTradeLimit: user.allowedTradeLimit,
+        meterDataAnalyzed: user.meterDataAnalyzed,
+        productionCapacity: user.productionCapacity,
+        meterVerifiedCapacity: user.meterVerifiedCapacity,
+      },
+    });
+  } catch (error: any) {
+    logger.error(`Complete signup error: ${error}`);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to complete signup.',
+    });
+  }
+});
+
+/**
  * POST /auth/verify-credential-preauth
  * Upload VC before having a session (during signup flow when 2 VCs are required)
  * Uses userId from verify-otp 403 response instead of auth token

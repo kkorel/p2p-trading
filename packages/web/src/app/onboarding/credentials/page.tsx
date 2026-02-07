@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context';
 import { authApi } from '@/lib/api';
 import {
   Zap,
@@ -33,13 +32,9 @@ interface UploadedVC {
 
 export default function CredentialsOnboarding() {
   const router = useRouter();
-  const { login } = useAuth();
 
   // Pending auth state from login flow
   const [userId, setUserId] = useState<string | null>(null);
-  const [phone, setPhone] = useState<string | null>(null);
-  const [otp, setOtp] = useState<string | null>(null);
-  const [pendingName, setPendingName] = useState<string | null>(null);
 
   // Credential state
   const [uploadedVCs, setUploadedVCs] = useState<UploadedVC[]>([]);
@@ -76,20 +71,14 @@ export default function CredentialsOnboarding() {
   // Load pending auth data from session storage
   useEffect(() => {
     const storedUserId = sessionStorage.getItem('pendingUserId');
-    const storedPhone = sessionStorage.getItem('pendingPhone');
-    const storedOtp = sessionStorage.getItem('pendingOtp');
-    const storedName = sessionStorage.getItem('pendingName');
 
-    if (!storedUserId || !storedPhone || !storedOtp) {
+    if (!storedUserId) {
       // No pending auth, redirect to login
       router.push('/');
       return;
     }
 
     setUserId(storedUserId);
-    setPhone(storedPhone);
-    setOtp(storedOtp);
-    setPendingName(storedName);
   }, [router]);
 
   // Handle file upload
@@ -144,13 +133,18 @@ export default function CredentialsOnboarding() {
     [userId]
   );
 
-  // Complete signup
+  // Complete signup (uses new endpoint that doesn't require OTP)
   const handleCompleteSignup = async () => {
-    if (!phone || !otp || !canComplete) return;
+    if (!userId || !canComplete) return;
 
     setIsCompletingSignup(true);
     try {
-      await login(phone, otp, pendingName || undefined);
+      // Use completeSignup endpoint instead of login (no OTP needed)
+      const result = await authApi.completeSignup(userId);
+
+      // Store token and trigger auth state update
+      localStorage.setItem('authToken', result.token);
+      window.dispatchEvent(new Event('auth:login'));
 
       // Clear session storage
       sessionStorage.removeItem('pendingUserId');
