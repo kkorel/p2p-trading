@@ -300,23 +300,48 @@ const CRED_DISPLAY_NAMES: Record<string, string> = {
 
 // --- Credential processing helper ---
 
+// Localized credential display names for error messages
+const CRED_DISPLAY_NAMES_HI: Record<string, string> = {
+  'Electricity Connection ID': 'बिजली कनेक्शन आईडी',
+  'Solar Panel ID': 'सोलर पैनल आईडी',
+  'Consumption ID': 'खपत आईडी',
+  'Battery Storage ID': 'बैटरी स्टोरेज आईडी',
+  'Program Enrollment ID': 'प्रोग्राम एनरोलमेंट आईडी',
+};
+
 async function processCredentialUpload(
   userId: string,
   fileData: FileData,
-  expectedType?: string
+  expectedType?: string,
+  language?: string
 ): Promise<{ success: boolean; credType: string; summary: string; error?: string; claims?: any }> {
+  const isHindi = language === 'hi-IN';
   let credential: any;
 
   if (fileData.mimeType === 'application/json') {
     try {
       credential = JSON.parse(fileData.buffer.toString('utf-8'));
     } catch {
-      return { success: false, credType: '', summary: '', error: 'Could not read this JSON file. Please check and try again.' };
+      return {
+        success: false,
+        credType: '',
+        summary: '',
+        error: isHindi
+          ? 'यह JSON फ़ाइल पढ़ नहीं पाई। कृपया जाँच करें और दोबारा कोशिश करें।'
+          : 'Could not read this JSON file. Please check and try again.',
+      };
     }
   } else {
     const extraction = await extractVCFromPdf(fileData.buffer);
     if (!extraction.success || !extraction.credential) {
-      return { success: false, credType: '', summary: '', error: 'Could not read this PDF. Please check and try again.' };
+      return {
+        success: false,
+        credType: '',
+        summary: '',
+        error: isHindi
+          ? 'यह PDF पढ़ नहीं पाई। कृपया जाँच करें और दोबारा कोशिश करें।'
+          : 'Could not read this PDF. Please check and try again.',
+      };
     }
     credential = extraction.credential;
   }
@@ -324,18 +349,29 @@ async function processCredentialUpload(
   // Detect type
   const detectedType = detectCredentialType(credential);
   if (!detectedType) {
-    return { success: false, credType: '', summary: '', error: 'This does not look like a valid ID document. Please upload your Solar ID or Electricity Connection ID (PDF from your electricity company).' };
+    return {
+      success: false,
+      credType: '',
+      summary: '',
+      error: isHindi
+        ? 'यह सही दस्तावेज़ नहीं लग रहा। कृपया अपना सोलर आईडी या बिजली कनेक्शन आईडी (PDF) अपलोड करें।'
+        : 'This does not look like a valid ID document. Please upload your Solar ID or Electricity Connection ID (PDF from your electricity company).',
+    };
   }
 
   // Check expected type
   if (expectedType && detectedType !== expectedType) {
     const expectedName = CRED_DISPLAY_NAMES[expectedType] || expectedType;
     const actualName = CRED_DISPLAY_NAMES[detectedType] || detectedType;
+    const expectedNameHi = CRED_DISPLAY_NAMES_HI[expectedName] || expectedName;
+    const actualNameHi = CRED_DISPLAY_NAMES_HI[actualName] || actualName;
     return {
       success: false,
       credType: detectedType,
       summary: '',
-      error: `This is a ${actualName}, but I need your ${expectedName}. Please upload the right document.`,
+      error: isHindi
+        ? `यह ${actualNameHi} है, लेकिन मुझे आपका ${expectedNameHi} चाहिए। सही दस्तावेज़ अपलोड करें।`
+        : `This is a ${actualName}, but I need your ${expectedName}. Please upload the right document.`,
     };
   }
 
@@ -1343,7 +1379,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
   // Allow cancellation at any point
   if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop') {
     return {
-      messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+      messages: [{ text: h(ctx, 'Purchase cancelled.', 'खरीदारी रद्द हो गई।') }],
       contextUpdate: { pendingPurchase: undefined },
     };
   }
@@ -1396,7 +1432,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           messages: [{
             text: h(ctx,
               `✅ *Confirm Purchase*\n\nYou selected:\n• ${quantity} units\n• Time: Tomorrow\n\nProceed with purchase?`,
-              `✅ *Purchase Confirm Karo*\n\nAapne chuna:\n• ${quantity} unit\n• Time: Kal\n\nKhareedna hai?`
+              `✅ *खरीदारी पक्की करें*\n\nआपने चुना:\n• ${quantity} यूनिट\n• समय: कल\n\nखरीदना है?`
             ),
             buttons: [
               { text: h(ctx, '✅ Yes, buy it!', '✅ हाँ, खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
@@ -1429,7 +1465,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
               messages: [{
                 text: h(ctx,
                   `✅ *Confirm Purchase*\n\nYou selected Deal #${numInput}:\n• ${deal.quantity} units @ ₹${deal.pricePerUnit}/unit\n• Total: ₹${(deal.quantity * deal.pricePerUnit).toFixed(0)}\n• Time: Tomorrow\n\nProceed with purchase?`,
-                  `✅ *Purchase Confirm Karo*\n\nAapne Deal #${numInput} chuna:\n• ${deal.quantity} unit @ ₹${deal.pricePerUnit}/unit\n• Total: ₹${(deal.quantity * deal.pricePerUnit).toFixed(0)}\n• Time: Kal\n\nKhareedna hai?`
+                  `✅ *खरीदारी पक्की करें*\n\nआपने डील #${numInput} चुना:\n• ${deal.quantity} यूनिट @ ₹${deal.pricePerUnit}/यूनिट\n• कुल: ₹${(deal.quantity * deal.pricePerUnit).toFixed(0)}\n• समय: कल\n\nखरीदना है?`
                 ),
                 buttons: [
                   { text: h(ctx, '✅ Yes, buy it!', '✅ हाँ, खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
@@ -1501,7 +1537,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         const answer = message.replace('purchase_confirm:', '');
         if (answer === 'no') {
           return {
-            messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+            messages: [{ text: h(ctx, 'Purchase cancelled.', 'खरीदारी रद्द हो गई।') }],
             contextUpdate: { pendingPurchase: undefined },
           };
         }
@@ -1514,7 +1550,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
 
       if (isNo) {
         return {
-          messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+          messages: [{ text: h(ctx, 'Purchase cancelled.', 'खरीदारी रद्द हो गई।') }],
           contextUpdate: { pendingPurchase: undefined },
         };
       }
@@ -1540,7 +1576,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         const answer = message.replace('purchase_offer_confirm:', '');
         if (answer === 'no') {
           return {
-            messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+            messages: [{ text: h(ctx, 'Purchase cancelled.', 'खरीदारी रद्द हो गई।') }],
             contextUpdate: { pendingPurchase: undefined },
           };
         }
@@ -1553,7 +1589,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
 
       if (isNo) {
         return {
-          messages: [{ text: h(ctx, 'Purchase cancelled.', 'Purchase cancel ho gayi.') }],
+          messages: [{ text: h(ctx, 'Purchase cancelled.', 'खरीदारी रद्द हो गई।') }],
           contextUpdate: { pendingPurchase: undefined },
         };
       }
@@ -3066,11 +3102,11 @@ const states: Record<ChatState, StateHandler> = {
       }
 
       try {
-        const result = await processCredentialUpload(ctx.userId!, fileData, 'UtilityCustomerCredential');
+        const result = await processCredentialUpload(ctx.userId!, fileData, 'UtilityCustomerCredential', ctx.language);
 
         if (!result.success) {
           return {
-            messages: [{ text: h(ctx, result.error || 'Could not verify this credential. Please try again.', result.error || 'दस्तावेज़ वेरिफाई नहीं हो पाया। दोबारा कोशिश करो।') }],
+            messages: [{ text: result.error || h(ctx, 'Could not verify this credential. Please try again.', 'दस्तावेज़ वेरिफाई नहीं हो पाया। दोबारा कोशिश करो।') }],
           };
         }
 
@@ -3306,7 +3342,7 @@ const states: Record<ChatState, StateHandler> = {
       }
 
       try {
-        const result = await processCredentialUpload(ctx.userId!, fileData, ctx.expectedCredType);
+        const result = await processCredentialUpload(ctx.userId!, fileData, ctx.expectedCredType, ctx.language);
 
         if (!result.success) {
           return {
@@ -4075,7 +4111,7 @@ const states: Record<ChatState, StateHandler> = {
                   },
                 ],
                 newState: 'OFFER_OPTIONAL_CREDS',
-                contextUpdate: { expectedCredType: 'ConsumptionProfileCredential' },
+                contextUpdate: { intent: 'buy', expectedCredType: 'ConsumptionProfileCredential' },
               };
             }
 
@@ -4230,7 +4266,7 @@ const states: Record<ChatState, StateHandler> = {
                 },
               ],
               newState: 'OFFER_OPTIONAL_CREDS',
-              contextUpdate: { expectedCredType: 'ConsumptionProfileCredential' },
+              contextUpdate: { intent: 'buy', expectedCredType: 'ConsumptionProfileCredential' },
             };
           }
           // Start interactive purchase

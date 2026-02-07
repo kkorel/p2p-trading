@@ -145,8 +145,14 @@ export function MessageList({
               <TopDealsCard
                 data={msg.topDeals}
                 language={responseLanguage}
-                onQuickBuy={(offerId, qty) => onButtonClick?.(`buy_deal:${offerId}:${qty}`, `Buy ${qty} units`)}
-                onCustomAmount={() => onButtonClick?.('buy_custom', 'Custom amount')}
+                onQuickBuy={(offerId, qty) => onButtonClick?.(
+                  `buy_deal:${offerId}:${qty}`,
+                  responseLanguage === 'hi-IN' ? `${qty} यूनिट खरीदो` : `Buy ${qty} units`
+                )}
+                onCustomAmount={() => onButtonClick?.(
+                  'buy_custom',
+                  responseLanguage === 'hi-IN' ? 'अपनी मात्रा' : 'Custom amount'
+                )}
               />
             )}
 
@@ -155,8 +161,14 @@ export function MessageList({
               <MatchedOffersCard
                 data={msg.matchedOffers}
                 language={responseLanguage}
-                onAccept={() => onButtonClick?.('purchase_offer_confirm:yes', 'Accept')}
-                onCancel={() => onButtonClick?.('purchase_offer_confirm:no', 'Cancel')}
+                onAccept={() => onButtonClick?.(
+                  'purchase_offer_confirm:yes',
+                  responseLanguage === 'hi-IN' ? 'मंज़ूर' : 'Accept'
+                )}
+                onCancel={() => onButtonClick?.(
+                  'purchase_offer_confirm:no',
+                  responseLanguage === 'hi-IN' ? 'रद्द करो' : 'Cancel'
+                )}
               />
             )}
 
