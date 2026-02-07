@@ -1,11 +1,11 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { Header } from './header';
 import { BottomNav } from './bottom-nav';
 import { LoginScreen } from '@/components/auth/login-screen';
-import { OnboardingScreen } from '@/components/auth/onboarding-screen';
 import { Skeleton } from '@/components/ui';
 
 interface AppShellProps {
@@ -16,6 +16,16 @@ interface AppShellProps {
 
 export function AppShell({ children, title, hideNav = false }: AppShellProps) {
   const { isLoading, isAuthenticated, user } = useAuth();
+  const router = useRouter();
+
+  // Redirect to credentials page if profile not complete
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user && !user.profileComplete) {
+      // Store userId for the credentials page
+      sessionStorage.setItem('pendingUserId', user.id);
+      router.push('/onboarding/credentials');
+    }
+  }, [isLoading, isAuthenticated, user, router]);
 
   // Loading state
   if (isLoading) {
@@ -36,9 +46,18 @@ export function AppShell({ children, title, hideNav = false }: AppShellProps) {
     return <LoginScreen />;
   }
 
-  // Authenticated but profile not complete - show VC onboarding
+  // Profile not complete - show loading while redirecting
   if (!user?.profileComplete) {
-    return <OnboardingScreen />;
+    return (
+      <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-[14px] bg-[var(--color-primary-light)] flex items-center justify-center">
+            <Skeleton className="w-6 h-6 rounded-full" />
+          </div>
+          <Skeleton className="w-24 h-4" />
+        </div>
+      </div>
+    );
   }
 
   return (
