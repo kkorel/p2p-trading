@@ -36,12 +36,20 @@ export function Header({ title }: HeaderProps) {
             {!statsLoading && (
               <Link
                 href="/profile"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--color-success-light)] rounded-full hover:bg-[var(--color-success)]/20 transition-colors"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full transition-colors ${
+                  totalValue >= 0
+                    ? 'bg-[var(--color-success-light)] hover:bg-[var(--color-success)]/20'
+                    : 'bg-[var(--color-error)]/10 hover:bg-[var(--color-error)]/20'
+                }`}
                 title="P2P Trading Value"
               >
-                <TrendingUp className="h-3.5 w-3.5 text-[var(--color-success)]" />
-                <span className="text-sm font-semibold text-[var(--color-success)]">
-                  +{formatCurrency(totalValue)}
+                <TrendingUp className={`h-3.5 w-3.5 ${
+                  totalValue >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
+                }`} />
+                <span className={`text-sm font-semibold ${
+                  totalValue >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
+                }`}>
+                  {totalValue > 0 ? '+' : ''}{formatCurrency(totalValue)}
                 </span>
               </Link>
             )}

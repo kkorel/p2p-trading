@@ -273,11 +273,13 @@ export function ChatPage() {
           {user && (
             <>
               <div
-                className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-xs font-medium shrink-0"
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shrink-0 ${
+                  totalValue >= 0 ? 'bg-white/20' : 'bg-red-500/30'
+                }`}
                 title="P2P Earnings"
               >
                 <TrendingUp size={12} />
-                <span>{formatCurrency(totalValue)}</span>
+                <span>{totalValue > 0 ? '+' : ''}{formatCurrency(totalValue)}</span>
               </div>
               <div
                 className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-xs font-medium shrink-0"
