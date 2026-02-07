@@ -1,7 +1,7 @@
 'use client';
 
 import { type DashboardData } from '@/hooks/use-chat-engine';
-import { Wallet, Star, TrendingUp, Zap, ShoppingBag, Info } from 'lucide-react';
+import { Wallet, TrendingUp, Zap, ShoppingBag, Info } from 'lucide-react';
 
 interface DashboardCardProps {
   data: DashboardData;
@@ -10,31 +10,38 @@ interface DashboardCardProps {
 }
 
 // Localized labels
-const LABELS: Record<string, { label: string; labelHi: string }> = {
-  balance: { label: 'Balance', labelHi: 'बैलेंस' },
-  trust: { label: 'Trust Score', labelHi: 'ट्रस्ट स्कोर' },
-  tradeLimit: { label: 'Trade Limit', labelHi: 'ट्रेड लिमिट' },
-  seller: { label: 'Seller Stats', labelHi: 'सेलर स्टैट्स' },
-  buyer: { label: 'Buyer Stats', labelHi: 'बायर स्टैट्स' },
-  activeListings: { label: 'Active Listings', labelHi: 'ऐक्टिव लिस्टिंग' },
-  thisWeek: { label: 'This Week', labelHi: 'इस हफ्ते' },
-  allTime: { label: 'All Time', labelHi: 'कुल' },
-  orders: { label: 'Orders', labelHi: 'ऑर्डर्स' },
-  energyBought: { label: 'Energy Bought', labelHi: 'खरीदी गई बिजली' },
-  totalSpent: { label: 'Total Spent', labelHi: 'कुल खर्च' },
-  earned: { label: 'earned', labelHi: 'कमाई' },
-  kWh: { label: 'kWh', labelHi: 'किलोवाट घंटा' },
+const LABELS: Record<string, { en: string; hi: string }> = {
+  balance: { en: 'Balance', hi: 'बैलेंस' },
+  trust: { en: 'Trust', hi: 'भरोसा' },
+  tradeLimit: { en: 'Trade Limit', hi: 'बेचने की सीमा' },
+  seller: { en: 'Selling', hi: 'बिक्री' },
+  buyer: { en: 'Buying', hi: 'खरीदारी' },
+  activeListings: { en: 'Listed', hi: 'लिस्टेड' },
+  thisWeek: { en: 'This Week', hi: 'इस हफ्ते' },
+  allTime: { en: 'Total', hi: 'कुल' },
+  orders: { en: 'Orders', hi: 'ऑर्डर' },
+  kWh: { en: 'kWh', hi: 'यूनिट' },
+  totalSpent: { en: 'Spent', hi: 'खर्च' },
 };
 
-function getLabel(key: string, lang?: string): string {
+function getLabel(key: string, isHindi: boolean): string {
   const entry = LABELS[key];
   if (!entry) return key;
-  return lang === 'hi-IN' ? entry.labelHi : entry.label;
+  return isHindi ? entry.hi : entry.en;
+}
+
+// Get trust tier color based on score
+function getTrustColor(score: number): { bg: string; text: string; border: string } {
+  if (score >= 0.9) return { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' }; // Platinum
+  if (score >= 0.7) return { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' }; // Gold
+  if (score >= 0.5) return { bg: 'bg-gray-200', text: 'text-gray-700', border: 'border-gray-300' }; // Silver
+  if (score >= 0.3) return { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' }; // Bronze
+  return { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' }; // Starter
 }
 
 export function DashboardCard({ data, language, onExplain }: DashboardCardProps) {
   const isHindi = language === 'hi-IN';
-  const trustTierName = isHindi ? data.trustTier.nameHi : data.trustTier.name;
+  const trustColor = getTrustColor(data.trustScore);
 
   const handleFieldClick = (field: string) => {
     onExplain?.(field);
@@ -60,41 +67,37 @@ export function DashboardCard({ data, language, onExplain }: DashboardCardProps)
         {/* Balance */}
         <button
           onClick={() => handleFieldClick('balance')}
-          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-left group"
+          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-center group"
         >
-          <div className="flex items-center gap-1 mb-1">
+          <div className="flex items-center justify-center gap-1 mb-1">
             <Wallet className="w-3.5 h-3.5 text-teal-600" />
-            <span className="text-[10px] text-gray-500 uppercase tracking-wide">{getLabel('balance', language)}</span>
-            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500 ml-auto" />
+            <span className="text-[10px] text-gray-500 uppercase tracking-wide">{getLabel('balance', isHindi)}</span>
+            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500" />
           </div>
           <div className="text-lg font-bold text-gray-900">₹{data.balance.toLocaleString('en-IN')}</div>
         </button>
 
-        {/* Trust Score */}
+        {/* Trust Score - Color coded */}
         <button
           onClick={() => handleFieldClick('trust')}
-          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-left group"
+          className={`rounded-xl p-3 border hover:shadow-md transition-all text-center group ${trustColor.bg} ${trustColor.border}`}
         >
-          <div className="flex items-center gap-1 mb-1">
-            <Star className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-[10px] text-gray-500 uppercase tracking-wide">{getLabel('trust', language)}</span>
-            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500 ml-auto" />
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <span className="text-[10px] text-gray-600 uppercase tracking-wide">{getLabel('trust', isHindi)}</span>
+            <Info className={`w-3 h-3 opacity-50 group-hover:opacity-100 ${trustColor.text}`} />
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-lg font-bold text-gray-900">{(data.trustScore * 100).toFixed(0)}%</span>
-            <span className="text-xs text-gray-500">{data.trustTier.emoji} {trustTierName}</span>
-          </div>
+          <div className={`text-lg font-bold ${trustColor.text}`}>{(data.trustScore * 100).toFixed(0)}%</div>
         </button>
 
         {/* Trade Limit */}
         <button
           onClick={() => handleFieldClick('tradelimit')}
-          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-left group"
+          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-center group"
         >
-          <div className="flex items-center gap-1 mb-1">
+          <div className="flex items-center justify-center gap-1 mb-1">
             <TrendingUp className="w-3.5 h-3.5 text-green-600" />
-            <span className="text-[10px] text-gray-500 uppercase tracking-wide">{getLabel('tradeLimit', language)}</span>
-            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500 ml-auto" />
+            <span className="text-[10px] text-gray-500 uppercase tracking-wide">{getLabel('tradeLimit', isHindi)}</span>
+            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500" />
           </div>
           <div className="text-lg font-bold text-gray-900">{data.tradeLimit}%</div>
         </button>
@@ -108,24 +111,24 @@ export function DashboardCard({ data, language, onExplain }: DashboardCardProps)
         >
           <div className="flex items-center gap-1.5 mb-2">
             <Zap className="w-4 h-4 text-amber-600" />
-            <span className="text-xs font-semibold text-amber-800">{getLabel('seller', language)}</span>
+            <span className="text-xs font-semibold text-amber-800">{getLabel('seller', isHindi)}</span>
             <Info className="w-3 h-3 text-amber-300 group-hover:text-amber-600 ml-auto" />
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <div className="text-sm font-bold text-gray-900">{data.seller.activeListings}</div>
-              <div className="text-[10px] text-gray-500">{getLabel('activeListings', language)}</div>
-              <div className="text-[10px] text-gray-400">({data.seller.totalListedKwh} {isHindi ? 'किवॉह' : 'kWh'})</div>
+              <div className="text-[10px] text-gray-500">{getLabel('activeListings', isHindi)}</div>
+              <div className="text-[10px] text-gray-400">({data.seller.totalListedKwh} {getLabel('kWh', isHindi)})</div>
             </div>
             <div>
               <div className="text-sm font-bold text-green-600">₹{data.seller.weeklyEarnings.toLocaleString('en-IN')}</div>
-              <div className="text-[10px] text-gray-500">{getLabel('thisWeek', language)}</div>
-              <div className="text-[10px] text-gray-400">{data.seller.weeklyKwh.toFixed(1)} {isHindi ? 'किवॉह' : 'kWh'}</div>
+              <div className="text-[10px] text-gray-500">{getLabel('thisWeek', isHindi)}</div>
+              <div className="text-[10px] text-gray-400">{data.seller.weeklyKwh.toFixed(1)} {getLabel('kWh', isHindi)}</div>
             </div>
             <div>
               <div className="text-sm font-bold text-gray-900">₹{data.seller.totalEarnings.toLocaleString('en-IN')}</div>
-              <div className="text-[10px] text-gray-500">{getLabel('allTime', language)}</div>
-              <div className="text-[10px] text-gray-400">{data.seller.totalKwh.toFixed(1)} {isHindi ? 'किवॉह' : 'kWh'}</div>
+              <div className="text-[10px] text-gray-500">{getLabel('allTime', isHindi)}</div>
+              <div className="text-[10px] text-gray-400">{data.seller.totalKwh.toFixed(1)} {getLabel('kWh', isHindi)}</div>
             </div>
           </div>
         </button>
@@ -139,21 +142,21 @@ export function DashboardCard({ data, language, onExplain }: DashboardCardProps)
         >
           <div className="flex items-center gap-1.5 mb-2">
             <ShoppingBag className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-semibold text-blue-800">{getLabel('buyer', language)}</span>
+            <span className="text-xs font-semibold text-blue-800">{getLabel('buyer', isHindi)}</span>
             <Info className="w-3 h-3 text-blue-300 group-hover:text-blue-600 ml-auto" />
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <div className="text-sm font-bold text-gray-900">{data.buyer.totalOrders}</div>
-              <div className="text-[10px] text-gray-500">{getLabel('orders', language)}</div>
+              <div className="text-[10px] text-gray-500">{getLabel('orders', isHindi)}</div>
             </div>
             <div>
               <div className="text-sm font-bold text-gray-900">{data.buyer.totalBoughtKwh.toFixed(1)}</div>
-              <div className="text-[10px] text-gray-500">{isHindi ? 'किलोवाट घंटा' : 'kWh'}</div>
+              <div className="text-[10px] text-gray-500">{getLabel('kWh', isHindi)}</div>
             </div>
             <div>
               <div className="text-sm font-bold text-red-600">₹{data.buyer.totalSpent.toLocaleString('en-IN')}</div>
-              <div className="text-[10px] text-gray-500">{getLabel('totalSpent', language)}</div>
+              <div className="text-[10px] text-gray-500">{getLabel('totalSpent', isHindi)}</div>
             </div>
           </div>
         </button>
@@ -162,7 +165,7 @@ export function DashboardCard({ data, language, onExplain }: DashboardCardProps)
       {/* Tap hint */}
       <div className="px-3 pb-3 text-center">
         <p className="text-[10px] text-gray-400">
-          {isHindi ? '👆 किसी भी फ़ील्ड पर टैप करके जानें' : '👆 Tap any field to learn more'}
+          {isHindi ? '👆 जानने के लिए टैप करो' : '👆 Tap to learn more'}
         </p>
       </div>
     </div>

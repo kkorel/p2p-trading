@@ -3218,8 +3218,8 @@ const states: Record<ChatState, StateHandler> = {
             // Show range based on potential price variation (Rs 6-9 per kWh)
             const minMonthly = Math.round(tradeableKwh * 6);
             const maxMonthly = Math.round(tradeableKwh * 9);
-            earningsEn = `With your current ${tradeLimitPct}% trade limit, you can earn Rs ${minMonthly}-${maxMonthly} per month. As your trust score grows, you can sell more! `;
-            earningsHi = `आपकी ${tradeLimitPct}% ट्रेड लिमिट के साथ, आप लगभग ₹${minMonthly}-${maxMonthly} प्रति महीना कमा सकते हो। जैसे-जैसे आपका ट्रस्ट स्कोर बढ़ेगा, आप और ज़्यादा बेच पाएंगे! `;
+            earningsEn = `With your current ${tradeLimitPct}% trade limit, you can earn Rs ${minMonthly}-${maxMonthly} per month. As you sell more successfully, your limit increases! `;
+            earningsHi = `अभी आप ₹${minMonthly}-${maxMonthly} महीना कमा सकते हो। जैसे-जैसे आप अच्छे से बेचते रहोगे, आप और ज़्यादा बेच पाओगे! `;
           }
 
           explainEn = `${capEn}I'll sell the extra energy from your solar panels at good prices to maximize your earnings. ${earningsEn}`;
@@ -3305,7 +3305,7 @@ const states: Record<ChatState, StateHandler> = {
                 {
                   text: h(ctx,
                     `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
-                    `Ho gaya! Aapki energy ab sale pe hai:\n${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe, kal subah 6 se shaam 6 tak.\n\nBuyers ab aapki energy khareed sakte hain!`
+                    `हो गया! आपकी बिजली अब बिकने को तैयार है:\n${o.quantity} यूनिट ₹${o.pricePerKwh} प्रति यूनिट पे, कल सुबह 6 से शाम 6 तक।\n\nअब खरीदार आपकी बिजली खरीद सकते हैं!`
                   ),
                   buttons: [
                     { text: h(ctx, '📋 View My Listings', '📋 मेरी लिस्टिंग देखो'), callbackData: 'action:show_listings' },
@@ -3325,7 +3325,7 @@ const states: Record<ChatState, StateHandler> = {
               {
                 text: h(ctx,
                   'Profile set up! You can create offers from the Sell tab or tell me here (e.g. "list 50 kWh at Rs 6").',
-                  'Profile ready! Sell tab se ya mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
+                  'प्रोफ़ाइल तैयार! Sell टैब से या मुझसे कहो (जैसे "50 यूनिट ₹6 पे डाल दो") और ऑफ़र बन जाएगा।'
                 ),
                 buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
               },
@@ -3340,7 +3340,7 @@ const states: Record<ChatState, StateHandler> = {
               {
                 text: h(ctx,
                   'Profile is set up! You can create offers by telling me (e.g. "list 50 kWh at Rs 6").',
-                  'Profile ready hai! Mujhse kaho (jaise "50 kWh Rs 6 pe daal do") aur offer ban jayega.'
+                  'प्रोफ़ाइल तैयार है! मुझसे कहो (जैसे "50 यूनिट ₹6 पे डाल दो") और ऑफ़र बन जाएगा।'
                 ),
                 buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
               },

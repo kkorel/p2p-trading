@@ -95,7 +95,20 @@ export function MessageList({
               <DashboardCard
                 data={msg.dashboard}
                 language={responseLanguage}
-                onExplain={(field) => onButtonClick?.(`explain:${field}`, `Explain ${field}`)}
+                onExplain={(field) => {
+                  // Localized field names for display
+                  const fieldNames: Record<string, { en: string; hi: string }> = {
+                    balance: { en: 'Balance', hi: 'बैलेंस' },
+                    trust: { en: 'Trust', hi: 'भरोसा' },
+                    tradelimit: { en: 'Trade Limit', hi: 'बेचने की सीमा' },
+                    seller: { en: 'Selling', hi: 'बिक्री' },
+                    buyer: { en: 'Buying', hi: 'खरीदारी' },
+                  };
+                  const isHindi = responseLanguage === 'hi-IN';
+                  const name = fieldNames[field] || { en: field, hi: field };
+                  const displayText = isHindi ? `${name.hi} क्या है?` : `What is ${name.en}?`;
+                  onButtonClick?.(`explain:${field}`, displayText);
+                }}
               />
             )}
 

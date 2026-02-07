@@ -21,10 +21,62 @@ const logger = createLogger('ChatRoutes');
 const router = Router();
 
 /**
+ * Convert a number to Hindi words for TTS
+ * Handles numbers up to 99,99,999 (Indian numbering system)
+ */
+function numberToHindiWords(num: number): string {
+  if (num === 0) return 'शून्य';
+
+  const ones = ['', 'एक', 'दो', 'तीन', 'चार', 'पाँच', 'छह', 'सात', 'आठ', 'नौ', 'दस',
+    'ग्यारह', 'बारह', 'तेरह', 'चौदह', 'पंद्रह', 'सोलह', 'सत्रह', 'अठारह', 'उन्नीस'];
+  const tens = ['', '', 'बीस', 'तीस', 'चालीस', 'पचास', 'साठ', 'सत्तर', 'अस्सी', 'नब्बे'];
+
+  function twoDigit(n: number): string {
+    if (n < 20) return ones[n];
+    const t = Math.floor(n / 10);
+    const o = n % 10;
+    if (o === 0) return tens[t];
+    // Hindi has special forms for 21-99
+    return tens[t] + ' ' + ones[o];
+  }
+
+  let result = '';
+
+  // Lakhs (1,00,000)
+  if (num >= 100000) {
+    const lakhs = Math.floor(num / 100000);
+    result += twoDigit(lakhs) + ' लाख ';
+    num %= 100000;
+  }
+
+  // Thousands (1,000 - 99,999)
+  if (num >= 1000) {
+    const thousands = Math.floor(num / 1000);
+    result += twoDigit(thousands) + ' हज़ार ';
+    num %= 1000;
+  }
+
+  // Hundreds
+  if (num >= 100) {
+    const hundreds = Math.floor(num / 100);
+    result += ones[hundreds] + ' सौ ';
+    num %= 100;
+  }
+
+  // Remaining two digits
+  if (num > 0) {
+    result += twoDigit(num);
+  }
+
+  return result.trim();
+}
+
+/**
  * Preprocess text for TTS to make it more natural-sounding:
  * - Remove URLs (unpronounceable)
  * - Replace "/" with language-appropriate "per"
  * - Remove markdown formatting
+ * - Convert numbers to Hindi words for Hindi TTS
  * - Handle other TTS-unfriendly symbols
  */
 function preprocessTextForTTS(text: string, languageCode: string): string {
@@ -58,6 +110,17 @@ function preprocessTextForTTS(text: string, languageCode: string): string {
   processed = processed.replace(/kWh/gi, languageCode === 'hi-IN' ? 'किलोवाट घंटा' : 'kilowatt hour');
   processed = processed.replace(/kW/gi, languageCode === 'hi-IN' ? 'किलोवाट' : 'kilowatt');
   processed = processed.replace(/%/g, languageCode === 'hi-IN' ? ' प्रतिशत' : ' percent');
+
+  // Convert numbers to Hindi words for Hindi TTS (so "4050" becomes "चार हज़ार पचास")
+  if (languageCode === 'hi-IN') {
+    processed = processed.replace(/\d+/g, (match) => {
+      const num = parseInt(match, 10);
+      if (num > 0 && num < 10000000) { // Up to 99 lakh
+        return numberToHindiWords(num);
+      }
+      return match; // Keep very large numbers as-is
+    });
+  }
 
   // Clean up extra whitespace
   processed = processed.replace(/\s+/g, ' ').trim();
