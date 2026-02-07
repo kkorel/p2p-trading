@@ -1920,6 +1920,8 @@ async function handlePendingAutoBuyInput(ctx: SessionContext, message: string): 
   const pending = ctx.pendingAutoBuy;
   if (!pending?.awaitingField) return null;
 
+  console.log(`[AutoBuy] Processing: field=${pending.awaitingField}, message="${message}", pending=${JSON.stringify(pending)}`);
+
   switch (pending.awaitingField) {
     case 'quantity': {
       // Parse quantity from button callback or text
@@ -1994,7 +1996,9 @@ async function handlePendingAutoBuyInput(ctx: SessionContext, message: string): 
         price = parseFloat(message.replace(/[^\d.]/g, ''));
       }
 
-      if (!price || price <= 0) {
+      console.log(`[AutoBuy] max_price: parsed price=${price} from "${message}"`);
+
+      if (!price || price <= 0 || isNaN(price)) {
         const discomRate = 7.5;
         const recommendedMax = 6;
         const savingsAtRecommended = Math.round(((discomRate - recommendedMax) / discomRate) * 100);
@@ -2108,9 +2112,21 @@ async function handlePendingAutoBuyInput(ctx: SessionContext, message: string): 
         contextUpdate: { pendingAutoBuy: undefined },
       };
     }
-  }
 
-  return null;
+    default: {
+      // Unknown awaiting field - log and reset
+      console.warn(`[AutoBuy] Unknown awaitingField: ${pending.awaitingField}`);
+      return {
+        messages: [{
+          text: h(ctx, 'Something went wrong with auto-buy setup. Let me start again.', 'ऑटो-बाय सेटअप में कुछ गड़बड़ हो गई। चलो फिर से शुरू करते हैं।'),
+          buttons: [
+            { text: h(ctx, '🤖 Setup Auto-Buy', '🤖 ऑटो-बाय सेटअप'), callbackData: 'action:setup_auto_buy' },
+          ],
+        }],
+        contextUpdate: { pendingAutoBuy: undefined },
+      };
+    }
+  }
 }
 
 /**
