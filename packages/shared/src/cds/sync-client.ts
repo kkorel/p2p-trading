@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { config } from '../config';
 import { createLogger } from '../utils/logger';
-import { TimeWindow, BECKN_SCHEMA_CONTEXT, BECKN_DEFAULT_LOCATION, BecknLocation } from '../types/beckn';
+import { TimeWindow } from '../types/beckn';
 import { secureAxiosBpp } from '../beckn/secure-client';
 
 const logger = createLogger('CDS-PUBLISH');
@@ -165,8 +165,7 @@ interface CatalogPublishContext {
   bpp_id: string;
   bpp_uri: string;
   ttl: string;
-  location: BecknLocation;
-  schema_context: string[];
+  // NOTE: Do NOT include 'location' or 'schema_context' - CDS will not index catalogs with these fields
 }
 
 interface CatalogPublishMessage {
@@ -293,6 +292,7 @@ function buildBecknOffer(offer: SyncOffer, _meterId?: string): BecknOffer {
  * Create the Beckn publish context
  */
 function createPublishContext(transactionId?: string): CatalogPublishContext {
+  // NOTE: Do NOT include 'location' or 'schema_context' - CDS will not index catalogs with these fields
   return {
     domain: BECKN_DOMAIN,
     version: BECKN_VERSION,
@@ -305,8 +305,6 @@ function createPublishContext(transactionId?: string): CatalogPublishContext {
     bpp_id: config.bpp.id,
     bpp_uri: config.bpp.uri,
     ttl: 'PT30S',
-    location: BECKN_DEFAULT_LOCATION,
-    schema_context: BECKN_SCHEMA_CONTEXT,
   };
 }
 
@@ -374,9 +372,6 @@ export async function publishCatalogToCDS(
       context_bpp_id: publishMessage.context.bpp_id,
       context_bpp_uri: publishMessage.context.bpp_uri,
     });
-
-    // Log full request body for debugging
-    console.log('[CDS-PUBLISH-REQUEST]', JSON.stringify(publishMessage, null, 2));
 
     // Use secureAxiosBpp for CDS publish (BPP keys for catalog_publish)
     const response = await secureAxiosBpp.post(url, publishMessage, {
