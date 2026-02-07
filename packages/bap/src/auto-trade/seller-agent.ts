@@ -159,49 +159,71 @@ async function executeSellerAutoTrade(
   // First convert monthly capacity to daily (divide by 30)
   // Then: dailyEffective = (tradeLimit / 100) × dailyCapacity × weatherMultiplier
   const dailyCapacity = config.capacityKwh / 30;
-  const effectiveCapacity = (tradeLimit / 100) * dailyCapacity * weatherMultiplier;
-  const roundedCapacity = Math.round(effectiveCapacity * 10) / 10;
+  const targetCapacity = (tradeLimit / 100) * dailyCapacity * weatherMultiplier;
+  const roundedTarget = Math.round(targetCapacity * 10) / 10;
 
-  // Check for over-selling
+  // Get existing offers to calculate delta
   const existingOffers = await getProviderOffers(providerId);
+
+  // Calculate tomorrow's date range
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStart = new Date(tomorrow);
+  tomorrowStart.setHours(0, 0, 0, 0);
+  const tomorrowEnd = new Date(tomorrow);
+  tomorrowEnd.setHours(23, 59, 59, 999);
+
+  // Filter offers for tomorrow only
+  const tomorrowOffers = existingOffers.filter(o => {
+    if (!o.timeWindow?.startTime) return false;
+    const offerStart = new Date(o.timeWindow.startTime);
+    return offerStart >= tomorrowStart && offerStart <= tomorrowEnd;
+  });
+
+  const alreadyListed = tomorrowOffers.reduce(
+    (sum, o) => sum + (o.blockStats?.activeCommitment ?? o.maxQuantity),
+    0
+  );
+
+  // Calculate delta - only list what's needed
+  const deltaToList = Math.max(0, roundedTarget - alreadyListed);
+  const roundedDelta = Math.round(deltaToList * 10) / 10;
+
+  let status: 'success' | 'warning_oversell' | 'skipped' = 'success';
+  let warningMessage: string | undefined;
+
+  // Check if total would exceed daily capacity
   const totalActiveCommitment = existingOffers.reduce(
     (sum, o) => sum + (o.blockStats?.activeCommitment ?? o.maxQuantity),
     0
   );
 
-  const wouldOverSell = (totalActiveCommitment + roundedCapacity) > dailyCapacity;
-
-  let status: 'success' | 'warning_oversell' | 'skipped' = 'success';
-  let warningMessage: string | undefined;
-
-  if (wouldOverSell) {
+  if ((totalActiveCommitment + roundedDelta) > dailyCapacity * 1.1) { // 10% buffer
     status = 'warning_oversell';
-    warningMessage = `Warning: Listing ${roundedCapacity} kWh would exceed your daily capacity of ${dailyCapacity.toFixed(1)} kWh. ` +
-      `Already committed: ${totalActiveCommitment.toFixed(1)} kWh. ` +
-      `Consider waiting for existing offers to complete.`;
+    warningMessage = `Warning: Total commitment (${(totalActiveCommitment + roundedDelta).toFixed(1)} kWh) exceeds daily capacity (${dailyCapacity.toFixed(1)} kWh).`;
     logger.warn(`Over-sell warning for user ${config.userId}: ${warningMessage}`);
   }
 
-  // Skip if nothing to list
-  if (roundedCapacity < 1) {
+  // Skip if nothing more to list (already have enough for tomorrow)
+  if (roundedDelta < 0.5) {
     return {
       userId: config.userId,
       configId: config.id,
       status: 'skipped',
-      effectiveCapacity: roundedCapacity,
+      effectiveCapacity: roundedTarget,
       listedQuantity: 0,
       weatherMultiplier,
-      warningMessage: 'Effective capacity too low to list (< 1 kWh)',
+      warningMessage: alreadyListed > 0
+        ? `Already have ${alreadyListed.toFixed(1)} kWh listed for tomorrow (target: ${roundedTarget.toFixed(1)} kWh)`
+        : 'Effective capacity too low to list (< 0.5 kWh)',
     };
   }
 
-  // Create the offer
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(6, 0, 0, 0);
-
-  const tomorrowEnd = new Date(tomorrow);
-  tomorrowEnd.setHours(18, 0, 0, 0);
+  // Create the offer for tomorrow (6am - 6pm)
+  const offerStart = new Date(tomorrow);
+  offerStart.setHours(6, 0, 0, 0);
+  const offerEnd = new Date(tomorrow);
+  offerEnd.setHours(18, 0, 0, 0);
 
   // Create catalog item
   // Map energyType to valid SourceType (default to SOLAR for 'OTHER')
@@ -214,32 +236,41 @@ async function executeSellerAutoTrade(
     providerId,
     sourceType,
     'SCHEDULED',
-    roundedCapacity,
+    roundedDelta,
     [],
     `auto-${config.userId}-${Date.now()}`
   );
 
-  // Create offer
+  // Create offer with the delta amount
   const offer = await addOffer(
     item.id,
     providerId,
     config.pricePerKwh,
     'INR',
-    roundedCapacity,
+    roundedDelta,
     {
-      startTime: tomorrow.toISOString(),
-      endTime: tomorrowEnd.toISOString(),
+      startTime: offerStart.toISOString(),
+      endTime: offerEnd.toISOString(),
     }
   );
+
+  logger.info(`Auto-trade listing created for ${config.userId}:`, {
+    target: roundedTarget,
+    alreadyListed,
+    delta: roundedDelta,
+    weatherMultiplier,
+  });
 
   return {
     userId: config.userId,
     configId: config.id,
     status,
-    effectiveCapacity: roundedCapacity,
-    listedQuantity: roundedCapacity,
+    effectiveCapacity: roundedTarget,
+    listedQuantity: roundedDelta,
     weatherMultiplier,
-    warningMessage,
+    warningMessage: alreadyListed > 0
+      ? `Added ${roundedDelta.toFixed(1)} kWh (already had ${alreadyListed.toFixed(1)} kWh listed)`
+      : undefined,
     offerId: offer.id,
   };
 }

@@ -229,6 +229,13 @@ interface PendingPurchase {
   transactionId?: string;
 }
 
+interface PendingAutoBuy {
+  quantity?: number;
+  maxPrice?: number;
+  awaitingField?: 'quantity' | 'max_price';
+  suggestedQuantities?: number[]; // Based on sanctioned load
+}
+
 interface SessionContext {
   phone?: string;
   name?: string;
@@ -251,6 +258,7 @@ interface SessionContext {
   verifiedCreds?: string[];
   pendingListing?: PendingListing;
   pendingPurchase?: PendingPurchase;
+  pendingAutoBuy?: PendingAutoBuy;
   /** User's preference for voice output (TTS auto-play) */
   voiceOutputEnabled?: boolean;
   /** Whether user has been asked about voice preferences */
@@ -469,7 +477,7 @@ async function processCredentialUpload(
             generationType: claims.generationType || claims.sourceType || null,
             capacityKW: claims.capacityKW || null,
             generationMeterNumber: claims.meterNumber || null,
-            commissioningDate: claims.commissioningDate ? new Date(claims.commissioningDate) : null,
+            commissioningDate: parseDate(claims.commissioningDate),
             storageCapacityKWh: claims.storageCapacityKWh || null,
             storageType: claims.storageType || null,
             consumerNumber: currentUser?.consumerNumber || null,
@@ -509,6 +517,16 @@ function degTypeToDbType(degType: string): any {
     UtilityProgramEnrollmentCredential: 'PROGRAM_ENROLLMENT',
   };
   return map[degType] || 'UTILITY_CUSTOMER';
+}
+
+/**
+ * Safely parse a date string, returning null if invalid
+ */
+function parseDate(dateStr: string | undefined | null): Date | null {
+  if (!dateStr) return null;
+  const parsed = Date.parse(dateStr);
+  if (isNaN(parsed)) return null;
+  return new Date(parsed);
 }
 
 async function getVerifiedCredentials(userId: string): Promise<string[]> {
@@ -1519,10 +1537,10 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
     case 'choose_mode': {
       // Handle mode selection: Automatic vs One-time
       if (message === 'purchase_mode:onetime' || lower.includes('one') || lower.includes('once') || lower.includes('ek baar') || numInput === 2) {
-        // One-time purchase - continue to quantity question
+        // One-time purchase - set to quantity to skip mode selection loop
         const updated: PendingPurchase = {
           ...pending,
-          awaitingField: undefined as any,
+          awaitingField: 'quantity',
         };
         const next = await askNextPurchaseDetail(ctx, updated);
         return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
@@ -1792,6 +1810,132 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
             { text: h(ctx, '❌ No', '❌ Nahi'), callbackData: 'purchase_offer_confirm:no' },
           ],
         }],
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Handle auto-buy setup step-by-step flow
+ */
+async function handlePendingAutoBuyInput(ctx: SessionContext, message: string): Promise<AgentResponse | null> {
+  const pending = ctx.pendingAutoBuy;
+  if (!pending?.awaitingField) return null;
+
+  switch (pending.awaitingField) {
+    case 'quantity': {
+      // Parse quantity from button callback or text
+      let qty: number | undefined;
+      if (message.startsWith('autobuy_qty:')) {
+        qty = parseFloat(message.replace('autobuy_qty:', ''));
+      } else {
+        qty = parseFloat(message.replace(/[^\d.]/g, ''));
+      }
+
+      if (!qty || qty <= 0) {
+        // Re-show quantity options
+        const buttons = (pending.suggestedQuantities || [10, 20, 30, 50]).map(q => ({
+          text: `${q} units`,
+          callbackData: `autobuy_qty:${q}`,
+        }));
+        return {
+          messages: [{
+            text: h(ctx, 'Please select or enter a valid quantity:', 'सही मात्रा चुनो या लिखो:'),
+            buttons,
+          }],
+        };
+      }
+
+      // Move to max price step
+      return {
+        messages: [{
+          text: h(ctx,
+            `📝 *${qty} units daily*\n\nWhat's the maximum price per unit you're willing to pay?`,
+            `📝 *${qty} यूनिट रोज़*\n\nप्रति यूनिट अधिकतम कितना दाम दोगे?`
+          ),
+          buttons: [
+            { text: '₹5/unit', callbackData: 'autobuy_price:5' },
+            { text: '₹6/unit', callbackData: 'autobuy_price:6' },
+            { text: '₹7/unit', callbackData: 'autobuy_price:7' },
+            { text: '₹8/unit', callbackData: 'autobuy_price:8' },
+          ],
+        }],
+        contextUpdate: {
+          pendingAutoBuy: { ...pending, quantity: qty, awaitingField: 'max_price' },
+        },
+      };
+    }
+
+    case 'max_price': {
+      // Parse price from button callback or text
+      let price: number | undefined;
+      if (message.startsWith('autobuy_price:')) {
+        price = parseFloat(message.replace('autobuy_price:', ''));
+      } else {
+        price = parseFloat(message.replace(/[^\d.]/g, ''));
+      }
+
+      if (!price || price <= 0) {
+        return {
+          messages: [{
+            text: h(ctx, 'Please select or enter a valid price:', 'सही दाम चुनो या लिखो:'),
+            buttons: [
+              { text: '₹5/unit', callbackData: 'autobuy_price:5' },
+              { text: '₹6/unit', callbackData: 'autobuy_price:6' },
+              { text: '₹7/unit', callbackData: 'autobuy_price:7' },
+              { text: '₹8/unit', callbackData: 'autobuy_price:8' },
+            ],
+          }],
+        };
+      }
+
+      // Complete auto-buy setup
+      const qty = pending.quantity!;
+      const { setupBuyerAutoTrade, runSingleBuyerAutoTrade, getBuyAdvice } = await import('../auto-trade');
+      const setupResult = await setupBuyerAutoTrade(ctx.userId!, qty, price);
+
+      if (setupResult.success) {
+        const buyResult = await runSingleBuyerAutoTrade(ctx.userId!);
+        const advice = await getBuyAdvice(ctx.userId!, ctx.language === 'hi-IN');
+
+        if (buyResult && buyResult.status === 'success') {
+          return {
+            messages: [{
+              text: h(ctx,
+                `✅ Auto-buy activated!\n\n🛒 Found a deal right now! Bought *${buyResult.quantityBought} kWh* at ₹${buyResult.pricePerUnit}/unit.\nTotal: ₹${buyResult.totalSpent.toFixed(0)}\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you at ≤₹${price}/unit.\n\n${advice.advice}`,
+                `✅ ऑटो-बाय चालू!\n\n🛒 अभी एक डील मिल गई! *${buyResult.quantityBought} kWh* ₹${buyResult.pricePerUnit}/यूनिट पर खरीद लिया।\nकुल: ₹${buyResult.totalSpent.toFixed(0)}\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट ≤₹${price}/यूनिट पर खरीदूंगा।\n\n${advice.advice}`
+              ),
+              buttons: [
+                { text: h(ctx, '📋 View Orders', '📋 ऑर्डर देखो'), callbackData: 'action:show_orders' },
+                { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
+                { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+              ],
+            }],
+            contextUpdate: { pendingAutoBuy: undefined },
+          };
+        }
+
+        // Enabled but no immediate deal
+        return {
+          messages: [{
+            text: h(ctx,
+              `✅ Auto-buy enabled!\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you at ≤₹${price}/unit.\n\n${advice.advice}`,
+              `✅ ऑटो-बाय चालू!\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट ≤₹${price}/यूनिट पर खरीदूंगा।\n\n${advice.advice}`
+            ),
+            buttons: [
+              { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
+              { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+            ],
+          }],
+          contextUpdate: { pendingAutoBuy: undefined },
+        };
+      }
+
+      return {
+        messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
+        contextUpdate: { pendingAutoBuy: undefined },
       };
     }
   }
@@ -3601,40 +3745,67 @@ const states: Record<ChatState, StateHandler> = {
           if (setupResult.success) {
             const tradeResult = await runSingleSellerAutoTrade(ctx.userId!);
 
-            if (tradeResult && (tradeResult.status === 'success' || tradeResult.status === 'warning_oversell')) {
+            if (tradeResult) {
               const weatherPercent = Math.round(tradeResult.weatherMultiplier * 100);
-              const listedQty = tradeResult.listedQuantity.toFixed(1);
               const dailyCapacity = (detectedCapacity / 30).toFixed(1);
 
-              let warningText = '';
-              if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
-                warningText = '\n\n⚠️ ' + tradeResult.warningMessage;
+              // Handle skipped case (already have enough listed)
+              if (tradeResult.status === 'skipped') {
+                return {
+                  messages: [
+                    {
+                      text: h(ctx,
+                        `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output):\n${tradeResult.warningMessage || 'Already have enough listed for tomorrow.'}\n\nMonthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and add more listings if needed.`,
+                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए:\n${tradeResult.warningMessage || 'कल के लिए पहले से काफी लिस्टेड है।'}\n\nमासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे मौसम देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।`
+                      ),
+                      buttons: [
+                        { text: h(ctx, '📋 View Listings', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
+                        { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
+                        { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      ],
+                    },
+                  ],
+                  newState: 'GENERAL_CHAT',
+                  contextUpdate: { tradingActive: true },
+                };
               }
 
-              return {
-                messages: [
-                  {
-                    text: h(ctx,
-                      `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${smartPrice}/unit.\n\nMonthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
-                      `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं *${listedQty} kWh* ₹${smartPrice}/यूनिट पर लिस्ट कर रहा हूं।\n\nमासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
-                    ),
-                    offerCreated: {
-                      quantity: tradeResult.listedQuantity,
-                      pricePerKwh: smartPrice,
-                      startTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                      endTime: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
-                      energyType: 'SOLAR',
+              if (tradeResult.status === 'success' || tradeResult.status === 'warning_oversell') {
+                const listedQty = tradeResult.listedQuantity.toFixed(1);
+
+                let infoText = '';
+                if (tradeResult.warningMessage && tradeResult.status === 'success') {
+                  // This is the delta info, not a warning
+                  infoText = '\n\n📝 ' + tradeResult.warningMessage;
+                } else if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
+                  infoText = '\n\n⚠️ ' + tradeResult.warningMessage;
+                }
+
+                return {
+                  messages: [
+                    {
+                      text: h(ctx,
+                        `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${smartPrice}/unit.\n\nMonthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and add listings automatically.${infoText}`,
+                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं *${listedQty} kWh* ₹${smartPrice}/यूनिट पर लिस्ट कर रहा हूं।\n\nमासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।${infoText}`
+                      ),
+                      offerCreated: {
+                        quantity: tradeResult.listedQuantity,
+                        pricePerKwh: smartPrice,
+                        startTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                        endTime: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
+                        energyType: 'SOLAR',
+                      },
+                      buttons: [
+                        { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
+                        { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
+                        { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      ],
                     },
-                    buttons: [
-                      { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
-                      { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
-                      { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
-                    ],
-                  },
-                ],
-                newState: 'GENERAL_CHAT',
-                contextUpdate: { tradingActive: true },
-              };
+                  ],
+                  newState: 'GENERAL_CHAT',
+                  contextUpdate: { tradingActive: true },
+                };
+              }
             }
           }
 
@@ -3725,6 +3896,11 @@ const states: Record<ChatState, StateHandler> = {
   GENERAL_CHAT: {
     async onEnter(ctx) {
       const messages: AgentMessage[] = [];
+
+      // Skip welcome message if there's a pending operation (user already has a prompt)
+      if (ctx.pendingPurchase?.awaitingField || ctx.pendingListing?.awaitingField || ctx.pendingAutoBuy?.awaitingField) {
+        return { messages: [] };
+      }
 
       // Show smart suggestions when entering general chat
       const suggestions = getSmartSuggestions(ctx, 'GENERAL_CHAT');
@@ -4030,6 +4206,12 @@ const states: Record<ChatState, StateHandler> = {
       // --- Handle pending purchase flow (multi-turn detail gathering) ---
       if (ctx.pendingPurchase?.awaitingField) {
         const result = await handlePendingPurchaseInput(ctx, message);
+        if (result) return result;
+      }
+
+      // --- Handle pending auto-buy setup flow ---
+      if (ctx.pendingAutoBuy?.awaitingField) {
+        const result = await handlePendingAutoBuyInput(ctx, message);
         if (result) return result;
       }
 
@@ -4482,13 +4664,41 @@ const states: Record<ChatState, StateHandler> = {
               };
             }
 
+            // Start step-by-step flow with buttons based on sanctioned load
+            const userData = await prisma.user.findUnique({
+              where: { id: ctx.userId! },
+              select: { sanctionedLoadKW: true },
+            });
+
+            // Calculate suggested quantities based on sanctioned load
+            const sanctionedKW = userData?.sanctionedLoadKW || 5; // Default 5 kW
+            const dailyUsageEstimate = Math.round(sanctionedKW * 4); // ~4 hours peak usage estimate
+            const suggestedQuantities = [
+              Math.round(dailyUsageEstimate * 0.5), // Half usage
+              dailyUsageEstimate,                    // Full estimate
+              Math.round(dailyUsageEstimate * 1.5), // 1.5x
+              Math.round(dailyUsageEstimate * 2),   // Double
+            ].filter(q => q > 0);
+
+            // Ensure reasonable defaults if calculation gives odd numbers
+            const quantities = suggestedQuantities.length >= 3
+              ? suggestedQuantities.slice(0, 4)
+              : [10, 20, 30, 50];
+
             return {
               messages: [{
                 text: h(ctx,
-                  '🤖 *Set Up Auto-Buy*\n\nI can buy energy for you when prices are lowest!\n\nTell me:\n• How many units you need daily\n• Maximum price you\'re willing to pay\n\nExample: "Buy 20 units daily, max ₹7 per unit"',
-                  '🤖 *ऑटो-बाय सेटअप*\n\nमैं सबसे सस्ते दाम पर बिजली खरीद सकता हूं!\n\nबताओ:\n• रोज़ कितनी यूनिट चाहिए\n• अधिकतम कितना दाम दोगे\n\nउदाहरण: "रोज़ 20 यूनिट, अधिकतम ₹7"'
+                  `🤖 *Set Up Auto-Buy*\n\nI'll buy energy for you at the best prices!\n\nBased on your ${sanctionedKW} kW connection, how many units do you need daily?`,
+                  `🤖 *ऑटो-बाय सेटअप*\n\nमैं आपके लिए सबसे सस्ते दाम पर बिजली खरीदूंगा!\n\nआपके ${sanctionedKW} kW कनेक्शन के हिसाब से, रोज़ कितनी यूनिट चाहिए?`
                 ),
+                buttons: quantities.map(q => ({
+                  text: `${q} units`,
+                  callbackData: `autobuy_qty:${q}`,
+                })),
               }],
+              contextUpdate: {
+                pendingAutoBuy: { awaitingField: 'quantity', suggestedQuantities: quantities },
+              },
             };
           }
 
