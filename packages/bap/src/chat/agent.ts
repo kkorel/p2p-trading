@@ -933,8 +933,14 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
 
   switch (pending.awaitingField) {
     case 'choose_mode': {
-      // Handle mode selection: Automatic (one-click) vs Detailed
-      if (message === 'listing_mode:quick' || lower.includes('quick') || lower.includes('auto') || numInput === 1) {
+      // Handle "Sell Automatically" (auto-trade setup) - return null to let action handler process it
+      if (message === 'action:setup_auto_sell') {
+        // Clear pendingListing in context but return null so action handler can take over
+        ctx.pendingListing = undefined;
+        return null;
+      }
+      // Handle mode selection: Quick sell vs Detailed
+      if (message === 'listing_mode:quick' || lower.includes('quick') || numInput === 1) {
         // ONE-CLICK: Directly create a default offer without asking anything
         if (!ctx.userId) {
           return {
@@ -4147,6 +4153,8 @@ const states: Record<ChatState, StateHandler> = {
             message = 'show my balance';
             break;
           case 'setup_auto_sell':
+            // Clear any pending listing to avoid conflict with choose_mode handler
+            ctx.pendingListing = undefined;
             message = 'setup auto sell';
             break;
           case 'setup_auto_buy':
