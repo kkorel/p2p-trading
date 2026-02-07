@@ -3522,37 +3522,64 @@ const states: Record<ChatState, StateHandler> = {
             data: { profileComplete: true },
           });
 
-          const offerResult = await mockTradingAgent.createDefaultOffer(ctx.userId!);
+          // Get user's capacity from credentials
+          const userData = await prisma.user.findUnique({
+            where: { id: ctx.userId! },
+            include: { provider: true },
+          });
 
-          if (offerResult.success && offerResult.offer) {
-            const o = offerResult.offer;
-            return {
-              messages: [
-                {
-                  text: h(ctx,
-                    `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
-                    `हो गया! आपकी बिजली अब बिकने को तैयार है:\n${o.quantity} यूनिट ₹${o.pricePerKwh} प्रति यूनिट पे, कल सुबह 6 से शाम 6 तक।\n\nअब खरीदार आपकी बिजली खरीद सकते हैं!`
-                  ),
-                  offerCreated: {
-                    quantity: o.quantity,
-                    pricePerKwh: o.pricePerKwh,
-                    startTime: o.startTime,
-                    endTime: o.endTime,
-                    energyType: 'SOLAR',
+          const detectedCapacity = userData?.meterVerifiedCapacity
+            || userData?.productionCapacity
+            || userData?.provider?.capacityKW
+            || 10;
+          const smartPrice = 6; // ₹6/unit
+
+          // Setup and run auto-trade agent
+          const { setupSellerAutoTrade, runSingleSellerAutoTrade } = await import('../auto-trade');
+          const setupResult = await setupSellerAutoTrade(ctx.userId!, detectedCapacity, smartPrice);
+
+          if (setupResult.success) {
+            const tradeResult = await runSingleSellerAutoTrade(ctx.userId!);
+
+            if (tradeResult && (tradeResult.status === 'success' || tradeResult.status === 'warning_oversell')) {
+              const weatherPercent = Math.round(tradeResult.weatherMultiplier * 100);
+              const listedQty = tradeResult.listedQuantity.toFixed(1);
+              const dailyCapacity = (detectedCapacity / 30).toFixed(1);
+
+              let warningText = '';
+              if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
+                warningText = '\n\n⚠️ ' + tradeResult.warningMessage;
+              }
+
+              return {
+                messages: [
+                  {
+                    text: h(ctx,
+                      `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${smartPrice}/unit.\n\nMonthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
+                      `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं *${listedQty} kWh* ₹${smartPrice}/यूनिट पर लिस्ट कर रहा हूं।\n\nमासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
+                    ),
+                    offerCreated: {
+                      quantity: tradeResult.listedQuantity,
+                      pricePerKwh: smartPrice,
+                      startTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                      endTime: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
+                      energyType: 'SOLAR',
+                    },
+                    buttons: [
+                      { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
+                      { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
+                      { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                    ],
                   },
-                  buttons: [
-                    { text: h(ctx, '📋 View My Listings', '📋 मेरी लिस्टिंग देखो'), callbackData: 'action:show_listings' },
-                    { text: h(ctx, '🔋 Buy Energy', '🔋 बिजली खरीदो'), callbackData: 'action:buy_energy' },
-                    { text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), callbackData: 'action:show_earnings' },
-                  ],
-                },
-              ],
-              newState: 'GENERAL_CHAT',
-              contextUpdate: { tradingActive: true },
-            };
+                ],
+                newState: 'GENERAL_CHAT',
+                contextUpdate: { tradingActive: true },
+              };
+            }
           }
 
-          logger.warn(`createDefaultOffer returned error for user ${ctx.userId}: ${offerResult.error}`);
+          // Fallback if auto-trade setup failed
+          logger.warn(`Auto-trade setup failed for user ${ctx.userId}: ${setupResult.error}`);
           return {
             messages: [
               {
