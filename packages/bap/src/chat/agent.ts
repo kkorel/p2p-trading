@@ -1253,6 +1253,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
   const timeWindow = offers[0]?.timeWindow || 'Flexible';
 
   // Build matchedOffers card data for both single and multi-offer displays
+  // Round quantities and prices for cleaner display
   const matchedOffersCard = {
     selectionType: selectionType as 'single' | 'multiple',
     offers: offers.map(o => ({
@@ -1261,22 +1262,22 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
       providerName: o.providerName,
       trustScore: 0.7, // Default trust score
       energyType: 'SOLAR', // Default to solar
-      quantity: o.quantity,
-      pricePerKwh: o.price,
-      subtotal: o.subtotal || (o.price * o.quantity),
+      quantity: Math.round(o.quantity * 10) / 10, // Round to 1 decimal
+      pricePerKwh: Math.round(o.price * 100) / 100, // Round to 2 decimals
+      subtotal: Math.round(o.subtotal || (o.price * o.quantity)),
       timeWindow: o.timeWindow || timeWindow,
     })),
     summary: summary ? {
-      totalQuantity: summary.totalQuantity,
-      totalPrice: summary.totalPrice,
-      averagePrice: summary.averagePrice,
+      totalQuantity: Math.round(summary.totalQuantity * 10) / 10,
+      totalPrice: Math.round(summary.totalPrice),
+      averagePrice: Math.round(summary.averagePrice * 100) / 100,
       fullyFulfilled: summary.fullyFulfilled,
-      shortfall: summary.shortfall || 0,
+      shortfall: Math.round((summary.shortfall || 0) * 10) / 10,
       offersUsed: summary.offersUsed,
     } : {
-      totalQuantity: offers.reduce((s, o) => s + o.quantity, 0),
-      totalPrice: offers.reduce((s, o) => s + (o.subtotal || o.price * o.quantity), 0),
-      averagePrice: offers.length > 0 ? offers.reduce((s, o) => s + o.price, 0) / offers.length : 0,
+      totalQuantity: Math.round(offers.reduce((s, o) => s + o.quantity, 0) * 10) / 10,
+      totalPrice: Math.round(offers.reduce((s, o) => s + (o.subtotal || o.price * o.quantity), 0)),
+      averagePrice: offers.length > 0 ? Math.round((offers.reduce((s, o) => s + o.price, 0) / offers.length) * 100) / 100 : 0,
       fullyFulfilled: true,
       shortfall: 0,
       offersUsed: offers.length,
@@ -4376,7 +4377,7 @@ export async function processMessage(
         const messages: AgentMessage[] = [{ text: welcomeMsg || fallbackWelcome }];
         await storeAgentMessages(session.id, messages);
 
-        return { messages };
+        return { messages, responseLanguage: savedLang || 'en-IN' };
       }
 
       if (user) {
@@ -4424,10 +4425,10 @@ export async function processMessage(
           await transitionState(session.id, enterResp.newState, enterResp.contextUpdate);
           const chainResp = await states[enterResp.newState as ChatState].onEnter({ ...ctx, ...enterResp.contextUpdate });
           await storeAgentMessages(session.id, chainResp.messages);
-          return { messages: [...allMessages, ...chainResp.messages] };
+          return { messages: [...allMessages, ...chainResp.messages], responseLanguage: 'en-IN' };
         }
 
-        return { messages: allMessages };
+        return { messages: allMessages, responseLanguage: 'en-IN' };
       }
     }
 
@@ -4598,7 +4599,7 @@ export async function processMessage(
         }
 
         await storeAgentMessages(session.id, messages);
-        return { messages };
+        return { messages, responseLanguage: ctx.language || 'en-IN' };
       }
 
       // UNVERIFIED USER: Either doesn't exist or hasn't completed profile
@@ -4617,12 +4618,12 @@ export async function processMessage(
 
     await storeMessage(session.id, 'user', userMessage);
 
-    const ctx: SessionContext = {};
-    ctx._platform = platform; // Set platform for state handlers
-    const enterResp = await states.GREETING.onEnter(ctx);
+    const anonCtx: SessionContext = {};
+    anonCtx._platform = platform; // Set platform for state handlers
+    const enterResp = await states.GREETING.onEnter(anonCtx);
     await storeAgentMessages(session.id, enterResp.messages);
 
-    return { messages: enterResp.messages };
+    return { messages: enterResp.messages, responseLanguage: 'en-IN' };
   }
 
   // Existing session

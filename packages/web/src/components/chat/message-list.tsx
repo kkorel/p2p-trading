@@ -77,24 +77,27 @@ export function MessageList({
 
           {/* Bubble */}
           <div className="max-w-[80%] flex flex-col gap-1.5">
-            <div
-              className={`relative px-3.5 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap ${msg.role === 'agent'
-                  ? 'bg-gray-100 text-gray-900 rounded-2xl rounded-bl-md'
-                  : 'bg-teal-600 text-white rounded-2xl rounded-br-md'
-                }`}
-            >
-              {msg.content}
+            {/* Hide text bubble when premium UI cards are present (topDeals, matchedOffers, orderConfirmation, earnings) */}
+            {!(msg.role === 'agent' && (msg.topDeals || msg.matchedOffers || msg.orderConfirmation || msg.earnings)) && (
+              <div
+                className={`relative px-3.5 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap ${msg.role === 'agent'
+                    ? 'bg-gray-100 text-gray-900 rounded-2xl rounded-bl-md'
+                    : 'bg-teal-600 text-white rounded-2xl rounded-br-md'
+                  }`}
+              >
+                {msg.content}
 
-              {/* Speaker button for agent messages */}
-              {msg.role === 'agent' && showSpeaker && msg.content.length > 0 && (
-                <span className="inline-block ml-1.5 align-middle">
-                  <InlineSpeakerButton
-                    text={msg.content}
-                    languageCode={responseLanguage}
-                  />
-                </span>
-              )}
-            </div>
+                {/* Speaker button for agent messages */}
+                {msg.role === 'agent' && showSpeaker && msg.content.length > 0 && (
+                  <span className="inline-block ml-1.5 align-middle">
+                    <InlineSpeakerButton
+                      text={msg.content}
+                      languageCode={responseLanguage}
+                    />
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Dashboard card */}
             {msg.role === 'agent' && msg.dashboard && (
@@ -139,8 +142,8 @@ export function MessageList({
               <TopDealsCard
                 data={msg.topDeals}
                 language={responseLanguage}
-                onQuickBuy={(offerId, qty) => onButtonClick?.(`quick_buy:${offerId}:${qty}`, `Buy ${qty} units`)}
-                onCustomAmount={() => onButtonClick?.('custom_amount', 'Custom amount')}
+                onQuickBuy={(offerId, qty) => onButtonClick?.(`buy_deal:${offerId}:${qty}`, `Buy ${qty} units`)}
+                onCustomAmount={() => onButtonClick?.('buy_custom', 'Custom amount')}
               />
             )}
 
