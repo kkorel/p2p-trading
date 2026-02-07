@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp, ShieldCheck, Sun, Battery, BarChart2, Award, CheckCircle2, Activity, Download } from 'lucide-react';
+import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp, ShieldCheck, Sun, Battery, BarChart2, Award, CheckCircle2, Activity, Download, Satellite, MapPin } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
@@ -204,7 +204,7 @@ function MyCredentialsCard() {
     authApi
       .getCredentialsList()
       .then((res) => setCredentials(res.credentials))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -382,7 +382,129 @@ export default function ProfilePage() {
         {/* My Credentials Card */}
         <MyCredentialsCard />
 
-        {/* Production Capacity Card */}
+        {/* 🛰️ Satellite Installation Insight */}
+        {user.satelliteAnalysis && user.satelliteAnalysis.available && (
+          <div className="rounded-xl overflow-hidden shadow-sm" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+            {/* Header */}
+            <div className="px-4 pt-4 pb-2 flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <Satellite className="w-3.5 h-3.5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">🛰️ Satellite Verification</h3>
+                <p className="text-[10px] text-slate-400">
+                  {user.satelliteAnalysis.verificationMethod === 'SOLAR_API' ? 'Verified via Google Solar API' : 'Default analysis'}
+                </p>
+              </div>
+            </div>
+
+            {/* Satellite Image */}
+            {user.satelliteAnalysis.satelliteImageUrl && (
+              <div className="px-4 pb-3">
+                <div className="rounded-lg overflow-hidden relative">
+                  <img
+                    src={user.satelliteAnalysis.satelliteImageUrl}
+                    alt="Satellite view"
+                    className="w-full h-[160px] object-cover"
+                  />
+                  {user.satelliteAnalysis.location && (
+                    <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm rounded-full px-2 py-0.5">
+                      <MapPin className="w-3 h-3 text-red-400" />
+                      <span className="text-[10px] text-white font-mono">
+                        {user.satelliteAnalysis.location.lat.toFixed(4)}°N, {user.satelliteAnalysis.location.lon.toFixed(4)}°E
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {user.satelliteAnalysis.location?.formattedAddress && (
+                  <p className="text-[11px] text-slate-400 mt-1.5 truncate">
+                    📍 {user.satelliteAnalysis.location.formattedAddress}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Stats Grid */}
+            <div className="px-4 pb-3 grid grid-cols-2 gap-2">
+              <div className="bg-white/5 rounded-lg p-2.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wide">Sunshine</span>
+                </div>
+                <p className="text-base font-bold text-white">
+                  {user.satelliteAnalysis.maxSunshineHours?.toLocaleString() || '—'}
+                  <span className="text-[10px] font-normal text-slate-400 ml-1">hrs/yr</span>
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-lg p-2.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Activity className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wide">Roof Area</span>
+                </div>
+                <p className="text-base font-bold text-white">
+                  {user.satelliteAnalysis.roofAreaM2?.toFixed(0) || '—'}
+                  <span className="text-[10px] font-normal text-slate-400 ml-1">m²</span>
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-lg p-2.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Zap className="w-3.5 h-3.5 text-green-400" />
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wide">Max Panels</span>
+                </div>
+                <p className="text-base font-bold text-white">
+                  {user.satelliteAnalysis.maxPanelCount || '—'}
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-lg p-2.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Satellite className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wide">Quality</span>
+                </div>
+                <p className="text-base font-bold text-white">
+                  {user.satelliteAnalysis.imageryQuality || '—'}
+                </p>
+              </div>
+            </div>
+
+            {/* Score + Trading Limit */}
+            <div className="px-4 pb-4">
+              {/* Score Bar */}
+              <div className="bg-white/5 rounded-lg p-3 mb-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium text-white flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    Installation Score
+                  </span>
+                  <span className="text-sm font-bold text-green-400">
+                    {Math.round((user.satelliteAnalysis.installationScore || 0) * 100)}%
+                  </span>
+                </div>
+                <div className="h-1.5 bg-slate-600 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"
+                    style={{ width: `${Math.round((user.satelliteAnalysis.installationScore || 0) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Trading Limit */}
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp className="w-4 h-4 text-green-400" />
+                    <div>
+                      <p className="text-xs font-medium text-white">Satellite Trading Limit</p>
+                      <p className="text-[10px] text-slate-400">Based on installation quality</p>
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold text-green-400">
+                    {user.satelliteAnalysis.tradingLimitPercent}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <Card>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">

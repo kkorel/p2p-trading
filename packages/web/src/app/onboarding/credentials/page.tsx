@@ -42,6 +42,8 @@ export default function CredentialsOnboarding() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isCompletingSignup, setIsCompletingSignup] = useState(false);
 
+
+
   // Role selection
   const [selectedRole, setSelectedRole] = useState<'seller' | 'buyer' | 'both' | null>(null);
 
@@ -119,6 +121,8 @@ export default function CredentialsOnboarding() {
               claims: result.extractedClaims,
             },
           ]);
+
+
         } else {
           setUploadError(
             `Credential verification failed. Please ensure you have a valid ${expectedType || 'credential'} JSON file.`
@@ -191,13 +195,12 @@ export default function CredentialsOnboarding() {
               <div key={step.id} className="flex items-center flex-1">
                 <div className="flex flex-col items-center flex-1">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
-                      index < currentStep
-                        ? 'bg-[var(--color-success)] text-white'
-                        : index === currentStep
-                          ? 'bg-[var(--color-primary)] text-white'
-                          : 'bg-[var(--color-border)] text-[var(--color-text-muted)]'
-                    }`}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${index < currentStep
+                      ? 'bg-[var(--color-success)] text-white'
+                      : index === currentStep
+                        ? 'bg-[var(--color-primary)] text-white'
+                        : 'bg-[var(--color-border)] text-[var(--color-text-muted)]'
+                      }`}
                   >
                     {index < currentStep ? (
                       <CheckCircle2 className="w-4 h-4" />
@@ -206,22 +209,20 @@ export default function CredentialsOnboarding() {
                     )}
                   </div>
                   <span
-                    className={`text-[10px] mt-1 ${
-                      index <= currentStep
-                        ? 'text-[var(--color-text)]'
-                        : 'text-[var(--color-text-muted)]'
-                    }`}
+                    className={`text-[10px] mt-1 ${index <= currentStep
+                      ? 'text-[var(--color-text)]'
+                      : 'text-[var(--color-text-muted)]'
+                      }`}
                   >
                     {step.label}
                   </span>
                 </div>
                 {index < STEPS.length - 1 && (
                   <div
-                    className={`h-[2px] flex-1 mx-1 transition-colors ${
-                      index < currentStep
-                        ? 'bg-[var(--color-success)]'
-                        : 'bg-[var(--color-border)]'
-                    }`}
+                    className={`h-[2px] flex-1 mx-1 transition-colors ${index < currentStep
+                      ? 'bg-[var(--color-success)]'
+                      : 'bg-[var(--color-border)]'
+                      }`}
                   />
                 )}
               </div>
@@ -252,11 +253,10 @@ export default function CredentialsOnboarding() {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
             <div
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                hasUtilityVC
-                  ? 'bg-[var(--color-success)] text-white'
-                  : 'bg-[var(--color-primary)] text-white'
-              }`}
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${hasUtilityVC
+                ? 'bg-[var(--color-success)] text-white'
+                : 'bg-[var(--color-primary)] text-white'
+                }`}
             >
               {hasUtilityVC ? <CheckCircle2 className="w-4 h-4" /> : '1'}
             </div>
@@ -355,11 +355,10 @@ export default function CredentialsOnboarding() {
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                  canComplete
-                    ? 'bg-[var(--color-success)] text-white'
-                    : 'bg-[var(--color-primary)] text-white'
-                }`}
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${canComplete
+                  ? 'bg-[var(--color-success)] text-white'
+                  : 'bg-[var(--color-primary)] text-white'
+                  }`}
               >
                 {canComplete ? <CheckCircle2 className="w-4 h-4" /> : '3'}
               </div>
@@ -395,6 +394,8 @@ export default function CredentialsOnboarding() {
                     <span className="text-sm text-[var(--color-text-muted)]">Upload Generation Profile VC</span>
                   </button>
                 )}
+
+
 
                 {/* Storage VC */}
                 {hasStorageVC ? (

@@ -30,7 +30,7 @@ export async function geocodeAddress(address: string): Promise<GeoLocation | nul
             return null;
         }
 
-        const data = await response.json();
+        const data = await response.json() as { results?: Array<{ latitude: number; longitude: number; name: string }> };
         if (!data.results || data.results.length === 0) {
             logger.warn('No geocoding results found', { address });
             return null;
@@ -68,7 +68,7 @@ export async function getWeatherForecast(lat: number, lon: number): Promise<Weat
             return null;
         }
 
-        const data = await response.json();
+        const data = await response.json() as { hourly: { time: string[]; cloud_cover: number[]; wind_speed_10m: number[]; precipitation: number[]; weather_code: number[] } };
 
         const hourly: HourlyWeather[] = data.hourly.time.map((time: string, i: number) => ({
             time: new Date(time),

@@ -31,6 +31,9 @@ model User {
   baselineTrustScore  Float     @default(0.3) @map("baseline_trust_score") // Initial score from meter analysis
   meterDataAnalyzed   Boolean   @default(false) @map("meter_data_analyzed")
   
+  // Satellite verification (Google Solar API)
+  satelliteAnalysis   String?   @map("satellite_analysis")   // JSON from Google Solar API analysis
+  
   // Production capacity (kWh per month)
   productionCapacity    Float?    @map("production_capacity")       // User-declared production
   meterVerifiedCapacity Float?    @map("meter_verified_capacity")   // Verified from meter PDF

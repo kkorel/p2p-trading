@@ -564,6 +564,42 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
 
         logger.info(`Auto-created Provider ${providerId} for user ${userId} from ${credType}`);
       }
+
+      // 🛰️ Satellite Analysis: Analyze installation and set trading limit
+      if (currentUser?.installationAddress && credType === 'GenerationProfileCredential') {
+        try {
+          const { analyzeInstallation, getSatelliteImageUrl } = await import('@p2p/shared');
+
+          logger.info(`Starting satellite analysis for user ${userId}`, {
+            address: currentUser.installationAddress
+          });
+
+          const analysis = await analyzeInstallation(currentUser.installationAddress);
+
+          // Update user with trading limit and satellite analysis
+          const satelliteUpdate: Record<string, any> = {
+            allowedTradeLimit: analysis.tradingLimitPercent,
+            satelliteAnalysis: JSON.stringify(analysis),
+          };
+
+          await prisma.user.update({
+            where: { id: userId },
+            data: satelliteUpdate,
+          });
+
+          logger.info(`Satellite analysis complete for user ${userId}`, {
+            available: analysis.available,
+            score: analysis.installationScore,
+            tradingLimit: analysis.tradingLimitPercent,
+            method: analysis.verificationMethod,
+          });
+        } catch (satelliteError: any) {
+          // Don't fail VC verification if satellite analysis fails
+          logger.warn(`Satellite analysis failed for user ${userId}, using default limit`, {
+            error: satelliteError.message,
+          });
+        }
+      }
     }
 
     // Fetch all credentials to return status
@@ -578,6 +614,34 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
     );
 
     logger.info(`Pre-auth: User ${userId} verified ${credType}: method=${extractionMethod}, verified=${verificationResult.verified}`);
+
+    // Fetch updated user to get satellite analysis data
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        allowedTradeLimit: true,
+        satelliteAnalysis: true,
+        installationAddress: true,
+      },
+    });
+
+    // Parse satellite analysis if available
+    let satelliteData = null;
+    if (updatedUser?.satelliteAnalysis) {
+      try {
+        satelliteData = JSON.parse(updatedUser.satelliteAnalysis);
+        // Add satellite image URL if location is available
+        if (satelliteData.location?.lat && satelliteData.location?.lon) {
+          const { getSatelliteImageUrl } = await import('@p2p/shared');
+          satelliteData.satelliteImageUrl = getSatelliteImageUrl(
+            satelliteData.location.lat,
+            satelliteData.location.lon
+          );
+        }
+      } catch (e) {
+        logger.warn(`Failed to parse satellite analysis for user ${userId}`);
+      }
+    }
 
     res.json({
       success: true,
@@ -598,6 +662,20 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
         utilityVC: !hasUtilityVC,
         roleVC: !hasRoleVC,
       },
+      // 🛰️ Satellite verification data for frontend display
+      satelliteVerification: satelliteData ? {
+        available: satelliteData.available,
+        location: satelliteData.location,
+        maxSunshineHours: satelliteData.maxSunshineHours,
+        maxPanelCount: satelliteData.maxPanelCount,
+        roofAreaM2: satelliteData.roofAreaM2,
+        imageryQuality: satelliteData.imageryQuality,
+        installationScore: satelliteData.installationScore,
+        tradingLimitPercent: satelliteData.tradingLimitPercent,
+        satelliteImageUrl: satelliteData.satelliteImageUrl,
+        verificationMethod: satelliteData.verificationMethod,
+        analyzedAt: satelliteData.analyzedAt,
+      } : null,
     });
   } catch (error: any) {
     logger.error(`Pre-auth verify credential error: ${error}`);
@@ -695,6 +773,19 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
         meterDataAnalyzed: user.meterDataAnalyzed,
         productionCapacity: user.productionCapacity,
         meterVerifiedCapacity: user.meterVerifiedCapacity,
+        satelliteAnalysis: user.satelliteAnalysis ? (() => {
+          try {
+            const parsed = JSON.parse(user.satelliteAnalysis);
+            // Add satellite image URL if location is available
+            if (parsed.location?.lat && parsed.location?.lon) {
+              const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+              if (apiKey) {
+                parsed.satelliteImageUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${parsed.location.lat},${parsed.location.lon}&zoom=19&size=400x300&maptype=satellite&key=${apiKey}`;
+              }
+            }
+            return parsed;
+          } catch { return null; }
+        })() : null,
       },
     });
   } catch (error: any) {
@@ -922,7 +1013,7 @@ router.post('/payment', authMiddleware, async (req: Request, res: Response) => {
     const maxWaitMs = 5000;
     const pollIntervalMs = 200;
     const startTime = Date.now();
-    
+
     let order = null;
     while (Date.now() - startTime < maxWaitMs) {
       order = await prisma.order.findUnique({

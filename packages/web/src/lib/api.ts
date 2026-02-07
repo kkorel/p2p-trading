@@ -119,6 +119,19 @@ export const authApi = {
       credentials: Array<{ type: string; verified: boolean; verifiedAt: string | null }>;
       signupReady: boolean;
       missing: { utilityVC: boolean; roleVC: boolean };
+      satelliteVerification?: {
+        available: boolean;
+        location?: { lat: number; lon: number; formattedAddress?: string };
+        maxSunshineHours?: number;
+        maxPanelCount?: number;
+        roofAreaM2?: number;
+        imageryQuality?: 'HIGH' | 'MEDIUM' | 'LOW';
+        installationScore?: number;
+        tradingLimitPercent?: number;
+        satelliteImageUrl?: string;
+        verificationMethod?: string;
+        analyzedAt?: string;
+      };
     }>('/auth/verify-credential-preauth', {
       method: 'POST',
       body: JSON.stringify({ userId, pdfBase64, credential }),
@@ -547,6 +560,19 @@ export interface User {
   meterDataAnalyzed?: boolean;
   productionCapacity?: number | null;
   meterVerifiedCapacity?: number | null;
+  satelliteAnalysis?: {
+    available: boolean;
+    location?: { lat: number; lon: number; formattedAddress?: string };
+    maxSunshineHours?: number;
+    maxPanelCount?: number;
+    roofAreaM2?: number;
+    imageryQuality?: 'HIGH' | 'MEDIUM' | 'LOW';
+    installationScore?: number;
+    tradingLimitPercent?: number;
+    satelliteImageUrl?: string;
+    verificationMethod?: string;
+    analyzedAt?: string;
+  } | null;
 }
 
 // Response type for verifyOtp - can be success or requiresVC
