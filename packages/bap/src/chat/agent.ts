@@ -3317,6 +3317,9 @@ const states: Record<ChatState, StateHandler> = {
         const dbType = degTypeToDbType(result.credType);
         const updatedCreds = [...new Set([...(ctx.verifiedCreds || []), dbType])];
 
+        // Debug: log credential type and intent
+        logger.info(`[WAITING_OPTIONAL_CRED] credType=${result.credType}, ctx.intent=${ctx.intent}, dbType=${dbType}`);
+
         // Special handling for consumption credential - show savings calculation for buyers
         if (result.credType === 'ConsumptionProfileCredential' && ctx.intent === 'buy') {
           // Extract sanctioned load from claims
@@ -3378,6 +3381,27 @@ const states: Record<ChatState, StateHandler> = {
       const hasGeneration = verifiedCreds.includes('GENERATION_PROFILE');
       const hasStorage = verifiedCreds.includes('STORAGE_PROFILE');
 
+      // IMPORTANT: Check intent FIRST - user may have switched from selling to buying
+      // If they explicitly chose to buy, go to buyer flow even if they have selling credentials
+      if (ctx.intent === 'buy') {
+        await prisma.user.update({
+          where: { id: ctx.userId! },
+          data: { profileComplete: true },
+        });
+
+        return {
+          messages: [
+            {
+              text: h(ctx,
+                'I\'ll help you find the best energy deals from local producers at fair prices. Your profile is ready!',
+                'Main aapko local producers se sahi daam pe bijli dilaunga. Aapka profile ready hai!'
+              )
+            },
+          ],
+          newState: 'GENERAL_CHAT',
+        };
+      }
+
       // Selling flow — explain what Oorja does, show expected earnings, ask to start
       if (hasGeneration || hasStorage) {
         const user = await prisma.user.findUnique({
@@ -3423,26 +3447,6 @@ const states: Record<ChatState, StateHandler> = {
               ],
             },
           ],
-        };
-      }
-
-      // Buyer flow — explain and mark complete
-      if (ctx.intent === 'buy') {
-        await prisma.user.update({
-          where: { id: ctx.userId! },
-          data: { profileComplete: true },
-        });
-
-        return {
-          messages: [
-            {
-              text: h(ctx,
-                'I\'ll help you find the best energy deals from local producers at fair prices. Your profile is ready!',
-                'Main aapko local producers se sahi daam pe bijli dilaunga. Aapka profile ready hai!'
-              )
-            },
-          ],
-          newState: 'GENERAL_CHAT',
         };
       }
 
