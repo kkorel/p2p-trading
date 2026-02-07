@@ -14,6 +14,7 @@ import { optionalAuthMiddleware } from './middleware';
 import { processMessage, FileData, VoiceInputOptions } from './chat/agent';
 import { transcribeBase64Audio, isSTTAvailable, STTError } from './chat/sarvam-stt';
 import { synthesizeSpeech, isTTSAvailable, TTSError, type TTSSpeaker } from './chat/sarvam-tts';
+import { transliterateToNativeScript, type SarvamLangCode } from './chat/sarvam';
 import { v4 as uuidv4 } from 'uuid';
 
 const logger = createLogger('ChatRoutes');
@@ -179,6 +180,23 @@ router.post('/voice', async (req: Request, res: Response) => {
 
     logger.info(`Voice transcription: "${transcription.transcript.substring(0, 50)}..." [${transcription.languageName}]`);
 
+    // Get user's language preference from session (for transliteration)
+    const existingSession = await prisma.chatSession.findUnique({
+      where: { platform_platformId: { platform: 'WEB', platformId } },
+    });
+    const sessionCtx = existingSession?.contextJson ? JSON.parse(existingSession.contextJson) : {};
+    const userLanguage = (sessionCtx.language || transcription.languageCode) as SarvamLangCode;
+
+    // Transliterate transcript to user's selected language script
+    // This converts Roman script names (e.g., "Aryan") to native script (e.g., "अर्यन")
+    let displayTranscript = transcription.transcript;
+    if (userLanguage !== 'en-IN' && userLanguage !== transcription.languageCode) {
+      displayTranscript = await transliterateToNativeScript(transcription.transcript, userLanguage);
+      if (displayTranscript !== transcription.transcript) {
+        logger.info(`Transliterated transcript: "${transcription.transcript}" → "${displayTranscript}"`);
+      }
+    }
+
     // Send the transcript to the agent with voice language info
     const voiceOptions: VoiceInputOptions = {
       detectedLanguage: transcription.languageCode,
@@ -196,13 +214,13 @@ router.post('/voice', async (req: Request, res: Response) => {
     res.json({
       success: true,
       sessionId: platformId,
-      transcript: transcription.transcript,
+      transcript: displayTranscript, // Use transliterated transcript for display
       language: transcription.languageCode,
       languageName: transcription.languageName,
       processingTimeMs: transcription.processingTimeMs,
       messages,
       authToken: response.authToken || undefined,
-      responseLanguage: response.responseLanguage || transcription.languageCode,
+      responseLanguage: response.responseLanguage || userLanguage,
       voiceOutputEnabled: response.voiceOutputEnabled,
       autoVoice: response.autoVoice, // Auto-play voice when input was voice
     });

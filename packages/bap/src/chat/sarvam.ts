@@ -149,3 +149,56 @@ export async function translateFromEnglish(text: string, targetLang: SarvamLangC
 export function isTranslationAvailable(): boolean {
   return !!SARVAM_API_KEY;
 }
+
+/**
+ * Transliterate Roman script text to native Indic script.
+ * Used to display names and English words in the user's selected language script.
+ *
+ * @param text - Text to transliterate (may contain Roman script words)
+ * @param targetLang - Target language script (e.g., 'hi-IN' for Devanagari)
+ * @returns Text with Roman words transliterated to target script
+ */
+export async function transliterateToNativeScript(
+  text: string,
+  targetLang: SarvamLangCode
+): Promise<string> {
+  // Skip if target is English or no API key
+  if (targetLang === 'en-IN' || !SARVAM_API_KEY) {
+    return text;
+  }
+
+  // Check if text has Roman characters that need transliteration
+  const hasRomanChars = /[a-zA-Z]/.test(text);
+  if (!hasRomanChars) {
+    return text; // Already in native script
+  }
+
+  try {
+    const response = await axios.post(
+      `${SARVAM_BASE_URL}/transliterate`,
+      {
+        input: text,
+        source_language_code: 'en-IN',
+        target_language_code: targetLang,
+      },
+      {
+        headers: {
+          'api-subscription-key': SARVAM_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        timeout: 5000,
+      }
+    );
+
+    const transliterated = response.data?.transliterated_text;
+    if (transliterated) {
+      logger.debug(`Transliterated [en-IN → ${targetLang}]: "${text}" → "${transliterated}"`);
+      return transliterated;
+    }
+
+    return text;
+  } catch (error: any) {
+    logger.warn(`Transliteration failed [en-IN → ${targetLang}]: ${error.message}`);
+    return text;
+  }
+}

@@ -224,7 +224,7 @@ async function processCredentialUpload(
   // Detect type
   const detectedType = detectCredentialType(credential);
   if (!detectedType) {
-    return { success: false, credType: '', summary: '', error: 'This does not look like a valid ID document. Please upload your Solar ID or Electricity Connection ID (PDF or JSON file from your electricity company).' };
+    return { success: false, credType: '', summary: '', error: 'This does not look like a valid ID document. Please upload your Solar ID or Electricity Connection ID (PDF from your electricity company).' };
   }
 
   // Check expected type
@@ -2858,8 +2858,8 @@ const states: Record<ChatState, StateHandler> = {
         messages: [
           {
             text: progress + h(ctx,
-              `I need your electricity account ID from ${discomLabel}. You can get it online here:\n${credLink}\n\nDownload and upload it here (PDF or JSON).`,
-              `मुझे आपकी बिजली कंपनी (${localizedDiscom}) का आईडी चाहिए। वो आपको ऑनलाइन मिल जाएगा इस वेबसाइट पर:\n${credLink}\n\nडाउनलोड करके यहाँ अपलोड करो (पीडीएफ या जेएसओएन)।`
+              `I need your electricity account ID from ${discomLabel}. You can get it online here:\n${credLink}\n\nDownload and upload it here (PDF).`,
+              `मुझे आपकी बिजली कंपनी (${localizedDiscom}) का आईडी चाहिए। वो आपको ऑनलाइन मिल जाएगा इस वेबसाइट पर:\n${credLink}\n\nडाउनलोड करके यहाँ अपलोड करो (पीडीएफ)।`
             ),
           },
         ],
@@ -2872,7 +2872,7 @@ const states: Record<ChatState, StateHandler> = {
           return {
             messages: [
               { text: kbAnswer },
-              { text: h(ctx, 'Upload your electricity account ID when ready (PDF or JSON).', 'जब तैयार हो तब बिजली कंपनी का आईडी अपलोड करो (पीडीएफ या जेएसओएन)।'), delay: 300 },
+              { text: h(ctx, 'Upload your electricity account ID when ready (PDF).', 'जब तैयार हो तब बिजली कंपनी का आईडी अपलोड करो (पीडीएफ)।'), delay: 300 },
             ],
           };
         }
@@ -2891,7 +2891,7 @@ const states: Record<ChatState, StateHandler> = {
         }
 
         return {
-          messages: [{ text: h(ctx, 'Please upload your electricity account ID (PDF or JSON).', 'Apni bijli company ka ID upload karo (PDF ya JSON).') }],
+          messages: [{ text: h(ctx, 'Please upload your electricity account ID (PDF).', 'अपनी बिजली कंपनी का आईडी अपलोड करो (पीडीएफ)।') }],
         };
       }
 
@@ -3094,8 +3094,8 @@ const states: Record<ChatState, StateHandler> = {
         messages: [
           {
             text: h(ctx,
-              `Your electricity company would have given you a ${farmerName.en} online. You can get it here:\n${credLink}\n\nUpload it here (PDF or JSON).`,
-              `आपकी बिजली कंपनी ने आपको ${farmerName.hi} ऑनलाइन दिया होगा। इस लिंक पर मिल जाएगा:\n${credLink}\n\nअपलोड करो (पीडीएफ या जेएसओएन)।`
+              `Your electricity company would have given you a ${farmerName.en} online. You can get it here:\n${credLink}\n\nUpload it here (PDF).`,
+              `आपकी बिजली कंपनी ने आपको ${farmerName.hi} ऑनलाइन दिया होगा। इस लिंक पर मिल जाएगा:\n${credLink}\n\nअपलोड करो (पीडीएफ)।`
             ),
           },
         ],
@@ -3126,8 +3126,8 @@ const states: Record<ChatState, StateHandler> = {
           messages: [
             {
               text: h(ctx,
-                `Please upload your ${farmerName.en} (PDF or JSON).`,
-                `अपना ${farmerName.hi} अपलोड करो (पीडीएफ या जेएसओएन)।`
+                `Please upload your ${farmerName.en} (PDF).`,
+                `अपना ${farmerName.hi} अपलोड करो (पीडीएफ)।`
               ),
               buttons: [{ text: h(ctx, '⏭️ Skip this', '⏭️ ये स्किप करो'), callbackData: 'skip' }],
             },
@@ -4391,12 +4391,18 @@ export async function processMessage(
   // Determine effective language for this message:
   // 1. Structured input (numbers, callbacks) → keep existing preference
   // 2. Voice input → KEEP existing preference (don't switch based on detected language)
-  // 3. Native Indic script detected in TEXT → switch to that language
-  // 4. English detected in TEXT → switch to English
+  // 3. File uploads → KEEP existing preference (label is always English)
+  // 4. Native Indic script detected in TEXT → switch to that language
+  // 5. English detected in TEXT → switch to English
   let userLang: SarvamLangCode;
   if (isStructuredInput || isCallbackData) {
     // Don't change language on button presses or numeric input
     userLang = (ctx.language || 'en-IN') as SarvamLangCode;
+  } else if (fileData) {
+    // File uploads: KEEP existing language preference
+    // The label "[PDF uploaded]" is always English but user expects response in their chosen language
+    userLang = (ctx.language || 'en-IN') as SarvamLangCode;
+    logger.info(`[FileUpload] Keeping existing language preference: ${userLang}`);
   } else if (voiceOptions?.isVoiceInput) {
     // Voice input: KEEP existing language preference
     // User may say English words (like names) but expects response in their chosen language
