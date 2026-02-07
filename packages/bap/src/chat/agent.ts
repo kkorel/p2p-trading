@@ -4738,8 +4738,14 @@ export async function processMessage(
   // 5. Native Indic script detected in TEXT → switch to that language
   // 6. First message in English → default to English
   let userLang: SarvamLangCode;
-  if (isStructuredInput || isCallbackData) {
-    // Don't change language on button presses or numeric input
+  // IMPORTANT: Handle language selection callbacks FIRST, before any defaults
+  if (userMessage.startsWith('lang:')) {
+    // User explicitly selected a language via button (e.g., "lang:hi-IN")
+    const selectedLang = userMessage.replace('lang:', '') as SarvamLangCode;
+    userLang = selectedLang;
+    logger.info(`[Language] User selected language via callback: ${selectedLang}`);
+  } else if (isStructuredInput || isCallbackData) {
+    // Don't change language on other button presses or numeric input
     userLang = (ctx.language || 'en-IN') as SarvamLangCode;
   } else if (fileData) {
     // File uploads: KEEP existing language preference
