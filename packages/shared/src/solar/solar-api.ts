@@ -16,7 +16,11 @@ import type {
     SolarAnalysis,
     GoogleSolarBuildingInsights,
     GoogleGeocodingResult,
+    HeatmapResult,
+    GoogleDataLayersResponse,
 } from './types';
+import * as GeoTIFF from 'geotiff';
+import { PNG } from 'pngjs';
 
 // ─── Inline Logger (no external dependencies) ───────────────────────────────
 const logger = {
@@ -313,5 +317,201 @@ export async function warmupCache(addresses: string[]): Promise<void> {
         } catch (error) {
             logger.warn('Failed to cache demo address', { address, error: String(error) });
         }
+    }
+}
+
+// ─── Solar Heatmap ──────────────────────────────────────────────────────────
+
+/**
+ * Fetch data layers from Google Solar API
+ */
+async function fetchDataLayers(
+    lat: number,
+    lon: number,
+    radiusMeters: number = 50
+): Promise<GoogleDataLayersResponse | null> {
+    const apiKey = process.env.GOOGLE_SOLAR_API_KEY;
+    if (!apiKey) {
+        logger.warn('GOOGLE_SOLAR_API_KEY not set');
+        return null;
+    }
+
+    try {
+        const url = `${GOOGLE_SOLAR_API}/dataLayers:get?location.latitude=${lat}&location.longitude=${lon}&radiusMeters=${radiusMeters}&view=FULL_LAYERS&requiredQuality=MEDIUM&key=${apiKey}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            logger.warn('Solar Data Layers API error', { status: response.status });
+            return null;
+        }
+
+        return await response.json() as GoogleDataLayersResponse;
+    } catch (error) {
+        logger.error('Data Layers fetch failed', { error: String(error) });
+        return null;
+    }
+}
+
+/**
+ * Map a flux value (kWh/m²/year) to an RGBA color
+ * Blue (low) → Green (moderate) → Yellow (good) → Red (excellent)
+ */
+function fluxToColor(flux: number, minFlux: number, maxFlux: number): [number, number, number, number] {
+    if (flux <= -9999) return [0, 0, 0, 0]; // Transparent for invalid pixels
+
+    const range = maxFlux - minFlux;
+    if (range <= 0) return [128, 128, 128, 200]; // Gray fallback
+
+    const t = Math.max(0, Math.min(1, (flux - minFlux) / range));
+
+    let r: number, g: number, b: number;
+
+    if (t < 0.25) {
+        // Blue → Cyan
+        const s = t / 0.25;
+        r = 0;
+        g = Math.round(100 * s);
+        b = Math.round(200 + 55 * (1 - s));
+    } else if (t < 0.5) {
+        // Cyan → Green
+        const s = (t - 0.25) / 0.25;
+        r = 0;
+        g = Math.round(100 + 155 * s);
+        b = Math.round(200 * (1 - s));
+    } else if (t < 0.75) {
+        // Green → Yellow
+        const s = (t - 0.5) / 0.25;
+        r = Math.round(255 * s);
+        g = 255;
+        b = 0;
+    } else {
+        // Yellow → Red
+        const s = (t - 0.75) / 0.25;
+        r = 255;
+        g = Math.round(255 * (1 - s));
+        b = 0;
+    }
+
+    return [r, g, b, 200]; // Semi-transparent
+}
+
+/**
+ * Get a solar heatmap for an address.
+ * Returns a rendered PNG showing annual solar flux as a color-coded heatmap.
+ *
+ * @param address - Street address to analyze (e.g. "42 MG Road, Mumbai")
+ * @param radiusMeters - Radius around the location (default: 50m)
+ * @returns HeatmapResult with base64 PNG image and flux statistics
+ */
+export async function getSolarHeatmap(
+    address: string,
+    radiusMeters: number = 50
+): Promise<HeatmapResult> {
+    try {
+        // Step 1: Geocode
+        const coords = await geocodeWithGoogle(address);
+        if (!coords) {
+            return { available: false, errorReason: 'Geocoding failed' };
+        }
+
+        logger.info('Fetching heatmap', { address, lat: coords.lat, lon: coords.lon });
+
+        // Step 2: Fetch data layers
+        const dataLayers = await fetchDataLayers(coords.lat, coords.lon, radiusMeters);
+        if (!dataLayers || !dataLayers.annualFluxUrl) {
+            return { available: false, errorReason: 'No solar data layers available' };
+        }
+
+        // Step 3: Fetch the annualFlux GeoTIFF
+        const apiKey = process.env.GOOGLE_SOLAR_API_KEY!;
+        const tiffUrl = `${dataLayers.annualFluxUrl}&key=${apiKey}`;
+        const tiffResponse = await fetch(tiffUrl);
+
+        if (!tiffResponse.ok) {
+            logger.warn('Failed to fetch GeoTIFF', { status: tiffResponse.status });
+            return { available: false, errorReason: `GeoTIFF fetch failed: ${tiffResponse.status}` };
+        }
+
+        const tiffBuffer = await tiffResponse.arrayBuffer();
+
+        // Step 4: Decode GeoTIFF
+        const tiff = await GeoTIFF.fromArrayBuffer(tiffBuffer);
+        const image = await tiff.getImage();
+        const width = image.getWidth();
+        const height = image.getHeight();
+        const rasters = await image.readRasters();
+        const fluxData = rasters[0] as Float32Array;
+
+        // Step 5: Calculate flux statistics (ignoring invalid pixels)
+        let minFlux = Infinity;
+        let maxFlux = -Infinity;
+        let sumFlux = 0;
+        let validCount = 0;
+
+        for (let i = 0; i < fluxData.length; i++) {
+            const val = fluxData[i];
+            if (val > -9999) {
+                minFlux = Math.min(minFlux, val);
+                maxFlux = Math.max(maxFlux, val);
+                sumFlux += val;
+                validCount++;
+            }
+        }
+
+        if (validCount === 0) {
+            return { available: false, errorReason: 'No valid flux data in GeoTIFF' };
+        }
+
+        const avgFlux = sumFlux / validCount;
+
+        // Step 6: Render to PNG
+        const png = new PNG({ width, height });
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = y * width + x;
+                const pngIdx = idx * 4;
+                const [r, g, b, a] = fluxToColor(fluxData[idx], minFlux, maxFlux);
+                png.data[pngIdx] = r;
+                png.data[pngIdx + 1] = g;
+                png.data[pngIdx + 2] = b;
+                png.data[pngIdx + 3] = a;
+            }
+        }
+
+        const pngBuffer = PNG.sync.write(png);
+        const imageBase64 = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+
+        // Step 7: Extract bounds from GeoTIFF metadata
+        const bbox = image.getBoundingBox();
+
+        logger.info('Heatmap generated', {
+            width,
+            height,
+            minFlux: Math.round(minFlux),
+            maxFlux: Math.round(maxFlux),
+            avgFlux: Math.round(avgFlux),
+        });
+
+        return {
+            available: true,
+            imageBase64,
+            width,
+            height,
+            fluxStats: {
+                minKwhPerM2: Math.round(minFlux * 100) / 100,
+                maxKwhPerM2: Math.round(maxFlux * 100) / 100,
+                avgKwhPerM2: Math.round(avgFlux * 100) / 100,
+            },
+            bounds: {
+                west: bbox[0],
+                south: bbox[1],
+                east: bbox[2],
+                north: bbox[3],
+            },
+        };
+    } catch (error: any) {
+        logger.error('Heatmap generation failed', { error: error.message, address });
+        return { available: false, errorReason: error.message };
     }
 }

@@ -71,6 +71,45 @@ export interface GoogleGeocodingResult {
     status: string;
 }
 
+/** Result from getSolarHeatmap() */
+export interface HeatmapResult {
+    /** Whether heatmap data was available for this location */
+    available: boolean;
+    /** Base64-encoded PNG data URL (data:image/png;base64,...) */
+    imageBase64?: string;
+    /** Image dimensions in pixels */
+    width?: number;
+    height?: number;
+    /** Solar flux statistics across the image */
+    fluxStats?: {
+        minKwhPerM2: number;
+        maxKwhPerM2: number;
+        avgKwhPerM2: number;
+    };
+    /** Geographic bounds of the image */
+    bounds?: {
+        north: number;
+        south: number;
+        east: number;
+        west: number;
+    };
+    /** Error reason if available=false */
+    errorReason?: string;
+}
+
+/** Response from Google Solar API dataLayers:get endpoint */
+export interface GoogleDataLayersResponse {
+    imageryDate: { year: number; month: number; day: number };
+    imageryProcessedDate: { year: number; month: number; day: number };
+    dsmUrl: string;
+    rgbUrl: string;
+    maskUrl: string;
+    annualFluxUrl: string;
+    monthlyFluxUrl: string;
+    hourlyShadeUrls: string[];
+    imageryQuality: string;
+}
+
 /** Trading limit calculation constants */
 export const LIMIT_THRESHOLDS = {
     HIGH_SUNSHINE: 1800,    // hours/year → 15% limit
