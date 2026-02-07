@@ -13,7 +13,7 @@
  */
 
 import axios from 'axios';
-import { config, createLogger, Order, prisma, secureAxiosBpp, secureAxios } from '@p2p/shared';
+import { config, createLogger, Order, prisma, secureAxios } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
@@ -199,12 +199,12 @@ export async function writeTradeToLedger(
         clientReference: `${transactionId}-${orderItemId}-${Date.now()}`,
       };
 
-      // Log full request before sending (stringify in message since logger doesn't print context objects)
-      console.log('[LEDGER-PUT] Request body:', JSON.stringify(request, null, 2));
-      logger.info(`[LEDGER-PUT] Sending to ${ledgerUrl}/ledger/put`);
+      // Log full request before sending
+      logger.info(`[LEDGER-PUT] ${ledgerUrl}/ledger/put`);
+      logger.info(`[LEDGER-PUT] body: ${JSON.stringify(request)}`);
 
-      // POST with BPP signing (ledger requires Beckn signature)
-      const response = await secureAxiosBpp.post<LedgerWriteResponse>(
+      // POST with BAP signing (BUYER role = BAP keys)
+      const response = await secureAxios.post<LedgerWriteResponse>(
         `${ledgerUrl}/ledger/put`,
         request,
         {
@@ -286,11 +286,11 @@ async function writeSingleRecord(
   };
 
   // Log full request before sending
-  console.log('[LEDGER-PUT] Request body:', JSON.stringify(request, null, 2));
-  logger.info(`[LEDGER-PUT] Sending to ${ledgerUrl}/ledger/put`);
+  logger.info(`[LEDGER-PUT] ${ledgerUrl}/ledger/put`);
+  logger.info(`[LEDGER-PUT] body: ${JSON.stringify(request)}`);
 
-  // POST with BPP signing (ledger requires Beckn signature)
-  const response = await secureAxiosBpp.post<LedgerWriteResponse>(
+  // POST with BAP signing (BUYER role = BAP keys)
+  const response = await secureAxios.post<LedgerWriteResponse>(
     `${ledgerUrl}/ledger/put`,
     request,
     {
@@ -343,8 +343,8 @@ export async function getTradeFromLedger(
     };
 
     // Log request
-    console.log('[LEDGER-GET] Request body:', JSON.stringify(request, null, 2));
-    logger.info(`[LEDGER-GET] Querying ${ledgerUrl}/ledger/get`);
+    logger.info(`[LEDGER-GET] ${ledgerUrl}/ledger/get`);
+    logger.info(`[LEDGER-GET] body: ${JSON.stringify(request)}`);
 
     // POST with BAP signing (BUYER role reads ledger)
     const response = await secureAxios.post<LedgerGetResponse>(

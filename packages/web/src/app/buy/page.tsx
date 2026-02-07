@@ -417,21 +417,26 @@ export default function BuyPage() {
                 <Badge variant="primary">{offers.length} found</Badge>
               </div>
               <div className="flex flex-col gap-3">
-                {offers.slice(0, visibleCount).map((item) => (
-                  <OfferCard
-                    key={item.offer.id}
-                    offer={item.offer}
-                    providerName={item.providerName}
-                    sourceType={item.sourceType}
-                    availableQty={item.availableQty}
-                    score={item.score}
-                    matchesFilters={item.matchesFilters}
-                    filterReasons={item.filterReasons}
-                    scoreBreakdown={item.scoreBreakdown}
-                    isSelected={selectedOffer?.offer.id === item.offer.id}
-                    onSelect={() => handleSelectOffer(item)}
-                  />
-                ))}
+                {offers.slice(0, visibleCount).map((item) => {
+                  // Use composite key to handle same offer ID across different providers
+                  const uniqueKey = `${item.providerId}-${item.offer.id}`;
+                  const selectedKey = selectedOffer ? `${selectedOffer.providerId}-${selectedOffer.offer.id}` : null;
+                  return (
+                    <OfferCard
+                      key={uniqueKey}
+                      offer={item.offer}
+                      providerName={item.providerName}
+                      sourceType={item.sourceType}
+                      availableQty={item.availableQty}
+                      score={item.score}
+                      matchesFilters={item.matchesFilters}
+                      filterReasons={item.filterReasons}
+                      scoreBreakdown={item.scoreBreakdown}
+                      isSelected={uniqueKey === selectedKey}
+                      onSelect={() => handleSelectOffer(item)}
+                    />
+                  );
+                })}
               </div>
 
               {offers.length > visibleCount && (
