@@ -57,6 +57,77 @@ export interface ListingsCardData {
   userName: string;
 }
 
+export interface OfferCreatedData {
+  quantity: number;
+  pricePerKwh: number;
+  startTime: string;
+  endTime: string;
+  energyType?: string;
+}
+
+// Top Deals Card (Step 4 - buyer flow)
+export interface TopDealData {
+  offerId: string;
+  providerName: string;
+  trustScore: number;
+  energyType: string;
+  quantity: number;
+  pricePerKwh: number;
+  savingsPercent: number;
+}
+
+export interface TopDealsCardData {
+  deals: TopDealData[];
+  discomRate: number;
+}
+
+// Matched Offers Card (Step 7 - buyer flow)
+export interface MatchedOfferData {
+  offerId: string;
+  providerId: string;
+  providerName: string;
+  trustScore: number;
+  energyType: string;
+  quantity: number;
+  pricePerKwh: number;
+  subtotal: number;
+  timeWindow: string;
+}
+
+export interface MatchedOffersCardData {
+  selectionType: 'single' | 'multiple';
+  offers: MatchedOfferData[];
+  summary: {
+    totalQuantity: number;
+    totalPrice: number;
+    averagePrice: number;
+    fullyFulfilled: boolean;
+    shortfall: number;
+    offersUsed: number;
+  };
+  timeWindow: string;
+  transactionId: string;
+}
+
+// Order Confirmation Card (Step 8 - buyer flow)
+export interface OrderConfirmationCardData {
+  success: boolean;
+  orderId?: string;
+  offers: Array<{
+    providerName: string;
+    quantity: number;
+    pricePerKwh: number;
+    subtotal: number;
+  }>;
+  summary: {
+    totalQuantity: number;
+    totalPrice: number;
+    averagePrice: number;
+    ordersConfirmed: number;
+  };
+  timeWindow: string;
+}
+
 export interface ChatMessageData {
   role: 'agent' | 'user';
   content: string;
@@ -64,6 +135,10 @@ export interface ChatMessageData {
   offers?: OfferData[];
   dashboard?: DashboardData;
   listings?: ListingsCardData;
+  offerCreated?: OfferCreatedData;
+  topDeals?: TopDealsCardData;
+  matchedOffers?: MatchedOffersCardData;
+  orderConfirmation?: OrderConfirmationCardData;
 }
 
 /** Get stored session - prioritize authenticated session, then anonymous. */
@@ -218,6 +293,10 @@ export function useChatEngine() {
             buttons: m.buttons,
             dashboard: m.dashboard,
             listings: m.listings,
+            offerCreated: m.offerCreated,
+            topDeals: m.topDeals,
+            matchedOffers: m.matchedOffers,
+            orderConfirmation: m.orderConfirmation,
           })),
         ]);
       }
@@ -230,9 +309,12 @@ export function useChatEngine() {
       }
     } catch (err: any) {
       console.error('[Chat] sendMessageToAgent error:', err);
+      const errorMsg = responseLanguage === 'hi-IN'
+        ? 'माफ़ करना, कुछ गड़बड़ हो गई। दोबारा कोशिश करो।'
+        : 'Sorry, something went wrong. Please try again.';
       setMessages((prev) => [
         ...prev,
-        { role: 'agent', content: 'Sorry, something went wrong. Please try again.' },
+        { role: 'agent', content: errorMsg },
       ]);
     } finally {
       setIsLoading(false);
@@ -364,6 +446,8 @@ export function useChatEngine() {
               content: m.content,
               buttons: m.buttons,
               dashboard: m.dashboard,
+              listings: m.listings,
+              offerCreated: m.offerCreated,
             })),
           ]);
         }
@@ -430,6 +514,10 @@ export function useChatEngine() {
             buttons: m.buttons,
             dashboard: m.dashboard,
             listings: m.listings,
+            offerCreated: m.offerCreated,
+            topDeals: m.topDeals,
+            matchedOffers: m.matchedOffers,
+            orderConfirmation: m.orderConfirmation,
           })),
         ]);
       }

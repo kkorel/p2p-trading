@@ -7,6 +7,10 @@ import { InlineSpeakerButton } from './speaker-button';
 import { OfferList } from './offer-list';
 import { DashboardCard } from './dashboard-card';
 import { ListingCard } from './listing-card';
+import { OfferCreatedCard } from './offer-created-card';
+import { TopDealsCard } from './top-deals-card';
+import { MatchedOffersCard } from './matched-offers-card';
+import { OrderConfirmationCard } from './order-confirmation-card';
 
 export type { ChatMessageData };
 
@@ -117,6 +121,42 @@ export function MessageList({
             {msg.role === 'agent' && msg.listings && msg.listings.listings.length > 0 && (
               <ListingCard
                 data={msg.listings}
+                language={responseLanguage}
+              />
+            )}
+
+            {/* Offer created card for new listing */}
+            {msg.role === 'agent' && msg.offerCreated && (
+              <OfferCreatedCard
+                data={msg.offerCreated}
+                language={responseLanguage}
+              />
+            )}
+
+            {/* Top deals card for buyer flow */}
+            {msg.role === 'agent' && msg.topDeals && (
+              <TopDealsCard
+                data={msg.topDeals}
+                language={responseLanguage}
+                onQuickBuy={(offerId, qty) => onButtonClick?.(`quick_buy:${offerId}:${qty}`, `Buy ${qty} units`)}
+                onCustomAmount={() => onButtonClick?.('custom_amount', 'Custom amount')}
+              />
+            )}
+
+            {/* Matched offers card for buyer flow */}
+            {msg.role === 'agent' && msg.matchedOffers && (
+              <MatchedOffersCard
+                data={msg.matchedOffers}
+                language={responseLanguage}
+                onAccept={() => onButtonClick?.('purchase_offer_confirm:yes', 'Accept')}
+                onCancel={() => onButtonClick?.('purchase_offer_confirm:no', 'Cancel')}
+              />
+            )}
+
+            {/* Order confirmation card for buyer flow */}
+            {msg.role === 'agent' && msg.orderConfirmation && (
+              <OrderConfirmationCard
+                data={msg.orderConfirmation}
                 language={responseLanguage}
               />
             )}

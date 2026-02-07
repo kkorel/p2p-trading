@@ -166,6 +166,10 @@ router.post('/send', async (req: Request, res: Response) => {
       offers: m.offers || undefined,
       dashboard: m.dashboard || undefined,
       listings: m.listings || undefined,
+      offerCreated: m.offerCreated || undefined,
+      topDeals: m.topDeals || undefined,
+      matchedOffers: m.matchedOffers || undefined,
+      orderConfirmation: m.orderConfirmation || undefined,
     }));
 
     res.json({
@@ -218,6 +222,10 @@ router.post('/upload', async (req: Request, res: Response) => {
       buttons: m.buttons || undefined,
       dashboard: m.dashboard || undefined,
       listings: m.listings || undefined,
+      offerCreated: m.offerCreated || undefined,
+      topDeals: m.topDeals || undefined,
+      matchedOffers: m.matchedOffers || undefined,
+      orderConfirmation: m.orderConfirmation || undefined,
     }));
 
     res.json({
@@ -323,6 +331,10 @@ router.post('/voice', async (req: Request, res: Response) => {
       buttons: m.buttons || undefined,
       dashboard: m.dashboard || undefined,
       listings: m.listings || undefined,
+      offerCreated: m.offerCreated || undefined,
+      topDeals: m.topDeals || undefined,
+      matchedOffers: m.matchedOffers || undefined,
+      orderConfirmation: m.orderConfirmation || undefined,
     }));
 
     res.json({

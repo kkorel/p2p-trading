@@ -84,6 +84,70 @@ export interface AgentMessage {
   dashboard?: DashboardData;
   /** Structured listings for card UI rendering */
   listings?: ListingsCardData;
+  /** Structured offer created data for card UI rendering */
+  offerCreated?: {
+    quantity: number;
+    pricePerKwh: number;
+    startTime: string;
+    endTime: string;
+    energyType?: string;
+  };
+  /** Structured top deals for buyer flow */
+  topDeals?: {
+    deals: Array<{
+      offerId: string;
+      providerName: string;
+      trustScore: number;
+      energyType: string;
+      quantity: number;
+      pricePerKwh: number;
+      savingsPercent: number;
+    }>;
+    discomRate: number;
+  };
+  /** Structured matched offers for buyer flow */
+  matchedOffers?: {
+    selectionType: 'single' | 'multiple';
+    offers: Array<{
+      offerId: string;
+      providerId: string;
+      providerName: string;
+      trustScore: number;
+      energyType: string;
+      quantity: number;
+      pricePerKwh: number;
+      subtotal: number;
+      timeWindow: string;
+    }>;
+    summary: {
+      totalQuantity: number;
+      totalPrice: number;
+      averagePrice: number;
+      fullyFulfilled: boolean;
+      shortfall: number;
+      offersUsed: number;
+    };
+    timeWindow: string;
+    transactionId: string;
+  };
+  /** Structured order confirmation for buyer flow */
+  orderConfirmation?: {
+    success: boolean;
+    orderId?: string;
+    offers: Array<{
+      providerName: string;
+      quantity: number;
+      pricePerKwh: number;
+      subtotal: number;
+    }>;
+    summary: {
+      totalQuantity: number;
+      totalPrice: number;
+      averagePrice: number;
+      ordersConfirmed: number;
+    };
+    timeWindow: string;
+  };
 }
 
 export interface AgentResponse {
@@ -231,7 +295,7 @@ async function processCredentialUpload(
   userId: string,
   fileData: FileData,
   expectedType?: string
-): Promise<{ success: boolean; credType: string; summary: string; error?: string }> {
+): Promise<{ success: boolean; credType: string; summary: string; error?: string; claims?: any }> {
   let credential: any;
 
   if (fileData.mimeType === 'application/json') {
@@ -345,7 +409,7 @@ async function processCredentialUpload(
     }
   }
 
-  return { success: true, credType: detectedType, summary };
+  return { success: true, credType: detectedType, summary, claims };
 }
 
 function degTypeToDbType(degType: string): any {
@@ -775,14 +839,19 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
         const result = await mockTradingAgent.createDefaultOffer(ctx.userId);
         if (result.success && result.offer) {
           const o = result.offer;
-          const start = new Date(o.startTime);
-          const end = new Date(o.endTime);
           return {
             messages: [{
               text: h(ctx,
-                `✅ Done! Your energy is now on sale:\n\n• ${o.quantity} kWh at ₹${o.pricePerKwh}/unit\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} to ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}\n\nBuyers can now see and purchase your energy!`,
-                `✅ हो गया! आपकी बिजली बिक्री के लिए तैयार:\n\n• ${o.quantity} यूनिट ₹${o.pricePerKwh}/यूनिट पे\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} से ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} तक\n\nखरीदार अब आपकी बिजली खरीद सकते हैं!`
+                `Your energy is now on sale!`,
+                `आपकी बिजली बिक्री के लिए तैयार!`
               ),
+              offerCreated: {
+                quantity: o.quantity,
+                pricePerKwh: o.pricePerKwh,
+                startTime: o.startTime,
+                endTime: o.endTime,
+                energyType: 'SOLAR',
+              },
               buttons: [
                 { text: h(ctx, '📋 My Listings', '📋 मेरी लिस्टिंग'), callbackData: 'action:show_listings' },
                 { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
@@ -972,14 +1041,19 @@ async function createListingFromPending(ctx: SessionContext, pending: PendingLis
 
   if (result.success && result.offer) {
     const o = result.offer;
-    const start = new Date(o.startTime);
-    const end = new Date(o.endTime);
     return {
       messages: [{
         text: h(ctx,
-          `Done! Your listing is live:\n• ${o.quantity} kWh at Rs ${o.pricePerKwh}/unit\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} to ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}\n\nBuyers can now see and buy your energy!`,
-          `Ho gaya! Aapki listing live hai:\n• ${o.quantity} kWh Rs ${o.pricePerKwh}/unit pe\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} se ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} tak\n\nBuyers ab aapki energy khareed sakte hain!`
+          `Your listing is now live!`,
+          `आपकी लिस्टिंग लाइव है!`
         ),
+        offerCreated: {
+          quantity: o.quantity,
+          pricePerKwh: o.pricePerKwh,
+          startTime: o.startTime,
+          endTime: o.endTime,
+          energyType: pending.energyType || 'SOLAR',
+        },
         buttons: [
           { text: h(ctx, '📋 View My Listings', '📋 मेरी लिस्टिंग देखो'), callbackData: 'action:show_listings' },
           { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
@@ -1013,7 +1087,7 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
   if (!pending.topDealsShown && pending.quantity == null) {
     const { deals, message } = await getTopDeals(3, ctx.language);
 
-    // Build buttons for top deals
+    // Build buttons for top deals (fallback for WhatsApp/Telegram)
     const buttons = deals.slice(0, 3).map((deal, i) => ({
       text: `${i + 1}️⃣ Buy ${deal.quantity} units @ ₹${deal.pricePerUnit}`,
       callbackData: `buy_deal:${deal.offerId}:${deal.quantity}`,
@@ -1022,25 +1096,26 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
     // Add custom amount option
     buttons.push({ text: h(ctx, '📝 Custom amount', '📝 Custom amount'), callbackData: 'buy_custom' });
 
-    // Build structured offers for premium UI (web only)
-    const structuredOffers = deals.map(deal => ({
-      id: deal.offerId,
-      sellerName: deal.providerName,
-      sellerTrustScore: deal.trustScore,
-      energyType: (deal.energyType.includes('Solar') || deal.energyType.includes('☀️')) ? 'solar' as const :
-        (deal.energyType.includes('Wind') || deal.energyType.includes('💨')) ? 'wind' as const : 'grid' as const,
-      pricePerUnit: deal.pricePerUnit,
-      quantity: deal.quantity,
-      totalPrice: deal.totalPrice,
-      timeWindow: 'Flexible',
-      savingsPercent: Math.round(deal.savingsPercent),
-    }));
+    // Build structured top deals for premium UI card
+    const topDealsCard = {
+      deals: deals.map(deal => ({
+        offerId: deal.offerId,
+        providerName: deal.providerName,
+        trustScore: deal.trustScore,
+        energyType: deal.energyType.includes('Solar') || deal.energyType.includes('☀️') ? 'SOLAR' :
+          deal.energyType.includes('Wind') || deal.energyType.includes('💨') ? 'WIND' : 'MIXED',
+        quantity: deal.quantity,
+        pricePerKwh: deal.pricePerUnit,
+        savingsPercent: Math.round(deal.savingsPercent),
+      })),
+      discomRate: 7.5,
+    };
 
     return {
       messages: [{
         text: message,
-        offers: structuredOffers, // Premium UI cards for web
-        buttons,
+        topDeals: topDealsCard, // Premium UI card for web
+        buttons, // Fallback for WhatsApp/Telegram
       }],
       contextUpdate: { pendingPurchase: { ...pending, topDealsShown: true, awaitingField: 'top_deals' } },
     };
@@ -1166,91 +1241,60 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
   const offers = result.discoveredOffers || [];
   const summary = result.summary;
   const selectionType = result.selectionType || 'single';
-
-  // --- Single offer display ---
-  if (selectionType === 'single' && offers.length === 1) {
-    const offer = offers[0];
-    const totalPrice = offer.subtotal || (offer.price * offer.quantity);
-
-    return {
-      messages: [
-        searchMsg,
-        {
-          text: h(ctx,
-            `Found a match!\n\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh at Rs ${offer.price}/unit\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nDo you want to buy this?`,
-            `Offer mil gaya!\n\n• Seller: ${offer.providerName}\n• ${offer.quantity} kWh Rs ${offer.price}/unit pe\n• Total: Rs ${totalPrice.toFixed(2)}\n• Time: ${offer.timeWindow}\n\nYe khareedna hai?`
-          ),
-          buttons: [
-            { text: h(ctx, '✅ Yes, buy it!', '✅ हाँ, खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
-            { text: h(ctx, '❌ No, cancel', '❌ नहीं, रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
-          ],
-        },
-      ],
-      contextUpdate: {
-        pendingPurchase: {
-          ...pending,
-          awaitingField: 'confirm_offer',
-          discoveredOffer: {
-            offerId: offer.offerId,
-            providerId: offer.providerId,
-            providerName: offer.providerName,
-            price: offer.price,
-            quantity: offer.quantity,
-            timeWindow: offer.timeWindow,
-          },
-          discoveredOffers: offers,
-          selectionType,
-          summary,
-          transactionId: result.transactionId,
-        },
-      },
-    };
-  }
-
-  // --- Multi-offer display ---
-  const DISCOM_RATE = 7; // Reference rate for savings calc
-
-  // Build structured offers for premium UI
-  const structuredOffers = offers.map(o => ({
-    id: o.offerId,
-    sellerName: o.providerName,
-    sellerTrustScore: 0.7, // Default trust score
-    energyType: 'solar' as const, // Default to solar
-    pricePerUnit: o.price,
-    quantity: o.quantity,
-    totalPrice: o.subtotal || (o.price * o.quantity),
-    timeWindow: o.timeWindow || 'Flexible',
-    savingsPercent: Math.round(((DISCOM_RATE - o.price) / DISCOM_RATE) * 100),
-  }));
-
-  const offerLines = offers.map((o, i) =>
-    `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`
-  ).join('\n\n');
-
-  const totalLine = summary
-    ? `Total: ${summary.totalQuantity} kWh | Avg Rs ${summary.averagePrice.toFixed(2)}/unit | Rs ${summary.totalPrice.toFixed(2)}`
-    : `Total: Rs ${offers.reduce((s, o) => s + o.subtotal, 0).toFixed(2)}`;
-
-  const fulfillLine = summary && !summary.fullyFulfilled
-    ? h(ctx,
-      `\n(Partial: ${summary.shortfall} kWh short of ${pending.quantity} kWh requested)`,
-      `\n(Partial: ${pending.quantity} mein se ${summary.shortfall} kWh nahi mili)`
-    )
-    : '';
-
   const timeWindow = offers[0]?.timeWindow || 'Flexible';
+
+  // Build matchedOffers card data for both single and multi-offer displays
+  const matchedOffersCard = {
+    selectionType: selectionType as 'single' | 'multiple',
+    offers: offers.map(o => ({
+      offerId: o.offerId,
+      providerId: o.providerId,
+      providerName: o.providerName,
+      trustScore: 0.7, // Default trust score
+      energyType: 'SOLAR', // Default to solar
+      quantity: o.quantity,
+      pricePerKwh: o.price,
+      subtotal: o.subtotal || (o.price * o.quantity),
+      timeWindow: o.timeWindow || timeWindow,
+    })),
+    summary: summary ? {
+      totalQuantity: summary.totalQuantity,
+      totalPrice: summary.totalPrice,
+      averagePrice: summary.averagePrice,
+      fullyFulfilled: summary.fullyFulfilled,
+      shortfall: summary.shortfall || 0,
+      offersUsed: summary.offersUsed,
+    } : {
+      totalQuantity: offers.reduce((s, o) => s + o.quantity, 0),
+      totalPrice: offers.reduce((s, o) => s + (o.subtotal || o.price * o.quantity), 0),
+      averagePrice: offers.length > 0 ? offers.reduce((s, o) => s + o.price, 0) / offers.length : 0,
+      fullyFulfilled: true,
+      shortfall: 0,
+      offersUsed: offers.length,
+    },
+    timeWindow,
+    transactionId: result.transactionId || '',
+  };
+
+  // Build text message (fallback for WhatsApp/Telegram)
+  const textMessage = selectionType === 'single' && offers.length === 1
+    ? h(ctx,
+        `Found a match!\n\n• Seller: ${offers[0].providerName}\n• ${offers[0].quantity} kWh at Rs ${offers[0].price}/unit\n• Total: Rs ${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• Time: ${offers[0].timeWindow}\n\nDo you want to buy this?`,
+        `Offer mil gaya!\n\n• Seller: ${offers[0].providerName}\n• ${offers[0].quantity} kWh Rs ${offers[0].price}/unit pe\n• Total: Rs ${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• Time: ${offers[0].timeWindow}\n\nYe khareedna hai?`
+      )
+    : h(ctx,
+        `Found best deals from ${offers.length} sellers!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nTotal: ${matchedOffersCard.summary.totalQuantity} kWh | Rs ${matchedOffersCard.summary.totalPrice.toFixed(2)}\nTime: ${timeWindow}\n\nAccept this deal?`,
+        `${offers.length} sellers se best deals mile!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nTotal: ${matchedOffersCard.summary.totalQuantity} kWh | Rs ${matchedOffersCard.summary.totalPrice.toFixed(2)}\nTime: ${timeWindow}\n\nYe deal accept karna hai?`
+      );
 
   return {
     messages: [
       searchMsg,
       {
-        text: h(ctx,
-          `Found best deals from ${offers.length} sellers!\n\n${offerLines}\n\n${totalLine}\nTime: ${timeWindow}${fulfillLine}\n\nAccept this deal?`,
-          `${offers.length} sellers se best deals mile!\n\n${offerLines}\n\n${totalLine}\nTime: ${timeWindow}${fulfillLine}\n\nYe deal accept karna hai?`
-        ),
-        offers: structuredOffers,
+        text: textMessage,
+        matchedOffers: matchedOffersCard, // Premium UI card for web
         buttons: [
-          { text: h(ctx, '✅ Yes, buy all!', '✅ हाँ, सब खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
+          { text: h(ctx, selectionType === 'single' ? '✅ Yes, buy it!' : '✅ Yes, buy all!', selectionType === 'single' ? '✅ हाँ, खरीद लो!' : '✅ हाँ, सब खरीद लो!'), callbackData: 'purchase_offer_confirm:yes' },
           { text: h(ctx, '❌ No, cancel', '❌ नहीं, रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
         ],
       },
@@ -1259,6 +1303,14 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
       pendingPurchase: {
         ...pending,
         awaitingField: 'confirm_offer',
+        discoveredOffer: selectionType === 'single' && offers.length === 1 ? {
+          offerId: offers[0].offerId,
+          providerId: offers[0].providerId,
+          providerName: offers[0].providerName,
+          price: offers[0].price,
+          quantity: offers[0].quantity,
+          timeWindow: offers[0].timeWindow,
+        } : undefined,
         discoveredOffers: offers,
         selectionType,
         summary,
@@ -1541,6 +1593,25 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
               ? `\n• ${result.bulkResult.confirmedCount} order(s) confirmed`
               : '';
 
+            // Build order confirmation card
+            const orderConfirmationCard = {
+              success: true,
+              orderId: result.order?.orderId,
+              offers: pending.discoveredOffers.map(o => ({
+                providerName: o.providerName,
+                quantity: o.quantity,
+                pricePerKwh: o.price,
+                subtotal: o.subtotal,
+              })),
+              summary: {
+                totalQuantity: s.totalQuantity,
+                totalPrice: s.totalPrice,
+                averagePrice: s.averagePrice,
+                ordersConfirmed: result.bulkResult?.confirmedCount || pending.discoveredOffers.length,
+              },
+              timeWindow: pending.discoveredOffers[0].timeWindow,
+            };
+
             return {
               messages: [
                 confirmMsg,
@@ -1549,6 +1620,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
                     `Purchase successful!\n\n${offerList}\n\n• Total: ${s.totalQuantity} kWh at avg Rs ${s.averagePrice.toFixed(2)}/unit\n• Amount: Rs ${s.totalPrice.toFixed(2)}${bulkInfo}\n• Time: ${pending.discoveredOffers[0].timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
                     `खरीदारी हो गई!\n\n${offerList}\n\n• कुल: ${s.totalQuantity} यूनिट औसत ₹${s.averagePrice.toFixed(2)}/यूनिट\n• रकम: ₹${s.totalPrice.toFixed(2)}${bulkInfo}\n• समय: ${pending.discoveredOffers[0].timeWindow}\n\nआपकी बिजली ग्रिड से आएगी। आपका पैसा प्लेटफॉर्म पे सुरक्षित है - डिलीवरी के बाद सेलर को मिलेगा।`
                   ),
+                  orderConfirmation: orderConfirmationCard,
                 },
               ],
               contextUpdate: { pendingPurchase: undefined },
@@ -1558,6 +1630,26 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           // Single offer success display
           if (result.order) {
             const o = result.order;
+
+            // Build order confirmation card
+            const orderConfirmationCard = {
+              success: true,
+              orderId: o.orderId,
+              offers: [{
+                providerName: o.providerName,
+                quantity: o.quantity,
+                pricePerKwh: o.pricePerKwh,
+                subtotal: o.totalPrice,
+              }],
+              summary: {
+                totalQuantity: o.quantity,
+                totalPrice: o.totalPrice,
+                averagePrice: o.pricePerKwh,
+                ordersConfirmed: 1,
+              },
+              timeWindow: o.timeWindow,
+            };
+
             return {
               messages: [
                 confirmMsg,
@@ -1566,6 +1658,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
                     `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
                     `खरीदारी हो गई!\n• ${o.quantity} यूनिट ${o.providerName} से\n• ₹${o.pricePerKwh}/यूनिट (कुल: ₹${o.totalPrice.toFixed(2)})\n• समय: ${o.timeWindow}\n\nआपकी बिजली ग्रिड से आएगी। आपका पैसा प्लेटफॉर्म पे सुरक्षित है - डिलीवरी के बाद सेलर को मिलेगा।`
                   ),
+                  orderConfirmation: orderConfirmationCard,
                 },
               ],
               contextUpdate: { pendingPurchase: undefined },
@@ -3202,6 +3295,45 @@ const states: Record<ChatState, StateHandler> = {
         const dbType = degTypeToDbType(result.credType);
         const updatedCreds = [...new Set([...(ctx.verifiedCreds || []), dbType])];
 
+        // Special handling for consumption credential - show savings calculation for buyers
+        if (result.credType === 'ConsumptionProfileCredential' && ctx.intent === 'buy') {
+          // Extract sanctioned load from claims
+          const claims = result.claims || {};
+          const sanctionedLoad = claims.sanctionedLoadKW || 0;
+
+          // Calculate monthly savings: sanctioned_load * 24 * 30 * 0.3 * 1.5
+          // This assumes 30% usage pattern and Rs 1.5 savings per unit
+          const monthlySavings = Math.round(sanctionedLoad * 24 * 30 * 0.3 * 1.5);
+
+          // Mark profile complete for buyers
+          await prisma.user.update({
+            where: { id: ctx.userId! },
+            data: { profileComplete: true },
+          });
+
+          const savingsEn = monthlySavings > 0
+            ? `With your ${sanctionedLoad} kW connection, you could save around Rs ${monthlySavings} per month by buying green energy at lower rates!`
+            : `You're all set to buy green energy at lower rates and save money!`;
+          const savingsHi = monthlySavings > 0
+            ? `आपके ${sanctionedLoad} किलोवाट कनेक्शन से आप हर महीने करीब ₹${monthlySavings} बचा सकते हो सस्ती हरी बिजली खरीद कर!`
+            : `आप अब सस्ती हरी बिजली खरीद कर पैसे बचा सकते हो!`;
+
+          return {
+            messages: [
+              { text: h(ctx, `Verified! ${result.summary}`, `वेरिफाई हो गया! ${result.summary}`) },
+              { text: h(ctx, savingsEn, savingsHi), delay: 300 },
+              { text: h(ctx,
+                'I\'ll help you find the best energy deals from local producers. Your profile is ready!',
+                'मैं आपको किसानों से सबसे अच्छे दाम पर बिजली ढूंढने में मदद करूंगा। आपका प्रोफाइल तैयार है!'
+              ), delay: 300 },
+            ],
+            newState: 'GENERAL_CHAT',
+            contextUpdate: {
+              verifiedCreds: updatedCreds,
+            },
+          };
+        }
+
         return {
           messages: [{ text: h(ctx, `Verified! ${result.summary}`, `वेरिफाई हो गया! ${result.summary}`) }],
           newState: 'CONFIRM_TRADING',
@@ -3880,11 +4012,11 @@ const states: Record<ChatState, StateHandler> = {
                 messages: [
                   {
                     text: h(ctx,
-                      'To buy energy, I need your consumption profile credential first. This proves your electricity connection and load capacity.\n\nYou can get it from your DISCOM or download a sample from the credential portal.',
-                      'Energy khareedne ke liye pehle aapka consumption profile credential chahiye. Ye aapka bijli connection aur load capacity prove karta hai.\n\nYe aapko apni DISCOM se ya credential portal se mil jaayega.'
+                      'To buy electricity, I first need your electricity bill document. This shows your meter connection and how much power your home can use.\n\nYou can get this from your electricity company office.',
+                      'बिजली खरीदने के लिए पहले आपका बिजली का कागज़ चाहिए। इससे पता चलता है कि आपके घर में कितनी बिजली आ सकती है।\n\nये आपको अपनी बिजली कंपनी से मिल जाएगा।'
                     ),
                     buttons: [
-                      { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'upload_cons_cred' },
+                      { text: h(ctx, '📄 Upload document', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
                     ],
                   },
                 ],
@@ -4018,11 +4150,11 @@ const states: Record<ChatState, StateHandler> = {
               messages: [
                 {
                   text: h(ctx,
-                    'To buy energy, I need your consumption profile credential first.',
-                    'Energy khareedne ke liye pehle aapka consumption profile credential chahiye.'
+                    'To buy electricity, I first need your electricity bill document.',
+                    'बिजली खरीदने के लिए पहले आपका बिजली का कागज़ चाहिए।'
                   ),
                   buttons: [
-                    { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'upload_cons_cred' },
+                    { text: h(ctx, '📄 Upload document', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
                   ],
                 },
               ],
