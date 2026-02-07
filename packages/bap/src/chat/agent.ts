@@ -2865,8 +2865,10 @@ const states: Record<ChatState, StateHandler> = {
 
   AUTHENTICATED: {
     async onEnter(ctx) {
+      logger.info(`[AUTHENTICATED.onEnter] ctx.language = "${ctx.language}", ctx.name = "${ctx.name}", ctx.userId = "${ctx.userId}"`);
       const name = ctx.name || 'friend';
       if (!ctx.userId) {
+        logger.info(`[AUTHENTICATED.onEnter] No userId, returning welcome in language: ${ctx.language}`);
         return {
           messages: [{ text: h(ctx, `Welcome, ${name}!`, `स्वागत है, ${name}!`) }],
           newState: 'ASK_DISCOM',
@@ -2914,6 +2916,7 @@ const states: Record<ChatState, StateHandler> = {
         };
       }
 
+      logger.info(`[AUTHENTICATED.onEnter] Final path - returning welcome in language: ${ctx.language}`);
       return {
         messages: [{ text: h(ctx, `Welcome, ${name}!`, `स्वागत है, ${name}!`) }],
         newState: 'ASK_DISCOM',
