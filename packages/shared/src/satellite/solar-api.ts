@@ -19,7 +19,7 @@ const GOOGLE_GEOCODING_API = 'https://maps.googleapis.com/maps/api/geocode/json'
 const GOOGLE_STATIC_MAPS_API = 'https://maps.googleapis.com/maps/api/staticmap';
 
 // Cache for demo addresses (populated at startup or on-demand)
-const analysisCache = new Map<string, SolarAnalysis>();
+const analysisCache = new Map<string, { data: SolarAnalysis; expiresAt: number }>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Trading limit thresholds
@@ -169,9 +169,11 @@ export async function analyzeInstallation(address: string): Promise<SolarAnalysi
     // Check cache first
     const cacheKey = normalizeAddress(address);
     const cached = analysisCache.get(cacheKey);
-    if (cached) {
+    if (cached && cached.expiresAt > Date.now()) {
         logger.info('Returning cached analysis', { address });
-        return cached;
+        return cached.data;
+    } else if (cached) {
+        analysisCache.delete(cacheKey); // Expired
     }
 
     try {
@@ -195,7 +197,9 @@ export async function analyzeInstallation(address: string): Promise<SolarAnalysi
         // Step 3: Calculate score and limit
         const solarPotential = insights.solarPotential;
         const sunshineHours = solarPotential.maxSunshineHoursPerYear || 0;
-        const imageryQuality = insights.imageryQuality || 'LOW';
+        const rawQuality = insights.imageryQuality || 'LOW';
+        const imageryQuality: 'HIGH' | 'MEDIUM' | 'LOW' =
+            rawQuality === 'IMAGERY_QUALITY_UNSPECIFIED' ? 'LOW' : rawQuality;
         const roofArea = solarPotential.roofSegmentStats?.reduce(
             (sum, seg) => sum + (seg.stats.areaMeters2 || 0),
             0
@@ -221,7 +225,7 @@ export async function analyzeInstallation(address: string): Promise<SolarAnalysi
             maxPanelCount: solarPotential.maxArrayPanelsCount,
             yearlyEnergyKwh: bestConfig?.yearlyEnergyDcKwh,
             roofAreaM2: roofArea,
-            imageryQuality: imageryQuality as 'HIGH' | 'MEDIUM' | 'LOW',
+            imageryQuality,
             carbonOffsetKg: solarPotential.carbonOffsetFactorKgPerMwh
                 ? (bestConfig?.yearlyEnergyDcKwh || 0) * solarPotential.carbonOffsetFactorKgPerMwh / 1000
                 : undefined,
@@ -239,8 +243,8 @@ export async function analyzeInstallation(address: string): Promise<SolarAnalysi
             imageryQuality,
         });
 
-        // Cache the result
-        analysisCache.set(cacheKey, analysis);
+        // Cache the result (expires after CACHE_TTL_MS)
+        analysisCache.set(cacheKey, { data: analysis, expiresAt: Date.now() + CACHE_TTL_MS });
 
         return analysis;
     } catch (error: any) {
