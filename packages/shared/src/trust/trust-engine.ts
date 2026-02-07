@@ -36,11 +36,11 @@ export function getTrustConfig(): TrustConfig {
         sellerCancelPenalty: parseFloat(process.env.TRUST_SELLER_CANCEL_PENALTY || '0.05'),
         limitTiers: [
             { minScore: 0.0, maxLimit: 10 },   // 0-30% trust → 10% limit
-            { minScore: 0.3, maxLimit: 20 },   // 30-50% trust → 20% limit
-            { minScore: 0.5, maxLimit: 40 },   // 50-70% trust → 40% limit
-            { minScore: 0.7, maxLimit: 60 },   // 70-85% trust → 60% limit
-            { minScore: 0.85, maxLimit: 80 },  // 85-95% trust → 80% limit
-            { minScore: 0.95, maxLimit: 100 }, // 95%+ trust → 100% limit
+            { minScore: 0.31, maxLimit: 20 },  // 31-50% trust → 20% limit
+            { minScore: 0.51, maxLimit: 40 },  // 51-70% trust → 40% limit
+            { minScore: 0.71, maxLimit: 60 },  // 71-85% trust → 60% limit
+            { minScore: 0.86, maxLimit: 80 },  // 86-95% trust → 80% limit
+            { minScore: 0.96, maxLimit: 100 }, // 96%+ trust → 100% limit
         ],
     };
 }
@@ -241,11 +241,11 @@ export function updateTrustAfterMeterAnalysis(
  * Get human-readable trust tier description
  */
 export function getTrustTierDescription(trustScore: number): string {
-    if (trustScore >= 0.95) return 'Platinum (Full Trading)';
-    if (trustScore >= 0.85) return 'Gold (80% Trading)';
-    if (trustScore >= 0.7) return 'Silver (60% Trading)';
-    if (trustScore >= 0.5) return 'Bronze (40% Trading)';
-    if (trustScore >= 0.3) return 'Starter (20% Trading)';
+    if (trustScore >= 0.96) return 'Platinum (Full Trading)';
+    if (trustScore >= 0.86) return 'Gold (80% Trading)';
+    if (trustScore >= 0.71) return 'Silver (60% Trading)';
+    if (trustScore >= 0.51) return 'Bronze (40% Trading)';
+    if (trustScore >= 0.31) return 'Starter (20% Trading)';
     return 'New (10% Trading)';
 }
 
@@ -260,11 +260,11 @@ export function getNextTierProgress(trustScore: number): {
 } {
     const tiers = [
         { minScore: 0.0, name: 'New' },
-        { minScore: 0.3, name: 'Starter' },
-        { minScore: 0.5, name: 'Bronze' },
-        { minScore: 0.7, name: 'Silver' },
-        { minScore: 0.85, name: 'Gold' },
-        { minScore: 0.95, name: 'Platinum' },
+        { minScore: 0.31, name: 'Starter' },
+        { minScore: 0.51, name: 'Bronze' },
+        { minScore: 0.71, name: 'Silver' },
+        { minScore: 0.86, name: 'Gold' },
+        { minScore: 0.96, name: 'Platinum' },
     ];
 
     let currentTierIndex = 0;
