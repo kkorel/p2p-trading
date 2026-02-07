@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 FROM node:20-alpine AS base
 
 # Dependencies stage
@@ -16,9 +15,8 @@ RUN mkdir -p packages/shared packages/bap
 RUN echo '{"name":"@p2p/shared","version":"1.0.0"}' > packages/shared/package.json
 RUN echo '{"name":"@p2p/bap","version":"1.0.0"}' > packages/bap/package.json
 
-# Install dependencies with BuildKit cache
-RUN --mount=type=cache,id=npm-web-deps,target=/root/.npm \
-    npm ci --ignore-scripts
+# Install dependencies
+RUN npm ci --ignore-scripts
 
 # Build stage
 FROM base AS builder
