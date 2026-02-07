@@ -3,11 +3,6 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [main, master]
-    paths:
-      - 'packages/bap/**'
-      - 'packages/shared/**'
-      - 'package*.json'
-      - '.github/workflows/docker-build.yml'
 
 env:
   REGISTRY: ghcr.io
