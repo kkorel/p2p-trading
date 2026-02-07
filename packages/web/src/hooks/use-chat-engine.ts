@@ -437,7 +437,9 @@ export function useChatEngine() {
 
       const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
       const isJson = file.type === 'application/json' || file.name.endsWith('.json');
-      const msgs = getUploadMessages(responseLanguage);
+      // Use localStorage as source of truth for language (more reliable than React state)
+      const currentLang = (typeof window !== 'undefined' && localStorage.getItem('oorja_language')) || responseLanguage;
+      const msgs = getUploadMessages(currentLang);
 
       if (!isPdf && !isJson) {
         setMessages((prev) => [

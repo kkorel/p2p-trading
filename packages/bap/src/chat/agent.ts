@@ -2812,11 +2812,14 @@ const states: Record<ChatState, StateHandler> = {
         };
       }
 
-      // Update name if new user
-      if (result.isNewUser && ctx.name && result.userId) {
+      // Update name and language preference for new user
+      if (result.isNewUser && result.userId) {
         await prisma.user.update({
           where: { id: result.userId },
-          data: { name: ctx.name },
+          data: {
+            name: ctx.name || undefined,
+            languagePreference: ctx.language || undefined,
+          },
         });
       } else if (!result.isNewUser && result.user?.name) {
         ctx.name = result.user.name;
@@ -2853,6 +2856,7 @@ const states: Record<ChatState, StateHandler> = {
           authToken: authSession.token,
           name: ctx.name || result.user?.name || undefined,
           otpAttempts: 0,
+          language: ctx.language, // Explicitly preserve language through state transition
         },
         authToken: authSession.token,
       };
