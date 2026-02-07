@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp, ShieldCheck, Sun, Battery, BarChart2, Award, CheckCircle2, Activity, Download } from 'lucide-react';
+import { LogOut, User, Phone, Shield, Wallet, Check, AlertCircle, Upload, FileText, Sparkles, ExternalLink, Zap, Info, TrendingUp, ShieldCheck, Sun, Battery, BarChart2, Award, CheckCircle2, Activity, Download, MapPin, Leaf, Clock } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/contexts/auth-context';
 import { useBalance } from '@/contexts/balance-context';
@@ -246,6 +246,165 @@ function MyCredentialsCard() {
   );
 }
 
+// Solar Installation Card - displays solar analysis from Google Solar API
+function SolarInstallationCard() {
+  const { user } = useAuth();
+  const solar = user?.solarAnalysis;
+
+  // Don't show if no solar analysis
+  if (!solar) return null;
+
+  const scorePercent = Math.round(solar.installationScore * 100);
+  const hasData = solar.available && solar.verificationMethod === 'SOLAR_API';
+
+  // Score color based on value
+  const getScoreColor = (score: number) => {
+    if (score >= 0.7) return 'text-[var(--color-success)]';
+    if (score >= 0.4) return 'text-[var(--color-warning)]';
+    return 'text-[var(--color-text-muted)]';
+  };
+
+  // Imagery quality badge variant
+  const getQualityVariant = (quality?: string | null): 'success' | 'warning' | 'default' => {
+    if (quality === 'HIGH') return 'success';
+    if (quality === 'MEDIUM') return 'warning';
+    return 'default';
+  };
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+          <Sun className="w-4 h-4 text-amber-500" />
+          Solar Installation
+        </h3>
+        {hasData && solar.imageryQuality && (
+          <Badge variant={getQualityVariant(solar.imageryQuality)} size="sm">
+            {solar.imageryQuality} Quality
+          </Badge>
+        )}
+      </div>
+
+      {/* Satellite Image */}
+      {solar.satelliteImageUrl && (
+        <div className="mb-4 rounded-lg overflow-hidden border border-[var(--color-border)]">
+          <img
+            src={solar.satelliteImageUrl}
+            alt="Satellite view of your installation"
+            className="w-full h-40 object-cover"
+          />
+        </div>
+      )}
+
+      {/* Location */}
+      {solar.formattedAddress && (
+        <div className="flex items-start gap-2 mb-3 text-sm text-[var(--color-text-muted)]">
+          <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span className="line-clamp-2">{solar.formattedAddress}</span>
+        </div>
+      )}
+
+      {hasData ? (
+        <>
+          {/* Installation Score */}
+          <div className="p-3 bg-[var(--color-bg-subtle)] rounded-lg mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-[var(--color-text-muted)]">Installation Score</span>
+              <span className={`text-2xl font-bold ${getScoreColor(solar.installationScore)}`}>
+                {scorePercent}%
+              </span>
+            </div>
+            <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-300"
+                style={{ width: `${scorePercent}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Solar Stats Grid */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {solar.maxSunshineHours && (
+              <div className="p-2.5 bg-[var(--color-bg-subtle)] rounded-lg">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-xs text-[var(--color-text-muted)]">Sunshine</span>
+                </div>
+                <p className="text-lg font-semibold text-[var(--color-text)]">
+                  {Math.round(solar.maxSunshineHours).toLocaleString()}
+                  <span className="text-xs font-normal text-[var(--color-text-muted)]"> hrs/yr</span>
+                </p>
+              </div>
+            )}
+
+            {solar.yearlyEnergyKwh && (
+              <div className="p-2.5 bg-[var(--color-bg-subtle)] rounded-lg">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Zap className="w-3.5 h-3.5 text-[var(--color-primary)]" />
+                  <span className="text-xs text-[var(--color-text-muted)]">Potential</span>
+                </div>
+                <p className="text-lg font-semibold text-[var(--color-text)]">
+                  {Math.round(solar.yearlyEnergyKwh).toLocaleString()}
+                  <span className="text-xs font-normal text-[var(--color-text-muted)]"> kWh/yr</span>
+                </p>
+              </div>
+            )}
+
+            {solar.roofAreaM2 && (
+              <div className="p-2.5 bg-[var(--color-bg-subtle)] rounded-lg">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <BarChart2 className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
+                  <span className="text-xs text-[var(--color-text-muted)]">Roof Area</span>
+                </div>
+                <p className="text-lg font-semibold text-[var(--color-text)]">
+                  {Math.round(solar.roofAreaM2)}
+                  <span className="text-xs font-normal text-[var(--color-text-muted)]"> m²</span>
+                </p>
+              </div>
+            )}
+
+            {solar.carbonOffsetKg && (
+              <div className="p-2.5 bg-[var(--color-bg-subtle)] rounded-lg">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Leaf className="w-3.5 h-3.5 text-green-500" />
+                  <span className="text-xs text-[var(--color-text-muted)]">CO₂ Offset</span>
+                </div>
+                <p className="text-lg font-semibold text-[var(--color-text)]">
+                  {(solar.carbonOffsetKg / 1000).toFixed(1)}
+                  <span className="text-xs font-normal text-[var(--color-text-muted)]"> tons/yr</span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Trading Limit from Solar */}
+          <div className="p-3 bg-[var(--color-primary-light)] rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[var(--color-text)]">Solar-Based Trade Limit</span>
+              <span className="text-lg font-bold text-[var(--color-primary)]">
+                {solar.tradingLimitPercent}%
+              </span>
+            </div>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">
+              Based on your solar potential analysis. This limit may increase as your trust score improves.
+            </p>
+          </div>
+        </>
+      ) : (
+        // No solar data available
+        <div className="p-3 bg-[var(--color-bg-subtle)] rounded-lg">
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {solar.errorReason || 'Solar analysis data not available for your location.'}
+          </p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-2">
+            Using default trading limit of {solar.tradingLimitPercent}%
+          </p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function ProfilePage() {
   const { user, logout, updateUser } = useAuth();
   const { balance, setBalance } = useBalance();
@@ -381,6 +540,9 @@ export default function ProfilePage() {
 
         {/* My Credentials Card */}
         <MyCredentialsCard />
+
+        {/* Solar Installation Card */}
+        <SolarInstallationCard />
 
         {/* Production Capacity Card */}
         <Card>

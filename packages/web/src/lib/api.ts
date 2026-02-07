@@ -538,6 +538,25 @@ export const sellerApi = {
 };
 
 // Types
+export interface SolarAnalysis {
+  available: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  formattedAddress?: string | null;
+  maxSunshineHours?: number | null;
+  maxPanelCount?: number | null;
+  yearlyEnergyKwh?: number | null;
+  roofAreaM2?: number | null;
+  imageryQuality?: string | null;  // 'HIGH' | 'MEDIUM' | 'LOW'
+  carbonOffsetKg?: number | null;
+  installationScore: number;       // 0.0-1.0
+  tradingLimitPercent: number;     // 7-15%
+  verificationMethod: string;      // 'SOLAR_API' or 'DEFAULT'
+  errorReason?: string | null;
+  satelliteImageUrl?: string | null;
+  analyzedAt: string;
+}
+
 export interface User {
   id: string;
   phone: string;
@@ -550,6 +569,7 @@ export interface User {
   meterDataAnalyzed?: boolean;
   productionCapacity?: number | null;
   meterVerifiedCapacity?: number | null;
+  solarAnalysis?: SolarAnalysis | null;
 }
 
 // Response type for verifyOtp - can be success or requiresVC
