@@ -17,7 +17,7 @@ RUN echo '{"name":"@p2p/shared","version":"1.0.0"}' > packages/shared/package.js
 RUN echo '{"name":"@p2p/bap","version":"1.0.0"}' > packages/bap/package.json
 
 # Install dependencies with BuildKit cache
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-web-deps,target=/root/.npm \
     npm ci --ignore-scripts
 
 # Build stage

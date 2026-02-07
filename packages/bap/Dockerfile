@@ -16,7 +16,7 @@ RUN mkdir -p packages/web
 RUN echo '{"name":"@p2p/web","version":"1.0.0","private":true}' > packages/web/package.json
 
 # Install dependencies with BuildKit cache mount for npm
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-bap-deps,target=/root/.npm \
     npm ci --ignore-scripts
 
 # Stage 2: Build
@@ -63,7 +63,7 @@ RUN mkdir -p packages/web
 RUN echo '{"name":"@p2p/web","version":"1.0.0","private":true}' > packages/web/package.json
 
 # Install production dependencies with BuildKit cache
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-bap-prod,target=/root/.npm \
     npm ci --omit=dev --ignore-scripts
 
 # Copy built artifacts
