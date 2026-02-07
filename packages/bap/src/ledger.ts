@@ -13,7 +13,7 @@
  */
 
 import axios from 'axios';
-import { config, createLogger, Order, prisma, createSignedHeaders, getKeyPair } from '@p2p/shared';
+import { config, createLogger, Order, prisma, secureAxiosBpp } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
@@ -199,23 +199,11 @@ export async function writeTradeToLedger(
         clientReference: `${transactionId}-${orderItemId}-${Date.now()}`,
       };
 
-      logger.info('Writing trade item to ledger', {
-        transactionId, orderItemId, ledgerUrl,
-      });
-
-      // Use signed headers (matching ONIX degledgerrecorder)
-      const keyPair = getKeyPair();
-      const signedHeaders = keyPair
-        ? createSignedHeaders(request, keyPair)
-        : { 'Content-Type': 'application/json' };
-
-      const response = await axios.post<LedgerWriteResponse>(
+      // Use secureAxiosBpp for signed requests (same as CDS publish)
+      const response = await secureAxiosBpp.post<LedgerWriteResponse>(
         `${ledgerUrl}/ledger/put`,
         request,
-        {
-          headers: signedHeaders,
-          timeout: 10000,
-        }
+        { timeout: 10000 }
       );
 
       if (response.data.success) {
@@ -290,15 +278,10 @@ async function writeSingleRecord(
     clientReference: `${opts.transactionId}-${opts.orderItemId}-${Date.now()}`,
   };
 
-  // Use signed headers (matching ONIX degledgerrecorder)
-  const keyPair = getKeyPair();
-  const signedHeaders = keyPair
-    ? createSignedHeaders(request, keyPair)
-    : { 'Content-Type': 'application/json' };
-
-  const response = await axios.post<LedgerWriteResponse>(
+  // Use secureAxiosBpp for signed requests (same as CDS publish)
+  const response = await secureAxiosBpp.post<LedgerWriteResponse>(
     `${ledgerUrl}/ledger/put`, request,
-    { headers: signedHeaders, timeout: 10000 }
+    { timeout: 10000 }
   );
 
   return response.data.success
