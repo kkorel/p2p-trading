@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Stage 1: Dependencies (cached layer)
 FROM node:20-alpine AS deps
 
@@ -14,8 +15,9 @@ COPY packages/bap/package*.json ./packages/bap/
 RUN mkdir -p packages/web
 RUN echo '{"name":"@p2p/web","version":"1.0.0","private":true}' > packages/web/package.json
 
-# Install dependencies (this layer is cached if package*.json unchanged)
-RUN npm ci --ignore-scripts
+# Install dependencies with BuildKit cache mount for npm
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
 
 # Stage 2: Build
 FROM deps AS builder
@@ -60,8 +62,9 @@ COPY --from=builder /app/packages/bap/package.json ./packages/bap/
 RUN mkdir -p packages/web
 RUN echo '{"name":"@p2p/web","version":"1.0.0","private":true}' > packages/web/package.json
 
-# Install production dependencies only
-RUN npm ci --omit=dev --ignore-scripts
+# Install production dependencies with BuildKit cache
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --ignore-scripts
 
 # Copy built artifacts
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
