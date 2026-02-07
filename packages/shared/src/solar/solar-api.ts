@@ -424,7 +424,8 @@ export async function getSolarHeatmap(
 
         // Step 3: Fetch the annualFlux GeoTIFF
         const apiKey = process.env.GOOGLE_SOLAR_API_KEY!;
-        const tiffUrl = `${dataLayers.annualFluxUrl}?key=${apiKey}`;
+        // annualFluxUrl already contains ?id=... so append with &
+        const tiffUrl = `${dataLayers.annualFluxUrl}&key=${apiKey}`;
         const tiffResponse = await fetch(tiffUrl);
 
         if (!tiffResponse.ok) {
@@ -513,5 +514,59 @@ export async function getSolarHeatmap(
     } catch (error: any) {
         logger.error('Heatmap generation failed', { error: error.message, address });
         return { available: false, errorReason: error.message };
+    }
+}
+
+/**
+ * Get a solar heatmap image for coordinates.
+ * Drop-in async replacement for getSatelliteImageUrl — same (lat, lon) signature.
+ *
+ * @param lat - Latitude
+ * @param lon - Longitude
+ * @returns base64 PNG data URL string, or empty string if unavailable
+ */
+export async function getHeatmapImageUrl(lat: number, lon: number): Promise<string> {
+    try {
+        const dataLayers = await fetchDataLayers(lat, lon);
+        if (!dataLayers || !dataLayers.annualFluxUrl) return '';
+
+        const apiKey = process.env.GOOGLE_SOLAR_API_KEY;
+        if (!apiKey) return '';
+
+        const tiffUrl = `${dataLayers.annualFluxUrl}&key=${apiKey}`;
+        const tiffResponse = await fetch(tiffUrl);
+        if (!tiffResponse.ok) return '';
+
+        const tiff = await GeoTIFF.fromArrayBuffer(await tiffResponse.arrayBuffer());
+        const image = await tiff.getImage();
+        const width = image.getWidth();
+        const height = image.getHeight();
+        const rasters = await image.readRasters();
+        const fluxData = rasters[0] as Float32Array;
+
+        let minFlux = Infinity, maxFlux = -Infinity;
+        for (let i = 0; i < fluxData.length; i++) {
+            if (fluxData[i] > -9999) {
+                minFlux = Math.min(minFlux, fluxData[i]);
+                maxFlux = Math.max(maxFlux, fluxData[i]);
+            }
+        }
+        if (minFlux === Infinity) return '';
+
+        const png = new PNG({ width, height });
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = y * width + x;
+                const [r, g, b, a] = fluxToColor(fluxData[idx], minFlux, maxFlux);
+                png.data[idx * 4] = r;
+                png.data[idx * 4 + 1] = g;
+                png.data[idx * 4 + 2] = b;
+                png.data[idx * 4 + 3] = a;
+            }
+        }
+
+        return `data:image/png;base64,${PNG.sync.write(png).toString('base64')}`;
+    } catch {
+        return '';
     }
 }

@@ -12,7 +12,7 @@
  *   GOOGLE_SOLAR_API_KEY — for building insights + data layers
  */
 
-export { analyzeInstallation, getSatelliteImageUrl, geocodeWithGoogle, warmupCache, getSolarHeatmap, THRESHOLDS } from './solar-api';
+export { analyzeInstallation, getSatelliteImageUrl, geocodeWithGoogle, warmupCache, getSolarHeatmap, getHeatmapImageUrl, THRESHOLDS } from './solar-api';
 export { LIMIT_THRESHOLDS } from './types';
 export type { SolarAnalysis, GoogleSolarBuildingInsights, HeatmapResult } from './types';
 
