@@ -360,10 +360,12 @@ export async function publishCatalogToCDS(
     };
 
     const url = getCDSPublishUrl();
+    const offerIds = offers.map(o => o.id).join(', ');
     logger.info('Publishing catalog to external CDS', {
       url,
       providerId: provider.id,
       catalogId,
+      offerIds,
       itemCount: items.length,
       offerCount: offers.length,
       isActive,
@@ -372,6 +374,9 @@ export async function publishCatalogToCDS(
       context_bpp_id: publishMessage.context.bpp_id,
       context_bpp_uri: publishMessage.context.bpp_uri,
     });
+
+    // Log full request body for debugging
+    console.log('[CDS-PUBLISH-REQUEST]', JSON.stringify(publishMessage, null, 2));
 
     // Use secureAxiosBpp for CDS publish (BPP keys for catalog_publish)
     const response = await secureAxiosBpp.post(url, publishMessage, {
@@ -389,9 +394,11 @@ export async function publishCatalogToCDS(
 
     logger.info('Catalog published successfully', {
       providerId: provider.id,
+      offerIds,
+      catalogId,
       status: response.status,
       ack_status: response.data?.ack_status,
-      data: JSON.stringify(response.data).substring(0, 500), // Truncate for logging
+      response: JSON.stringify(response.data),
     });
 
     return true;
