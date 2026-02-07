@@ -196,7 +196,7 @@ export default function BuyPage() {
                     providerId: provider.id,
                     providerName: provider.descriptor?.name || 'Provider',
                     sourceType: item.itemAttributes?.sourceType || 'MIXED',
-                    availableQty: item.itemAttributes?.availableQuantity || offer.maxQuantity,
+                    availableQty: offer.maxQuantity || item.itemAttributes?.availableQuantity || 0,
                     score: matchedOffer?.score,
                     matchesFilters: matchedOffer?.matchesFilters ?? true,
                     filterReasons: matchedOffer?.filterReasons,
