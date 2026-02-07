@@ -364,6 +364,8 @@ export function useChatEngine() {
             matchedOffers: m.matchedOffers,
             orderConfirmation: m.orderConfirmation,
             earnings: m.earnings,
+            slider: m.slider,
+            autoTradeStatus: m.autoTradeStatus,
           })),
         ]);
       }
@@ -530,6 +532,12 @@ export function useChatEngine() {
               dashboard: m.dashboard,
               listings: m.listings,
               offerCreated: m.offerCreated,
+              topDeals: m.topDeals,
+              matchedOffers: m.matchedOffers,
+              orderConfirmation: m.orderConfirmation,
+              earnings: m.earnings,
+              slider: m.slider,
+              autoTradeStatus: m.autoTradeStatus,
             })),
           ]);
         }
@@ -609,6 +617,8 @@ export function useChatEngine() {
             matchedOffers: m.matchedOffers,
             orderConfirmation: m.orderConfirmation,
             earnings: m.earnings,
+            slider: m.slider,
+            autoTradeStatus: m.autoTradeStatus,
           })),
         ]);
       }
