@@ -341,11 +341,20 @@ export async function getBuyAdvice(userId: string, isHindi: boolean = false): Pr
     select: { installationAddress: true },
   });
 
+  // If no address, provide general buying advice without weather personalization
   if (!user?.installationAddress) {
     return {
       advice: isHindi
-        ? 'पता उपलब्ध नहीं है। मौसम के हिसाब से सलाह नहीं दे सकता।'
-        : 'Address not available. Cannot provide weather-based advice.',
+        ? '💡 *खरीदने की सलाह*\n\n' +
+          '• सबसे अच्छा समय: सुबह 10 बजे से दोपहर 2 बजे तक\n' +
+          '• इस समय सोलर प्रोडक्शन सबसे ज्यादा = सप्लाई ज्यादा = दाम कम\n' +
+          '• बारिश/बादल वाले दिन दाम थोड़े ज्यादा हो सकते हैं\n\n' +
+          '_पते के लिए Utility ID अपलोड करो, फिर मौसम के हिसाब से सटीक सलाह मिलेगी!_'
+        : '💡 *Best Time to Buy*\n\n' +
+          '• Best window: 10 AM - 2 PM (peak solar hours)\n' +
+          '• High solar production = more supply = lower prices\n' +
+          '• Cloudy/rainy days may have slightly higher prices\n\n' +
+          '_Upload your Utility ID to get personalized weather-based advice!_',
     };
   }
 
@@ -353,8 +362,8 @@ export async function getBuyAdvice(userId: string, isHindi: boolean = false): Pr
   if (!forecast) {
     return {
       advice: isHindi
-        ? 'मौसम का डेटा उपलब्ध नहीं है।'
-        : 'Weather data not available.',
+        ? 'मौसम का डेटा उपलब्ध नहीं है। आम तौर पर सुबह 10 बजे से दोपहर 2 बजे तक खरीदना सबसे अच्छा है।'
+        : 'Weather data not available. Generally, 10 AM - 2 PM is the best time to buy.',
     };
   }
 

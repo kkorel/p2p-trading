@@ -3381,18 +3381,27 @@ const states: Record<ChatState, StateHandler> = {
             ? `आपके ${sanctionedLoad} किलोवाट कनेक्शन से आप हर महीने करीब ₹${monthlySavings} बचा सकते हो सस्ती हरी बिजली खरीद कर!`
             : `आप अब सस्ती हरी बिजली खरीद कर पैसे बचा सकते हो!`;
 
+          // Continue directly to buy flow instead of going back to GENERAL_CHAT
           return {
             messages: [
               { text: h(ctx, `Verified! ${result.summary}`, `वेरिफाई हो गया! ${result.summary}`) },
               { text: h(ctx, savingsEn, savingsHi), delay: 300 },
-              { text: h(ctx,
-                'I\'ll help you find the best energy deals from local producers. Your profile is ready!',
-                'मैं आपको बाज़ार से सबसे अच्छे दाम पर बिजली ढूंढने में मदद करूंगा। आपका प्रोफाइल तैयार है!'
-              ), delay: 300 },
+              {
+                text: h(ctx,
+                  '🔋 *Buy Energy*\n\nHow would you like to proceed?\n\n🤖 *Buy Automatically* - Daily auto-buy at best prices\n📝 *One-time Purchase* - Buy energy once',
+                  '🔋 *बिजली खरीदो*\n\nकैसे आगे बढ़ना चाहते हो?\n\n🤖 *ऑटोमैटिक* - रोज़ सबसे सस्ते दाम पर\n📝 *एक बार* - एक बार खरीदो'
+                ),
+                buttons: [
+                  { text: h(ctx, '🤖 Buy Automatically', '🤖 ऑटोमैटिक'), callbackData: 'action:setup_auto_buy' },
+                  { text: h(ctx, '📝 One-time Purchase', '📝 एक बार'), callbackData: 'purchase_mode:onetime' },
+                ],
+                delay: 300,
+              },
             ],
             newState: 'GENERAL_CHAT',
             contextUpdate: {
               verifiedCreds: updatedCreds,
+              pendingPurchase: { awaitingField: 'choose_mode' },
             },
           };
         }
