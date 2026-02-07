@@ -1147,58 +1147,18 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
     };
   }
 
-  // Show top deals AFTER quantity is known (if not already shown)
-  if (!pending.topDealsShown) {
-    const { deals, message } = await getTopDeals(3, ctx.language);
-
-    // Build buttons for top deals (fallback for WhatsApp/Telegram)
-    const buttons = deals.slice(0, 3).map((deal, i) => ({
-      text: `${i + 1}️⃣ Buy ${deal.quantity} units @ ₹${deal.pricePerUnit}`,
-      callbackData: `buy_deal:${deal.offerId}:${deal.quantity}`,
-    }));
-
-    // Add custom amount option
-    buttons.push({ text: h(ctx, '📝 Custom amount', '📝 अपनी मात्रा'), callbackData: 'buy_custom' });
-
-    // Build structured top deals for premium UI card
-    const topDealsCard = {
-      deals: deals.map(deal => ({
-        offerId: deal.offerId,
-        providerName: deal.providerName,
-        trustScore: deal.trustScore,
-        energyType: deal.energyType.includes('Solar') || deal.energyType.includes('☀️') ? 'SOLAR' :
-          deal.energyType.includes('Wind') || deal.energyType.includes('💨') ? 'WIND' : 'MIXED',
-        quantity: deal.quantity,
-        pricePerKwh: deal.pricePerUnit,
-        savingsPercent: Math.round(deal.savingsPercent),
-      })),
-      discomRate: 7.5,
-    };
-
-    return {
-      messages: [{
-        text: message,
-        topDeals: topDealsCard, // Premium UI card for web
-        buttons, // Fallback for WhatsApp/Telegram
-      }],
-      contextUpdate: { pendingPurchase: { ...pending, topDealsShown: true, awaitingField: 'top_deals' } },
-    };
-  }
-
-  // maxPrice is no longer asked — smart-buy finds the cheapest combination automatically.
-  // If user volunteers a max price via intent params, it's kept but not required.
-
+  // Ask for time SECOND (after quantity)
   if (!pending.timeDesc) {
     return {
       messages: [{
         text: h(ctx,
-          '⏰ *Delivery Time*\n\nWhen do you need the energy?',
-          '⏰ *डिलीवरी का समय*\n\nबिजली कब चाहिए?'
+          '⏰ *When do you need it?*\n\nChoose when you want the energy delivered.',
+          '⏰ *कब चाहिए?*\n\nबताओ बिजली कब डिलीवर करनी है।'
         ),
         buttons: [
-          { text: h(ctx, '🌅 Tomorrow morning', '🌅 Kal subah'), callbackData: 'purchase_time:tomorrow morning' },
-          { text: h(ctx, '☀️ Tomorrow afternoon', '☀️ Kal dopahar'), callbackData: 'purchase_time:tomorrow afternoon' },
-          { text: h(ctx, '🌇 Today evening', '🌇 Aaj shaam'), callbackData: 'purchase_time:today evening' },
+          { text: h(ctx, '🌅 Tomorrow morning', '🌅 कल सुबह'), callbackData: 'purchase_time:tomorrow morning' },
+          { text: h(ctx, '☀️ Tomorrow afternoon', '☀️ कल दोपहर'), callbackData: 'purchase_time:tomorrow afternoon' },
+          { text: h(ctx, '🌇 Today evening', '🌇 आज शाम'), callbackData: 'purchase_time:today evening' },
         ],
       }],
       contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'timeframe' } },
