@@ -67,7 +67,8 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/bap/dist ./packages/bap/dist
 COPY --from=builder /app/packages/shared/prisma ./packages/shared/prisma
-# Note: Prisma client is in packages/shared/dist/generated (custom output path)
+# Copy Prisma generated client (compiled code references src/generated path)
+COPY --from=builder /app/packages/shared/src/generated ./packages/shared/src/generated
 # @prisma runtime is needed for Prisma to work
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
