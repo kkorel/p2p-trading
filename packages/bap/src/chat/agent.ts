@@ -4320,9 +4320,33 @@ const states: Record<ChatState, StateHandler> = {
           case 'show_earnings':
             message = 'show my earnings';
             break;
-          case 'buy_energy':
+          case 'buy_energy': {
+            // Clear any pending purchase to avoid conflict with choose_mode handler
+            ctx.pendingPurchase = undefined;
+            ctx.pendingAutoBuy = undefined;
+
+            // Credential gate: must have Consumption Profile to buy
+            if (!verifiedCreds.includes('CONSUMPTION_PROFILE')) {
+              return {
+                messages: [
+                  {
+                    text: h(ctx,
+                      'To buy electricity, I first need your electricity bill document. This shows your meter connection and how much power your home can use.\n\nYou can get this from your electricity company office.',
+                      'बिजली खरीदने के लिए पहले आपका बिजली का कागज़ चाहिए। इससे पता चलता है कि आपके घर में कितनी बिजली आ सकती है।\n\nये आपको अपनी बिजली कंपनी से मिल जाएगा।'
+                    ),
+                    buttons: [
+                      { text: h(ctx, '📄 Upload document', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
+                    ],
+                  },
+                ],
+                newState: 'OFFER_OPTIONAL_CREDS',
+                contextUpdate: { intent: 'buy', expectedCredType: 'ConsumptionProfileCredential' },
+              };
+            }
+            // Has credential - continue to buy flow
             message = 'buy energy';
             break;
+          }
           case 'show_orders':
             message = 'show my orders';
             break;
