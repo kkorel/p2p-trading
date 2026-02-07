@@ -3798,10 +3798,18 @@ const states: Record<ChatState, StateHandler> = {
 
                 return {
                   messages: [
+                    // First message: Weather and trade limit explanation
                     {
                       text: h(ctx,
-                        `✅ Auto-sell activated!\n\n🌤️ Based on tomorrow's weather forecast (${weatherPercent}% solar efficiency) and your ${tradeLimitPct}% trade limit, I've listed *${listedQty} kWh* at ₹${smartPrice}/unit.\n\n📊 Monthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the weather and your existing listings, then add what's needed.${infoText}`,
-                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर एफिशिएंसी) और आपकी ${tradeLimitPct}% ट्रेड लिमिट के हिसाब से, मैंने *${listedQty} kWh* ₹${smartPrice}/यूनिट पर लिस्ट किया है।\n\n📊 मासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे मौसम और मौजूदा लिस्टिंग देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।${infoText}`
+                        `🌤️ Tomorrow's weather forecast shows *${weatherPercent}%* solar efficiency. Based on this and your *${tradeLimitPct}%* trade limit, I'm placing an offer for *${listedQty} kWh* at ₹${smartPrice}/unit.`,
+                        `🌤️ कल के मौसम में *${weatherPercent}%* सोलर एफिशिएंसी है। इसके और आपकी *${tradeLimitPct}%* ट्रेड लिमिट के हिसाब से, मैं *${listedQty} kWh* ₹${smartPrice}/यूनिट पर ऑफ़र लगा रहा हूं।`
+                      ),
+                    },
+                    // Second message: Offer card with confirmation and buttons
+                    {
+                      text: h(ctx,
+                        `✅ Auto-sell activated!\n\n📊 Monthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the weather and your existing listings, then add what's needed.${infoText}`,
+                        `✅ ऑटो-सेल चालू!\n\n📊 मासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे मौसम और मौजूदा लिस्टिंग देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।${infoText}`
                       ),
                       offerCreated: {
                         quantity: tradeResult.listedQuantity,
@@ -4534,23 +4542,40 @@ const states: Record<ChatState, StateHandler> = {
                 const listedQty = tradeResult.listedQuantity.toFixed(1);
                 const dailyCapacity = (capacity / 30).toFixed(1);
 
+                // Get trade limit for explanation
+                const userForLimit = await prisma.user.findUnique({
+                  where: { id: ctx.userId! },
+                  select: { allowedTradeLimit: true },
+                });
+                const tradeLimitPct = userForLimit?.allowedTradeLimit || 10;
+
                 let warningText = '';
                 if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
                   warningText = '\n\n⚠️ ' + tradeResult.warningMessage;
                 }
 
                 return {
-                  messages: [{
-                    text: h(ctx,
-                      `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${price}/unit.\n\nMonthly capacity: ${capacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
-                      `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं *${listedQty} kWh* ₹${price}/यूनिट पर लिस्ट कर रहा हूं।\n\nमासिक क्षमता: ${capacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
-                    ),
-                    buttons: [
-                      { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
-                      { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
-                      { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
-                    ],
-                  }],
+                  messages: [
+                    // First message: Weather and trade limit explanation
+                    {
+                      text: h(ctx,
+                        `🌤️ Tomorrow's weather forecast shows *${weatherPercent}%* solar efficiency. Based on this and your *${tradeLimitPct}%* trade limit, I'm placing an offer for *${listedQty} kWh* at ₹${price}/unit.`,
+                        `🌤️ कल के मौसम में *${weatherPercent}%* सोलर एफिशिएंसी है। इसके और आपकी *${tradeLimitPct}%* ट्रेड लिमिट के हिसाब से, मैं *${listedQty} kWh* ₹${price}/यूनिट पर ऑफ़र लगा रहा हूं।`
+                      ),
+                    },
+                    // Second message: Confirmation with buttons
+                    {
+                      text: h(ctx,
+                        `✅ Auto-sell activated!\n\n📊 Monthly capacity: ${capacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
+                        `✅ ऑटो-सेल चालू!\n\n📊 मासिक क्षमता: ${capacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
+                      ),
+                      buttons: [
+                        { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
+                        { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
+                        { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      ],
+                    },
+                  ],
                 };
               } else if (tradeResult && tradeResult.status === 'skipped') {
                 const dailyCapacity = (capacity / 30).toFixed(1);
