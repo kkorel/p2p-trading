@@ -80,8 +80,8 @@ export function MessageList({
 
           {/* Bubble */}
           <div className="max-w-[80%] flex flex-col gap-1.5">
-            {/* Hide text bubble when premium UI cards are present (topDeals, matchedOffers, orderConfirmation, earnings) */}
-            {!(msg.role === 'agent' && (msg.topDeals || msg.matchedOffers || msg.orderConfirmation || msg.earnings)) && (
+            {/* Hide text bubble when premium UI cards are present (topDeals, matchedOffers, orderConfirmation, earnings, offerCreated) */}
+            {!(msg.role === 'agent' && (msg.topDeals || msg.matchedOffers || msg.orderConfirmation || msg.earnings || msg.offerCreated)) && (
               <div
                 className={`relative px-3.5 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap ${msg.role === 'agent'
                     ? 'bg-gray-100 text-gray-900 rounded-2xl rounded-bl-md'

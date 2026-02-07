@@ -17,8 +17,8 @@ const LABELS = {
   bestDeals: { en: 'Best Deals Found!', hi: 'बेस्ट डील मिली!' },
   bestDeal: { en: 'Best deal for your request', hi: 'आपकी मांग के लिए सबसे अच्छी डील' },
   combinedFrom: { en: 'Combined from', hi: '' },
-  sellers: { en: 'sellers', hi: 'किसान' },
-  sellersFrom: { en: 'sellers', hi: 'किसानों से' },
+  sellers: { en: 'sellers', hi: 'विक्रेता' },
+  sellersFrom: { en: 'sellers', hi: 'विक्रेताओं से' },
   seller: { en: 'Seller', hi: 'विक्रेता' },
   quantity: { en: 'Quantity', hi: 'मात्रा' },
   price: { en: 'Price', hi: 'दाम' },
@@ -200,20 +200,20 @@ export function MatchedOffersCard({ data, language, onAccept, onCancel }: Matche
       </div>
 
       {/* Action Buttons */}
-      <div className="px-3 pb-3 flex gap-2">
-        <button
-          onClick={onAccept}
-          className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-        >
-          <CheckCircle className="w-4 h-4" />
-          {isSingle ? getLabel('buyNow', isHindi) : getLabel('acceptAll', isHindi)}
-        </button>
+      <div className="px-3 pb-3 flex justify-end gap-2">
         <button
           onClick={onCancel}
-          className="px-4 py-2.5 border border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+          className="px-3 py-2 border border-gray-300 hover:border-gray-400 text-gray-600 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
           {getLabel('cancel', isHindi)}
+        </button>
+        <button
+          onClick={onAccept}
+          className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5"
+        >
+          <CheckCircle className="w-3.5 h-3.5" />
+          {isSingle ? getLabel('buyNow', isHindi) : getLabel('acceptAll', isHindi)}
         </button>
       </div>
     </div>

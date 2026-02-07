@@ -846,7 +846,7 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
   if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop') {
     return {
       messages: [{
-        text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.'),
+        text: h(ctx, 'Listing cancelled.', 'लिस्टिंग रद्द हो गई।'),
         buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
       }],
       contextUpdate: { pendingListing: undefined },
@@ -1028,7 +1028,7 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
         const answer = message.replace('listing_confirm:', '');
         if (answer === 'no') {
           return {
-            messages: [{ text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.') }],
+            messages: [{ text: h(ctx, 'Listing cancelled.', 'लिस्टिंग रद्द हो गई।') }],
             contextUpdate: { pendingListing: undefined },
           };
         }
@@ -1041,7 +1041,7 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
 
       if (isNo) {
         return {
-          messages: [{ text: h(ctx, 'Listing cancelled.', 'Listing cancel ho gayi.') }],
+          messages: [{ text: h(ctx, 'Listing cancelled.', 'लिस्टिंग रद्द हो गई।') }],
           contextUpdate: { pendingListing: undefined },
         };
       }
@@ -1139,7 +1139,7 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
     }));
 
     // Add custom amount option
-    buttons.push({ text: h(ctx, '📝 Custom amount', '📝 Custom amount'), callbackData: 'buy_custom' });
+    buttons.push({ text: h(ctx, '📝 Custom amount', '📝 अपनी मात्रा'), callbackData: 'buy_custom' });
 
     // Build structured top deals for premium UI card
     const topDealsCard = {
@@ -1171,7 +1171,7 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
       messages: [{
         text: h(ctx,
           '📝 *Custom Purchase*\n\nHow many units of energy do you want to buy?\n\n💡 Tip: 50 units = enough for 5 homes for 1 day',
-          '📝 *Custom Purchase*\n\nKitne unit energy khareedna chahte ho?\n\n💡 Tip: 50 unit = 5 ghar ke liye 1 din ki bijli'
+          '📝 *अपनी मात्रा*\n\nकितनी यूनिट बिजली खरीदनी है?\n\n💡 टिप: 50 यूनिट = 5 घरों के लिए 1 दिन की बिजली'
         ),
         buttons: [
           { text: '🔋 10 units', callbackData: 'purchase_qty:10' },
@@ -1191,7 +1191,7 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
       messages: [{
         text: h(ctx,
           '⏰ *Delivery Time*\n\nWhen do you need the energy?',
-          '⏰ *Delivery Time*\n\nEnergy kab chahiye?'
+          '⏰ *डिलीवरी का समय*\n\nबिजली कब चाहिए?'
         ),
         buttons: [
           { text: h(ctx, '🌅 Tomorrow morning', '🌅 Kal subah'), callbackData: 'purchase_time:tomorrow morning' },
@@ -1222,7 +1222,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
   const searchMsg: AgentMessage = {
     text: h(ctx,
       'Searching for the best deals...',
-      'Sabse acche deals dhundh raha hun...'
+      'सबसे अच्छी डील ढूंढ रहा हूं...'
     ),
   };
 
@@ -1240,7 +1240,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
           {
             text: h(ctx,
               'Your session has expired. Please log in again using /start.',
-              'Aapka session expire ho gaya. /start se dobara login karo.'
+              'आपका सेशन समाप्त हो गया। /start से दोबारा लॉगिन करो।'
             )
           },
         ],
@@ -1264,7 +1264,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
       if (windowStrs.length > 0) {
         errorText += h(ctx,
           `\n\nOffers are available at these times:\n${windowStrs.map((w, i) => `${i + 1}. ${w}`).join('\n')}\n\nWould you like to try a different time?`,
-          `\n\nYe time pe offers available hain:\n${windowStrs.map((w, i) => `${i + 1}. ${w}`).join('\n')}\n\nKya alag time pe try karna hai?`
+          `\n\nइन समय पर ऑफ़र उपलब्ध हैं:\n${windowStrs.map((w, i) => `${i + 1}. ${w}`).join('\n')}\n\nअलग समय पर कोशिश करोगे?`
         );
       }
     }
@@ -1272,7 +1272,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
     messages.push({
       text: h(ctx, errorText, errorText),
       buttons: [
-        { text: h(ctx, '🔄 Try different time', '🔄 Alag time'), callbackData: 'purchase_time:retry' },
+        { text: h(ctx, '🔄 Try different time', '🔄 अलग समय'), callbackData: 'purchase_time:retry' },
         { text: h(ctx, '❌ Cancel', '❌ रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
       ],
     });
@@ -1326,11 +1326,11 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
   const textMessage = selectionType === 'single' && offers.length === 1
     ? h(ctx,
         `Found a match!\n\n• Seller: ${offers[0].providerName}\n• ${offers[0].quantity} kWh at Rs ${offers[0].price}/unit\n• Total: Rs ${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• Time: ${offers[0].timeWindow}\n\nDo you want to buy this?`,
-        `Offer mil gaya!\n\n• Seller: ${offers[0].providerName}\n• ${offers[0].quantity} kWh Rs ${offers[0].price}/unit pe\n• Total: Rs ${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• Time: ${offers[0].timeWindow}\n\nYe khareedna hai?`
+        `ऑफ़र मिल गया!\n\n• विक्रेता: ${offers[0].providerName}\n• ${offers[0].quantity} यूनिट ₹${offers[0].price}/यूनिट पर\n• कुल: ₹${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• समय: ${offers[0].timeWindow}\n\nये खरीदना है?`
       )
     : h(ctx,
         `Found best deals from ${offers.length} sellers!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nTotal: ${matchedOffersCard.summary.totalQuantity} kWh | Rs ${matchedOffersCard.summary.totalPrice.toFixed(2)}\nTime: ${timeWindow}\n\nAccept this deal?`,
-        `${offers.length} sellers se best deals mile!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nTotal: ${matchedOffersCard.summary.totalQuantity} kWh | Rs ${matchedOffersCard.summary.totalPrice.toFixed(2)}\nTime: ${timeWindow}\n\nYe deal accept karna hai?`
+        `${offers.length} विक्रेताओं से बेस्ट डील मिली!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} यूनिट × ₹${o.price}/यूनिट = ₹${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nकुल: ${matchedOffersCard.summary.totalQuantity} यूनिट | ₹${matchedOffersCard.summary.totalPrice.toFixed(2)}\nसमय: ${timeWindow}\n\nये डील मंज़ूर है?`
       );
 
   return {
@@ -1483,7 +1483,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           text: `${i + 1}️⃣ Buy ${deal.quantity} units @ ₹${deal.pricePerUnit}`,
           callbackData: `buy_deal:${deal.offerId}:${deal.quantity}`,
         }));
-        buttons.push({ text: h(ctx, '📝 Custom amount', '📝 Custom amount'), callbackData: 'buy_custom' });
+        buttons.push({ text: h(ctx, '📝 Custom amount', '📝 अपनी मात्रा'), callbackData: 'buy_custom' });
 
         return {
           messages: [{
@@ -1523,7 +1523,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
 
       if (!timeDesc || timeDesc.length < 2) {
         return {
-          messages: [{ text: h(ctx, 'Please tell me when you need the energy (e.g. "tomorrow", "today").', 'Kab chahiye batao (jaise "kal", "aaj").') }],
+          messages: [{ text: h(ctx, 'Please tell me when you need the energy (e.g. "tomorrow", "today").', 'बिजली कब चाहिए? (जैसे "कल", "आज")') }],
         };
       }
       const updated = { ...pending, timeDesc, awaitingField: undefined as any };
@@ -1607,7 +1607,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         const confirmMsg: AgentMessage = {
           text: h(ctx,
             'Completing your purchase...',
-            'Aapki purchase complete kar raha hun...'
+            'आपकी खरीदारी पूरी कर रहा हूं...'
           ),
         };
 
@@ -1718,7 +1718,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
             {
               text: h(ctx,
                 `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`,
-                `Purchase nahi ho payi: ${result.error || 'Unknown error'}. Dobara try karo.`
+                `खरीदारी नहीं हो पाई: ${result.error || 'Unknown error'}। दोबारा कोशिश करो।`
               )
             },
           ],
@@ -1760,7 +1760,7 @@ async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPur
   // Show "searching" message
   const searchMsg = h(ctx,
     'Searching for the best offer and processing your purchase...',
-    'Sabse accha offer dhundh raha hun aur purchase process kar raha hun...'
+    'सबसे अच्छा ऑफ़र ढूंढ रहा हूं और खरीदारी पूरी कर रहा हूं...'
   );
 
   const result = await executePurchase(ctx.userId, {
@@ -2027,23 +2027,23 @@ async function handleUniversalCommand(
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
       `☀️ *Trading Commands*\n` +
       `1️⃣ "becho" - Solar energy becho\n` +
-      `2️⃣ "kharido" - Green energy kharido\n` +
-      `3️⃣ "market" - Current prices dekho\n` +
-      `4️⃣ "dashboard" - Pura status dekho\n\n` +
-      `💰 *Account Commands*\n` +
-      `5️⃣ "kamai" - Apni kamai dekho\n` +
-      `6️⃣ "orders" - Orders track karo\n` +
-      `7️⃣ "balance" - Wallet balance dekho\n\n` +
-      `🛠️ *Navigation*\n` +
-      `• "madad" - Ye menu\n` +
-      `• "peeche" - Pichla step\n` +
-      `• "band" - Current action roko\n` +
-      `• "bhasha" - Bhasha badlo\n` +
-      `• "reset" - Naya shuru karo\n\n` +
-      `💡 *Examples:*\n` +
-      `• "50 unit Rs 6 pe becho"\n` +
-      `• "30 unit kharido"\n\n` +
-      `_Number (1-7) ya command type karo!_`
+      `2️⃣ "खरीदो" - हरी बिजली खरीदो\n` +
+      `3️⃣ "बाज़ार" - मौजूदा दाम देखो\n` +
+      `4️⃣ "डैशबोर्ड" - पूरा स्टेटस देखो\n\n` +
+      `💰 *खाता कमांड*\n` +
+      `5️⃣ "कमाई" - अपनी कमाई देखो\n` +
+      `6️⃣ "ऑर्डर" - ऑर्डर ट्रैक करो\n` +
+      `7️⃣ "बैलेंस" - वॉलेट बैलेंस देखो\n\n` +
+      `🛠️ *नेविगेशन*\n` +
+      `• "मदद" - यह मेनू\n` +
+      `• "पीछे" - पिछला स्टेप\n` +
+      `• "बंद" - मौजूदा एक्शन रोको\n` +
+      `• "भाषा" - भाषा बदलो\n` +
+      `• "रीसेट" - नया शुरू करो\n\n` +
+      `💡 *उदाहरण:*\n` +
+      `• "50 यूनिट ₹6 में बेचो"\n` +
+      `• "30 यूनिट खरीदो"\n\n` +
+      `_नंबर (1-7) या कमांड टाइप करो!_`
     );
     return {
       messages: [{
@@ -2076,10 +2076,10 @@ async function handleUniversalCommand(
         `Phone: ${ctx.phone || 'Not set'}\n` +
         `Verified: ${ctx.userId ? 'Yes ✓' : 'No'}`,
 
-        `📍 *Aapka Status*\n\n${progress}` +
-        `Naam: ${ctx.name || 'Nahi hai'}\n` +
-        `Phone: ${ctx.phone || 'Nahi hai'}\n` +
-        `Verified: ${ctx.userId ? 'Haan ✓' : 'Nahi'}`
+        `📍 *आपका स्टेटस*\n\n${progress}` +
+        `नाम: ${ctx.name || 'नहीं है'}\n` +
+        `फोन: ${ctx.phone || 'नहीं है'}\n` +
+        `वेरिफाइड: ${ctx.userId ? 'हाँ ✓' : 'नहीं'}`
       );
     } else {
       statusText = h(ctx,
@@ -2090,12 +2090,12 @@ async function handleUniversalCommand(
         `Verified: ${ctx.userId ? 'Yes ✓' : 'No'}\n` +
         `Trading: ${ctx.tradingActive ? 'Active ✓' : 'Not started'}`,
 
-        `📍 *Aapka Status*\n\n` +
-        `State: ${currentState}\n` +
-        `Naam: ${ctx.name || 'Nahi hai'}\n` +
-        `Phone: ${ctx.phone || 'Nahi hai'}\n` +
-        `Verified: ${ctx.userId ? 'Haan ✓' : 'Nahi'}\n` +
-        `Trading: ${ctx.tradingActive ? 'Chalu ✓' : 'Shuru nahi'}`
+        `📍 *आपका स्टेटस*\n\n` +
+        `स्टेट: ${currentState}\n` +
+        `नाम: ${ctx.name || 'नहीं है'}\n` +
+        `फोन: ${ctx.phone || 'नहीं है'}\n` +
+        `वेरिफाइड: ${ctx.userId ? 'हाँ ✓' : 'नहीं'}\n` +
+        `ट्रेडिंग: ${ctx.tradingActive ? 'चालू ✓' : 'शुरू नहीं'}`
       );
     }
     return { messages: [{ text: statusText }] };
@@ -2110,7 +2110,7 @@ async function handleUniversalCommand(
         messages: [{
           text: h(ctx,
             "Can't go back from here. Type 'help' for options.",
-            "Yahan se peeche nahi ja sakte. 'madad' type karo options ke liye."
+            "यहाँ से पीछे नहीं जा सकते। विकल्पों के लिए 'मदद' टाइप करो।"
           ),
         }],
       };
@@ -2136,7 +2136,7 @@ async function handleUniversalCommand(
     if (ctx.pendingListing || ctx.pendingPurchase) {
       const cancelText = h(ctx,
         '❌ Operation cancelled. What would you like to do?',
-        '❌ Cancel ho gaya. Ab kya karna hai?'
+        '❌ रद्द हो गया। अब क्या करना है?'
       );
       return {
         messages: [{ text: cancelText }],
@@ -2148,7 +2148,7 @@ async function handleUniversalCommand(
       messages: [{
         text: h(ctx,
           "Nothing to cancel. Type 'help' for options.",
-          "Cancel karne ke liye kuch nahi hai. 'madad' type karo options ke liye."
+          "रद्द करने के लिए कुछ नहीं है। विकल्पों के लिए 'मदद' टाइप करो।"
         ),
       }],
     };
@@ -2208,21 +2208,21 @@ async function handleUniversalCommand(
       `• Complete profile for higher limits\n` +
       `• Add more credentials to unlock features`,
 
-      `💡 *Trading Tips*\n` +
+      `💡 *ट्रेडिंग टिप्स*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `☀️ *Sellers ke liye:*\n` +
-      `• DISCOM se 10-20% kam rate rakho\n` +
-      `• Subah 6-10 baje list karo\n` +
-      `• Time pe delivery se trust badhta hai\n` +
-      `• Zyada trust = zyada trade limit\n\n` +
-      `⚡ *Buyers ke liye:*\n` +
-      `• Dopahar mein prices kam (12-4 PM)\n` +
-      `• Bulk mein kharido, discount milega\n` +
-      `• Pehle market price check karo\n` +
-      `• ⭐ rating wale trusted sellers hain\n\n` +
-      `📊 *General:*\n` +
-      `• Profile complete karo, limit badhegi\n` +
-      `• Zyada credentials = zyada features`
+      `☀️ *विक्रेताओं के लिए:*\n` +
+      `• DISCOM से 10-20% कम रेट रखो\n` +
+      `• सुबह 6-10 बजे लिस्ट करो\n` +
+      `• समय पर डिलीवरी से ट्रस्ट बढ़ता है\n` +
+      `• ज़्यादा ट्रस्ट = ज़्यादा ट्रेड लिमिट\n\n` +
+      `⚡ *खरीदारों के लिए:*\n` +
+      `• दोपहर में दाम कम (12-4 PM)\n` +
+      `• बल्क में खरीदो, डिस्काउंट मिलेगा\n` +
+      `• पहले मार्केट प्राइस चेक करो\n` +
+      `• ⭐ रेटिंग वाले विश्वसनीय विक्रेता हैं\n\n` +
+      `📊 *सामान्य:*\n` +
+      `• प्रोफाइल पूरा करो, लिमिट बढ़ेगी\n` +
+      `• ज़्यादा क्रेडेंशियल = ज़्यादा फीचर्स`
     );
     return { messages: [{ text: tipsText }] };
   }
@@ -2245,20 +2245,20 @@ async function handleUniversalCommand(
       `4. Payment released after delivery\n\n` +
       `🌍 Empowering India's green energy future!`,
 
-      `🌱 *Oorja ke baare mein*\n` +
+      `🌱 *ऊर्जा के बारे में*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `Oorja India ka pehla P2P energy trading platform hai.\n\n` +
-      `*Hum kya karte hain:*\n` +
-      `• Solar panel owners ko buyers se jodte hain\n` +
-      `• Direct energy trading enable karte hain\n` +
-      `• DISCOM se kam rate pe bijli\n` +
-      `• Gaon mein solar adoption support\n\n` +
-      `*Kaise kaam karta hai:*\n` +
-      `1. Sellers extra solar energy list karte hain\n` +
-      `2. Buyers best price dhundhte hain\n` +
-      `3. DISCOM grid se deliver karta hai\n` +
-      `4. Delivery ke baad payment release\n\n` +
-      `🌍 India ka green energy future!`
+      `ऊर्जा भारत का पहला P2P एनर्जी ट्रेडिंग प्लेटफॉर्म है।\n\n` +
+      `*हम क्या करते हैं:*\n` +
+      `• सोलर पैनल मालिकों को खरीदारों से जोड़ते हैं\n` +
+      `• डायरेक्ट एनर्जी ट्रेडिंग\n` +
+      `• DISCOM से कम रेट पर बिजली\n` +
+      `• गाँव में सोलर अपनाने में सहायता\n\n` +
+      `*कैसे काम करता है:*\n` +
+      `1. विक्रेता अतिरिक्त सोलर एनर्जी लिस्ट करते हैं\n` +
+      `2. खरीदार बेस्ट प्राइस ढूंढते हैं\n` +
+      `3. DISCOM ग्रिड से डिलीवर करता है\n` +
+      `4. डिलीवरी के बाद पेमेंट रिलीज़\n\n` +
+      `🌍 भारत का हरित ऊर्जा भविष्य!`
     );
     return { messages: [{ text: aboutText }] };
   }
@@ -2280,19 +2280,19 @@ async function handleUniversalCommand(
       `• "status" - See where you are\n\n` +
       `We're here to help! 🙏`,
 
-      `📞 *Support & Contact*\n` +
+      `📞 *सहायता और संपर्क*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `*Madad chahiye?*\n` +
-      `• "madad" type karo commands ke liye\n` +
-      `• "tips" type karo trading advice ke liye\n\n` +
-      `*Sampark:*\n` +
-      `• Email: support@oorja.energy\n` +
-      `• WhatsApp: Yahi number!\n\n` +
-      `*Common issues:*\n` +
-      `• "reset" - Naya shuru karo\n` +
-      `• "band" - Current action roko\n` +
-      `• "status" - Kahan ho dekho\n\n` +
-      `Hum madad ke liye hain! 🙏`
+      `*मदद चाहिए?*\n` +
+      `• कमांड के लिए "मदद" टाइप करो\n` +
+      `• ट्रेडिंग सलाह के लिए "टिप्स" टाइप करो\n\n` +
+      `*संपर्क:*\n` +
+      `• ईमेल: support@oorja.energy\n` +
+      `• व्हाट्सएप: यही नंबर!\n\n` +
+      `*सामान्य समस्याएं:*\n` +
+      `• "रीसेट" - नया शुरू करो\n` +
+      `• "बंद" - मौजूदा एक्शन रोको\n` +
+      `• "स्टेटस" - कहाँ हो देखो\n\n` +
+      `हम मदद के लिए हैं! 🙏`
     );
     return { messages: [{ text: supportText }] };
   }
@@ -2317,7 +2317,7 @@ async function handleUniversalCommand(
       messages: [{
         text: h(ctx,
           `🔇 *Voice Disabled*\n\nI won't read messages aloud. Say "voice on" to enable.`,
-          `🔇 *Voice Off*\n\nMain messages nahi bolunga. "voice on" bolo enable karne ke liye.`
+          `🔇 *वॉइस बंद*\n\nमैं संदेश नहीं बोलूंगा। चालू करने के लिए "voice on" बोलो।`
         ),
       }],
       contextUpdate: { voiceOutputEnabled: false, voicePromptShown: true },
@@ -2476,7 +2476,7 @@ function getConfusedResponse(ctx: SessionContext, userMessage: string): AgentRes
   // Build the friendly message
   const intro = h(ctx,
     "🤔 Hmm, I didn't quite get that.",
-    "🤔 Hmm, mujhe samajh nahi aaya."
+    "🤔 हम्म, मुझे समझ नहीं आया।"
   );
 
   // Context-aware suggestion based on user state
@@ -2484,46 +2484,46 @@ function getConfusedResponse(ctx: SessionContext, userMessage: string): AgentRes
   if (ctx.pendingListing) {
     contextSuggestion = h(ctx,
       "\n💡 You have a pending listing. Reply 'continue' to finish it or 'cancel' to start fresh.",
-      "\n💡 Aapka ek listing pending hai. 'continue' bolo jari rakhne ke liye ya 'cancel' bolo naya shuru karne ke liye."
+      "\n💡 आपकी एक लिस्टिंग पेंडिंग है। जारी रखने के लिए 'continue' या नया शुरू करने के लिए 'cancel' बोलो।"
     );
   } else if (ctx.pendingPurchase) {
     contextSuggestion = h(ctx,
       "\n💡 You have a pending purchase. Reply 'continue' to finish it or 'cancel' to start fresh.",
-      "\n💡 Aapka ek purchase pending hai. 'continue' bolo jari rakhne ke liye ya 'cancel' bolo naya shuru karne ke liye."
+      "\n💡 आपकी एक खरीदारी पेंडिंग है। जारी रखने के लिए 'continue' या नया शुरू करने के लिए 'cancel' बोलो।"
     );
   } else if (hasGeneration && !hasConsumption) {
     contextSuggestion = h(ctx,
       "\n💡 As a solar producer, would you like to sell some energy today?",
-      "\n💡 Solar producer ke taur pe, kya aap aaj kuch energy bechna chahenge?"
+      "\n💡 सोलर प्रोड्यूसर के तौर पर, क्या आप आज कुछ बिजली बेचना चाहेंगे?"
     );
   } else if (!hasGeneration && hasConsumption) {
     contextSuggestion = h(ctx,
       "\n💡 Looking to save on electricity? I can find you the best green energy deals!",
-      "\n💡 Bijli pe bachana chahte ho? Main aapke liye best green energy deals dhundh sakta hun!"
+      "\n💡 बिजली पर बचाना चाहते हो? मैं आपके लिए बेस्ट हरित ऊर्जा डील ढूंढ सकता हूं!"
     );
   }
 
   const menuIntro = h(ctx,
     "\n\nHere's what I can help with:",
-    "\n\nMain yeh madad kar sakta hun:"
+    "\n\nमैं यह मदद कर सकता हूं:"
   );
 
   // Quick numbered options with emojis
   const quickOptions = h(ctx,
     "\n1️⃣ Sell energy\n2️⃣ Buy energy\n3️⃣ Check prices\n4️⃣ My dashboard",
-    "\n1️⃣ Energy becho\n2️⃣ Energy kharido\n3️⃣ Daam dekho\n4️⃣ Dashboard"
+    "\n1️⃣ बिजली बेचो\n2️⃣ बिजली खरीदो\n3️⃣ दाम देखो\n4️⃣ डैशबोर्ड"
   );
 
   const helpHint = h(ctx,
     "\n\nType a number (1-4) or say 'help' for all commands!",
-    "\n\nNumber type karo (1-4) ya 'madad' bolo sabhi commands ke liye!"
+    "\n\nनंबर टाइप करो (1-4) या सभी कमांड के लिए 'मदद' बोलो!"
   );
 
   // Build buttons with emojis
   const buttons = [
-    { text: h(ctx, '☀️ Sell Energy', '☀️ Energy Becho'), callbackData: 'action:create_listing' },
-    { text: h(ctx, '⚡ Buy Energy', '⚡ Energy Kharido'), callbackData: 'action:buy_energy' },
-    { text: h(ctx, '📊 Market Prices', '📊 Daam Dekho'), callbackData: 'action:market_insights' },
+    { text: h(ctx, '☀️ Sell Energy', '☀️ बिजली बेचो'), callbackData: 'action:create_listing' },
+    { text: h(ctx, '⚡ Buy Energy', '⚡ बिजली खरीदो'), callbackData: 'action:buy_energy' },
+    { text: h(ctx, '📊 Market Prices', '📊 दाम देखो'), callbackData: 'action:market_insights' },
     { text: h(ctx, '📊 My Electricity Info', '📊 मेरी बिजली की जानकारी'), callbackData: 'action:dashboard' },
   ];
 
@@ -3385,7 +3385,7 @@ const states: Record<ChatState, StateHandler> = {
               { text: h(ctx, savingsEn, savingsHi), delay: 300 },
               { text: h(ctx,
                 'I\'ll help you find the best energy deals from local producers. Your profile is ready!',
-                'मैं आपको किसानों से सबसे अच्छे दाम पर बिजली ढूंढने में मदद करूंगा। आपका प्रोफाइल तैयार है!'
+                'मैं आपको बाज़ार से सबसे अच्छे दाम पर बिजली ढूंढने में मदद करूंगा। आपका प्रोफाइल तैयार है!'
               ), delay: 300 },
             ],
             newState: 'GENERAL_CHAT',
@@ -3593,7 +3593,7 @@ const states: Record<ChatState, StateHandler> = {
             {
               text: h(ctx,
                 'No problem. You can start selling anytime from the Sell tab or ask me here.',
-                'Koi baat nahi. Kabhi bhi Sell tab se ya mujhse poocho, bechna shuru kar sakte ho.'
+                'कोई बात नहीं। कभी भी Sell टैब से या मुझसे पूछो, बेचना शुरू कर सकते हो।'
               ),
               buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
             },
@@ -3608,10 +3608,10 @@ const states: Record<ChatState, StateHandler> = {
           messages: [
             { text: kbAnswer },
             {
-              text: h(ctx, 'Start selling your energy?', 'Energy bechna shuru karein?'),
+              text: h(ctx, 'Start selling your energy?', 'बिजली बेचना शुरू करें?'),
               buttons: [
-                { text: h(ctx, '✅ Yes', '✅ Haan'), callbackData: 'yes' },
-                { text: h(ctx, '❌ No', '❌ Nahi'), callbackData: 'no' },
+                { text: h(ctx, '✅ Yes', '✅ हाँ'), callbackData: 'yes' },
+                { text: h(ctx, '❌ No', '❌ नहीं'), callbackData: 'no' },
               ],
               delay: 300,
             },
@@ -3711,7 +3711,7 @@ const states: Record<ChatState, StateHandler> = {
             messages: [{
               text: h(ctx,
                 `🔄 *Reset Complete!*\n\nAll cleared. Let's start fresh!\n\nHow can I help you today?`,
-                `🔄 *Reset Ho Gaya!*\n\nSab clear ho gaya. Naya shuru!\n\nAaj kya madad karun?`
+                `🔄 *रीसेट हो गया!*\n\nसब क्लियर हो गया। नया शुरू!\n\nआज क्या मदद करूं?`
               ),
               buttons: [
                 { text: '☀️ Sell Energy', callbackData: 'action:create_listing' },
@@ -3732,7 +3732,7 @@ const states: Record<ChatState, StateHandler> = {
             messages: [{
               text: h(ctx,
                 `✅ Reset cancelled. Continuing where we were.\n\nHow can I help?`,
-                `✅ Reset cancel. Jahan the wahi se continue.\n\nKya madad karun?`
+                `✅ रीसेट रद्द। जहाँ थे वहीं से जारी।\n\nक्या मदद करूं?`
               ),
               buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
             }],
@@ -3749,7 +3749,7 @@ const states: Record<ChatState, StateHandler> = {
             messages: [{
               text: h(ctx,
                 `🔊 *Voice Enabled!*\n\nI'll read messages aloud for you. You can say "voice off" anytime to disable.\n\nHow can I help you today?`,
-                `🔊 *Voice On!*\n\nMain messages bolke sunaunga. Kabhi bhi "voice off" bolo band karne ke liye.\n\nAaj kya madad karun?`
+                `🔊 *वॉइस चालू!*\n\nमैं संदेश बोलकर सुनाऊंगा। कभी भी "voice off" बोलो बंद करने के लिए।\n\nआज क्या मदद करूं?`
               ),
               buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
             }],
@@ -3761,7 +3761,7 @@ const states: Record<ChatState, StateHandler> = {
             messages: [{
               text: h(ctx,
                 `🔇 *Voice Disabled*\n\nNo problem! You can say "voice on" anytime to enable it.\n\nHow can I help you today?`,
-                `🔇 *Voice Off*\n\nKoi baat nahi! Kabhi bhi "voice on" bolo enable karne ke liye.\n\nAaj kya madad karun?`
+                `🔇 *वॉइस बंद*\n\nकोई बात नहीं! कभी भी "voice on" बोलो चालू करने के लिए।\n\nआज क्या मदद करूं?`
               ),
               buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
             }],
@@ -4069,7 +4069,7 @@ const states: Record<ChatState, StateHandler> = {
                   {
                     text: h(ctx,
                       'To sell energy, I need your solar generation credential first. This proves your solar panel capacity.\n\nYou can get it from your DISCOM or download a sample from the credential portal.',
-                      'Energy bechne ke liye pehle aapka solar generation ka credential chahiye. Ye aapke solar panel ki capacity prove karta hai.\n\nYe aapko apni DISCOM se ya credential portal se mil jaayega.'
+                      'बिजली बेचने के लिए पहले आपका सोलर जनरेशन का क्रेडेंशियल चाहिए। यह आपके सोलर पैनल की क्षमता प्रमाणित करता है।\n\nयह आपको अपनी DISCOM या क्रेडेंशियल पोर्टल से मिल जाएगा।'
                     ),
                     buttons: [
                       { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
@@ -4229,7 +4229,7 @@ const states: Record<ChatState, StateHandler> = {
                 {
                   text: h(ctx,
                     'To sell energy, I need your solar generation credential first. This proves your solar panel capacity.',
-                    'Energy bechne ke liye pehle aapka solar generation ka credential chahiye.'
+                    'बिजली बेचने के लिए पहले आपका सोलर जनरेशन का क्रेडेंशियल चाहिए।'
                   ),
                   buttons: [
                     { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
