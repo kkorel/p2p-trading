@@ -4279,6 +4279,44 @@ const states: Record<ChatState, StateHandler> = {
           case 'create_listing':
             message = 'create a new listing';
             break;
+          case 'show_listings': {
+            // Directly return listings UI card
+            if (ctx.userId) {
+              const listingsData = await getActiveListingsData(ctx.userId);
+              if (listingsData && listingsData.listings.length > 0) {
+                const introText = h(ctx,
+                  `Here are your active listings, ${listingsData.userName}. Total: ${listingsData.totalListed} kWh listed, ${listingsData.totalSold} kWh sold.`,
+                  `${listingsData.userName}, यह रही आपकी लिस्टिंग। कुल: ${listingsData.totalListed} यूनिट लिस्टेड, ${listingsData.totalSold} यूनिट बिके।`
+                );
+                return {
+                  messages: [{
+                    text: introText,
+                    listings: listingsData,
+                    buttons: [
+                      { text: h(ctx, '➕ Add Listing', '➕ नई लिस्टिंग'), callbackData: 'action:create_listing' },
+                      { text: h(ctx, '📊 Dashboard', '📊 डैशबोर्ड'), callbackData: 'action:dashboard' },
+                      { text: h(ctx, '💰 Earnings', '💰 कमाई'), callbackData: 'action:show_earnings' },
+                    ],
+                  }],
+                };
+              }
+              // No listings
+              return {
+                messages: [{
+                  text: h(ctx,
+                    'You have no active listings yet. Would you like to create one?',
+                    'आपकी कोई लिस्टिंग नहीं है। क्या एक बनाना चाहोगे?'
+                  ),
+                  buttons: [
+                    { text: h(ctx, '☀️ Sell Energy', '☀️ बिजली बेचो'), callbackData: 'action:create_listing' },
+                    { text: h(ctx, '📊 Dashboard', '📊 डैशबोर्ड'), callbackData: 'action:dashboard' },
+                  ],
+                }],
+              };
+            }
+            message = 'show my listings';
+            break;
+          }
           case 'show_earnings':
             message = 'show my earnings';
             break;
