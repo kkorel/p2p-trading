@@ -18,6 +18,27 @@ import { sendFirstLoginWelcome } from './chat/notifications';
 
 const logger = createLogger('Auth');
 
+/**
+ * Parse date from various formats (DD-MM-YYYY, YYYY-MM-DD, ISO, etc.)
+ */
+function parseDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+
+  // Try DD-MM-YYYY format first (common in Indian VCs)
+  const ddmmyyyy = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (ddmmyyyy) {
+    const [, day, month, year] = ddmmyyyy;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(date.getTime())) return date;
+  }
+
+  // Try standard Date parsing (ISO, YYYY-MM-DD, etc.)
+  const date = new Date(dateStr);
+  if (!isNaN(date.getTime())) return date;
+
+  return null;
+}
+
 const router = Router();
 
 /**
@@ -307,7 +328,8 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
         if (claims.meterNumber) userUpdate.meterNumber = claims.meterNumber;
         if (claims.installationAddress) userUpdate.installationAddress = claims.installationAddress;
         if (claims.serviceConnectionDate) {
-          userUpdate.serviceConnectionDate = new Date(claims.serviceConnectionDate);
+          const parsedDate = parseDate(claims.serviceConnectionDate);
+          if (parsedDate) userUpdate.serviceConnectionDate = parsedDate;
         }
         break;
       }
@@ -406,7 +428,7 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
             generationType: claims.generationType || claims.sourceType || null,
             capacityKW: claims.capacityKW || null,
             generationMeterNumber: claims.meterNumber || null,
-            commissioningDate: claims.commissioningDate ? new Date(claims.commissioningDate) : null,
+            commissioningDate: claims.commissioningDate ? parseDate(claims.commissioningDate) : null,
             // From Storage VC
             storageCapacityKWh: claims.storageCapacityKWh || null,
             storagePowerRatingKW: claims.powerRatingKW || null,
@@ -441,7 +463,7 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
 
     res.json({
       success: true,
-      credentialType: credType,
+      credentialType: prismaCredType, // Return Prisma enum name for frontend
       verification: {
         verified: verificationResult.verified,
         checks: verificationResult.checks,
@@ -1320,7 +1342,8 @@ router.post('/verify-credential', authMiddleware, async (req: Request, res: Resp
         if (claims.meterNumber) userUpdate.meterNumber = claims.meterNumber;
         if (claims.installationAddress) userUpdate.installationAddress = claims.installationAddress;
         if (claims.serviceConnectionDate) {
-          userUpdate.serviceConnectionDate = new Date(claims.serviceConnectionDate);
+          const parsedDate = parseDate(claims.serviceConnectionDate);
+          if (parsedDate) userUpdate.serviceConnectionDate = parsedDate;
         }
         break;
       }
@@ -1421,7 +1444,7 @@ router.post('/verify-credential', authMiddleware, async (req: Request, res: Resp
             generationType: claims.generationType || claims.sourceType || null,
             capacityKW: claims.capacityKW || null,
             generationMeterNumber: claims.meterNumber || null,
-            commissioningDate: claims.commissioningDate ? new Date(claims.commissioningDate) : null,
+            commissioningDate: claims.commissioningDate ? parseDate(claims.commissioningDate) : null,
             // From Storage VC
             storageCapacityKWh: claims.storageCapacityKWh || null,
             storagePowerRatingKW: claims.powerRatingKW || null,

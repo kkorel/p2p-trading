@@ -6,18 +6,24 @@ import { useAuth } from '@/contexts/auth-context';
 import { authApi } from '@/lib/api';
 import {
   Zap,
-  Upload,
   CheckCircle2,
   AlertCircle,
   Loader2,
-  FileText,
   Sun,
   Battery,
   Gauge,
   ArrowRight,
+  FileJson,
 } from 'lucide-react';
 
 type CredentialType = 'UTILITY_CUSTOMER' | 'GENERATION_PROFILE' | 'STORAGE_PROFILE' | 'CONSUMPTION_PROFILE';
+
+// Progress steps for the status bar
+const STEPS = [
+  { id: 'utility', label: 'Utility VC' },
+  { id: 'role', label: 'Select Role' },
+  { id: 'credentials', label: 'Role VCs' },
+];
 
 interface UploadedVC {
   type: CredentialType;
@@ -59,6 +65,14 @@ export default function CredentialsOnboarding() {
       (selectedRole === 'buyer' && hasBuyerVC) ||
       (selectedRole === 'both' && hasSellerVC && hasBuyerVC));
 
+  // Determine current step for progress bar
+  const getCurrentStep = () => {
+    if (!hasUtilityVC) return 0;
+    if (!selectedRole) return 1;
+    return 2;
+  };
+  const currentStep = getCurrentStep();
+
   // Load pending auth data from session storage
   useEffect(() => {
     const storedUserId = sessionStorage.getItem('pendingUserId');
@@ -87,21 +101,25 @@ export default function CredentialsOnboarding() {
       setUploadError(null);
 
       try {
-        // Convert file to base64
-        const base64 = await new Promise<string>((resolve, reject) => {
+        // Read file as text and parse JSON
+        const jsonText = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            // Remove data URL prefix
-            const base64Data = result.split(',')[1];
-            resolve(base64Data);
-          };
+          reader.onload = () => resolve(reader.result as string);
           reader.onerror = reject;
-          reader.readAsDataURL(file);
+          reader.readAsText(file);
         });
 
-        // Upload to pre-auth endpoint
-        const result = await authApi.verifyCredentialPreauth(userId, base64);
+        let credential: any;
+        try {
+          credential = JSON.parse(jsonText);
+        } catch {
+          setUploadError('Invalid JSON file. Please upload a valid credential JSON.');
+          setIsUploading(false);
+          return;
+        }
+
+        // Upload to pre-auth endpoint (send as JSON credential, not base64)
+        const result = await authApi.verifyCredentialPreauth(userId, undefined, credential);
 
         if (result.success && result.verification.verified) {
           setUploadedVCs(prev => [
@@ -114,7 +132,7 @@ export default function CredentialsOnboarding() {
           ]);
         } else {
           setUploadError(
-            `Credential verification failed. Please ensure you have a valid ${expectedType || 'credential'} PDF.`
+            `Credential verification failed. Please ensure you have a valid ${expectedType || 'credential'} JSON file.`
           );
         }
       } catch (err: any) {
@@ -153,7 +171,7 @@ export default function CredentialsOnboarding() {
   const createFileInput = (onUpload: (file: File) => void) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.pdf,application/pdf';
+    input.accept = '.json,application/json';
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) onUpload(file);
@@ -172,8 +190,53 @@ export default function CredentialsOnboarding() {
   return (
     <div className="min-h-screen bg-[var(--color-surface)] flex flex-col items-center">
       <div className="max-w-[480px] mx-auto w-full min-h-screen flex flex-col px-4 py-8 bg-[var(--color-bg)] shadow-[var(--shadow-sm)]">
+        {/* Progress Status Bar */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            {STEPS.map((step, index) => (
+              <div key={step.id} className="flex items-center flex-1">
+                <div className="flex flex-col items-center flex-1">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
+                      index < currentStep
+                        ? 'bg-[var(--color-success)] text-white'
+                        : index === currentStep
+                          ? 'bg-[var(--color-primary)] text-white'
+                          : 'bg-[var(--color-border)] text-[var(--color-text-muted)]'
+                    }`}
+                  >
+                    {index < currentStep ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                  <span
+                    className={`text-[10px] mt-1 ${
+                      index <= currentStep
+                        ? 'text-[var(--color-text)]'
+                        : 'text-[var(--color-text-muted)]'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+                {index < STEPS.length - 1 && (
+                  <div
+                    className={`h-[2px] flex-1 mx-1 transition-colors ${
+                      index < currentStep
+                        ? 'bg-[var(--color-success)]'
+                        : 'bg-[var(--color-border)]'
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Header */}
-        <div className="flex flex-col items-center pt-4 pb-8">
+        <div className="flex flex-col items-center pt-2 pb-6">
           <div className="w-14 h-14 bg-[var(--color-primary-light)] rounded-[16px] flex items-center justify-center mb-3">
             <Zap className="h-7 w-7 text-[var(--color-primary)]" />
           </div>
@@ -230,9 +293,9 @@ export default function CredentialsOnboarding() {
                 <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
               ) : (
                 <>
-                  <FileText className="w-8 h-8 text-[var(--color-text-muted)]" />
+                  <FileJson className="w-8 h-8 text-[var(--color-text-muted)]" />
                   <span className="text-sm text-[var(--color-text-muted)]">
-                    Upload Utility Customer VC (PDF)
+                    Upload Utility Customer VC (JSON)
                   </span>
                 </>
               )}
