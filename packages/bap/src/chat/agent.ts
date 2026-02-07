@@ -4504,6 +4504,39 @@ const states: Record<ChatState, StateHandler> = {
             // Check if user mentioned past rain (it rained, baarish hui, etc.)
             const mentionedPastRain = /rained|baarish (hui|ho gayi|thi)|barish (hui|ho gayi)|rain (this|today|yesterday)/i.test(message);
 
+            // Check if user mentioned dust storm / high wind event
+            const mentionedDustStorm = /dust storm|aandhi|andhi|dhool|toofan|tufan|tez hawa|strong wind|windy|hawa chali|storm/i.test(message);
+
+            if (mentionedDustStorm) {
+              // Give specific dust storm advice - HIGH PRIORITY
+              return {
+                messages: [{
+                  text: h(ctx,
+                    '🌪️ *Dust Storm Alert - Clean Your Panels!*\n\n' +
+                    'Dust storms deposit a layer of fine particles that can reduce output by 25-40%!\n\n' +
+                    '⚠️ *Immediate Action Needed:*\n' +
+                    '1. Wait for winds to settle completely\n' +
+                    '2. Gently rinse panels with water first\n' +
+                    '3. Use soft cloth or sponge - NO abrasive materials\n' +
+                    '4. Clean early morning or evening (panels cool)\n\n' +
+                    '💡 After dust storm, cleaning can recover 25%+ of lost power!',
+                    '🌪️ *आंधी की चेतावनी - पैनल साफ करो!*\n\n' +
+                    'आंधी में महीन धूल जम जाती है जो बिजली 25-40% कम कर सकती है!\n\n' +
+                    '⚠️ *तुरंत करो:*\n' +
+                    '1. पहले हवा रुकने दो\n' +
+                    '2. पहले पानी से धीरे-धीरे धोओ\n' +
+                    '3. मुलायम कपड़ा/स्पंज इस्तेमाल करो - खुरदरा नहीं\n' +
+                    '4. सुबह या शाम साफ करो (पैनल ठंडे होने चाहिए)\n\n' +
+                    '💡 आंधी के बाद सफाई से 25%+ बिजली वापस मिलती है!'
+                  ),
+                  buttons: [
+                    { text: h(ctx, '✅ I cleaned them', '✅ साफ कर दिया'), callbackData: 'action:log_cleaning' },
+                    { text: h(ctx, '📋 More tips', '📋 और टिप्स'), callbackData: 'action:solar_tips' },
+                  ],
+                }],
+              };
+            }
+
             if (mentionedPastRain) {
               // Give specific post-rain advice
               return {

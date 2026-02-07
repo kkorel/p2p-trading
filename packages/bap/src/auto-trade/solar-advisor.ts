@@ -15,7 +15,7 @@ const logger = createLogger('SolarAdvisor');
 
 export interface SolarAdvisory {
   userId: string;
-  type: 'cleaning_recommended' | 'performance_drop' | 'rain_cleaning' | 'good_conditions';
+  type: 'cleaning_recommended' | 'performance_drop' | 'rain_cleaning' | 'dust_storm' | 'good_conditions';
   message: string;
   messageHi: string;
   priority: 'low' | 'medium' | 'high';
@@ -77,7 +77,19 @@ async function checkSellerAdvisory(seller: {
     return null;
   }
 
-  // 1. Check for rain-based cleaning opportunity
+  // 1. Check for dust storm / high wind in past 24 hours (PRIORITY - needs immediate cleaning)
+  const dustStormDetected = checkDustStormYesterday(forecast);
+  if (dustStormDetected) {
+    return {
+      userId: seller.userId,
+      type: 'dust_storm',
+      message: '🌪️ High winds detected in the past 24 hours! Dust and debris may have settled on your panels. Please clean them today for optimal performance.',
+      messageHi: '🌪️ पिछले 24 घंटों में तेज़ हवा चली! धूल और कचरा पैनल पर जम सकता है। आज साफ करो ताकि अच्छी बिजली बने।',
+      priority: 'high',
+    };
+  }
+
+  // 2. Check for rain-based cleaning opportunity
   const rainExpected = checkRainExpected(forecast);
   if (rainExpected) {
     return {
@@ -89,7 +101,7 @@ async function checkSellerAdvisory(seller: {
     };
   }
 
-  // 2. Check if cleaning is due (no cleaning in last 30 days)
+  // 3. Check if cleaning is due (no cleaning in last 30 days)
   const lastCleaning = await prisma.solarMaintenanceLog.findFirst({
     where: {
       userId: seller.userId,
@@ -114,7 +126,7 @@ async function checkSellerAdvisory(seller: {
     };
   }
 
-  // 3. Check for performance drop
+  // 4. Check for performance drop
   const performanceDrop = await detectPerformanceDrop(seller.userId, seller.capacityKwh);
   if (performanceDrop > 20) {
     return {
@@ -126,7 +138,7 @@ async function checkSellerAdvisory(seller: {
     };
   }
 
-  // 4. If conditions are good, return a positive advisory
+  // 5. If conditions are good, return a positive advisory
   if (weatherSummary.solarMultiplier >= 0.75) {
     return {
       userId: seller.userId,
@@ -165,6 +177,38 @@ async function detectPerformanceDrop(userId: string, expectedCapacity: number): 
 
   const dropPercent = Math.round(((avgExpected - avgActual) / avgExpected) * 100);
   return Math.max(0, dropPercent);
+}
+
+/**
+ * Check if there was a dust storm / high wind event in the past 24 hours
+ * High winds (>40 km/h) can carry dust and debris onto panels
+ */
+function checkDustStormYesterday(forecast: { hourly: Array<{ time: Date; windSpeed: number }> }): boolean {
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  // Check past 24 hours for high wind events (dust storm indicator)
+  const past24Hours = forecast.hourly.filter(h =>
+    h.time >= yesterday && h.time <= now
+  );
+
+  // Wind speed > 40 km/h is considered high enough to carry dust
+  const highWindThreshold = 40;
+  const hasHighWind = past24Hours.some(h => h.windSpeed > highWindThreshold);
+
+  // Also check for sustained moderate winds (>25 km/h for 3+ hours)
+  const moderateWindThreshold = 25;
+  let consecutiveModerateHours = 0;
+  for (const hour of past24Hours) {
+    if (hour.windSpeed > moderateWindThreshold) {
+      consecutiveModerateHours++;
+      if (consecutiveModerateHours >= 3) return true;
+    } else {
+      consecutiveModerateHours = 0;
+    }
+  }
+
+  return hasHighWind;
 }
 
 /**
