@@ -44,7 +44,9 @@ Important:
 export interface ClassifiedIntent {
   intent: 'show_listings' | 'show_earnings' | 'show_balance' | 'show_orders' | 'show_sales'
   | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'market_insights'
-  | 'show_dashboard' | 'track_activity' | 'change_language' | 'sign_out' | 'edit_profile' | 'general_qa';
+  | 'show_dashboard' | 'track_activity' | 'change_language' | 'sign_out' | 'edit_profile'
+  | 'setup_auto_sell' | 'setup_auto_buy' | 'check_auto_trade' | 'stop_auto_trade'
+  | 'solar_advice' | 'best_time_to_buy' | 'general_qa';
   params?: {
     price_per_kwh?: number;
     quantity_kwh?: number;
@@ -53,6 +55,7 @@ export interface ClassifiedIntent {
     time_period?: string;
     field?: 'name' | 'phone';
     new_value?: string;
+    capacity_kwh?: number;
   };
 }
 
@@ -74,6 +77,12 @@ Intents:
 - "change_language": User wants to change/switch their chat language (e.g. "change to Hindi", "switch language", "Tamil mein baat karo", "bhasha badlo", "I want to talk in Bengali")
 - "sign_out": User wants to logout/sign out of the app (e.g. "sign out", "logout", "log me out", "log out please", "baahar niklo", "sign off")
 - "edit_profile": User wants to change their name or profile details (e.g. "change my name to Raj", "edit profile", "update my name", "mera naam badlo", "call me Priya")
+- "setup_auto_sell": User wants to set up automatic daily selling (e.g. "sell automatically for me", "auto sell karo", "roz becho", "automatic trading start karo", "set up auto selling")
+- "setup_auto_buy": User wants to set up automatic buying (e.g. "buy automatically", "auto buy karo", "roz kharido", "automatic purchase", "buy for me daily")
+- "check_auto_trade": User asks about their auto-trade settings/status (e.g. "check my auto trade", "auto trade status", "mere auto trade ki status", "is automatic selling on")
+- "stop_auto_trade": User wants to stop automatic trading (e.g. "stop auto trade", "auto trade band karo", "stop automatic selling", "disable auto buy")
+- "solar_advice": User asks about solar panel maintenance or cleaning (e.g. "should I clean my panels", "panel saaf karoon", "solar maintenance", "when to clean panels", "panel ki safai")
+- "best_time_to_buy": User asks when is the best time to buy energy (e.g. "when should I buy", "best time to buy", "kab khareedna chahiye", "cheapest time to buy", "sasta kab milega")
 - "general_qa": General question about energy trading, Oorja, solar, etc.
 
 IMPORTANT: If the user says they want to "place", "create", "add", "daal", "bana", "list" something — that's "create_listing", NOT "show_listings" or "show_orders".
@@ -94,6 +103,16 @@ For "buy_energy", extract params if mentioned:
 
 For "show_sales", extract:
 - time_period: string (e.g. "today", "aaj", "this week", "is hafte")
+
+For "setup_auto_sell", extract params if mentioned:
+- capacity_kwh: number (solar panel capacity in kWh)
+- price_per_kwh: number (desired price per unit)
+Example: "I have 10 kWh capacity and want Rs 6 per unit" → {"intent": "setup_auto_sell", "params": {"capacity_kwh": 10, "price_per_kwh": 6}}
+
+For "setup_auto_buy", extract params if mentioned:
+- quantity_kwh: number (daily target quantity)
+- max_price: number (maximum price willing to pay)
+Example: "Buy 20 units daily at max Rs 7" → {"intent": "setup_auto_buy", "params": {"quantity_kwh": 20, "max_price": 7}}
 
 Respond ONLY with valid JSON, no markdown, no explanation:
 {"intent": "...", "params": {...}}`;

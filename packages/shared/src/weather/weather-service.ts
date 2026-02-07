@@ -11,6 +11,27 @@ const logger = createLogger('WeatherService');
 const OPEN_METEO_API = 'https://api.open-meteo.com/v1';
 const OPEN_METEO_GEOCODING = 'https://geocoding-api.open-meteo.com/v1';
 
+// Open-Meteo API response types
+interface GeocodingResult {
+    latitude: number;
+    longitude: number;
+    name: string;
+}
+
+interface GeocodingApiResponse {
+    results?: GeocodingResult[];
+}
+
+interface WeatherApiResponse {
+    hourly: {
+        time: string[];
+        cloud_cover: number[];
+        wind_speed_10m: number[];
+        precipitation: number[];
+        weather_code: number[];
+    };
+}
+
 // Cache forecasts to avoid excessive API calls (1 hour TTL)
 const forecastCache = new Map<string, { forecast: WeatherForecast; expiresAt: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -30,7 +51,7 @@ export async function geocodeAddress(address: string): Promise<GeoLocation | nul
             return null;
         }
 
-        const data = await response.json();
+        const data = await response.json() as GeocodingApiResponse;
         if (!data.results || data.results.length === 0) {
             logger.warn('No geocoding results found', { address });
             return null;
@@ -68,7 +89,7 @@ export async function getWeatherForecast(lat: number, lon: number): Promise<Weat
             return null;
         }
 
-        const data = await response.json();
+        const data = await response.json() as WeatherApiResponse;
 
         const hourly: HourlyWeather[] = data.hourly.time.map((time: string, i: number) => ({
             time: new Date(time),

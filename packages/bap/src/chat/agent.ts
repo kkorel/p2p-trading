@@ -3788,6 +3788,51 @@ const states: Record<ChatState, StateHandler> = {
           case 'show_balance':
             message = 'show my balance';
             break;
+          case 'setup_auto_sell':
+            message = 'setup auto sell';
+            break;
+          case 'setup_auto_buy':
+            message = 'setup auto buy';
+            break;
+          case 'check_auto_trade':
+            message = 'check auto trade status';
+            break;
+          case 'stop_auto_trade':
+            message = 'stop auto trade';
+            break;
+          case 'log_cleaning': {
+            // Log panel cleaning
+            if (ctx.userId) {
+              const { logPanelCleaning } = await import('../auto-trade');
+              await logPanelCleaning(ctx.userId);
+              return {
+                messages: [{
+                  text: h(ctx,
+                    '✅ Great! I\'ve logged your panel cleaning. I\'ll remind you again in about 30 days.',
+                    '✅ बढ़िया! मैंने नोट कर लिया। 30 दिन बाद फिर याद दिलाऊंगा।'
+                  ),
+                  buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+                }],
+              };
+            }
+            break;
+          }
+          case 'solar_tips': {
+            const { getSolarTips } = await import('../auto-trade');
+            const tips = getSolarTips(ctx.language === 'hi-IN');
+            return {
+              messages: [{
+                text: h(ctx,
+                  '☀️ *Solar Panel Tips*\n\n' + tips.map((t: string, i: number) => `${i + 1}. ${t}`).join('\n'),
+                  '☀️ *सोलर पैनल टिप्स*\n\n' + tips.map((t: string, i: number) => `${i + 1}. ${t}`).join('\n')
+                ),
+                buttons: [
+                  { text: h(ctx, '✅ I cleaned them', '✅ साफ कर दिया'), callbackData: 'action:log_cleaning' },
+                  { text: h(ctx, '📊 Dashboard', '📊 डैशबोर्ड'), callbackData: 'action:dashboard' },
+                ],
+              }],
+            };
+          }
         }
       }
 
@@ -4111,6 +4156,317 @@ const states: Record<ChatState, StateHandler> = {
             dataContext = 'Trading tips: 1) Trade regularly — more trades = better trust score = more buyers. 2) Keep solar panels clean for maximum generation. 3) List energy during peak hours (6PM-10PM) for higher demand and prices. 4) Price slightly below DISCOM rates (Rs 5-7/unit) for faster sales. 5) Upload all credentials for a verified profile that attracts more buyers.';
             fallbackText = dataContext;
             break;
+          }
+
+          // ============ Auto-Trade Intents ============
+
+          case 'setup_auto_sell': {
+            // Credential gate
+            if (!verifiedCreds.includes('GENERATION_PROFILE')) {
+              return {
+                messages: [{
+                  text: h(ctx,
+                    'To set up auto-selling, I first need your solar generation credential.',
+                    'ऑटो-सेल सेटअप करने के लिए पहले आपका सोलर जनरेशन क्रेडेंशियल चाहिए।'
+                  ),
+                  buttons: [
+                    { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
+                  ],
+                }],
+                newState: 'OFFER_OPTIONAL_CREDS',
+                contextUpdate: { expectedCredType: 'GenerationProfileCredential' },
+              };
+            }
+
+            // Extract params or ask
+            const capacity = intent.params?.capacity_kwh;
+            const price = intent.params?.price_per_kwh;
+
+            if (capacity && price) {
+              // Setup auto-trade and run immediately
+              const { setupSellerAutoTrade, runSingleSellerAutoTrade } = await import('../auto-trade');
+              const setupResult = await setupSellerAutoTrade(ctx.userId!, capacity, price);
+
+              if (setupResult.success) {
+                // Run the first auto-trade immediately instead of waiting for 6 AM
+                const tradeResult = await runSingleSellerAutoTrade(ctx.userId!);
+
+                if (tradeResult && (tradeResult.status === 'success' || tradeResult.status === 'warning_oversell')) {
+                  const weatherPercent = Math.round(tradeResult.weatherMultiplier * 100);
+                  const listedQty = tradeResult.listedQuantity.toFixed(1);
+
+                  let warningText = '';
+                  if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
+                    warningText = '\n\n⚠️ ' + tradeResult.warningMessage;
+                  }
+
+                  return {
+                    messages: [{
+                      text: h(ctx,
+                        `✅ Auto-sell activated!\n\n🌤️ Looking at today's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${price}/unit for tomorrow.\n\nEvery day at 6 AM, I'll:\n• Check the weather\n• Calculate your capacity\n• Create a listing automatically${warningText}`,
+                        `✅ ऑटो-सेल चालू!\n\n🌤️ आज के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं कल के लिए *${listedQty} kWh* ₹${price}/यूनिट पर लिस्ट कर रहा हूं।\n\nरोज़ सुबह 6 बजे:\n• मौसम देखूंगा\n• क्षमता गिनूंगा\n• ऑटो लिस्टिंग करूंगा${warningText}`
+                      ),
+                      buttons: [
+                        { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
+                        { text: h(ctx, '📊 Auto-Trade Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
+                        { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      ],
+                    }],
+                  };
+                } else if (tradeResult && tradeResult.status === 'skipped') {
+                  // Skipped due to low capacity or other reason
+                  return {
+                    messages: [{
+                      text: h(ctx,
+                        `✅ Auto-sell enabled!\n\n⚠️ ${tradeResult.warningMessage || 'No listing created right now.'}\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.\n\nCapacity: ${capacity} kWh\nPrice: ₹${price}/unit`,
+                        `✅ ऑटो-सेल चालू!\n\n⚠️ ${tradeResult.warningMessage || 'अभी कोई लिस्टिंग नहीं बनी।'}\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।\n\nक्षमता: ${capacity} kWh\nदाम: ₹${price}/यूनिट`
+                      ),
+                      buttons: [
+                        { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
+                        { text: h(ctx, '🛑 Stop Auto-Trade', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      ],
+                    }],
+                  };
+                }
+
+                // Error or no result - still enabled but first trade failed
+                return {
+                  messages: [{
+                    text: h(ctx,
+                      `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nCapacity: ${capacity} kWh\nPrice: ₹${price}/unit`,
+                      `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा उपलब्ध नहीं'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nक्षमता: ${capacity} kWh\nदाम: ₹${price}/यूनिट`
+                    ),
+                    buttons: [
+                      { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
+                      { text: h(ctx, '🛑 Stop Auto-Trade', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                    ],
+                  }],
+                };
+              }
+              return {
+                messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
+              };
+            }
+
+            // Ask for details
+            return {
+              messages: [{
+                text: h(ctx,
+                  '🤖 *Set Up Auto-Sell*\n\nI can sell energy for you automatically every day!\n\nTell me:\n• Your solar panel capacity (kWh)\n• Your desired price per unit\n\nExample: "I have 10 kWh capacity and want ₹6 per unit"',
+                  '🤖 *ऑटो-सेल सेटअप*\n\nमैं रोज़ आपके लिए बिजली बेच सकता हूं!\n\nबताओ:\n• सोलर पैनल की क्षमता (kWh)\n• प्रति यूनिट दाम\n\nउदाहरण: "मेरे पास 10 kWh है, ₹6 प्रति यूनिट चाहिए"'
+                ),
+              }],
+            };
+          }
+
+          case 'setup_auto_buy': {
+            // Credential gate
+            if (!verifiedCreds.includes('CONSUMPTION_PROFILE')) {
+              return {
+                messages: [{
+                  text: h(ctx,
+                    'To set up auto-buying, I first need your consumption credential.',
+                    'ऑटो-बाय सेटअप करने के लिए पहले आपका खपत क्रेडेंशियल चाहिए।'
+                  ),
+                  buttons: [
+                    { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
+                  ],
+                }],
+                newState: 'OFFER_OPTIONAL_CREDS',
+                contextUpdate: { intent: 'buy', expectedCredType: 'ConsumptionProfileCredential' },
+              };
+            }
+
+            const qty = intent.params?.quantity_kwh;
+            const maxPrice = intent.params?.max_price;
+
+            if (qty && maxPrice) {
+              const { setupBuyerAutoTrade, runSingleBuyerAutoTrade, getBuyAdvice } = await import('../auto-trade');
+              const setupResult = await setupBuyerAutoTrade(ctx.userId!, qty, maxPrice);
+
+              if (setupResult.success) {
+                // Try to buy immediately
+                const buyResult = await runSingleBuyerAutoTrade(ctx.userId!);
+                const advice = await getBuyAdvice(ctx.userId!, ctx.language === 'hi-IN');
+
+                if (buyResult && buyResult.status === 'success') {
+                  return {
+                    messages: [{
+                      text: h(ctx,
+                        `✅ Auto-buy activated!\n\n🛒 Found a deal right now! Bought *${buyResult.quantityBought} kWh* at ₹${buyResult.pricePerUnit}/unit.\nTotal: ₹${buyResult.totalSpent.toFixed(0)}\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you at ≤₹${maxPrice}/unit.\n\n${advice.advice}`,
+                        `✅ ऑटो-बाय चालू!\n\n🛒 अभी एक डील मिल गई! *${buyResult.quantityBought} kWh* ₹${buyResult.pricePerUnit}/यूनिट पर खरीद लिया।\nकुल: ₹${buyResult.totalSpent.toFixed(0)}\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट ≤₹${maxPrice}/यूनिट पर खरीदूंगा।\n\n${advice.advice}`
+                      ),
+                      buttons: [
+                        { text: h(ctx, '📋 View Orders', '📋 ऑर्डर देखो'), callbackData: 'action:show_orders' },
+                        { text: h(ctx, '📊 Auto-Trade Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
+                        { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      ],
+                    }],
+                  };
+                } else if (buyResult && buyResult.status === 'no_deals') {
+                  return {
+                    messages: [{
+                      text: h(ctx,
+                        `✅ Auto-buy enabled!\n\n🔍 No deals available right now at ≤₹${maxPrice}/unit. I'll keep looking!\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you.\n\n${advice.advice}`,
+                        `✅ ऑटो-बाय चालू!\n\n🔍 अभी ≤₹${maxPrice}/यूनिट पर कोई डील नहीं है। देखता रहूंगा!\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट खरीदूंगा।\n\n${advice.advice}`
+                      ),
+                      buttons: [
+                        { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
+                        { text: h(ctx, '🛑 Stop Auto-Trade', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      ],
+                    }],
+                  };
+                } else if (buyResult && buyResult.status === 'price_too_high') {
+                  return {
+                    messages: [{
+                      text: h(ctx,
+                        `✅ Auto-buy enabled!\n\n💰 Current prices are above your ₹${maxPrice}/unit limit (cheapest: ₹${buyResult.pricePerUnit}/unit). I'll wait for better prices!\n\nEvery day at 6:30 AM, I'll check for deals.\n\n${advice.advice}`,
+                        `✅ ऑटो-बाय चालू!\n\n💰 अभी दाम आपकी ₹${maxPrice}/यूनिट सीमा से ज्यादा हैं (सबसे सस्ता: ₹${buyResult.pricePerUnit}/यूनिट)। बेहतर दाम का इंतज़ार करूंगा!\n\nरोज़ सुबह 6:30 बजे चेक करूंगा।\n\n${advice.advice}`
+                      ),
+                      buttons: [
+                        { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
+                        { text: h(ctx, '🛑 Stop Auto-Trade', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      ],
+                    }],
+                  };
+                }
+
+                // Fallback - enabled but couldn't check right now
+                return {
+                  messages: [{
+                    text: h(ctx,
+                      `✅ Auto-buy enabled!\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you at ≤₹${maxPrice}/unit.\n\n${advice.advice}`,
+                      `✅ ऑटो-बाय चालू!\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट ≤₹${maxPrice}/यूनिट पर खरीदूंगा।\n\n${advice.advice}`
+                    ),
+                    buttons: [
+                      { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
+                      { text: h(ctx, '🛑 Stop Auto-Trade', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                    ],
+                  }],
+                };
+              }
+              return {
+                messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
+              };
+            }
+
+            return {
+              messages: [{
+                text: h(ctx,
+                  '🤖 *Set Up Auto-Buy*\n\nI can buy energy for you when prices are lowest!\n\nTell me:\n• How many units you need daily\n• Maximum price you\'re willing to pay\n\nExample: "Buy 20 units daily, max ₹7 per unit"',
+                  '🤖 *ऑटो-बाय सेटअप*\n\nमैं सबसे सस्ते दाम पर बिजली खरीद सकता हूं!\n\nबताओ:\n• रोज़ कितनी यूनिट चाहिए\n• अधिकतम कितना दाम दोगे\n\nउदाहरण: "रोज़ 20 यूनिट, अधिकतम ₹7"'
+                ),
+              }],
+            };
+          }
+
+          case 'check_auto_trade': {
+            const { getSellerAutoTradeStatus, getBuyerAutoTradeStatus } = await import('../auto-trade');
+            const sellerStatus = await getSellerAutoTradeStatus(ctx.userId!);
+            const buyerStatus = await getBuyerAutoTradeStatus(ctx.userId!);
+
+            let statusText = '';
+            if (sellerStatus.enabled && sellerStatus.config) {
+              const lastExec = sellerStatus.lastExecution
+                ? h(ctx,
+                    `Last run: ${sellerStatus.lastExecution.listedQuantity} kWh listed`,
+                    `पिछला: ${sellerStatus.lastExecution.listedQuantity} kWh लिस्ट किया`
+                  )
+                : h(ctx, 'Not run yet', 'अभी तक नहीं चला');
+              statusText += h(ctx,
+                `🔋 *Auto-Sell*: Enabled\n• Capacity: ${sellerStatus.config.capacityKwh} kWh\n• Price: ₹${sellerStatus.config.pricePerKwh}/unit\n• ${lastExec}\n\n`,
+                `🔋 *ऑटो-सेल*: चालू\n• क्षमता: ${sellerStatus.config.capacityKwh} kWh\n• दाम: ₹${sellerStatus.config.pricePerKwh}/यूनिट\n• ${lastExec}\n\n`
+              );
+            }
+            if (buyerStatus.enabled && buyerStatus.config) {
+              const lastExec = buyerStatus.lastExecution
+                ? h(ctx,
+                    `Last run: ${buyerStatus.lastExecution.quantityBought} kWh bought at ₹${buyerStatus.lastExecution.pricePerUnit}/unit`,
+                    `पिछला: ${buyerStatus.lastExecution.quantityBought} kWh खरीदा ₹${buyerStatus.lastExecution.pricePerUnit}/यूनिट पर`
+                  )
+                : h(ctx, 'Not run yet', 'अभी तक नहीं चला');
+              statusText += h(ctx,
+                `🛒 *Auto-Buy*: Enabled\n• Target: ${buyerStatus.config.targetQuantity} kWh/day\n• Max price: ₹${buyerStatus.config.maxPrice}/unit\n• ${lastExec}`,
+                `🛒 *ऑटो-बाय*: चालू\n• रोज़: ${buyerStatus.config.targetQuantity} kWh\n• अधिकतम दाम: ₹${buyerStatus.config.maxPrice}/यूनिट\n• ${lastExec}`
+              );
+            }
+
+            if (!statusText) {
+              statusText = h(ctx,
+                'No auto-trade configured. Would you like to set it up?',
+                'कोई ऑटो-ट्रेड सेटअप नहीं है। सेटअप करना है?'
+              );
+            }
+
+            return {
+              messages: [{
+                text: statusText,
+                buttons: [
+                  { text: h(ctx, '🔋 Setup Auto-Sell', '🔋 ऑटो-सेल सेटअप'), callbackData: 'action:setup_auto_sell' },
+                  { text: h(ctx, '🛒 Setup Auto-Buy', '🛒 ऑटो-बाय सेटअप'), callbackData: 'action:setup_auto_buy' },
+                  { text: h(ctx, '🛑 Stop Auto-Trade', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                ],
+              }],
+            };
+          }
+
+          case 'stop_auto_trade': {
+            const { disableSellerAutoTrade, disableBuyerAutoTrade } = await import('../auto-trade');
+            await disableSellerAutoTrade(ctx.userId!);
+            await disableBuyerAutoTrade(ctx.userId!);
+
+            return {
+              messages: [{
+                text: h(ctx,
+                  '🛑 Auto-trade disabled. I won\'t trade automatically anymore.',
+                  '🛑 ऑटो-ट्रेड बंद हो गया। अब मैं खुद से ट्रेड नहीं करूंगा।'
+                ),
+                buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+              }],
+            };
+          }
+
+          case 'solar_advice': {
+            const { getUserSolarAdvisory, getSolarTips } = await import('../auto-trade');
+            const advisory = await getUserSolarAdvisory(ctx.userId!, ctx.language === 'hi-IN');
+
+            if (advisory) {
+              return {
+                messages: [{
+                  text: advisory.message,
+                  buttons: [
+                    { text: h(ctx, '✅ I cleaned them', '✅ साफ कर दिया'), callbackData: 'action:log_cleaning' },
+                    { text: h(ctx, '📋 More tips', '📋 और टिप्स'), callbackData: 'action:solar_tips' },
+                  ],
+                }],
+              };
+            }
+
+            // No advisory available, show tips
+            const tips = getSolarTips(ctx.language === 'hi-IN');
+            return {
+              messages: [{
+                text: h(ctx,
+                  '☀️ *Solar Panel Tips*\n\n' + tips.slice(0, 3).map((t, i) => `${i + 1}. ${t}`).join('\n'),
+                  '☀️ *सोलर पैनल टिप्स*\n\n' + tips.slice(0, 3).map((t, i) => `${i + 1}. ${t}`).join('\n')
+                ),
+              }],
+            };
+          }
+
+          case 'best_time_to_buy': {
+            const { getBuyAdvice } = await import('../auto-trade');
+            const advice = await getBuyAdvice(ctx.userId!, ctx.language === 'hi-IN');
+
+            return {
+              messages: [{
+                text: advice.advice,
+                buttons: [
+                  { text: h(ctx, '⚡ Buy Now', '⚡ अभी खरीदो'), callbackData: 'action:buy_energy' },
+                  { text: h(ctx, '🤖 Auto-Buy', '🤖 ऑटो-बाय'), callbackData: 'action:setup_auto_buy' },
+                ],
+              }],
+            };
           }
 
           case 'general_qa':

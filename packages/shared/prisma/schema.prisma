@@ -91,6 +91,11 @@ model User {
   buyerPayments  PaymentRecord[] @relation("BuyerPayments")
   sellerPayments PaymentRecord[] @relation("SellerPayments")
 
+  // Auto-trade relations
+  sellerAutoTradeConfig SellerAutoTradeConfig?
+  buyerAutoTradeConfig  BuyerAutoTradeConfig?
+  solarMaintenanceLogs  SolarMaintenanceLog[]
+
   @@index([phone])
   @@map("users")
 }
@@ -488,4 +493,96 @@ model ChatMessage {
 
   @@index([sessionId, createdAt])
   @@map("chat_messages")
+}
+
+// ============================================
+// Auto-Trade Agent System
+// ============================================
+
+model SellerAutoTradeConfig {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  enabled     Boolean  @default(false)
+  capacityKwh Float    @map("capacity_kwh")    // Total solar capacity
+  pricePerKwh Float    @map("price_per_kwh")   // Desired price per unit
+  minPrice    Float?   @map("min_price")       // Minimum acceptable price
+  energyType  String   @default("SOLAR") @map("energy_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions SellerAutoTradeExecution[]
+
+  @@map("seller_auto_trade_configs")
+}
+
+model SellerAutoTradeExecution {
+  id                String   @id @default(uuid())
+  configId          String   @map("config_id")
+  userId            String   @map("user_id")
+  executedAt        DateTime @default(now()) @map("executed_at")
+  weatherMultiplier Float    @map("weather_multiplier")   // 0.25-1.0 based on cloud cover
+  effectiveCapacity Float    @map("effective_capacity")   // tradeLimit × capacity × weatherMultiplier
+  listedQuantity    Float    @map("listed_quantity")      // What was actually listed
+  priceUsed         Float    @map("price_used")
+  status            String   // 'success', 'warning_oversell', 'skipped'
+  warningMessage    String?  @map("warning_message")      // Over-sell warning if any
+  offerId           String?  @map("offer_id")             // Created offer ID
+
+  config SellerAutoTradeConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId])
+  @@index([userId])
+  @@index([executedAt])
+  @@map("seller_auto_trade_executions")
+}
+
+model BuyerAutoTradeConfig {
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  enabled        Boolean  @default(false)
+  targetQuantity Float    @map("target_quantity")  // How many units to buy daily
+  maxPrice       Float    @map("max_price")        // Maximum acceptable price per unit
+  preferredTime  String?  @map("preferred_time")   // 'morning', 'afternoon', 'evening', or null for auto
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions BuyerAutoTradeExecution[]
+
+  @@map("buyer_auto_trade_configs")
+}
+
+model BuyerAutoTradeExecution {
+  id             String   @id @default(uuid())
+  configId       String   @map("config_id")
+  userId         String   @map("user_id")
+  executedAt     DateTime @default(now()) @map("executed_at")
+  quantityBought Float    @map("quantity_bought")
+  pricePerUnit   Float    @map("price_per_unit")
+  totalSpent     Float    @map("total_spent")
+  status         String   // 'success', 'no_deals', 'price_too_high'
+  orderId        String?  @map("order_id")
+
+  config BuyerAutoTradeConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId])
+  @@index([userId])
+  @@index([executedAt])
+  @@map("buyer_auto_trade_executions")
+}
+
+model SolarMaintenanceLog {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  action      String   // 'cleaned', 'inspected'
+  performedAt DateTime @default(now()) @map("performed_at")
+  reportedBy  String   @map("reported_by") // 'user', 'system'
+  notes       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([performedAt])
+  @@map("solar_maintenance_logs")
 }

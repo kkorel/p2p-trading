@@ -32,6 +32,7 @@ import { initDb, closeDb, checkDbHealth } from './db';
 import { startDiscomMockService, stopDiscomMockService } from './discom-mock';
 import { startTelegramBot, stopTelegramBot } from './chat/telegram';
 import { startWhatsAppBot, stopWhatsAppBot } from './chat/whatsapp';
+import { initAutoTradeScheduler, isSchedulerInitialized } from './auto-trade';
 
 const app = express();
 const logger = createLogger('PROSUMER');
@@ -197,6 +198,12 @@ async function start() {
 
       // Start WhatsApp bot (only if WHATSAPP_ENABLED=true)
       startWhatsAppBot().catch(err => logger.error(`WhatsApp bot startup error: ${err.message}`));
+
+      // Initialize auto-trade scheduler (daily seller/buyer auto-trades)
+      initAutoTradeScheduler();
+      if (isSchedulerInitialized()) {
+        logger.info('Auto-trade scheduler initialized (6:00 AM seller, 6:30 AM buyer, 7:00 AM advisories)');
+      }
     });
 
     // Graceful shutdown handler
