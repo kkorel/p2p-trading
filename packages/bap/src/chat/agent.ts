@@ -765,12 +765,12 @@ function getMarketPriceInsight(energyType: string): MarketPriceInsight {
   const savings = Math.round(((data.discom - data.avg) / data.discom) * 100);
 
   return {
-    en: `Current market: ₹${data.min}-${data.max}/kWh (avg ₹${data.avg})\n` +
-      `DISCOM rate: ₹${data.discom}/kWh\n` +
-      `Your buyers save ~${savings}% vs DISCOM!`,
-    hi: `Market rate: ₹${data.min}-${data.max}/kWh (avg ₹${data.avg})\n` +
-      `DISCOM rate: ₹${data.discom}/kWh\n` +
-      `Buyers ko ~${savings}% bachega DISCOM se!`,
+    en: `Current market: ₹${data.min} to ₹${data.max} per kWh. Average ₹${data.avg}.\n` +
+      `DISCOM rate: ₹${data.discom} per kWh.\n` +
+      `Your buyers save around ${savings} percent versus DISCOM!`,
+    hi: `मार्केट रेट: ₹${data.min} से ₹${data.max} प्रति यूनिट। औसत ₹${data.avg}।\n` +
+      `DISCOM रेट: ₹${data.discom} प्रति यूनिट।\n` +
+      `खरीदारों को DISCOM से लगभग ${savings} प्रतिशत बचत होती है!`,
     low: data.min,
     recommended: data.avg,
     high: data.max,
@@ -3855,8 +3855,8 @@ const states: Record<ChatState, StateHandler> = {
             // Show range based on potential price variation (Rs 6-9 per kWh)
             const minMonthly = Math.round(tradeableKwh * 6);
             const maxMonthly = Math.round(tradeableKwh * 9);
-            earningsEn = `With your current ${tradeLimitPct}% trade limit, you can earn Rs ${minMonthly}-${maxMonthly} per month. As you sell more successfully, your limit increases! `;
-            earningsHi = `अभी आप ₹${minMonthly}-${maxMonthly} महीना कमा सकते हो। जैसे-जैसे आप अच्छे से बेचते रहोगे, आप और ज़्यादा बेच पाओगे! `;
+            earningsEn = `With your current ${tradeLimitPct}% trade limit, you can earn Rs ${minMonthly} to ${maxMonthly} per month. As you sell more successfully, your limit increases! `;
+            earningsHi = `अभी आप ₹${minMonthly} से ₹${maxMonthly} महीना कमा सकते हो। जैसे-जैसे आप अच्छे से बेचते रहोगे, आप और ज़्यादा बेच पाओगे! `;
           }
 
           explainEn = `${capEn}I'll sell the extra energy from your solar panels at good prices to maximize your earnings. ${earningsEn}`;
@@ -4680,6 +4680,89 @@ const states: Record<ChatState, StateHandler> = {
             break;
           }
 
+          case 'projected_earnings': {
+            // Get user's production capacity and current trust score
+            const projUser = await prisma.user.findUnique({
+              where: { id: ctx.userId! },
+              select: { productionCapacity: true, trustScore: true, name: true },
+            });
+
+            const capacity = projUser?.productionCapacity || ctx.productionCapacity;
+            const trustScore = projUser?.trustScore ?? 0.3;
+            const currentLimit = calculateAllowedLimit(trustScore);
+            const projectionDays = intent.params?.projection_days || 30; // Default 1 month
+
+            if (!capacity) {
+              return {
+                messages: [{
+                  text: h(ctx,
+                    'I need your solar generation credential to calculate projected earnings. Please upload it first.',
+                    'कमाई का अनुमान लगाने के लिए पहले आपका सोलर जनरेशन क्रेडेंशियल चाहिए।'
+                  ),
+                  buttons: [
+                    { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
+                  ],
+                }],
+              };
+            }
+
+            // Calculate projections
+            const monthlyCapacity = capacity; // Already monthly
+            const daysInMonth = 30;
+            const dailyCapacity = monthlyCapacity / daysInMonth;
+
+            // Current trade limit vs future potential (assuming trust improves)
+            const currentTradeableDaily = dailyCapacity * (currentLimit / 100);
+            const futureTradeableDaily = dailyCapacity * 0.8; // Assume 80% limit with good trading
+
+            // Price assumptions (Rs per kWh)
+            const lowPrice = 6;
+            const highPrice = 8;
+
+            // Calculate earnings for the projection period
+            const currentMinEarnings = Math.round(currentTradeableDaily * lowPrice * projectionDays);
+            const currentMaxEarnings = Math.round(currentTradeableDaily * highPrice * projectionDays);
+            const futureMinEarnings = Math.round(futureTradeableDaily * lowPrice * projectionDays);
+            const futureMaxEarnings = Math.round(futureTradeableDaily * highPrice * projectionDays);
+
+            // Format period for display
+            let periodEn = `${projectionDays} days`;
+            let periodHi = `${projectionDays} दिन`;
+            if (projectionDays === 30) { periodEn = '1 month'; periodHi = '1 महीना'; }
+            else if (projectionDays === 60) { periodEn = '2 months'; periodHi = '2 महीने'; }
+            else if (projectionDays === 90) { periodEn = '3 months'; periodHi = '3 महीने'; }
+            else if (projectionDays === 180) { periodEn = '6 months'; periodHi = '6 महीने'; }
+            else if (projectionDays === 365) { periodEn = '1 year'; periodHi = '1 साल'; }
+
+            return {
+              messages: [{
+                text: h(ctx,
+                  `📊 *Projected Earnings for ${periodEn}*\n\n` +
+                  `Your capacity: ${capacity} kWh per month.\n` +
+                  `Current trade limit: ${currentLimit}%.\n\n` +
+                  `💰 *At current level:*\n` +
+                  `₹${currentMinEarnings.toLocaleString('en-IN')} to ₹${currentMaxEarnings.toLocaleString('en-IN')}\n\n` +
+                  `🚀 *With consistent trading (80% limit):*\n` +
+                  `₹${futureMinEarnings.toLocaleString('en-IN')} to ₹${futureMaxEarnings.toLocaleString('en-IN')}\n\n` +
+                  `💡 Trade regularly to increase your limit and maximize earnings!`,
+                  `📊 *${periodHi} की अनुमानित कमाई*\n\n` +
+                  `आपकी क्षमता: ${capacity} kWh प्रति माह।\n` +
+                  `अभी की सीमा: ${currentLimit}%।\n\n` +
+                  `💰 *अभी के लेवल पर:*\n` +
+                  `₹${currentMinEarnings.toLocaleString('en-IN')} से ₹${currentMaxEarnings.toLocaleString('en-IN')}\n\n` +
+                  `🚀 *नियमित ट्रेडिंग से (80% सीमा पर):*\n` +
+                  `₹${futureMinEarnings.toLocaleString('en-IN')} से ₹${futureMaxEarnings.toLocaleString('en-IN')}\n\n` +
+                  `💡 नियमित बेचते रहो, सीमा बढ़ेगी और कमाई भी!`
+                ),
+                buttons: [
+                  { text: h(ctx, '☀️ Start Selling', '☀️ बेचना शुरू करो'), callbackData: 'action:create_listing' },
+                  { text: h(ctx, '🤖 Auto-Sell', '🤖 ऑटो-सेल'), callbackData: 'action:setup_auto_sell' },
+                  { text: h(ctx, '📊 Dashboard', '📊 डैशबोर्ड'), callbackData: 'action:dashboard' },
+                ],
+              }],
+            };
+          }
+
           // ============ Auto-Trade Intents ============
 
           case 'setup_auto_sell': {
@@ -5042,21 +5125,21 @@ const states: Record<ChatState, StateHandler> = {
                 messages: [{
                   text: h(ctx,
                     '🌪️ *Dust Storm Alert - Clean Your Panels!*\n\n' +
-                    'Dust storms deposit a layer of fine particles that can reduce output by 25-40%!\n\n' +
+                    'Dust storms deposit a layer of fine particles that can reduce output by 25 to 40 percent.\n\n' +
                     '⚠️ *Immediate Action Needed:*\n' +
-                    '1. Wait for winds to settle completely\n' +
-                    '2. Gently rinse panels with water first\n' +
-                    '3. Use soft cloth or sponge - NO abrasive materials\n' +
-                    '4. Clean early morning or evening (panels cool)\n\n' +
-                    '💡 After dust storm, cleaning can recover 25%+ of lost power!',
+                    '1. Wait for winds to settle completely.\n' +
+                    '2. Gently rinse panels with water first.\n' +
+                    '3. Use soft cloth or sponge. No abrasive materials.\n' +
+                    '4. Clean early morning or evening when panels are cool.\n\n' +
+                    '💡 After dust storm, cleaning can recover 25 percent or more of lost power.',
                     '🌪️ *आंधी की चेतावनी - पैनल साफ करो!*\n\n' +
-                    'आंधी में महीन धूल जम जाती है जो बिजली 25-40% कम कर सकती है!\n\n' +
+                    'आंधी में महीन धूल जम जाती है, जो बिजली 25 से 40 प्रतिशत कम कर सकती है।\n\n' +
                     '⚠️ *तुरंत करो:*\n' +
-                    '1. पहले हवा रुकने दो\n' +
-                    '2. पहले पानी से धीरे-धीरे धोओ\n' +
-                    '3. मुलायम कपड़ा/स्पंज इस्तेमाल करो - खुरदरा नहीं\n' +
-                    '4. सुबह या शाम साफ करो (पैनल ठंडे होने चाहिए)\n\n' +
-                    '💡 आंधी के बाद सफाई से 25%+ बिजली वापस मिलती है!'
+                    '1. पहले हवा रुकने दो।\n' +
+                    '2. पहले पानी से धीरे-धीरे धोओ।\n' +
+                    '3. मुलायम कपड़ा या स्पंज इस्तेमाल करो। खुरदरा नहीं।\n' +
+                    '4. सुबह या शाम साफ करो। पैनल ठंडे होने चाहिए।\n\n' +
+                    '💡 आंधी के बाद सफाई से 25 प्रतिशत से ज़्यादा बिजली वापस मिलती है।'
                   ),
                   buttons: [
                     { text: h(ctx, '✅ I cleaned them', '✅ साफ कर दिया'), callbackData: 'action:log_cleaning' },

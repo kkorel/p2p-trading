@@ -46,7 +46,7 @@ export interface ClassifiedIntent {
   | 'create_listing' | 'buy_energy' | 'discom_rates' | 'trading_tips' | 'market_insights'
   | 'show_dashboard' | 'track_activity' | 'change_language' | 'sign_out' | 'edit_profile'
   | 'setup_auto_sell' | 'setup_auto_buy' | 'check_auto_trade' | 'stop_auto_trade'
-  | 'solar_advice' | 'best_time_to_buy' | 'general_qa';
+  | 'solar_advice' | 'best_time_to_buy' | 'projected_earnings' | 'general_qa';
   params?: {
     price_per_kwh?: number;
     quantity_kwh?: number;
@@ -56,13 +56,14 @@ export interface ClassifiedIntent {
     field?: 'name' | 'phone';
     new_value?: string;
     capacity_kwh?: number;
+    projection_days?: number;
   };
 }
 
 const INTENT_PROMPT = `You are Oorja, a P2P energy trading assistant. Classify the user's message into ONE intent. The user may speak in English, Hindi, or a mix.
 
 Intents:
-- "show_listings": User wants to see their active listings/offers (e.g. "show my listings", "mere offers dikhao", "kitne listing hain")
+- "show_listings": User wants to see/view their active listings/offers (e.g. "show my listings", "see listings", "see my listings", "view my listings", "mere offers dikhao", "kitne listing hain", "meri listing dikhao")
 - "show_earnings": User asks about income/earnings/money made (e.g. "kitna kamaya", "my earnings", "how much did I earn")
 - "show_balance": User asks about wallet/account balance (e.g. "mere account mein kitne paise", "wallet balance")
 - "show_orders": User asks about order status/history (e.g. "mera order kya hua", "show my orders")
@@ -83,6 +84,7 @@ Intents:
 - "stop_auto_trade": User wants to stop automatic trading (e.g. "stop auto trade", "auto trade band karo", "stop automatic selling", "disable auto buy")
 - "solar_advice": User mentions weather conditions, dust storms, or asks about solar panel maintenance/cleaning (e.g. "it rained", "baarish hui", "rain today", "aaj dhoop hai", "cloudy", "badal", "dust storm", "aandhi aayi", "dhool", "toofan", "tez hawa", "windy", "hawa chali", "should I clean my panels", "panel saaf karoon", "solar maintenance", "when to clean panels", "panel ki safai", "mausam kaisa hai")
 - "best_time_to_buy": User asks when is the best time to buy energy (e.g. "when should I buy", "best time to buy", "kab khareedna chahiye", "cheapest time to buy", "sasta kab milega")
+- "projected_earnings": User asks about potential/projected/expected earnings over a period (e.g. "how much can I make in 3 months", "kitna kama sakta hoon 6 mahine mein", "projected earnings", "what will I earn in a year", "agar theek se bechoon toh kitna milega", "if I trade properly how much", "expected income", "potential earnings next month")
 - "general_qa": General question about energy trading, Oorja, solar, etc.
 
 IMPORTANT: If the user says they want to "place", "create", "add", "daal", "bana", "list" something — that's "create_listing", NOT "show_listings" or "show_orders".
@@ -113,6 +115,12 @@ For "setup_auto_buy", extract params if mentioned:
 - quantity_kwh: number (daily target quantity)
 - max_price: number (maximum price willing to pay)
 Example: "Buy 20 units daily at max Rs 7" → {"intent": "setup_auto_buy", "params": {"quantity_kwh": 20, "max_price": 7}}
+
+For "projected_earnings", extract params if mentioned:
+- projection_days: number (convert months/years to days: 1 month = 30 days, 1 year = 365 days)
+Example: "how much can I earn in 3 months" → {"intent": "projected_earnings", "params": {"projection_days": 90}}
+Example: "6 mahine mein kitna milega" → {"intent": "projected_earnings", "params": {"projection_days": 180}}
+Example: "agar theek se bechoon toh kitna kama sakta hoon" → {"intent": "projected_earnings", "params": {}} (no specific period)
 
 Respond ONLY with valid JSON, no markdown, no explanation:
 {"intent": "...", "params": {...}}`;
