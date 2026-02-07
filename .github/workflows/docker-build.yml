@@ -51,7 +51,29 @@ jobs:
 
       - name: Trigger Railway Deployment
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
         run: |
-          curl -X POST "${{ secrets.RAILWAY_WEBHOOK_URL }}" \
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "⚠️ RAILWAY_TOKEN not configured - skipping Railway trigger"
+            exit 0
+          fi
+          
+          echo "🚀 Triggering Railway deployment..."
+          
+          # Use Railway's GraphQL API to redeploy the service
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"event": "deploy"}' || echo "Railway webhook not configured"
+            -d "{\"query\": \"mutation { serviceInstanceRedeploy(serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\") }\"}")
+          
+          echo "Railway API Response: $RESPONSE"
+          
+          if echo "$RESPONSE" | grep -q "error"; then
+            echo "❌ Railway deployment may have failed"
+            exit 1
+          fi
+          
+          echo "✅ Railway deployment triggered!"
