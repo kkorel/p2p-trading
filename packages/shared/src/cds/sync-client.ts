@@ -179,10 +179,11 @@ interface CatalogPublishMessage {
 // ==================== Configuration ====================
 
 /**
- * Check if external CDS syncing is enabled
+ * CDS is always enabled - no toggle needed
+ * @deprecated This function always returns true. CDS publishing is unconditional.
  */
 export function isExternalCDSEnabled(): boolean {
-  return config.external.useExternalCds;
+  return true;
 }
 
 /**
@@ -321,11 +322,6 @@ export async function publishCatalogToCDS(
   offers: SyncOffer[],
   isActive: boolean = true
 ): Promise<boolean> {
-  if (!isExternalCDSEnabled()) {
-    logger.debug('External CDS sync disabled, skipping catalog publish', { providerId: provider.id });
-    return false;
-  }
-
   try {
     // Build catalog ID based on provider
     const catalogId = `catalog-${provider.id}`;
@@ -447,11 +443,6 @@ export async function revokeCatalogFromCDS(
  * @deprecated Use publishCatalogToCDS instead
  */
 export async function syncProviderToCDS(provider: SyncProvider): Promise<boolean> {
-  if (!isExternalCDSEnabled()) {
-    logger.debug('External CDS sync disabled, skipping provider sync', { providerId: provider.id });
-    return false;
-  }
-
   // For provider-only sync, we just log - real sync happens with publishCatalogToCDS
   logger.info('Provider registered (will sync with catalog)', {
     providerId: provider.id,
@@ -465,11 +456,6 @@ export async function syncProviderToCDS(provider: SyncProvider): Promise<boolean
  * @deprecated Use publishCatalogToCDS instead
  */
 export async function syncItemToCDS(item: SyncItem): Promise<boolean> {
-  if (!isExternalCDSEnabled()) {
-    logger.debug('External CDS sync disabled, skipping item sync', { itemId: item.id });
-    return false;
-  }
-
   // For item-only sync, we just log - real sync happens with publishCatalogToCDS
   logger.info('Item registered (will sync with catalog)', {
     itemId: item.id,
@@ -483,11 +469,6 @@ export async function syncItemToCDS(item: SyncItem): Promise<boolean> {
  * This is the main function called when offers are created
  */
 export async function syncOfferToCDS(offer: SyncOffer): Promise<boolean> {
-  if (!isExternalCDSEnabled()) {
-    logger.debug('External CDS sync disabled, skipping offer sync', { offerId: offer.id });
-    return false;
-  }
-
   try {
     // To sync a single offer, we need provider and item info
     // Build minimal catalog with just this offer
@@ -521,11 +502,6 @@ export async function syncOfferToCDS(offer: SyncOffer): Promise<boolean> {
  * Publishes the catalog with the offer removed
  */
 export async function deleteOfferFromCDS(offerId: string): Promise<boolean> {
-  if (!isExternalCDSEnabled()) {
-    logger.debug('External CDS sync disabled, skipping offer deletion', { offerId });
-    return false;
-  }
-
   // Note: The Beckn protocol doesn't have a direct "delete" operation
   // We need to republish the catalog without the deleted offer
   // This requires fetching current catalog state from the database
@@ -539,14 +515,6 @@ export async function deleteOfferFromCDS(offerId: string): Promise<boolean> {
  * Block status changes are reflected in availableQuantity updates
  */
 export async function syncBlocksToCDS(blocks: SyncBlocks): Promise<boolean> {
-  if (!isExternalCDSEnabled()) {
-    logger.debug('External CDS sync disabled, skipping block sync', {
-      offerId: blocks.offer_id,
-      blockCount: blocks.block_ids.length
-    });
-    return false;
-  }
-
   // Block status updates affect the availableQuantity in the catalog
   // The caller should republish the catalog with updated quantities
   logger.info('Block status changed (caller should republish catalog)', {

@@ -50,7 +50,7 @@ export const config = {
     bpp: process.env.BPP_URL || 'http://localhost:4000',
   },
 
-  // External Beckn services (always uses external CDS)
+  // External Beckn services (always uses external CDS - no toggle)
   external: {
     // Catalog Discovery Service (Beckn network CDS)
     // EXTERNAL_CDS_URL typically ends with /catalog for publish, /beckn for discover
@@ -59,8 +59,6 @@ export const config = {
     ledger: process.env.LEDGER_URL || 'https://34.93.166.38.sslip.io',
     // Verifiable Credentials portal
     vcPortal: process.env.VC_PORTAL_URL || 'https://open-vcs.up.railway.app',
-    // External CDS is always used (local CDS mock removed)
-    useExternalCds: process.env.USE_EXTERNAL_CDS !== 'false', // Default true
     // Enable ledger writes (disable for local dev)
     enableLedgerWrites: process.env.ENABLE_LEDGER_WRITES === 'true',
   },

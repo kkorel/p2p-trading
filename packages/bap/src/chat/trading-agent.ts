@@ -3,7 +3,7 @@
  * Supports language-aware responses (English / Hindi).
  */
 
-import { prisma, createLogger, publishOfferToCDS, isExternalCDSEnabled, config, snapTimeWindow, checkTradeWindow, validateQuantity, roundQuantity, checkBuyerCapacity } from '@p2p/shared';
+import { prisma, createLogger, publishOfferToCDS, config, snapTimeWindow, checkTradeWindow, validateQuantity, roundQuantity, checkBuyerCapacity } from '@p2p/shared';
 import { registerProvider, addCatalogItem, addOffer } from '../seller-catalog';
 import axios from 'axios';
 
@@ -84,35 +84,33 @@ export const mockTradingAgent = {
       );
 
       // Publish to CDS so the offer appears in discovery/buy page
-      if (isExternalCDSEnabled()) {
-        const providerName = user.name ? `${user.name} Energy` : 'Solar Energy';
-        publishOfferToCDS(
-          { id: providerId, name: providerName, trust_score: user.trustScore || 0.5 },
-          {
-            id: item.id,
-            provider_id: item.provider_id,
-            source_type: item.source_type,
-            delivery_mode: item.delivery_mode,
-            available_qty: item.available_qty,
-            production_windows: item.production_windows,
-            meter_id: item.meter_id,
-          },
-          {
-            id: offer.id,
-            item_id: offer.item_id,
-            provider_id: offer.provider_id,
-            price_value: offer.price.value,
-            currency: offer.price.currency,
-            max_qty: offer.maxQuantity,
-            time_window: offer.timeWindow,
-            pricing_model: offer.offerAttributes.pricingModel,
-            settlement_type: offer.offerAttributes.settlementType,
-          }
-        ).then(success => {
-          if (success) logger.info(`Offer published to CDS`, { offerId: offer.id });
-          else logger.warn(`CDS publish returned false`, { offerId: offer.id });
-        }).catch(err => logger.error(`Failed to publish offer to CDS`, { offerId: offer.id, error: err.message }));
-      }
+      const providerName = user.name ? `${user.name} Energy` : 'Solar Energy';
+      publishOfferToCDS(
+        { id: providerId, name: providerName, trust_score: user.trustScore || 0.5 },
+        {
+          id: item.id,
+          provider_id: item.provider_id,
+          source_type: item.source_type,
+          delivery_mode: item.delivery_mode,
+          available_qty: item.available_qty,
+          production_windows: item.production_windows,
+          meter_id: item.meter_id,
+        },
+        {
+          id: offer.id,
+          item_id: offer.item_id,
+          provider_id: offer.provider_id,
+          price_value: offer.price.value,
+          currency: offer.price.currency,
+          max_qty: offer.maxQuantity,
+          time_window: offer.timeWindow,
+          pricing_model: offer.offerAttributes.pricingModel,
+          settlement_type: offer.offerAttributes.settlementType,
+        }
+      ).then(success => {
+        if (success) logger.info(`Offer published to CDS`, { offerId: offer.id });
+        else logger.warn(`CDS publish returned false`, { offerId: offer.id });
+      }).catch(err => logger.error(`Failed to publish offer to CDS`, { offerId: offer.id, error: err.message }));
 
       logger.info(`Created default offer for user ${userId}: ${offerQty}kWh at Rs${pricePerKwh}/kWh`);
 
@@ -204,35 +202,33 @@ export const mockTradingAgent = {
       );
 
       // Publish to CDS
-      if (isExternalCDSEnabled()) {
-        const providerName = user.name ? `${user.name} Energy` : 'Solar Energy';
-        publishOfferToCDS(
-          { id: providerId, name: providerName, trust_score: user.trustScore || 0.5 },
-          {
-            id: item.id,
-            provider_id: item.provider_id,
-            source_type: item.source_type,
-            delivery_mode: item.delivery_mode,
-            available_qty: item.available_qty,
-            production_windows: item.production_windows,
-            meter_id: item.meter_id,
-          },
-          {
-            id: offer.id,
-            item_id: offer.item_id,
-            provider_id: offer.provider_id,
-            price_value: offer.price.value,
-            currency: offer.price.currency,
-            max_qty: offer.maxQuantity,
-            time_window: offer.timeWindow,
-            pricing_model: offer.offerAttributes.pricingModel,
-            settlement_type: offer.offerAttributes.settlementType,
-          }
-        ).then(success => {
-          if (success) logger.info(`Custom offer published to CDS`, { offerId: offer.id });
-          else logger.warn(`CDS publish returned false`, { offerId: offer.id });
-        }).catch(err => logger.error(`Failed to publish custom offer to CDS`, { offerId: offer.id, error: err.message }));
-      }
+      const providerName = user.name ? `${user.name} Energy` : 'Solar Energy';
+      publishOfferToCDS(
+        { id: providerId, name: providerName, trust_score: user.trustScore || 0.5 },
+        {
+          id: item.id,
+          provider_id: item.provider_id,
+          source_type: item.source_type,
+          delivery_mode: item.delivery_mode,
+          available_qty: item.available_qty,
+          production_windows: item.production_windows,
+          meter_id: item.meter_id,
+        },
+        {
+          id: offer.id,
+          item_id: offer.item_id,
+          provider_id: offer.provider_id,
+          price_value: offer.price.value,
+          currency: offer.price.currency,
+          max_qty: offer.maxQuantity,
+          time_window: offer.timeWindow,
+          pricing_model: offer.offerAttributes.pricingModel,
+          settlement_type: offer.offerAttributes.settlementType,
+        }
+      ).then(success => {
+        if (success) logger.info(`Custom offer published to CDS`, { offerId: offer.id });
+        else logger.warn(`CDS publish returned false`, { offerId: offer.id });
+      }).catch(err => logger.error(`Failed to publish custom offer to CDS`, { offerId: offer.id, error: err.message }));
 
       logger.info(`Created custom offer for user ${userId}: ${offerQty}kWh at Rs${pricePerKwh}/kWh`);
 

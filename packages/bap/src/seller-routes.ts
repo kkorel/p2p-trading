@@ -36,7 +36,6 @@ import {
   deleteOfferFromCDS,
   publishOfferToCDS,
   publishCatalogToCDS,
-  isExternalCDSEnabled,
   isValidTimeWindow,
   validateQuantity,
   roundQuantity,
@@ -888,7 +887,7 @@ router.post('/confirm', async (req: Request, res: Response) => {
 
             // IMPORTANT: Republish the full catalog to CDS with updated availableQuantity
             // This ensures the external CDS reflects the reduced inventory after a purchase
-            if (isExternalCDSEnabled() && order!.items && order!.items.length > 0) {
+            if (order!.items && order!.items.length > 0) {
               const sellerProviderId = order!.items[0].provider_id;
               if (sellerProviderId) {
                 try {
@@ -1232,7 +1231,7 @@ router.post('/cancel', async (req: Request, res: Response) => {
         logger.info(`Released ${releasedCount} blocks for cancelled order ${order.id}`);
 
         // 3. Republish catalog to CDS with increased availability
-        if (isExternalCDSEnabled() && order.items && order.items.length > 0) {
+        if (order.items && order.items.length > 0) {
           const sellerProviderId = order.items[0].provider_id;
           if (sellerProviderId) {
             try {
@@ -2140,53 +2139,42 @@ router.post('/seller/offers/direct', authMiddleware, requireSellerVC, async (req
   const providerName = providerInfo?.name || req.user!.name || 'Energy Provider';
 
   // Publish to CDS using proper Beckn catalog_publish format (non-blocking)
-  // Check if CDS publishing is enabled
-  const cdsEnabled = isExternalCDSEnabled();
-  logger.info(`CDS publishing ${cdsEnabled ? 'ENABLED' : 'DISABLED'}`, {
-    offerId: offer.id,
-    USE_EXTERNAL_CDS: process.env.USE_EXTERNAL_CDS,
-  });
-
-  if (cdsEnabled) {
-    const directUtilityInfo = await getProviderUtilityInfo(provider_id);
-    publishOfferToCDS(
-      {
-        id: provider_id,
-        name: providerName,
-        trust_score: providerInfo?.trust_score || 0.5,
-      },
-      {
-        id: item.id,
-        provider_id: item.provider_id,
-        source_type: item.source_type,
-        delivery_mode: item.delivery_mode,
-        available_qty: item.available_qty,
-        production_windows: item.production_windows,
-        meter_id: item.meter_id,
-        utility_id: directUtilityInfo.utilityId,
-        utility_customer_id: directUtilityInfo.utilityCustomerId,
-      },
-      {
-        id: offer.id,
-        item_id: offer.item_id,
-        provider_id: offer.provider_id,
-        price_value: offer.price.value,
-        currency: offer.price.currency,
-        max_qty: offer.maxQuantity,
-        time_window: offer.timeWindow,
-        pricing_model: offer.offerAttributes.pricingModel,
-        settlement_type: offer.offerAttributes.settlementType,
-      }
-    ).then(success => {
-      if (success) {
-        logger.info('Offer published to external CDS', { offerId: offer.id });
-      } else {
-        logger.warn('Offer publishing returned false', { offerId: offer.id });
-      }
-    }).catch(err => logger.error('Failed to publish offer to CDS', { offerId: offer.id, error: err.message }));
-  } else {
-    logger.warn('Skipping CDS publish - USE_EXTERNAL_CDS not enabled', { offerId: offer.id });
-  }
+  const directUtilityInfo = await getProviderUtilityInfo(provider_id);
+  publishOfferToCDS(
+    {
+      id: provider_id,
+      name: providerName,
+      trust_score: providerInfo?.trust_score || 0.5,
+    },
+    {
+      id: item.id,
+      provider_id: item.provider_id,
+      source_type: item.source_type,
+      delivery_mode: item.delivery_mode,
+      available_qty: item.available_qty,
+      production_windows: item.production_windows,
+      meter_id: item.meter_id,
+      utility_id: directUtilityInfo.utilityId,
+      utility_customer_id: directUtilityInfo.utilityCustomerId,
+    },
+    {
+      id: offer.id,
+      item_id: offer.item_id,
+      provider_id: offer.provider_id,
+      price_value: offer.price.value,
+      currency: offer.price.currency,
+      max_qty: offer.maxQuantity,
+      time_window: offer.timeWindow,
+      pricing_model: offer.offerAttributes.pricingModel,
+      settlement_type: offer.offerAttributes.settlementType,
+    }
+  ).then(success => {
+    if (success) {
+      logger.info('Offer published to external CDS', { offerId: offer.id });
+    } else {
+      logger.warn('Offer publishing returned false', { offerId: offer.id });
+    }
+  }).catch(err => logger.error('Failed to publish offer to CDS', { offerId: offer.id, error: err.message }));
 
   // Add source_type to the response
   res.json({
@@ -2240,55 +2228,53 @@ router.delete('/seller/offers/:id', authMiddleware, requireSellerVC, async (req:
   // If all offers are deleted, revoke the catalog entirely
   (async () => {
     try {
-      if (isExternalCDSEnabled()) {
-        const providerInfo = await getProvider(provider_id);
-        const providerName = providerInfo?.name || 'Energy Provider';
-        const items = await getProviderItems(provider_id);
-        const offers = await getProviderOffers(provider_id);
+      const providerInfo = await getProvider(provider_id);
+      const providerName = providerInfo?.name || 'Energy Provider';
+      const items = await getProviderItems(provider_id);
+      const offers = await getProviderOffers(provider_id);
 
-        // Convert to sync format
-        const rawDelSyncItems = items.map(item => ({
-          id: item.id,
-          provider_id: item.provider_id,
-          source_type: item.source_type,
-          delivery_mode: item.delivery_mode,
-          available_qty: item.available_qty,
-          production_windows: item.production_windows,
-          meter_id: item.meter_id,
-        }));
-        const delSyncItems = await enrichSyncItems(rawDelSyncItems, provider_id);
+      // Convert to sync format
+      const rawDelSyncItems = items.map(item => ({
+        id: item.id,
+        provider_id: item.provider_id,
+        source_type: item.source_type,
+        delivery_mode: item.delivery_mode,
+        available_qty: item.available_qty,
+        production_windows: item.production_windows,
+        meter_id: item.meter_id,
+      }));
+      const delSyncItems = await enrichSyncItems(rawDelSyncItems, provider_id);
 
-        const syncOffers = offers.map(offer => ({
-          id: offer.id,
-          item_id: offer.item_id,
-          provider_id: offer.provider_id,
-          price_value: offer.price.value,
-          currency: offer.price.currency,
-          max_qty: offer.maxQuantity,
-          time_window: offer.timeWindow,
-          pricing_model: offer.offerAttributes.pricingModel,
-          settlement_type: offer.offerAttributes.settlementType,
-        }));
+      const syncOffers = offers.map(offer => ({
+        id: offer.id,
+        item_id: offer.item_id,
+        provider_id: offer.provider_id,
+        price_value: offer.price.value,
+        currency: offer.price.currency,
+        max_qty: offer.maxQuantity,
+        time_window: offer.timeWindow,
+        pricing_model: offer.offerAttributes.pricingModel,
+        settlement_type: offer.offerAttributes.settlementType,
+      }));
 
-        // If no offers remain, revoke the catalog (set isActive: false)
-        // Otherwise republish with remaining offers
-        const isActive = syncOffers.length > 0;
+      // If no offers remain, revoke the catalog (set isActive: false)
+      // Otherwise republish with remaining offers
+      const isActive = syncOffers.length > 0;
 
-        await publishCatalogToCDS(
-          { id: provider_id, name: providerName },
-          delSyncItems,
-          syncOffers,
-          isActive
-        );
+      await publishCatalogToCDS(
+        { id: provider_id, name: providerName },
+        delSyncItems,
+        syncOffers,
+        isActive
+      );
 
-        if (isActive) {
-          logger.info('Catalog republished to CDS after offer deletion', {
-            providerId: provider_id,
-            remainingOffers: syncOffers.length
-          });
-        } else {
-          logger.info('Catalog revoked from CDS (no offers remaining)', { providerId: provider_id });
-        }
+      if (isActive) {
+        logger.info('Catalog republished to CDS after offer deletion', {
+          providerId: provider_id,
+          remainingOffers: syncOffers.length
+        });
+      } else {
+        logger.info('Catalog revoked from CDS (no offers remaining)', { providerId: provider_id });
       }
     } catch (err: any) {
       logger.error('Failed to republish catalog after deletion', { error: err.message });
@@ -2542,55 +2528,53 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
     logger.info(`Released ${releasedCount} blocks for seller-cancelled order ${order.id}`);
 
     // Republish catalog to CDS with increased availability
-    if (isExternalCDSEnabled()) {
-      try {
-        const providerInfo = await getProvider(providerId);
-        const providerName = providerInfo?.name || 'Energy Provider';
-        const allItems = await getProviderItems(providerId);
-        const allOffers = await getProviderOffers(providerId);
+    try {
+      const providerInfo = await getProvider(providerId);
+      const providerName = providerInfo?.name || 'Energy Provider';
+      const allItems = await getProviderItems(providerId);
+      const allOffers = await getProviderOffers(providerId);
 
-        const rawSellerCancelSyncItems = allItems.map(item => ({
-          id: item.id,
-          provider_id: item.provider_id,
-          source_type: item.source_type,
-          delivery_mode: item.delivery_mode,
-          available_qty: item.available_qty,
-          production_windows: item.production_windows,
-          meter_id: item.meter_id,
-        }));
-        const sellerCancelSyncItems = await enrichSyncItems(rawSellerCancelSyncItems, providerId);
+      const rawSellerCancelSyncItems = allItems.map(item => ({
+        id: item.id,
+        provider_id: item.provider_id,
+        source_type: item.source_type,
+        delivery_mode: item.delivery_mode,
+        available_qty: item.available_qty,
+        production_windows: item.production_windows,
+        meter_id: item.meter_id,
+      }));
+      const sellerCancelSyncItems = await enrichSyncItems(rawSellerCancelSyncItems, providerId);
 
-        const syncOffers = await Promise.all(allOffers.map(async (offer) => {
-          const availableBlocks = await getAvailableBlockCount(offer.id);
-          return {
-            id: offer.id,
-            item_id: offer.item_id,
-            provider_id: offer.provider_id,
-            price_value: offer.price.value,
-            currency: offer.price.currency,
-            max_qty: availableBlocks,
-            time_window: offer.timeWindow,
-            pricing_model: offer.offerAttributes.pricingModel,
-            settlement_type: offer.offerAttributes.settlementType,
-          };
-        }));
+      const syncOffers = await Promise.all(allOffers.map(async (offer) => {
+        const availableBlocks = await getAvailableBlockCount(offer.id);
+        return {
+          id: offer.id,
+          item_id: offer.item_id,
+          provider_id: offer.provider_id,
+          price_value: offer.price.value,
+          currency: offer.price.currency,
+          max_qty: availableBlocks,
+          time_window: offer.timeWindow,
+          pricing_model: offer.offerAttributes.pricingModel,
+          settlement_type: offer.offerAttributes.settlementType,
+        };
+      }));
 
-        const activeOffers = syncOffers.filter(o => o.max_qty > 0);
+      const activeOffers = syncOffers.filter(o => o.max_qty > 0);
 
-        await publishCatalogToCDS(
-          { id: providerId, name: providerName },
-          sellerCancelSyncItems,
-          activeOffers,
-          activeOffers.length > 0
-        );
+      await publishCatalogToCDS(
+        { id: providerId, name: providerName },
+        sellerCancelSyncItems,
+        activeOffers,
+        activeOffers.length > 0
+      );
 
-        logger.info(`Catalog republished to CDS after seller cancellation`, {
-          providerId,
-          releasedBlocks: releasedCount,
-        });
-      } catch (syncError: any) {
-        logger.error(`Failed to republish catalog after seller cancellation: ${syncError.message}`);
-      }
+      logger.info(`Catalog republished to CDS after seller cancellation`, {
+        providerId,
+        releasedBlocks: releasedCount,
+      });
+    } catch (syncError: any) {
+      logger.error(`Failed to republish catalog after seller cancellation: ${syncError.message}`);
     }
 
     return res.json({
@@ -2610,17 +2594,14 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
  * Useful for debugging whether offers are being published
  */
 router.get('/seller/cds-status', async (req: Request, res: Response) => {
-  const enabled = isExternalCDSEnabled();
   const signingOn = isSigningEnabled();
   const bppKeys = getBppKeyPair();
 
   res.json({
     cds: {
-      publishingEnabled: enabled,
+      publishingEnabled: true, // Always enabled - no toggle
       externalCdsUrl: config.external.cds,
-      useExternalCds: process.env.USE_EXTERNAL_CDS,
       envCheck: {
-        USE_EXTERNAL_CDS: process.env.USE_EXTERNAL_CDS || 'NOT SET',
         EXTERNAL_CDS_URL: process.env.EXTERNAL_CDS_URL || 'NOT SET (using default)',
       },
     },
@@ -2635,13 +2616,11 @@ router.get('/seller/cds-status', async (req: Request, res: Response) => {
         BPP_PRIVATE_KEY: process.env.BPP_PRIVATE_KEY ? 'SET' : 'NOT SET',
       },
     },
-    message: enabled && signingOn && bppKeys
+    message: signingOn && bppKeys
       ? 'CDS publishing is ENABLED with BPP signing - offers will be published to external CDS'
-      : !enabled
-        ? 'CDS publishing is DISABLED - set USE_EXTERNAL_CDS=true to enable'
-        : !signingOn
-          ? 'CDS publishing enabled but SIGNING is OFF - set BECKN_SIGNING_ENABLED=true'
-          : 'CDS publishing enabled but BPP keys missing - set BPP_KEY_ID, BPP_PUBLIC_KEY, BPP_PRIVATE_KEY',
+      : !signingOn
+        ? 'CDS publishing enabled but SIGNING is OFF - set BECKN_SIGNING_ENABLED=true'
+        : 'CDS publishing enabled but BPP keys missing - set BPP_KEY_ID, BPP_PUBLIC_KEY, BPP_PRIVATE_KEY',
   });
 });
 
@@ -2720,14 +2699,6 @@ router.post('/seller/cds-test-publish', authMiddleware, async (req: Request, res
 
   if (!provider_id) {
     return res.status(400).json({ error: 'No seller profile found' });
-  }
-
-  const enabled = isExternalCDSEnabled();
-  if (!enabled) {
-    return res.status(400).json({
-      error: 'CDS publishing is not enabled',
-      hint: 'Set USE_EXTERNAL_CDS=true in environment variables',
-    });
   }
 
   const providerInfo = await getProvider(provider_id);

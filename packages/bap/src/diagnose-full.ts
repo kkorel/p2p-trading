@@ -34,7 +34,6 @@ async function diagnose() {
     'BPP_KEY_ID',
     'BPP_PUBLIC_KEY',
     'BPP_PRIVATE_KEY',
-    'USE_EXTERNAL_CDS',
     'EXTERNAL_CDS_URL',
   ];
 
