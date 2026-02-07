@@ -11,19 +11,9 @@ import {
   getTomorrowWeatherSummary,
   type DailyWeatherSummary,
 } from './weather-integration';
-import { createLogger } from '@p2p/shared';
+import { createLogger, calculateAllowedLimit } from '@p2p/shared';
 
 const logger = createLogger('SellerAutoTrade');
-
-// Trust score to trade limit mapping
-function getTradeLimitFromTrust(score: number): number {
-  if (score >= 0.9) return 100; // Platinum
-  if (score >= 0.7) return 80;  // Gold
-  if (score >= 0.5) return 60;  // Silver
-  if (score >= 0.3) return 40;  // Bronze
-  if (score >= 0.1) return 20;  // Starter
-  return 10;                     // New
-}
 
 export interface SellerAutoTradeResult {
   userId: string;
@@ -140,7 +130,7 @@ async function executeSellerAutoTrade(
 
   // Get trade limit from trust score
   const trustScore = user.trustScore ?? 0.3;
-  const tradeLimit = getTradeLimitFromTrust(trustScore);
+  const tradeLimit = calculateAllowedLimit(trustScore);
 
   // Get weather forecast
   let weatherMultiplier = 0.7; // Default if weather unavailable
@@ -463,7 +453,7 @@ export async function previewAutoTrade(userId: string): Promise<{
   if (!user.provider) return null;
 
   const trustScore = user.trustScore ?? 0.3;
-  const tradeLimit = getTradeLimitFromTrust(trustScore);
+  const tradeLimit = calculateAllowedLimit(trustScore);
 
   let weatherMultiplier = 0.7;
   let condition = 'Weather unavailable';

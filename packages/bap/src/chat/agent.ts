@@ -3680,11 +3680,11 @@ const states: Record<ChatState, StateHandler> = {
       if (hasGeneration || hasStorage) {
         const user = await prisma.user.findUnique({
           where: { id: ctx.userId! },
-          select: { productionCapacity: true, allowedTradeLimit: true },
+          select: { productionCapacity: true, trustScore: true },
         });
 
         const capacity = user?.productionCapacity || ctx.productionCapacity;
-        const tradeLimitPct = user?.allowedTradeLimit || 10;
+        const tradeLimitPct = calculateAllowedLimit(user?.trustScore ?? 0.3);
         let explainEn: string;
         let explainHi: string;
 
@@ -3821,12 +3821,12 @@ const states: Record<ChatState, StateHandler> = {
                 const offerEndTime = new Date(tomorrow);
                 offerEndTime.setHours(18, 0, 0, 0);
 
-                // Get user's trade limit percentage
+                // Get user's trade limit percentage from trust score
                 const userForLimit = await prisma.user.findUnique({
                   where: { id: ctx.userId! },
-                  select: { allowedTradeLimit: true },
+                  select: { trustScore: true },
                 });
-                const tradeLimitPct = userForLimit?.allowedTradeLimit || 10;
+                const tradeLimitPct = calculateAllowedLimit(userForLimit?.trustScore ?? 0.3);
 
                 return {
                   messages: [
@@ -4574,12 +4574,12 @@ const states: Record<ChatState, StateHandler> = {
                 const listedQty = tradeResult.listedQuantity.toFixed(1);
                 const dailyCapacity = (capacity / 30).toFixed(1);
 
-                // Get trade limit for explanation
+                // Get trade limit for explanation from trust score
                 const userForLimit = await prisma.user.findUnique({
                   where: { id: ctx.userId! },
-                  select: { allowedTradeLimit: true },
+                  select: { trustScore: true },
                 });
-                const tradeLimitPct = userForLimit?.allowedTradeLimit || 10;
+                const tradeLimitPct = calculateAllowedLimit(userForLimit?.trustScore ?? 0.3);
 
                 let warningText = '';
                 if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
