@@ -367,13 +367,13 @@ export const mockTradingAgent = {
     if (completedOrders.length === 0) {
       return ht(lang,
         `No sales yet, ${name}. Your offers are live and waiting for buyers! Wallet: Rs ${user.balance.toFixed(2)}.`,
-        `Abhi tak koi sale nahi hui, ${name}. Aapke offers live hain, buyers ka wait kar rahe hain! Wallet: Rs ${user.balance.toFixed(2)}.`
+        `अभी तक कोई बिक्री नहीं हुई, ${name}। आपके ऑफर लाइव हैं, खरीदारों का इंतज़ार कर रहे हैं! वॉलेट: ₹${user.balance.toFixed(2)}`
       );
     }
 
     return ht(lang,
       `Your earnings, ${name}:\n- Orders: ${completedOrders.length}\n- Energy sold: ${totalKwh.toFixed(1)} kWh\n- Earnings: Rs ${totalEarnings.toFixed(2)}\n- Wallet: Rs ${user.balance.toFixed(2)}`,
-      `Aapki kamayi, ${name}:\n- Orders: ${completedOrders.length}\n- Energy bechi: ${totalKwh.toFixed(1)} kWh\n- Kamayi: Rs ${totalEarnings.toFixed(2)}\n- Wallet: Rs ${user.balance.toFixed(2)}`
+      `आपकी कमाई, ${name}:\n- ऑर्डर: ${completedOrders.length}\n- एनर्जी बेची: ${totalKwh.toFixed(1)} kWh\n- कमाई: ₹${totalEarnings.toFixed(2)}\n- वॉलेट: ₹${user.balance.toFixed(2)}`
     );
   },
 
@@ -497,7 +497,7 @@ export const mockTradingAgent = {
     if (!user?.providerId) {
       return ht(lang,
         'You have no listings yet. Would you like me to create one?',
-        'Aapki koi listing nahi hai. Kya main ek bana dun?'
+        'आपकी कोई लिस्टिंग नहीं है। क्या मैं एक बना दूं?'
       );
     }
 
@@ -1850,20 +1850,20 @@ export async function getActivitySummary(userId: string, lang?: string): Promise
     `• ${activeListings} active listing${activeListings !== 1 ? 's' : ''}\n\n` +
     `💼 *Wallet Balance*: ₹${balance.toFixed(0)}`,
 
-    `📊 *Aapki Activity Summary*\n` +
+    `📊 *आपकी एक्टिविटी समरी*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `👋 Namaste ${userName}!\n\n` +
-    `💰 *Kamai*\n` +
-    `• Aaj: ₹${todayEarnings.toFixed(0)}\n` +
-    `• Is Hafte: ₹${weekEarnings.toFixed(0)}\n` +
-    `• Total: ₹${totalEarnings.toFixed(0)}\n\n` +
-    `📦 *Orders*\n` +
-    `• ${pendingAsSeller} delivery pending (bechna)\n` +
-    `• ${pendingAsBuyer} delivery pending (khareedna)\n` +
-    `• ${monthCompletedSelling + monthCompletedBuying} is mahine complete\n\n` +
-    `📋 *Listings*\n` +
-    `• ${activeListings} active listing${activeListings !== 1 ? 's' : ''}\n\n` +
-    `💼 *Wallet Balance*: ₹${balance.toFixed(0)}`
+    `👋 नमस्ते ${userName}!\n\n` +
+    `💰 *कमाई*\n` +
+    `• आज: ₹${todayEarnings.toFixed(0)}\n` +
+    `• इस हफ्ते: ₹${weekEarnings.toFixed(0)}\n` +
+    `• कुल: ₹${totalEarnings.toFixed(0)}\n\n` +
+    `📦 *ऑर्डर*\n` +
+    `• ${pendingAsSeller} डिलीवरी पेंडिंग (बेचना)\n` +
+    `• ${pendingAsBuyer} डिलीवरी पेंडिंग (खरीदना)\n` +
+    `• ${monthCompletedSelling + monthCompletedBuying} इस महीने पूरे हुए\n\n` +
+    `📋 *लिस्टिंग*\n` +
+    `• ${activeListings} एक्टिव लिस्टिंग\n\n` +
+    `💼 *वॉलेट बैलेंस*: ₹${balance.toFixed(0)}`
   );
 
   return summary;

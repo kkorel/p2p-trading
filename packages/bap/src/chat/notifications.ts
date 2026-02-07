@@ -218,9 +218,10 @@ export async function notifyOrderCancelled(params: {
     const buyer = await getUserContact(buyerId);
     if (buyer.phone) {
       const refundText = refundAmount ? `\nRefund: ${formatCurrency(refundAmount)}` : '';
+      const cancelledByHi = cancelledBy === 'BUYER' ? 'खरीदार' : cancelledBy === 'SELLER' ? 'विक्रेता' : cancelledBy;
       const message = msg(buyer.lang,
         `❌ Order Cancelled\n\nCancelled by: ${cancelledBy}${reason ? `\nReason: ${reason}` : ''}${refundText}\n\nYou can create a new order anytime.`,
-        `❌ Order Cancel Ho Gaya\n\nKisne: ${cancelledBy}${reason ? `\nKaran: ${reason}` : ''}${refundText}\n\nNaya order kabhi bhi kar sakte ho.`
+        `❌ ऑर्डर रद्द हो गया\n\nकिसने: ${cancelledByHi}${reason ? `\nकारण: ${reason}` : ''}${refundText}\n\nनया ऑर्डर कभी भी कर सकते हो।`
       );
       
       sendProactiveMessage(buyer.phone, message).catch(err => {
@@ -235,7 +236,7 @@ export async function notifyOrderCancelled(params: {
     if (seller.phone) {
       const message = msg(seller.lang,
         `📢 Order Cancelled\n\nBuyer cancelled the order.${reason ? `\nReason: ${reason}` : ''}\n\nYour listing is still available for other buyers.`,
-        `📢 Order Cancel\n\nBuyer ne order cancel kar diya.${reason ? `\nKaran: ${reason}` : ''}\n\nAapki listing abhi bhi available hai.`
+        `📢 ऑर्डर रद्द\n\nखरीदार ने ऑर्डर रद्द कर दिया।${reason ? `\nकारण: ${reason}` : ''}\n\nआपकी लिस्टिंग अभी भी उपलब्ध है।`
       );
       
       sendProactiveMessage(seller.phone, message).catch(err => {
@@ -340,13 +341,13 @@ export async function notifyMilestone(params: {
     case 'ENERGY_1000':
       message = msg(user.lang,
         `🏆 1000 kWh MEGA Milestone!\n\nYou've traded 1000 kWh of green energy!\n\nYou're a true energy champion! 🌍💪`,
-        `🏆 1000 kWh MEGA Milestone!\n\nAapne 1000 kWh green energy trade ki!\n\nAap energy champion ho! 🌍💪`
+        `🏆 1000 kWh का MEGA मील का पत्थर!\n\nआपने 1000 kWh ग्रीन एनर्जी ट्रेड की!\n\nआप एनर्जी चैंपियन हो! 🌍💪`
       );
       break;
     case 'TRUST_UPGRADED':
       message = msg(user.lang,
         `🌟 Trust Score Upgraded!\n\n${details || 'Your reliability has improved.'}\n\nYou can now trade larger quantities!`,
-        `🌟 Trust Score Badh Gaya!\n\n${details || 'Aapki reliability badh gayi.'}\n\nAb bade orders kar sakte ho!`
+        `🌟 ट्रस्ट स्कोर बढ़ गया!\n\n${details || 'आपकी विश्वसनीयता बढ़ गई।'}\n\nअब बड़े ऑर्डर कर सकते हो!`
       );
       break;
     default:
@@ -449,19 +450,19 @@ I can help you:
 Just message me anytime with what you need. Type "help" to see all commands.
 
 Let's start your green energy journey! 🌱`,
-      `🎉 ${userName}, Oorja mein aapka swagat hai!
+      `🎉 ${userName}, ऊर्जा में आपका स्वागत है!
 
-Aapne app pe register kar liya. Main aapka P2P energy trading assistant hun, WhatsApp pe 24/7 available!
+आपने ऐप पर रजिस्टर कर लिया। मैं आपका P2P एनर्जी ट्रेडिंग असिस्टेंट हूं, WhatsApp पर 24/7 उपलब्ध!
 
-Main aapki madad kar sakta hun:
-• 🌞 Solar energy bechna
-• ⚡ Sasti green bijli khareedna
-• 📊 Orders aur earnings track karna
-• 💡 Market insights lena
+मैं आपकी मदद कर सकता हूं:
+• 🌞 सोलर एनर्जी बेचना
+• ⚡ सस्ती ग्रीन बिजली खरीदना
+• 📊 ऑर्डर और कमाई ट्रैक करना
+• 💡 मार्केट इनसाइट्स लेना
 
-Kuch bhi chahiye to message karo. "help" type karo sabhi commands dekhne ke liye.
+कुछ भी चाहिए तो मैसेज करो। "help" टाइप करो सभी कमांड्स देखने के लिए।
 
-Chalo green energy ka safar shuru karte hain! 🌱`
+चलो ग्रीन एनर्जी का सफर शुरू करते हैं! 🌱`
     );
 
     const success = await sendProactiveMessage(user.phone, message);
