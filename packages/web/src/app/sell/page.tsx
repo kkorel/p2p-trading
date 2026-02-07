@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Package, Tag, ShoppingBag, Sun, Wind, Droplets, Trash2, Clock, AlertCircle, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Package, Tag, ShoppingBag, Sun, Wind, Droplets, Trash2, Clock, AlertCircle, CheckCircle, XCircle, AlertTriangle, CloudSun } from 'lucide-react';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/app-shell';
 import { AddOfferSheet } from '@/components/sell/add-offer-sheet';
 import { Card, Button, Badge, EmptyState, SkeletonList, useToast, useConfirm } from '@/components/ui';
-import { sellerApi, type Offer, type Order, type Provider } from '@/lib/api';
+import { sellerApi, type Offer, type Order, type Provider, type WeatherCapacityResponse } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { useDataUpdate, useDataUpdateActions } from '@/contexts/data-update-context';
 import { formatCurrency, formatTime, formatDateTime, truncateId, cn } from '@/lib/utils';
@@ -38,6 +38,8 @@ export default function SellPage() {
     totalUnsoldInOffers: number;
     totalCommitted: number;
   } | null>(null);
+  const [weatherData, setWeatherData] = useState<WeatherCapacityResponse | null>(null);
+  const [isLoadingWeather, setIsLoadingWeather] = useState(false);
 
   // Check if user has set production capacity
   const hasProductionCapacity = user?.productionCapacity && user.productionCapacity > 0;
@@ -97,9 +99,31 @@ export default function SellPage() {
     }
   }, []);
 
+  // Fetch weather capacity data
+  const loadWeather = useCallback(async () => {
+    if (!hasProductionCapacity) return;
+    setIsLoadingWeather(true);
+    try {
+      const data = await sellerApi.getWeatherCapacity();
+      setWeatherData(data);
+    } catch (error) {
+      console.error('Failed to load weather data:', error);
+      // Silent fail - weather is enhancement, not critical
+    } finally {
+      setIsLoadingWeather(false);
+    }
+  }, [hasProductionCapacity]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Load weather data when user has production capacity
+  useEffect(() => {
+    if (hasProductionCapacity) {
+      loadWeather();
+    }
+  }, [hasProductionCapacity, loadWeather]);
 
   // Refresh data when triggered by other components (e.g., buyer accepts an offer)
   useEffect(() => {
@@ -267,6 +291,54 @@ export default function SellPage() {
                     Go to Profile
                   </Button>
                 </Link>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Weather Conditions Card */}
+        {hasProductionCapacity && weatherData && (
+          <Card padding="sm" className="bg-gradient-to-r from-[var(--color-bg-subtle)] to-[var(--color-surface)] border-[var(--color-border)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[var(--color-primary-light)] flex items-center justify-center">
+                  <CloudSun className="h-5 w-5 text-[var(--color-primary)]" />
+                </div>
+                <div>
+                  <p className="text-sm text-[var(--color-text-muted)]">Today's Conditions</p>
+                  <p className="text-base font-semibold text-[var(--color-text)]">
+                    {weatherData.condition}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[var(--color-text-muted)]">Effective Capacity</p>
+                <p className="text-lg font-bold text-[var(--color-primary)]">
+                  {weatherData.effectiveCapacity.toFixed(1)} kWh
+                </p>
+              </div>
+            </div>
+            {weatherData.bestWindow && (
+              <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--color-text-muted)]">Best time to sell:</span>
+                  <span className="font-medium text-[var(--color-success)]">
+                    {weatherData.bestWindow.start} - {weatherData.bestWindow.end}
+                  </span>
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Weather loading state */}
+        {hasProductionCapacity && isLoadingWeather && !weatherData && (
+          <Card padding="sm" className="animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[var(--color-border)]" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-[var(--color-border)] rounded w-32" />
+                <div className="h-5 bg-[var(--color-border)] rounded w-40" />
               </div>
             </div>
           </Card>
