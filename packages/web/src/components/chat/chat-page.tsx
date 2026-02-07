@@ -67,6 +67,21 @@ export function ChatPage() {
     }
   }, [settingsLoaded, messages.length]);
   
+  // Listen for voice:autoplay events (auto-play TTS when input was voice)
+  useEffect(() => {
+    const handleAutoVoice = (e: CustomEvent<{ text: string; language?: string }>) => {
+      const { text, language } = e.detail;
+      if (text) {
+        playTTS(text, language || responseLanguage, speaker, pace).catch(() => {});
+      }
+    };
+
+    window.addEventListener('voice:autoplay', handleAutoVoice as EventListener);
+    return () => {
+      window.removeEventListener('voice:autoplay', handleAutoVoice as EventListener);
+    };
+  }, [playTTS, responseLanguage, speaker, pace]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {

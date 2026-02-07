@@ -335,6 +335,7 @@ export function useChatEngine() {
       authToken?: string;
       responseLanguage?: string;
       voiceOutputEnabled?: boolean;
+      autoVoice?: boolean; // Auto-play TTS when input was voice
     }) => {
       // Validate transcript
       if (!result.transcript || !result.transcript.trim()) {
@@ -385,6 +386,15 @@ export function useChatEngine() {
       if (result.voiceOutputEnabled !== undefined) {
         window.dispatchEvent(new CustomEvent('voice:preference', {
           detail: { enabled: result.voiceOutputEnabled }
+        }));
+      }
+
+      // Auto-play voice response when input was voice
+      if (result.autoVoice && agentMessages && agentMessages.length > 0) {
+        // Dispatch event to trigger TTS playback of the agent's response
+        const textToSpeak = agentMessages.map(m => m.content).join('\n');
+        window.dispatchEvent(new CustomEvent('voice:autoplay', {
+          detail: { text: textToSpeak, language: result.responseLanguage }
         }));
       }
     },

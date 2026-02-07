@@ -204,6 +204,7 @@ router.post('/voice', async (req: Request, res: Response) => {
       authToken: response.authToken || undefined,
       responseLanguage: response.responseLanguage || transcription.languageCode,
       voiceOutputEnabled: response.voiceOutputEnabled,
+      autoVoice: response.autoVoice, // Auto-play voice when input was voice
     });
   } catch (error: any) {
     logger.error(`Chat voice error: ${error.message}\n${error.stack}`);

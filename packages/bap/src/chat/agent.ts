@@ -25,7 +25,7 @@ import {
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
 import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, getMarketInsights, getActivitySummary, getTopDeals, getBrowseMarketTable } from './trading-agent';
-import { askLLM, classifyIntent, composeResponse, extractNameWithLLM, extractPhoneWithLLM, extractOtpWithLLM } from './llm-fallback';
+import { askLLM, classifyIntent, composeResponse, extractNameWithLLM, extractPhoneWithLLM, extractOtpWithLLM, matchDiscomWithLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
 import { sendProactiveMessage, isWhatsAppConnected, getWhatsAppBotNumber } from './whatsapp';
@@ -68,6 +68,8 @@ export interface AgentResponse {
   responseLanguage?: string;
   /** User's voice output preference (for auto-play) */
   voiceOutputEnabled?: boolean;
+  /** Auto-play voice response (set when input was voice) */
+  autoVoice?: boolean;
 }
 
 /**
@@ -1636,6 +1638,7 @@ const WELCOME_MESSAGES: Record<string, { greeting: string; voiceNote: string }> 
   },
 };
 
+// DISCOM list with base (English) names - used for callback matching
 const DISCOM_LIST = [
   { text: 'BSES Rajdhani', callbackData: 'discom:bses_rajdhani' },
   { text: 'BSES Yamuna', callbackData: 'discom:bses_yamuna' },
@@ -1647,6 +1650,76 @@ const DISCOM_LIST = [
   { text: 'WBSEDCL (WB)', callbackData: 'discom:wbsedcl' },
   { text: 'Other', callbackData: 'discom:other' },
 ];
+
+// Localized DISCOM names for display
+const DISCOM_TRANSLATIONS: Record<string, Record<string, string>> = {
+  'hi-IN': {
+    'BSES Rajdhani': 'बीएसईएस राजधानी',
+    'BSES Yamuna': 'बीएसईएस यमुना',
+    'Tata Power Delhi': 'टाटा पावर दिल्ली',
+    'BESCOM (Bangalore)': 'बेस्कॉम (बैंगलोर)',
+    'MSEDCL (Maharashtra)': 'एमएसईडीसीएल (महाराष्ट्र)',
+    'UPPCL (UP)': 'यूपीपीसीएल (उत्तर प्रदेश)',
+    'TANGEDCO (TN)': 'टैंगेडको (तमिलनाडु)',
+    'WBSEDCL (WB)': 'डब्ल्यूबीएसईडीसीएल (पश्चिम बंगाल)',
+    'Other': 'अन्य',
+  },
+  'bn-IN': {
+    'BSES Rajdhani': 'বিএসইএস রাজধানী',
+    'BSES Yamuna': 'বিএসইএস যমুনা',
+    'Tata Power Delhi': 'টাটা পাওয়ার দিল্লি',
+    'BESCOM (Bangalore)': 'বেসকম (ব্যাঙ্গালোর)',
+    'MSEDCL (Maharashtra)': 'এমএসইডিসিএল (মহারাষ্ট্র)',
+    'UPPCL (UP)': 'ইউপিপিসিএল (উত্তর প্রদেশ)',
+    'TANGEDCO (TN)': 'ট্যাঙ্গেডকো (তামিলনাড়ু)',
+    'WBSEDCL (WB)': 'ডব্লিউবিএসইডিসিএল (পশ্চিমবঙ্গ)',
+    'Other': 'অন্যান্য',
+  },
+  'ta-IN': {
+    'BSES Rajdhani': 'பிஎஸ்இஎஸ் ராஜ்தானி',
+    'BSES Yamuna': 'பிஎஸ்இஎஸ் யமுனா',
+    'Tata Power Delhi': 'டாடா பவர் டெல்லி',
+    'BESCOM (Bangalore)': 'பெஸ்காம் (பெங்களூர்)',
+    'MSEDCL (Maharashtra)': 'எம்எஸ்இடிசிஎல் (மகாராஷ்டிரா)',
+    'UPPCL (UP)': 'யுபிபிசிஎல் (உத்தரப்பிரதேசம்)',
+    'TANGEDCO (TN)': 'டேன்ஜெட்கோ (தமிழ்நாடு)',
+    'WBSEDCL (WB)': 'டபிள்யூபிஎஸ்இடிசிஎல் (மேற்கு வங்காளம்)',
+    'Other': 'மற்றவை',
+  },
+  'te-IN': {
+    'BSES Rajdhani': 'బిఎస్‌ఇఎస్ రాజధాని',
+    'BSES Yamuna': 'బిఎస్‌ఇఎస్ యమునా',
+    'Tata Power Delhi': 'టాటా పవర్ ఢిల్లీ',
+    'BESCOM (Bangalore)': 'బెస్కామ్ (బెంగళూరు)',
+    'MSEDCL (Maharashtra)': 'ఎంఎస్‌ఇడిసిఎల్ (మహారాష్ట్ర)',
+    'UPPCL (UP)': 'యుపిపిసిఎల్ (ఉత్తర ప్రదేశ్)',
+    'TANGEDCO (TN)': 'టాన్‌గెడ్కో (తమిళనాడు)',
+    'WBSEDCL (WB)': 'డబ్ల్యుబిఎస్‌ఇడిసిఎల్ (పశ్చిమ బెంగాల్)',
+    'Other': 'ఇతర',
+  },
+  'kn-IN': {
+    'BSES Rajdhani': 'ಬಿಎಸ್‌ಇಎಸ್ ರಾಜಧಾನಿ',
+    'BSES Yamuna': 'ಬಿಎಸ್‌ಇಎಸ್ ಯಮುನಾ',
+    'Tata Power Delhi': 'ಟಾಟಾ ಪವರ್ ದೆಹಲಿ',
+    'BESCOM (Bangalore)': 'ಬೆಸ್ಕಾಮ್ (ಬೆಂಗಳೂರು)',
+    'MSEDCL (Maharashtra)': 'ಎಂಎಸ್‌ಇಡಿಸಿಎಲ್ (ಮಹಾರಾಷ್ಟ್ರ)',
+    'UPPCL (UP)': 'ಯುಪಿಪಿಸಿಎಲ್ (ಉತ್ತರ ಪ್ರದೇಶ)',
+    'TANGEDCO (TN)': 'ಟ್ಯಾಂಗೆಡ್ಕೊ (ತಮಿಳುನಾಡು)',
+    'WBSEDCL (WB)': 'ಡಬ್ಲ್ಯುಬಿಎಸ್‌ಇಡಿಸಿಎಲ್ (ಪಶ್ಚಿಮ ಬಂಗಾಳ)',
+    'Other': 'ಇತರೆ',
+  },
+};
+
+// Get localized DISCOM list based on language
+function getLocalizedDiscomList(language?: string): Array<{ text: string; callbackData: string }> {
+  const translations = language ? DISCOM_TRANSLATIONS[language] : undefined;
+  if (!translations) return DISCOM_LIST;
+
+  return DISCOM_LIST.map(item => ({
+    text: translations[item.text] || item.text,
+    callbackData: item.callbackData,
+  }));
+}
 
 const DISCOM_CRED_LINKS: Record<string, string> = {
   bses_rajdhani: 'https://creds.bsesdelhi.com/rajdhani',
@@ -2688,14 +2761,15 @@ const states: Record<ChatState, StateHandler> = {
   ASK_DISCOM: {
     async onEnter(ctx) {
       const progress = getProgressIndicator('ASK_DISCOM', ctx);
+      const localizedList = getLocalizedDiscomList(ctx.language);
       return {
         messages: [
           {
             text: progress + h(ctx,
               'Which company do you get electricity from?',
-              'Aap konsi company se bijli lete ho?'
+              'आप किस कंपनी से बिजली लेते हो?'
             ),
-            buttons: DISCOM_LIST,
+            buttons: localizedList,
           },
         ],
       };
@@ -2707,6 +2781,14 @@ const states: Record<ChatState, StateHandler> = {
         message = numericCallback;
       }
 
+      // Try to match spoken/typed DISCOM name to options via LLM
+      if (!message.startsWith('discom:')) {
+        const matchedDiscom = await matchDiscomWithLLM(message, DISCOM_LIST);
+        if (matchedDiscom) {
+          message = matchedDiscom;
+        }
+      }
+
       if (message.startsWith('discom:')) {
         const discomKey = message.replace('discom:', '');
 
@@ -2716,7 +2798,7 @@ const states: Record<ChatState, StateHandler> = {
               {
                 text: h(ctx,
                   'Please type your electricity company name:',
-                  'Apni bijli company ka naam likho:'
+                  'अपनी बिजली कंपनी का नाम लिखो:'
                 ),
               },
             ],
@@ -2741,9 +2823,9 @@ const states: Record<ChatState, StateHandler> = {
             {
               text: h(ctx,
                 'Please select your electricity company or type the name:',
-                'Apni bijli company chuno ya naam likho:'
+                'अपनी बिजली कंपनी चुनो या नाम लिखो:'
               ),
-              buttons: DISCOM_LIST,
+              buttons: getLocalizedDiscomList(ctx.language),
             },
           ],
         };
@@ -2767,12 +2849,17 @@ const states: Record<ChatState, StateHandler> = {
       ) || 'other';
       const credLink = DISCOM_CRED_LINKS[discomKey] || DISCOM_CRED_LINKS['other'];
 
+      // Get localized DISCOM name for display
+      const localizedDiscom = ctx.language && DISCOM_TRANSLATIONS[ctx.language]
+        ? (DISCOM_TRANSLATIONS[ctx.language][discomLabel] || discomLabel)
+        : discomLabel;
+
       return {
         messages: [
           {
             text: progress + h(ctx,
               `I need your electricity account ID from ${discomLabel}. You can get it online here:\n${credLink}\n\nDownload and upload it here (PDF or JSON).`,
-              `Mujhe aapki bijli company (${discomLabel}) ka ID chahiye. Vo aapko online mil jaayega is website par:\n${credLink}\n\nDownload karke yahan upload karo (PDF ya JSON).`
+              `मुझे आपकी बिजली कंपनी (${localizedDiscom}) का आईडी चाहिए। वो आपको ऑनलाइन मिल जाएगा इस वेबसाइट पर:\n${credLink}\n\nडाउनलोड करके यहाँ अपलोड करो (पीडीएफ या जेएसओएन)।`
             ),
           },
         ],
@@ -2785,7 +2872,7 @@ const states: Record<ChatState, StateHandler> = {
           return {
             messages: [
               { text: kbAnswer },
-              { text: h(ctx, 'Upload your electricity account ID when ready (PDF or JSON).', 'Jab ready ho tab bijli company ka ID upload karo (PDF ya JSON).'), delay: 300 },
+              { text: h(ctx, 'Upload your electricity account ID when ready (PDF or JSON).', 'जब तैयार हो तब बिजली कंपनी का आईडी अपलोड करो (पीडीएफ या जेएसओएन)।'), delay: 300 },
             ],
           };
         }
@@ -4370,7 +4457,8 @@ export async function processMessage(
 
     const effectiveLang = (response.contextUpdate?.language as any) || userLang;
     const voiceEnabled = chainCtx.voiceOutputEnabled;
-    return translateResponse({ messages: allMessages, authToken, voiceOutputEnabled: voiceEnabled }, effectiveLang);
+    const autoVoice = voiceOptions?.isVoiceInput === true;
+    return translateResponse({ messages: allMessages, authToken, voiceOutputEnabled: voiceEnabled, autoVoice }, effectiveLang);
   }
 
   if (response.contextUpdate) {
@@ -4384,7 +4472,8 @@ export async function processMessage(
   const effectiveLang = (response.contextUpdate?.language as any) || userLang;
   const mergedCtx = { ...ctx, ...response.contextUpdate };
   const voiceEnabled = mergedCtx.voiceOutputEnabled;
-  return translateResponse({ ...response, voiceOutputEnabled: voiceEnabled }, effectiveLang);
+  const autoVoice = voiceOptions?.isVoiceInput === true;
+  return translateResponse({ ...response, voiceOutputEnabled: voiceEnabled, autoVoice }, effectiveLang);
 }
 
 // --- Helpers ---

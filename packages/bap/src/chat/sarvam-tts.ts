@@ -23,14 +23,18 @@ const REQUEST_TIMEOUT_MS = 30000; // 30 seconds
  * Available voice speakers for Bulbul v2
  * Per Sarvam docs: https://docs.sarvam.ai/api-reference-docs/endpoints/text-to-speech
  */
-export type TTSSpeaker = 
-  | 'anushka'  // Female (default)
+export type TTSSpeaker =
+  | 'anushka'  // Female
   | 'manisha'  // Female
   | 'vidya'    // Female
   | 'arya'     // Female
-  | 'abhilash' // Male
+  | 'abhilash' // Male, North Indian (default)
   | 'karun'    // Male
   | 'hitesh';  // Male
+
+// Default voice configuration
+export const DEFAULT_SPEAKER: TTSSpeaker = 'abhilash'; // Male, North Indian voice
+export const DEFAULT_PACE = 0.85; // Slightly slower for clarity
 
 /**
  * Options for text-to-speech synthesis
@@ -193,15 +197,12 @@ export async function synthesizeSpeech(options: TTSOptions): Promise<TTSResult> 
   const requestBody: Record<string, any> = {
     text: options.text,
     target_language_code: options.languageCode,
-    speaker: options.speaker || 'anushka',
+    speaker: options.speaker || DEFAULT_SPEAKER,
     model: 'bulbul:v2',
     enable_preprocessing: true,
+    // Apply default pace for slower, clearer speech
+    pace: Math.max(0.3, Math.min(3.0, options.pace ?? DEFAULT_PACE)),
   };
-  
-  // Optional parameters
-  if (options.pace !== undefined) {
-    requestBody.pace = Math.max(0.3, Math.min(3.0, options.pace));
-  }
   if (options.pitch !== undefined) {
     requestBody.pitch = Math.max(-0.75, Math.min(0.75, options.pitch));
   }
@@ -212,7 +213,7 @@ export async function synthesizeSpeech(options: TTSOptions): Promise<TTSResult> 
     requestBody.speech_sample_rate = options.sampleRate;
   }
   
-  logger.info(`Synthesizing speech: ${options.text.substring(0, 50)}... [${options.languageCode}] [${options.speaker || 'anushka'}]`);
+  logger.info(`Synthesizing speech: ${options.text.substring(0, 50)}... [${options.languageCode}] [${options.speaker || DEFAULT_SPEAKER}]`);
   
   try {
     const response = await axios.post(SARVAM_TTS_URL, requestBody, {

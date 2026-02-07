@@ -430,6 +430,84 @@ Return ONLY the 4-6 digit code or "UNCLEAR":`;
 }
 
 /**
+ * Match a spoken/typed DISCOM name to one of the available options.
+ * Handles variations like "Tata Power" → "discom:tata_power_delhi"
+ * or "टाटा पावर दिल्ली" → "discom:tata_power_delhi"
+ * Returns the callback data string or null if no match.
+ */
+export async function matchDiscomWithLLM(
+  userMessage: string,
+  discomList: Array<{ text: string; callbackData: string }>
+): Promise<string | null> {
+  if (!OPENROUTER_API_KEY) return null;
+
+  const optionsList = discomList.map((d, i) => `${i + 1}. "${d.text}" → ${d.callbackData}`).join('\n');
+
+  const DISCOM_MATCH_PROMPT = `Match the user's input to one of these electricity company (DISCOM) options.
+
+Available options:
+${optionsList}
+
+Rules:
+- Match based on company name, even if partially mentioned
+- Handle Hindi/regional language variations (e.g., "टाटा पावर" = "Tata Power Delhi")
+- Handle abbreviations (e.g., "BSES" matches "BSES Rajdhani" or "BSES Yamuna")
+- Handle common misspellings
+- If the user says a city name, match to that region's DISCOM (e.g., "Delhi" could be Tata Power Delhi or BSES)
+- If you cannot confidently match to ONE option, return "NONE"
+
+Examples:
+- "Tata Power" → "discom:tata_power_delhi"
+- "टाटा पावर दिल्ली" → "discom:tata_power_delhi"
+- "BSES" → If unclear which one, return "NONE"
+- "Rajdhani" → "discom:bses_rajdhani"
+- "Maharashtra bijli" → "discom:msedcl"
+- "UP ki bijli company" → "discom:uppcl"
+- "random text" → "NONE"
+
+User's input: "${userMessage}"
+
+Return ONLY the callback data (e.g., "discom:tata_power_delhi") or "NONE":`;
+
+  try {
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
+      {
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'user', content: DISCOM_MATCH_PROMPT },
+        ],
+        temperature: 0.1,
+        max_tokens: 30,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://p2p-energy-trading.local',
+          'X-Title': 'Oorja DISCOM Matcher',
+        },
+        timeout: 5000,
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content?.trim();
+    if (reply && reply !== 'NONE' && reply.startsWith('discom:')) {
+      // Verify it's a valid callback
+      const isValid = discomList.some(d => d.callbackData === reply);
+      if (isValid) {
+        logger.debug(`DISCOM matched: "${userMessage.substring(0, 30)}..." → "${reply}"`);
+        return reply;
+      }
+    }
+    return null;
+  } catch (error: any) {
+    logger.warn(`DISCOM matching failed: ${error.message}`);
+    return null;
+  }
+}
+
+/**
  * Compose a natural, conversational response using LLM.
  * Takes the user's message, relevant data, and user context.
  * Returns null if LLM unavailable or fails.
