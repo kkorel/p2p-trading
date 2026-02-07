@@ -441,7 +441,7 @@ async function processCredentialUpload(
   });
 
   // Update user fields based on credential type
-  if (detectedType === 'GenerationProfileCredential') {
+  if (detectedType === 'GenerationProfileCredential' || detectedType === 'StorageProfileCredential') {
     const capacityKW = claims.capacityKW || extractCapacity(credential);
     if (capacityKW && capacityKW > 0) {
       const AVG_PEAK_SUN_HOURS = 4.5;
@@ -451,6 +451,49 @@ async function processCredentialUpload(
         where: { id: userId },
         data: { productionCapacity: monthlyKWh },
       });
+    }
+
+    // Auto-create Provider for Generation/Storage VCs (required for auto-trade)
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { providerId: true, name: true, consumerNumber: true, installationAddress: true },
+    });
+
+    if (!currentUser?.providerId) {
+      const providerId = `provider-${userId}`;
+      try {
+        await prisma.provider.create({
+          data: {
+            id: providerId,
+            name: currentUser?.name || 'Energy Provider',
+            generationType: claims.generationType || claims.sourceType || null,
+            capacityKW: claims.capacityKW || null,
+            generationMeterNumber: claims.meterNumber || null,
+            commissioningDate: claims.commissioningDate ? new Date(claims.commissioningDate) : null,
+            storageCapacityKWh: claims.storageCapacityKWh || null,
+            storageType: claims.storageType || null,
+            consumerNumber: currentUser?.consumerNumber || null,
+            installationAddress: currentUser?.installationAddress || null,
+          },
+        });
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { providerId },
+        });
+
+        logger.info(`Auto-created Provider ${providerId} for user ${userId} from ${detectedType}`);
+      } catch (err: any) {
+        // Provider might already exist (race condition) - try to link it
+        logger.warn(`Provider creation failed, trying to link: ${err.message}`);
+        const existingProvider = await prisma.provider.findUnique({ where: { id: providerId } });
+        if (existingProvider) {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { providerId },
+          });
+        }
+      }
     }
   }
 
