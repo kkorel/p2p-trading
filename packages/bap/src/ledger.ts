@@ -200,7 +200,7 @@ export async function writeTradeToLedger(
       };
 
       // Log full request before sending
-      logger.info('[LEDGER-PUT] Full request:', JSON.stringify(request, null, 2));
+      logger.info('[LEDGER-PUT] Full request', { request });
 
       // POST with BPP signing (ledger requires Beckn signature)
       const response = await secureAxiosBpp.post<LedgerWriteResponse>(
@@ -285,7 +285,7 @@ async function writeSingleRecord(
   };
 
   // Log full request before sending
-  logger.info('[LEDGER-PUT] Full request:', JSON.stringify(request, null, 2));
+  logger.info('[LEDGER-PUT] Full request', { request });
 
   // POST with BPP signing (ledger requires Beckn signature)
   const response = await secureAxiosBpp.post<LedgerWriteResponse>(
