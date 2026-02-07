@@ -5030,14 +5030,13 @@ const states: Record<ChatState, StateHandler> = {
 
           case 'solar_advice': {
             const { getUserSolarAdvisory, getSolarTips } = await import('../auto-trade');
+            const { classifyWeatherCondition } = await import('./llm-fallback');
 
-            // Check if user mentioned past rain (it rained, baarish hui, etc.) - includes Hindi script
-            const mentionedPastRain = /rained|baarish|barish|rain|बारिश|बरसात|वर्षा|पानी गिरा/i.test(message);
+            // Use LLM to classify weather condition (handles typos, Hindi variations, etc.)
+            const weatherCondition = await classifyWeatherCondition(message);
+            logger.debug(`Weather condition classified: ${weatherCondition} for message: "${message.substring(0, 50)}..."`);
 
-            // Check if user mentioned dust storm / high wind event - includes Hindi script
-            const mentionedDustStorm = /dust\s*storm|aandhi|andhi|dhool|toofan|tufan|tez\s*hawa|strong\s*wind|windy|hawa\s*chali|storm|डस्ट\s*स्टॉर्म|आंधी|आँधी|तूफान|तूफ़ान|तेज़?\s*हवा|धूल|झंझा/i.test(message);
-
-            if (mentionedDustStorm) {
+            if (weatherCondition === 'dust_storm') {
               // Give specific dust storm advice - HIGH PRIORITY
               return {
                 messages: [{
@@ -5067,7 +5066,7 @@ const states: Record<ChatState, StateHandler> = {
               };
             }
 
-            if (mentionedPastRain) {
+            if (weatherCondition === 'rain') {
               // Give specific post-rain advice
               return {
                 messages: [{

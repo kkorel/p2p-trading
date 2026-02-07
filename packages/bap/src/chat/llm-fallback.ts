@@ -557,6 +557,87 @@ Return ONLY the callback data (e.g., "discom:tata_power_delhi") or "NONE":`;
   }
 }
 
+// --- Weather condition classification types ---
+
+export type WeatherConditionType = 'dust_storm' | 'rain' | 'general';
+
+/**
+ * Classify the weather condition mentioned in a solar advice query using LLM.
+ * This handles typos, variations, and Hindi/English mix.
+ * Examples:
+ *   - "डस्ट टॉम आया है" → "dust_storm" (handles typo "टॉम" for "स्टॉर्म")
+ *   - "baarish hui" → "rain"
+ *   - "should I clean panels" → "general"
+ * Returns 'general' if LLM unavailable or no specific condition detected.
+ */
+export async function classifyWeatherCondition(userMessage: string): Promise<WeatherConditionType> {
+  if (!OPENROUTER_API_KEY) return 'general';
+
+  const WEATHER_CLASSIFY_PROMPT = `Classify the weather/environmental condition mentioned in this message about solar panels.
+
+Categories:
+1. "dust_storm" - User mentions dust storm, sandstorm, strong dusty winds, आंधी, धूल भरी आंधी, तूफान with dust, टॉम (typo for स्टॉर्म), डस्ट स्टॉर्म, or any dusty/sandy weather event that deposits particles on panels
+2. "rain" - User mentions it rained, बारिश, बरसात, वर्षा, पानी गिरा, monsoon rain, or any recent rainfall event
+3. "general" - General solar panel question, cleaning advice request, or no specific weather event mentioned
+
+Rules:
+- Handle Hindi/English mix and typos generously
+- "डस्ट टॉम" is a typo for "डस्ट स्टॉर्म" → classify as "dust_storm"
+- "tufan", "toofan", "andhi", "aandhi", "dhool" → "dust_storm"
+- "baarish", "barish", "rain hua", "it rained" → "rain"
+- If unsure or no weather event mentioned → "general"
+
+Examples:
+- "अभी डस्ट टॉम आया है, क्या मुझे कुछ करना है?" → dust_storm
+- "धूल भरी आंधी आई थी" → dust_storm
+- "dust storm happened" → dust_storm
+- "aandhi aayi hai" → dust_storm
+- "बारिश हुई है" → rain
+- "it rained yesterday" → rain
+- "baarish hui thi" → rain
+- "should I clean my panels?" → general
+- "panel saaf karoon?" → general
+- "mausam kaisa hai" → general
+
+User's message: "${userMessage}"
+
+Return ONLY one word: dust_storm, rain, or general`;
+
+  try {
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
+      {
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'user', content: WEATHER_CLASSIFY_PROMPT },
+        ],
+        temperature: 0.1,
+        max_tokens: 10,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://p2p-energy-trading.local',
+          'X-Title': 'Oorja Weather Classifier',
+        },
+        timeout: 5000,
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content?.trim()?.toLowerCase();
+    if (reply === 'dust_storm' || reply === 'rain') {
+      logger.debug(`Weather condition: "${userMessage.substring(0, 40)}..." → "${reply}"`);
+      return reply;
+    }
+    logger.debug(`Weather condition: "${userMessage.substring(0, 40)}..." → "general"`);
+    return 'general';
+  } catch (error: any) {
+    logger.warn(`Weather classification failed: ${error.message}`);
+    return 'general';
+  }
+}
+
 /**
  * Compose a natural, conversational response using LLM.
  * Takes the user's message, relevant data, and user context.
