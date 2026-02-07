@@ -195,7 +195,7 @@ interface PendingPurchase {
   quantity?: number;
   maxPrice?: number;
   timeDesc?: string;
-  awaitingField?: 'quantity' | 'timeframe' | 'confirm' | 'confirm_offer' | 'top_deals';
+  awaitingField?: 'choose_mode' | 'quantity' | 'timeframe' | 'confirm' | 'confirm_offer' | 'top_deals';
   topDealsShown?: boolean; // Whether we've already shown top deals
   selectedDealId?: string; // If user selects from top deals
   // Populated after discovery — single offer (legacy)
@@ -685,17 +685,17 @@ const QUICK_SELL_DEFAULTS = {
 };
 
 function askNextListingDetail(ctx: SessionContext, pending: PendingListing): AgentResponse | null {
-  // First interaction: Offer Quick Sell vs Detailed flow choice
+  // First interaction: Offer Auto-Trade vs One-time listing choice
   if (!pending.awaitingField && !pending.energyType && pending.quantity == null && pending.pricePerKwh == null && !pending.quickSellMode) {
     return {
       messages: [{
         text: h(ctx,
-          '☀️ *Sell Your Energy*\n\nHow would you like to proceed?\n\n⚡ *Sell Automatically* - One step with smart defaults\n📝 *Detailed* - Customize all options',
-          '☀️ *बिजली बेचो*\n\nकैसे आगे बढ़ना चाहते हो?\n\n⚡ *ऑटोमैटिक* - एक क्लिक में\n📝 *विस्तार से* - सब कुछ अपने हिसाब से'
+          '☀️ *Sell Your Energy*\n\nHow would you like to proceed?\n\n🤖 *Sell Automatically* - Daily auto-trade based on weather\n📝 *One-time Listing* - Create a single offer',
+          '☀️ *बिजली बेचो*\n\nकैसे आगे बढ़ना चाहते हो?\n\n🤖 *ऑटोमैटिक* - रोज़ मौसम के हिसाब से\n📝 *एक बार* - एक ऑफर बनाओ'
         ),
         buttons: [
-          { text: h(ctx, '⚡ Sell Automatically', '⚡ ऑटोमैटिक'), callbackData: 'listing_mode:quick' },
-          { text: h(ctx, '📝 Detailed Options', '📝 विस्तार से'), callbackData: 'listing_mode:detailed' },
+          { text: h(ctx, '🤖 Sell Automatically', '🤖 ऑटोमैटिक'), callbackData: 'action:setup_auto_sell' },
+          { text: h(ctx, '📝 One-time Listing', '📝 एक बार'), callbackData: 'listing_mode:detailed' },
         ],
       }],
       contextUpdate: { pendingListing: { ...pending, awaitingField: 'choose_mode' } },
@@ -1128,7 +1128,24 @@ async function createListingFromPending(ctx: SessionContext, pending: PendingLis
  * Returns an AgentResponse if something is missing, or null if all details are present.
  */
 async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurchase): Promise<AgentResponse | null> {
-  // Ask for quantity FIRST (before showing deals)
+  // First interaction: Offer Auto-Buy vs One-time purchase choice
+  if (!pending.awaitingField && pending.quantity == null && !pending.timeDesc) {
+    return {
+      messages: [{
+        text: h(ctx,
+          '🔋 *Buy Energy*\n\nHow would you like to proceed?\n\n🤖 *Buy Automatically* - Daily auto-buy at best prices\n📝 *One-time Purchase* - Buy energy once',
+          '🔋 *बिजली खरीदो*\n\nकैसे आगे बढ़ना चाहते हो?\n\n🤖 *ऑटोमैटिक* - रोज़ सबसे सस्ते दाम पर\n📝 *एक बार* - एक बार खरीदो'
+        ),
+        buttons: [
+          { text: h(ctx, '🤖 Buy Automatically', '🤖 ऑटोमैटिक'), callbackData: 'action:setup_auto_buy' },
+          { text: h(ctx, '📝 One-time Purchase', '📝 एक बार'), callbackData: 'purchase_mode:onetime' },
+        ],
+      }],
+      contextUpdate: { pendingPurchase: { ...pending, awaitingField: 'choose_mode' } },
+    };
+  }
+
+  // Ask for quantity (after mode choice or if already in one-time mode)
   if (pending.quantity == null) {
     return {
       messages: [{
@@ -1454,6 +1471,29 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           }],
         };
       }
+    }
+
+    case 'choose_mode': {
+      // Handle mode selection: Automatic vs One-time
+      if (message === 'purchase_mode:onetime' || lower.includes('one') || lower.includes('once') || lower.includes('ek baar') || numInput === 2) {
+        // One-time purchase - continue to quantity question
+        const updated: PendingPurchase = {
+          ...pending,
+          awaitingField: undefined as any,
+        };
+        const next = await askNextPurchaseDetail(ctx, updated);
+        return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
+      }
+      // Invalid selection - re-prompt
+      return {
+        messages: [{
+          text: h(ctx, 'Please select Automatic or One-time purchase:', 'ऑटोमैटिक या एक बार खरीदो चुनो:'),
+          buttons: [
+            { text: h(ctx, '🤖 Buy Automatically', '🤖 ऑटोमैटिक'), callbackData: 'action:setup_auto_buy' },
+            { text: h(ctx, '📝 One-time Purchase', '📝 एक बार'), callbackData: 'purchase_mode:onetime' },
+          ],
+        }],
+      };
     }
 
     case 'quantity': {
@@ -4208,6 +4248,7 @@ const states: Record<ChatState, StateHandler> = {
               if (tradeResult && (tradeResult.status === 'success' || tradeResult.status === 'warning_oversell')) {
                 const weatherPercent = Math.round(tradeResult.weatherMultiplier * 100);
                 const listedQty = tradeResult.listedQuantity.toFixed(1);
+                const dailyCapacity = (capacity / 30).toFixed(1);
 
                 let warningText = '';
                 if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
@@ -4217,8 +4258,8 @@ const states: Record<ChatState, StateHandler> = {
                 return {
                   messages: [{
                     text: h(ctx,
-                      `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${price}/unit.\n\nYour capacity: ${capacity} kWh\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
-                      `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं *${listedQty} kWh* ₹${price}/यूनिट पर लिस्ट कर रहा हूं।\n\nआपकी क्षमता: ${capacity} kWh\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
+                      `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${price}/unit.\n\nMonthly capacity: ${capacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
+                      `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं *${listedQty} kWh* ₹${price}/यूनिट पर लिस्ट कर रहा हूं।\n\nमासिक क्षमता: ${capacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
                     ),
                     buttons: [
                       { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
@@ -4228,11 +4269,12 @@ const states: Record<ChatState, StateHandler> = {
                   }],
                 };
               } else if (tradeResult && tradeResult.status === 'skipped') {
+                const dailyCapacity = (capacity / 30).toFixed(1);
                 return {
                   messages: [{
                     text: h(ctx,
-                      `✅ Auto-sell enabled!\n\n⚠️ ${tradeResult.warningMessage || 'No listing created right now.'}\n\nYour capacity: ${capacity} kWh at ₹${price}/unit\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.`,
-                      `✅ ऑटो-सेल चालू!\n\n⚠️ ${tradeResult.warningMessage || 'अभी कोई लिस्टिंग नहीं बनी।'}\n\nआपकी क्षमता: ${capacity} kWh, दाम: ₹${price}/यूनिट\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।`
+                      `✅ Auto-sell enabled!\n\n⚠️ ${tradeResult.warningMessage || 'No listing created right now.'}\n\nMonthly capacity: ${capacity} kWh (${dailyCapacity} kWh/day) at ₹${price}/unit\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.`,
+                      `✅ ऑटो-सेल चालू!\n\n⚠️ ${tradeResult.warningMessage || 'अभी कोई लिस्टिंग नहीं बनी।'}\n\nमासिक क्षमता: ${capacity} kWh (${dailyCapacity} kWh/दिन), दाम: ₹${price}/यूनिट\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।`
                     ),
                     buttons: [
                       { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
@@ -4243,11 +4285,12 @@ const states: Record<ChatState, StateHandler> = {
               }
 
               // Error or no result - still enabled but first trade failed
+              const dailyCapacityErr = (capacity / 30).toFixed(1);
               return {
                 messages: [{
                   text: h(ctx,
-                    `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nYour capacity: ${capacity} kWh at ₹${price}/unit`,
-                    `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा नहीं मिला'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nआपकी क्षमता: ${capacity} kWh, दाम: ₹${price}/यूनिट`
+                    `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nMonthly capacity: ${capacity} kWh (${dailyCapacityErr} kWh/day) at ₹${price}/unit`,
+                    `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा नहीं मिला'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nमासिक क्षमता: ${capacity} kWh (${dailyCapacityErr} kWh/दिन), दाम: ₹${price}/यूनिट`
                   ),
                   buttons: [
                     { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },

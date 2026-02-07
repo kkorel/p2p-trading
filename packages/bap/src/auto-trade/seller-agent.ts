@@ -156,8 +156,10 @@ async function executeSellerAutoTrade(
   }
 
   // Calculate effective capacity
-  // effectiveCapacity = (tradeLimit / 100) × capacity × weatherMultiplier
-  const effectiveCapacity = (tradeLimit / 100) * config.capacityKwh * weatherMultiplier;
+  // First convert monthly capacity to daily (divide by 30)
+  // Then: dailyEffective = (tradeLimit / 100) × dailyCapacity × weatherMultiplier
+  const dailyCapacity = config.capacityKwh / 30;
+  const effectiveCapacity = (tradeLimit / 100) * dailyCapacity * weatherMultiplier;
   const roundedCapacity = Math.round(effectiveCapacity * 10) / 10;
 
   // Check for over-selling
@@ -167,14 +169,14 @@ async function executeSellerAutoTrade(
     0
   );
 
-  const wouldOverSell = (totalActiveCommitment + roundedCapacity) > config.capacityKwh;
+  const wouldOverSell = (totalActiveCommitment + roundedCapacity) > dailyCapacity;
 
   let status: 'success' | 'warning_oversell' | 'skipped' = 'success';
   let warningMessage: string | undefined;
 
   if (wouldOverSell) {
     status = 'warning_oversell';
-    warningMessage = `Warning: Listing ${roundedCapacity} kWh would exceed your capacity of ${config.capacityKwh} kWh. ` +
+    warningMessage = `Warning: Listing ${roundedCapacity} kWh would exceed your daily capacity of ${dailyCapacity.toFixed(1)} kWh. ` +
       `Already committed: ${totalActiveCommitment.toFixed(1)} kWh. ` +
       `Consider waiting for existing offers to complete.`;
     logger.warn(`Over-sell warning for user ${config.userId}: ${warningMessage}`);
@@ -447,7 +449,9 @@ export async function previewAutoTrade(userId: string): Promise<{
     }
   }
 
-  const effectiveCapacity = Math.round((tradeLimit / 100) * config.capacityKwh * weatherMultiplier * 10) / 10;
+  // Convert monthly capacity to daily
+  const dailyCapacity = config.capacityKwh / 30;
+  const effectiveCapacity = Math.round((tradeLimit / 100) * dailyCapacity * weatherMultiplier * 10) / 10;
 
   const existingOffers = await getProviderOffers(user.provider.id);
   const currentCommitment = existingOffers.reduce(
@@ -455,7 +459,7 @@ export async function previewAutoTrade(userId: string): Promise<{
     0
   );
 
-  const wouldOverSell = (currentCommitment + effectiveCapacity) > config.capacityKwh;
+  const wouldOverSell = (currentCommitment + effectiveCapacity) > dailyCapacity;
 
   return {
     effectiveCapacity,
