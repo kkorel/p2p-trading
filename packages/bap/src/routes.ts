@@ -31,7 +31,6 @@ import {
   validateProviderMatch,
   // Secure client for signed Beckn requests
   secureAxios,
-  isSigningEnabled,
   getKeyPair,
   createSignedHeaders,
   // Beckn v2 wire-format builders
@@ -107,9 +106,6 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     }
     const catalogOffers = catalog['beckn:offers'] || catalog.offers || [];
 
-    // Log raw data for debugging
-    console.log(`[TRANSFORM-DEBUG] Provider ${providerId}: rawItems=${rawItems.length}, catalogOffers=${catalogOffers.length}`);
-    logger.info(`Processing catalog: provider=${providerId}, items=${rawItems.length}, offers=${catalogOffers.length}`);
 
     const transformedItems: any[] = [];
 
@@ -140,17 +136,6 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
                      offerAttrs.applicableQuantity || offerAttrs['beckn:applicableQuantity'] || priceApplicableQty || {};
       const maxQuantity = maxQty.unitQuantity || maxQty.value || (typeof maxQty === 'number' ? maxQty : null) ||
                          priceApplicableQty.unitQuantity || offerAttrs.maximumQuantity || itemAttrs.availableQuantity || 100;
-
-      console.log(`[OFFER-DEBUG] Offer ${offerId}: maxQty=${JSON.stringify(maxQty)}, extracted maxQuantity=${maxQuantity}`);
-
-      logger.debug('Extracted offer', {
-        offerId,
-        price: priceValue,
-        currency: priceCurrency,
-        startTime,
-        endTime,
-        bppUri,
-      });
 
       return {
         id: offerId,
@@ -201,7 +186,7 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
     } else if (catalogOffers.length > 0) {
       // FALLBACK: If no items but offers exist, extract offers with their referenced item IDs
       // This handles cases where CDS returns offers without explicit items array
-      logger.info('No items found but offers exist, extracting directly', {
+      logger.debug('No items found but offers exist', {
         providerId,
         offerCount: catalogOffers.length,
       });
@@ -248,7 +233,7 @@ function transformExternalCatalogFormat(rawMessage: any): { providers: any[] } {
   const totalOffers = providers.reduce((sum, p) =>
     sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
 
-  logger.info(`Transformed ${catalogs.length} catalogs into ${providers.length} providers`, {
+  logger.debug(`Transformed ${catalogs.length} catalogs into ${providers.length} providers`, {
     totalOffers,
     providerDetails: providers.map(p => ({
       id: p.id,
@@ -694,8 +679,6 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   // Build JSONPath expression
   const expression = `$[?(${filterParts.join(' && ')})]`;
 
-  console.log(`[DISCOVER-DEBUG] Filter expression: ${expression}`);
-
   // Create context with location for external CDS
   const context = createContext({
     action: 'discover',
@@ -738,31 +721,13 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
 
   const cdsDiscoverUrl = getCdsDiscoverUrl();
 
-  // Log full request for debugging CDS issues
-  console.log(`[CDS-DISCOVER] === OUTBOUND REQUEST ===`);
-  console.log(`[CDS-DISCOVER] URL: ${cdsDiscoverUrl}`);
-  console.log(`[CDS-DISCOVER] Signing enabled: ${isSigningEnabled()}`);
-  console.log(`[CDS-DISCOVER] Request body:\n${JSON.stringify(discoverMessage, null, 2)}`);
-
-  logger.info('Sending discover request to external CDS', {
-    transaction_id: txnId,
-    message_id: context.message_id,
-    action: 'discover',
-    cdsUrl: cdsDiscoverUrl,
-    signingEnabled: isSigningEnabled(),
-    filterExpression: expression,
-  });
+  logger.debug('discover', { txnId, url: cdsDiscoverUrl });
 
   // Log outbound event
   await logEvent(txnId, context.message_id, 'discover', 'OUTBOUND', JSON.stringify(discoverMessage));
 
   try {
     const response = await secureAxios.post(cdsDiscoverUrl, discoverMessage);
-
-    // Log full response for debugging
-    console.log(`[CDS-DISCOVER] === RESPONSE ===`);
-    console.log(`[CDS-DISCOVER] Status: ${response.status}`);
-    console.log(`[CDS-DISCOVER] Response body:\n${JSON.stringify(response.data, null, 2)}`);
 
     // Check if the CDS returned catalog data synchronously in the response
     // External CDS may return data in ack.message.catalogs instead of via callback
@@ -773,34 +738,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     let processedCatalog: { providers: any[] } | null = null;
 
     if (syncCatalog && syncCatalog.length > 0) {
-      logger.info('Processing synchronous catalog response from CDS', {
-        transaction_id: txnId,
-        catalogCount: syncCatalog.length,
-      });
-
-      // Log ALL catalogs returned by CDS
-      console.log(`[CDS-DEBUG] Total catalogs returned: ${syncCatalog.length}`);
-
-      for (let i = 0; i < syncCatalog.length; i++) {
-        const cat = syncCatalog[i];
-        const items = cat['beckn:items'] || cat.items || [];
-        const offers = cat['beckn:offers'] || cat.offers || [];
-        const catalogId = cat['beckn:id'] || cat.id;
-        const providerId = cat['beckn:providerId'] || cat.providerId;
-        const bppId = cat['beckn:bppId'] || cat.bppId;
-
-        console.log(`[CDS-DEBUG] Catalog[${i}]: id=${catalogId}, providerId=${providerId}, bppId=${bppId}, items=${items.length}, offers=${offers.length}`);
-
-        // Log offer details if any
-        if (offers.length > 0) {
-          for (const offer of offers) {
-            const offerId = offer['beckn:id'] || offer.id;
-            console.log(`[CDS-DEBUG]   Offer: ${offerId}`);
-          }
-        }
-
-        logger.info(`Catalog[${i}]: id=${catalogId}, provider=${providerId}, items=${items.length}, offers=${offers.length}`);
-      }
+      logger.debug('CDS response', { txnId, catalogs: syncCatalog.length });
 
       // Transform and store the synchronous catalog response
       const catalog = transformExternalCatalogFormat({ catalogs: syncCatalog });
@@ -815,19 +753,8 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
 
       // Apply time window filtering if a time window was requested
       if (requestedTimeWindow) {
-        const beforeCount = filteredProviders.reduce((sum, p) =>
-          sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
-
         const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, requestedTimeWindow);
         filteredProviders = timeFilteredCatalog.providers;
-
-        const afterCount = filteredProviders.reduce((sum, p) =>
-          sum + p.items.reduce((iSum: number, i: any) => iSum + (i.offers?.length || 0), 0), 0);
-
-        logger.info(`Time window filter: ${beforeCount} offers → ${afterCount} offers`, {
-          transaction_id: txnId,
-          requestedWindow: requestedTimeWindow,
-        });
       }
 
       // Refresh local offer availability from actual block counts
@@ -842,32 +769,16 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
               const availableBlocks = await getAvailableBlockCount(offer.id);
               offer.maxQuantity = availableBlocks;
 
-              logger.debug(`Refreshed local offer availability: ${offer.id} = ${availableBlocks} blocks`, {
-                transaction_id: txnId,
-              });
             }
           }
           // Filter out offers with 0 availability
-          const beforeFilter = item.offers?.length || 0;
           item.offers = (item.offers || []).filter((o: any) => o.maxQuantity > 0);
-          const afterFilter = item.offers?.length || 0;
-          if (beforeFilter !== afterFilter) {
-            console.log(`[FILTER-DEBUG] Item ${item.id}: filtered ${beforeFilter} -> ${afterFilter} offers (removed ${beforeFilter - afterFilter} with maxQuantity <= 0)`);
-          }
         }
         // Filter out items with no offers
-        const itemsBefore = providerCatalog.items?.length || 0;
         providerCatalog.items = (providerCatalog.items || []).filter((i: any) => i.offers && i.offers.length > 0);
-        const itemsAfter = providerCatalog.items?.length || 0;
-        if (itemsBefore !== itemsAfter) {
-          console.log(`[FILTER-DEBUG] Provider ${providerCatalog.id}: filtered ${itemsBefore} -> ${itemsAfter} items`);
-        }
       }
       // Filter out providers with no items
-      const providersBefore = filteredProviders.length;
       filteredProviders = filteredProviders.filter(p => p.items && p.items.length > 0);
-      const providersAfter = filteredProviders.length;
-      console.log(`[FILTER-DEBUG] Final: ${providersBefore} providers -> ${providersAfter} providers with offers`);
 
       // Extract providers and offers for matching
       const providers = new Map<string, Provider>();
@@ -898,11 +809,8 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
 
         try {
           matchingResults = matchOffers(allOffers, providers, criteria);
-          logger.info(`Matching: scored ${matchingResults.allOffers.length} offers, ${matchingResults.eligibleCount} eligible`, {
-            transaction_id: txnId,
-          });
         } catch (matchError: any) {
-          logger.error(`Matching algorithm error: ${matchError.message}`, { transaction_id: txnId });
+          logger.error(`Matching error: ${matchError.message}`);
         }
       }
 
@@ -914,9 +822,7 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         status: 'SELECTING',
       });
 
-      logger.info(`Synchronous catalog processed: ${filteredProviders.length} providers, ${allOffers.length} offers`, {
-        transaction_id: txnId,
-      });
+      logger.info(`discover: ${filteredProviders.length} providers, ${allOffers.length} offers`);
 
       processedCatalog = { providers: filteredProviders };
     }
@@ -929,20 +835,8 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       ack: response.data,
     });
   } catch (error: any) {
-    // Log the full CDS error response for debugging
-    const cdsResponseData = error.response?.data;
     const cdsStatus = error.response?.status;
-    const cdsHeaders = error.response?.headers;
-    console.error(`[CDS-DISCOVER] === ERROR ===`);
-    console.error(`[CDS-DISCOVER] HTTP Status: ${cdsStatus || 'NO RESPONSE'}`);
-    console.error(`[CDS-DISCOVER] Error: ${error.message}`);
-    console.error(`[CDS-DISCOVER] Response body:\n${JSON.stringify(cdsResponseData || 'none', null, 2)}`);
-    console.error(`[CDS-DISCOVER] Response headers:\n${JSON.stringify(cdsHeaders || 'none', null, 2)}`);
-    logger.error(`External CDS discover failed (HTTP ${cdsStatus}): ${error.message}`, {
-      transaction_id: txnId,
-      cdsStatus,
-      cdsResponse: cdsResponseData ? JSON.stringify(cdsResponseData).substring(0, 500) : 'no response body',
-    });
+    logger.error(`CDS discover failed: ${error.message}`, { status: cdsStatus });
 
     // Fall back to local catalog so user still gets results
     logger.info('Falling back to LOCAL catalog after CDS failure', { transaction_id: txnId });
@@ -1090,9 +984,6 @@ router.post('/api/select', async (req: Request, res: Response) => {
   const effectiveSmartTimeWindow = txState.discoveryCriteria?.timeWindow || requestedTimeWindow;
 
   if (smartBuy && effectiveTarget && (requestedTimeWindow || effectiveSmartTimeWindow)) {
-    const source = req.body.source || (req.headers['user-agent']?.includes('axios') ? 'chat-agent (server)' : 'web-ui (browser)');
-    logger.info(`[SmartBuy] ⚡ SMART BUY triggered | source=${source} | qty=${effectiveTarget} kWh | txId=${transaction_id} | timeWindow=${JSON.stringify(effectiveSmartTimeWindow)}`);
-
     // Collect all offers and providers from the catalog
     const allOffers: CatalogOffer[] = [];
     const providers = new Map<string, Provider>();
@@ -1182,12 +1073,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
     const isSingleOffer = smartResult.selectedOffers.length === 1 && smartResult.fullyFulfilled;
     const selectionType = isSingleOffer ? 'single' : 'multiple';
 
-    logger.info(`[SmartBuy] ✅ Result | source=${source} | ${selectionType} mode | ${smartResult.offersUsed} seller(s) | ${smartResult.totalQuantity}/${effectiveTarget} kWh | Rs ${smartResult.totalPrice.toFixed(2)} | fulfilled=${smartResult.fullyFulfilled}`, {
-      transaction_id,
-      selectionType,
-      fullyFulfilled: smartResult.fullyFulfilled,
-      shortfall: smartResult.shortfall,
-    });
+    logger.info(`smartBuy: ${smartResult.offersUsed} sellers, ${smartResult.totalQuantity}/${effectiveTarget} kWh, Rs ${smartResult.totalPrice.toFixed(2)}`);
 
     // Store selection in transaction state (same format as bulk mode)
     await updateTransaction(transaction_id, {
@@ -1477,14 +1363,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
     message: { order: wireOrder },
   };
 
-  logger.info('Sending select request', {
-    transaction_id,
-    message_id: context.message_id,
-    action: 'select',
-    offer_id: selectedOffer.id,
-    targetBppUri,
-    isExternalBpp,
-  });
+  logger.debug('select', { txnId: transaction_id, offer: selectedOffer.id });
 
   await logEvent(transaction_id, context.message_id, 'select', 'OUTBOUND', JSON.stringify(selectMessage));
 
@@ -1506,7 +1385,6 @@ router.post('/api/select', async (req: Request, res: Response) => {
     const bppEndpoint = isExternalBpp ? targetBppUri : `${config.urls.bpp}/select`;
     const targetUrl = isExternalBpp ? `${targetBppUri}/select` : bppEndpoint;
 
-    logger.info(`Routing select to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
 
     // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
     // Use plain axios for local BPP (no signature needed)
@@ -1645,15 +1523,7 @@ router.post('/api/init', async (req: Request, res: Response) => {
     message: { order: initWireOrder },
   };
 
-  logger.info('Sending init request', {
-    transaction_id,
-    message_id: context.message_id,
-    action: 'init',
-    targetBppUri,
-    isExternalBpp,
-    itemCount: orderItems.length,
-    bulkMode: isBulkMode,
-  });
+  logger.debug('init', { txnId: transaction_id, items: orderItems.length });
 
   await logEvent(transaction_id, context.message_id, 'init', 'OUTBOUND', JSON.stringify(initMessage));
 
@@ -1661,7 +1531,6 @@ router.post('/api/init', async (req: Request, res: Response) => {
     // Route to the correct BPP based on offer's bpp_uri
     const targetUrl = isExternalBpp ? `${targetBppUri}/init` : `${config.urls.bpp}/init`;
 
-    logger.info(`Routing init to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
 
     // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
     const response = isExternalBpp
@@ -1804,14 +1673,7 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
     },
   } as any;
 
-  logger.info('Sending confirm request', {
-    transaction_id,
-    message_id: context.message_id,
-    action: 'confirm',
-    order_id: orderId,
-    targetBppUri,
-    isExternalBpp,
-  });
+  logger.debug('confirm', { txnId: transaction_id, orderId });
 
   await logEvent(transaction_id, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
 
@@ -1819,7 +1681,6 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
     // Route to the correct BPP based on offer's bpp_uri
     const targetUrl = isExternalBpp ? `${targetBppUri}/confirm` : `${config.urls.bpp}/confirm`;
 
-    logger.info(`Routing confirm to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
 
     // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
     const response = isExternalBpp
@@ -1927,13 +1788,7 @@ router.post('/api/status', async (req: Request, res: Response) => {
     },
   } as any;
 
-  logger.info('Sending status request', {
-    transaction_id,
-    message_id: context.message_id,
-    action: 'status',
-    targetBppUri,
-    isExternalBpp,
-  });
+  logger.debug('status', { txnId: transaction_id });
 
   await logEvent(transaction_id, context.message_id, 'status', 'OUTBOUND', JSON.stringify(statusMessage));
 
@@ -1941,7 +1796,6 @@ router.post('/api/status', async (req: Request, res: Response) => {
     // Route to the correct BPP based on offer's bpp_uri
     const targetUrl = isExternalBpp ? `${targetBppUri}/status` : `${config.urls.bpp}/status`;
 
-    logger.info(`Routing status to BPP: ${targetUrl}`, { isExternalBpp, transaction_id });
 
     // Use secureAxios for external BPPs (handles Beckn HTTP signatures)
     const response = isExternalBpp
