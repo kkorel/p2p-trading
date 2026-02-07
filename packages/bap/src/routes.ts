@@ -1363,7 +1363,7 @@ router.post('/api/select', async (req: Request, res: Response) => {
     message: { order: wireOrder },
   };
 
-  logger.debug('select', { txnId: transaction_id, offer: selectedOffer.id });
+  logger.info(`select: ${selectedOffer.id}`);
 
   await logEvent(transaction_id, context.message_id, 'select', 'OUTBOUND', JSON.stringify(selectMessage));
 
@@ -1523,7 +1523,7 @@ router.post('/api/init', async (req: Request, res: Response) => {
     message: { order: initWireOrder },
   };
 
-  logger.debug('init', { txnId: transaction_id, items: orderItems.length });
+  logger.info(`init: ${orderItems.length} items`);
 
   await logEvent(transaction_id, context.message_id, 'init', 'OUTBOUND', JSON.stringify(initMessage));
 
@@ -1673,7 +1673,7 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
     },
   } as any;
 
-  logger.debug('confirm', { txnId: transaction_id, orderId });
+  logger.info(`confirm: ${orderId}`);
 
   await logEvent(transaction_id, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
 
@@ -1788,7 +1788,7 @@ router.post('/api/status', async (req: Request, res: Response) => {
     },
   } as any;
 
-  logger.debug('status', { txnId: transaction_id });
+  logger.info(`status: ${orderId}`);
 
   await logEvent(transaction_id, context.message_id, 'status', 'OUTBOUND', JSON.stringify(statusMessage));
 

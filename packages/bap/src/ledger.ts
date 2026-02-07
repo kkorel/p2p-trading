@@ -243,7 +243,7 @@ export async function writeTradeToLedger(
       code: error.code,
       url: `${ledgerUrl}/ledger/put`,
     };
-    logger.error('Ledger API error', errorDetails);
+    logger.error(`Ledger API error: ${error.message} (${error.response?.status || error.code})`);
 
     let errorMessage = error.message;
     if (error.code === 'ECONNREFUSED') {
