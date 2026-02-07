@@ -13,7 +13,7 @@ import {
   deleteAllUserSessions,
   createLogger,
   analyzeInstallation,
-  getSatelliteImageUrl,
+  getHeatmapImageUrl,
   SolarAnalysis,
 } from '@p2p/shared';
 import { authMiddleware, devModeOnly } from './middleware';
@@ -57,10 +57,10 @@ async function runSolarAnalysisForUser(
     // Call Google Solar API
     const analysis = await analyzeInstallation(installationAddress);
 
-    // Get satellite image URL if we have coordinates
+    // Get heatmap image URL if we have coordinates
     let satelliteImageUrl: string | null = null;
     if (analysis.location?.lat && analysis.location?.lon) {
-      satelliteImageUrl = getSatelliteImageUrl(analysis.location.lat, analysis.location.lon);
+      satelliteImageUrl = await getHeatmapImageUrl(analysis.location.lat, analysis.location.lon);
     }
 
     // Upsert UserSolarAnalysis record

@@ -1,17 +1,18 @@
 /**
- * Solar Analysis Module - Google Solar API Integration
+ * Solar Analysis Module — Standalone Toolbox
  *
- * Provides solar potential analysis for installations based on satellite data.
- * Used during onboarding to calculate initial trading limits (7-15%).
+ * Provides Google Solar API integration for installation analysis and heatmaps.
+ * Fully self-contained — only requires `geotiff` and `pngjs` as dependencies.
  *
  * Usage:
- *   import { analyzeInstallation, getSatelliteImageUrl } from '@p2p/shared';
+ *   import { analyzeInstallation, getSatelliteImageUrl, getSolarHeatmap } from '@p2p/shared';
  *   const analysis = await analyzeInstallation("42 MG Road, Mumbai");
  *   const imageUrl = getSatelliteImageUrl(19.0760, 72.8777);
+ *   const heatmap = await getSolarHeatmap("42 MG Road, Mumbai");
  *
  * Required env vars:
- *   GOOGLE_MAPS_API_KEY  - for geocoding + satellite images
- *   GOOGLE_SOLAR_API_KEY - for building insights
+ *   GOOGLE_MAPS_API_KEY  — for geocoding + satellite images
+ *   GOOGLE_SOLAR_API_KEY — for building insights + data layers
  */
 
 export {
@@ -19,9 +20,11 @@ export {
     getSatelliteImageUrl,
     geocodeWithGoogle,
     warmupCache,
+    getSolarHeatmap,
+    getHeatmapImageUrl,
     THRESHOLDS,
 } from './solar-api';
 
 export { LIMIT_THRESHOLDS } from './types';
 
-export type { SolarAnalysis, GoogleSolarBuildingInsights } from './types';
+export type { SolarAnalysis, GoogleSolarBuildingInsights, HeatmapResult } from './types';
