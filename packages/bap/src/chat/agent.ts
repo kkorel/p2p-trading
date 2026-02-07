@@ -846,7 +846,7 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
 
       if (!timeDesc || timeDesc.length < 2) {
         return {
-          messages: [{ text: h(ctx, 'Please tell me when you want to sell (e.g. "tomorrow", "today").', 'Kab bechna hai batao (jaise "kal", "aaj").') }],
+          messages: [{ text: h(ctx, 'Please tell me when you want to sell (e.g. "tomorrow", "today").', 'कब बेचना है बताओ (जैसे "कल", "आज")।') }],
         };
       }
       const updated = { ...pending, timeDesc, awaitingField: undefined as any };
@@ -1593,7 +1593,7 @@ async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPur
   return {
     messages: [
       { text: searchMsg },
-      { text: h(ctx, `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`, `Purchase nahi ho payi: ${result.error || 'Unknown error'}. Dobara try karo.`) },
+      { text: h(ctx, `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`, `खरीदारी नहीं हो पाई: ${result.error || 'Unknown error'}। दोबारा कोशिश करो।`) },
     ],
     contextUpdate: { pendingPurchase: undefined },
   };
@@ -1929,7 +1929,7 @@ async function handleUniversalCommand(
     });
 
     const enterResp = await states[previousState as ChatState].onEnter(ctx);
-    const backMsg = h(ctx, '⬅️ Going back...', '⬅️ Peeche ja rahe hain...');
+    const backMsg = h(ctx, '⬅️ Going back...', '⬅️ पीछे जा रहे हैं...');
 
     return {
       messages: [{ text: backMsg }, ...enterResp.messages],
@@ -2533,14 +2533,14 @@ const states: Record<ChatState, StateHandler> = {
       }
       const progress = getProgressIndicator('WAITING_NAME', ctx);
       return {
-        messages: [{ text: progress + h(ctx, 'What is your name?', 'Aapka naam kya hai?') }],
+        messages: [{ text: progress + h(ctx, 'What is your name?', 'आपका नाम क्या है?') }],
       };
     },
     async onMessage(ctx, message) {
       // Ignore callback-style inputs (e.g., action:buy_energy, cmd:help) — re-prompt
       if (message.includes(':') && !message.includes(' ')) {
         return {
-          messages: [{ text: h(ctx, 'What is your name?', 'Aapka naam kya hai?') }],
+          messages: [{ text: h(ctx, 'What is your name?', 'आपका नाम क्या है?') }],
         };
       }
 
@@ -2646,7 +2646,7 @@ const states: Record<ChatState, StateHandler> = {
       if (!result.success) {
         if (attempts >= 3) {
           return {
-            messages: [{ text: h(ctx, 'Too many wrong attempts. Let\'s try again.', 'Bahut galat try. Chalo phir se shuru karte hain.') }],
+            messages: [{ text: h(ctx, 'Too many wrong attempts. Let\'s try again.', 'बहुत गलत कोशिश। चलो फिर से शुरू करते हैं।') }],
             newState: 'WAITING_PHONE',
             contextUpdate: { otpAttempts: 0 },
           };
@@ -2884,7 +2884,7 @@ const states: Record<ChatState, StateHandler> = {
             return {
               messages: [
                 { text: llmAnswer },
-                { text: h(ctx, 'Upload the ID when ready.', 'Jab ready ho tab ID upload karo.'), delay: 300 },
+                { text: h(ctx, 'Upload the ID when ready.', 'जब तैयार हो तब आईडी अपलोड करो।'), delay: 300 },
               ],
             };
           }
@@ -2900,7 +2900,7 @@ const states: Record<ChatState, StateHandler> = {
 
         if (!result.success) {
           return {
-            messages: [{ text: h(ctx, result.error || 'Could not verify this credential. Please try again.', result.error || 'Credential verify nahi ho paya. Dobara try karo.') }],
+            messages: [{ text: h(ctx, result.error || 'Could not verify this credential. Please try again.', result.error || 'दस्तावेज़ वेरिफाई नहीं हो पाया। दोबारा कोशिश करो।') }],
           };
         }
 
@@ -3178,38 +3178,39 @@ const states: Record<ChatState, StateHandler> = {
 
         const capacity = user?.productionCapacity || ctx.productionCapacity;
         const tradeLimitPct = user?.allowedTradeLimit || 10;
-        const pricePerKwh = 6.0;
         let explainEn: string;
         let explainHi: string;
 
         if (hasGeneration) {
-          const capEn = capacity ? `Your solar panel generates ~${capacity} kWh/month. ` : '';
-          const capHi = capacity ? `Aapka solar panel ~${capacity} kWh/month bijli banata hai. ` : '';
+          const capEn = capacity ? `Your solar panel generates ~${capacity} kWh per month. ` : '';
+          const capHi = capacity ? `आपका सोलर पैनल ~${capacity} किलोवाट घंटा प्रति महीना बिजली बनाता है। ` : '';
 
           // Calculate expected monthly earnings
           let earningsEn = '';
           let earningsHi = '';
           if (capacity) {
             const tradeableKwh = Math.floor(capacity * tradeLimitPct / 100);
-            const expectedMonthly = Math.round(tradeableKwh * pricePerKwh);
-            earningsEn = `You can earn approximately Rs ${expectedMonthly}/month from this. `;
-            earningsHi = `Isse aap lagbhag Rs ${expectedMonthly}/month kama sakte ho. `;
+            // Show range based on potential price variation (Rs 6-9 per kWh)
+            const minMonthly = Math.round(tradeableKwh * 6);
+            const maxMonthly = Math.round(tradeableKwh * 9);
+            earningsEn = `With your current ${tradeLimitPct}% trade limit, you can earn Rs ${minMonthly}-${maxMonthly} per month. As your trust score grows, you can sell more! `;
+            earningsHi = `आपकी ${tradeLimitPct}% ट्रेड लिमिट के साथ, आप लगभग ₹${minMonthly}-${maxMonthly} प्रति महीना कमा सकते हो। जैसे-जैसे आपका ट्रस्ट स्कोर बढ़ेगा, आप और ज़्यादा बेच पाएंगे! `;
           }
 
-          explainEn = `${capEn}I'll sell the extra energy from your solar panels at good prices in the market to maximize your profit. ${earningsEn}`;
-          explainHi = `${capHi}Main aapke ghar pe lage solar se jo bijli bani hai, usse achhe daam pe market mein bechunga taaki aapka profit ho. ${earningsHi}`;
+          explainEn = `${capEn}I'll sell the extra energy from your solar panels at good prices to maximize your earnings. ${earningsEn}`;
+          explainHi = `${capHi}मैं आपके सोलर से बनी बिजली को अच्छे दाम पर बाज़ार में बेचूँगा ताकि आपकी कमाई ज़्यादा हो। ${earningsHi}`;
         } else {
           explainEn = `I'll help you store energy in your battery and sell it at the best times for maximum returns.`;
-          explainHi = `Main aapki battery mein store ki hui bijli ko sahi waqt pe bech ke aapka munafa badhaunga.`;
+          explainHi = `मैं आपकी बैटरी में जमा बिजली को सही समय पर बेचकर आपका मुनाफा बढ़ाऊंगा।`;
         }
 
         return {
           messages: [
             {
-              text: h(ctx, `${explainEn}\n\nShall we start?`, `${explainHi}\n\nShuru karein?`),
+              text: h(ctx, `${explainEn}\n\nShall we start?`, `${explainHi}\n\nशुरू करें?`),
               buttons: [
-                { text: h(ctx, '✅ Yes, start!', '✅ Haan, shuru karo!'), callbackData: 'yes' },
-                { text: h(ctx, '⏸️ Not now', '⏸️ Abhi nahi'), callbackData: 'no' },
+                { text: h(ctx, '✅ Yes, start!', '✅ हाँ, शुरू करो!'), callbackData: 'yes' },
+                { text: h(ctx, '⏸️ Not now', '⏸️ अभी नहीं'), callbackData: 'no' },
               ],
             },
           ],
@@ -3431,7 +3432,7 @@ const states: Record<ChatState, StateHandler> = {
             };
           }
           return {
-            messages: [{ text: h(ctx, 'Nothing pending to continue. How can I help?', 'Kuch pending nahi hai. Kya madad karun?') }],
+            messages: [{ text: h(ctx, 'Nothing pending to continue. How can I help?', 'कुछ पेंडिंग नहीं है। क्या मदद करूं?') }],
           };
         } else if (syncAction === 'fresh') {
           // User wants to start fresh - clear pending operations
@@ -3699,7 +3700,7 @@ const states: Record<ChatState, StateHandler> = {
                       'Energy bechne ke liye pehle aapka solar generation ka credential chahiye. Ye aapke solar panel ki capacity prove karta hai.\n\nYe aapko apni DISCOM se ya credential portal se mil jaayega.'
                     ),
                     buttons: [
-                      { text: h(ctx, '📄 Upload credential', '📄 Credential upload karo'), callbackData: 'action:trigger_file_upload' },
+                      { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
                     ],
                   },
                 ],
@@ -3733,7 +3734,7 @@ const states: Record<ChatState, StateHandler> = {
                       'Energy khareedne ke liye pehle aapka consumption profile credential chahiye. Ye aapka bijli connection aur load capacity prove karta hai.\n\nYe aapko apni DISCOM se ya credential portal se mil jaayega.'
                     ),
                     buttons: [
-                      { text: h(ctx, '📄 Upload credential', '📄 Credential upload karo'), callbackData: 'upload_cons_cred' },
+                      { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'upload_cons_cred' },
                     ],
                   },
                 ],
@@ -3842,7 +3843,7 @@ const states: Record<ChatState, StateHandler> = {
                     'Energy bechne ke liye pehle aapka solar generation ka credential chahiye.'
                   ),
                   buttons: [
-                    { text: h(ctx, '📄 Upload credential', '📄 Credential upload karo'), callbackData: 'action:trigger_file_upload' },
+                    { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'action:trigger_file_upload' },
                   ],
                 },
               ],
@@ -3871,7 +3872,7 @@ const states: Record<ChatState, StateHandler> = {
                     'Energy khareedne ke liye pehle aapka consumption profile credential chahiye.'
                   ),
                   buttons: [
-                    { text: h(ctx, '📄 Upload credential', '📄 Credential upload karo'), callbackData: 'upload_cons_cred' },
+                    { text: h(ctx, '📄 Upload credential', '📄 दस्तावेज़ अपलोड करो'), callbackData: 'upload_cons_cred' },
                   ],
                 },
               ],

@@ -20,6 +20,51 @@ import { v4 as uuidv4 } from 'uuid';
 const logger = createLogger('ChatRoutes');
 const router = Router();
 
+/**
+ * Preprocess text for TTS to make it more natural-sounding:
+ * - Remove URLs (unpronounceable)
+ * - Replace "/" with language-appropriate "per"
+ * - Remove markdown formatting
+ * - Handle other TTS-unfriendly symbols
+ */
+function preprocessTextForTTS(text: string, languageCode: string): string {
+  let processed = text;
+
+  // Remove URLs (https://... http://... www...)
+  processed = processed.replace(/https?:\/\/[^\s]+/gi, '');
+  processed = processed.replace(/www\.[^\s]+/gi, '');
+
+  // Replace forward slash with language-appropriate "per"
+  const perWord: Record<string, string> = {
+    'en-IN': ' per ',
+    'hi-IN': ' प्रति ',
+    'bn-IN': ' প্রতি ',
+    'ta-IN': ' ஒரு ',
+    'te-IN': ' కు ',
+    'kn-IN': ' ಪ್ರತಿ ',
+  };
+  const perReplacement = perWord[languageCode] || ' per ';
+  // Only replace / when it's used as "per" (e.g., Rs/kWh, km/h)
+  processed = processed.replace(/(\S)\/(\S)/g, `$1${perReplacement}$2`);
+
+  // Remove markdown formatting
+  processed = processed.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
+  processed = processed.replace(/\*([^*]+)\*/g, '$1'); // *italic*
+  processed = processed.replace(/`([^`]+)`/g, '$1'); // `code`
+
+  // Replace common symbols with words
+  processed = processed.replace(/₹\s*/g, languageCode === 'hi-IN' ? 'रुपये ' : 'Rupees ');
+  processed = processed.replace(/Rs\.?\s*/gi, languageCode === 'hi-IN' ? 'रुपये ' : 'Rupees ');
+  processed = processed.replace(/kWh/gi, languageCode === 'hi-IN' ? 'किलोवाट घंटा' : 'kilowatt hour');
+  processed = processed.replace(/kW/gi, languageCode === 'hi-IN' ? 'किलोवाट' : 'kilowatt');
+  processed = processed.replace(/%/g, languageCode === 'hi-IN' ? ' प्रतिशत' : ' percent');
+
+  // Clean up extra whitespace
+  processed = processed.replace(/\s+/g, ' ').trim();
+
+  return processed;
+}
+
 // All chat routes use optional auth — authenticated users get their userId-based
 // platformId; anonymous users get a generated session ID.
 router.use(optionalAuthMiddleware);
@@ -272,11 +317,22 @@ router.post('/tts', async (req: Request, res: Response) => {
       });
     }
 
+    // Preprocess text for TTS (remove URLs, handle symbols)
+    const processedText = preprocessTextForTTS(text.trim(), languageCode);
+
+    if (!processedText) {
+      return res.status(400).json({
+        success: false,
+        error: 'No speakable content after preprocessing',
+        errorType: 'invalid_input',
+      });
+    }
+
     // Synthesize speech
     let result;
     try {
       result = await synthesizeSpeech({
-        text: text.trim(),
+        text: processedText,
         languageCode,
         speaker: (speaker as TTSSpeaker) || 'anushka',
         pace: pace ? parseFloat(pace) : undefined,
