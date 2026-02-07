@@ -148,9 +148,10 @@ async function executeSellerAutoTrade(
   // Calculate effective capacity
   // First convert monthly capacity to daily (divide by 30)
   // Then: dailyEffective = (tradeLimit / 100) × dailyCapacity × weatherMultiplier
+  // IMPORTANT: Orders can only be placed in integer units, so always round DOWN
   const dailyCapacity = config.capacityKwh / 30;
   const targetCapacity = (tradeLimit / 100) * dailyCapacity * weatherMultiplier;
-  const roundedTarget = Math.round(targetCapacity * 10) / 10;
+  const roundedTarget = Math.floor(targetCapacity); // Round DOWN to integer
 
   // Get existing offers to calculate delta
   const existingOffers = await getProviderOffers(providerId);
@@ -175,9 +176,9 @@ async function executeSellerAutoTrade(
     0
   );
 
-  // Calculate delta - only list what's needed
+  // Calculate delta - only list what's needed (integer units only)
   const deltaToList = Math.max(0, roundedTarget - alreadyListed);
-  const roundedDelta = Math.round(deltaToList * 10) / 10;
+  const roundedDelta = Math.floor(deltaToList); // Round DOWN to integer
 
   let status: 'success' | 'warning_oversell' | 'skipped' = 'success';
   let warningMessage: string | undefined;
@@ -190,12 +191,12 @@ async function executeSellerAutoTrade(
 
   if ((totalActiveCommitment + roundedDelta) > dailyCapacity * 1.1) { // 10% buffer
     status = 'warning_oversell';
-    warningMessage = `Warning: Total commitment (${(totalActiveCommitment + roundedDelta).toFixed(1)} kWh) exceeds daily capacity (${dailyCapacity.toFixed(1)} kWh).`;
+    warningMessage = `Warning: Total commitment (${totalActiveCommitment + roundedDelta} kWh) exceeds daily capacity (${Math.floor(dailyCapacity)} kWh).`;
     logger.warn(`Over-sell warning for user ${config.userId}: ${warningMessage}`);
   }
 
   // Skip if nothing more to list (already have enough for tomorrow)
-  if (roundedDelta < 0.5) {
+  if (roundedDelta < 1) {
     return {
       userId: config.userId,
       configId: config.id,
@@ -204,8 +205,8 @@ async function executeSellerAutoTrade(
       listedQuantity: 0,
       weatherMultiplier,
       warningMessage: alreadyListed > 0
-        ? `Already have ${alreadyListed.toFixed(1)} kWh listed for tomorrow (target: ${roundedTarget.toFixed(1)} kWh)`
-        : 'Effective capacity too low to list (< 0.5 kWh)',
+        ? `Already have ${alreadyListed} kWh listed for tomorrow (target: ${roundedTarget} kWh)`
+        : 'Effective capacity too low to list (< 1 kWh)',
     };
   }
 
@@ -259,7 +260,7 @@ async function executeSellerAutoTrade(
     listedQuantity: roundedDelta,
     weatherMultiplier,
     warningMessage: alreadyListed > 0
-      ? `Added ${roundedDelta.toFixed(1)} kWh (already had ${alreadyListed.toFixed(1)} kWh listed)`
+      ? `Added ${roundedDelta} kWh (already had ${alreadyListed} kWh listed)`
       : undefined,
     offerId: offer.id,
   };
@@ -470,9 +471,9 @@ export async function previewAutoTrade(userId: string): Promise<{
     }
   }
 
-  // Convert monthly capacity to daily
+  // Convert monthly capacity to daily (integer units only)
   const dailyCapacity = config.capacityKwh / 30;
-  const effectiveCapacity = Math.round((tradeLimit / 100) * dailyCapacity * weatherMultiplier * 10) / 10;
+  const effectiveCapacity = Math.floor((tradeLimit / 100) * dailyCapacity * weatherMultiplier);
 
   const existingOffers = await getProviderOffers(user.provider.id);
   const currentCommitment = existingOffers.reduce(
