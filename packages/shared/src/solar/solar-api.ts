@@ -3,7 +3,7 @@
  * Integrates with Google Solar API and Google Geocoding to analyze installations
  * and calculate initial trading limits based on satellite data.
  * 
- * This module is fully self-contained with no external dependencies.
+ * This module requires `geotiff` and `pngjs` as dependencies.
  * Import from '@p2p/shared' or directly from this folder.
  * 
  * Usage:
@@ -424,7 +424,7 @@ export async function getSolarHeatmap(
 
         // Step 3: Fetch the annualFlux GeoTIFF
         const apiKey = process.env.GOOGLE_SOLAR_API_KEY!;
-        const tiffUrl = `${dataLayers.annualFluxUrl}&key=${apiKey}`;
+        const tiffUrl = `${dataLayers.annualFluxUrl}?key=${apiKey}`;
         const tiffResponse = await fetch(tiffUrl);
 
         if (!tiffResponse.ok) {
