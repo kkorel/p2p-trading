@@ -31,7 +31,7 @@ import chatRoutes from './chat-routes';
 import { initDb, closeDb, checkDbHealth } from './db';
 import { startDiscomMockService, stopDiscomMockService } from './discom-mock';
 import { startTelegramBot, stopTelegramBot } from './chat/telegram';
-import { startWhatsAppBot, stopWhatsAppBot } from './chat/whatsapp';
+import { whatsappWebhookRouter, stopWhatsAppBot } from './chat/whatsapp';
 import { initAutoTradeScheduler, isSchedulerInitialized } from './auto-trade';
 
 const app = express();
@@ -73,6 +73,9 @@ app.use('/callbacks', callbacks);  // Legacy: /callbacks/on_select, etc.
 app.use('/callbacks', sellerRoutes);  // DeDi registration: bpp.digioorga.org/callbacks → /callbacks/select
 app.use('/', sellerRoutes);           // Legacy: /select, /init, etc.
 
+// WhatsApp Cloud API webhook (verification + incoming messages)
+app.use('/webhook', whatsappWebhookRouter);
+
 // Health check - verifies database and cache connectivity
 app.get('/health', async (req, res) => {
   try {
@@ -102,7 +105,7 @@ app.get('/health', async (req, res) => {
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/callbacks') ||
     req.path.startsWith('/auth') || req.path.startsWith('/seller') ||
-    req.path.startsWith('/chat') ||
+    req.path.startsWith('/chat') || req.path.startsWith('/webhook') ||
     req.path.startsWith('/select') || req.path.startsWith('/init') ||
     req.path.startsWith('/confirm') || req.path.startsWith('/status') ||
     req.path === '/health') {
@@ -196,8 +199,8 @@ async function start() {
       // Start Telegram bot (only if token is configured)
       startTelegramBot().catch(err => logger.error(`Telegram bot startup error: ${err.message}`));
 
-      // Start WhatsApp bot (only if WHATSAPP_ENABLED=true)
-      startWhatsAppBot().catch(err => logger.error(`WhatsApp bot startup error: ${err.message}`));
+      // WhatsApp Cloud API — webhook router already mounted, just log status
+      logger.info('WhatsApp Cloud API webhook mounted at /webhook/whatsapp');
 
       // Initialize auto-trade scheduler (daily seller/buyer auto-trades)
       initAutoTradeScheduler();

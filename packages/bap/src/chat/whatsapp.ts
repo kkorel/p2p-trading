@@ -1,249 +1,205 @@
 /**
- * WhatsApp Bot — Oorja agent on WhatsApp via Baileys.
- * Uses multi-device protocol. Only starts if WHATSAPP_ENABLED=true.
- * Supports text, documents (PDF/JSON), and voice messages.
+ * WhatsApp Bot — Oorja agent on WhatsApp via Cloud API.
+ * Uses the official Meta WhatsApp Business Platform (Cloud API).
+ * Receives messages via webhooks, sends via graph.facebook.com HTTP API.
  * 
- * Setup: On first run, scan the QR code displayed in terminal with your
- * WhatsApp app (Settings → Linked Devices → Link a Device).
- * After linking, credentials are saved and no re-scan is needed.
+ * Rich UI: Agent responses with structured data (dashboard, offers, earnings, etc.)
+ * are rendered as premium image cards via @napi-rs/canvas and sent as WhatsApp images.
+ * Native interactive buttons (≤3 options) and list menus (4-10 options) are used
+ * instead of numbered text for a polished user experience.
+ * 
+ * Setup:
+ * 1. Create a Meta Developer account & Business app
+ * 2. Add WhatsApp product, get Phone Number ID + Access Token
+ * 3. Set webhook URL to https://your-domain.com/webhook/whatsapp
+ * 4. Subscribe to the "messages" webhook field
+ * 5. Set env vars: WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN
  */
 
-import makeWASocket, {
-  DisconnectReason,
-  useMultiFileAuthState,
-  WASocket,
-  proto,
-  downloadMediaMessage,
-  AnyMessageContent,
-  WAMessage,
-} from '@whiskeysockets/baileys';
-import { Boom } from '@hapi/boom';
-import * as qrcode from 'qrcode-terminal';
-import * as path from 'path';
-import * as fs from 'fs';
+import { Router, Request, Response } from 'express';
+import axios from 'axios';
+import FormData from 'form-data';
 import { createLogger, prisma } from '@p2p/shared';
 import { processMessage, FileData } from './agent';
 import { transcribeAudio, isSTTAvailable, STTError } from './sarvam-stt';
+import { mapAgentMessages, WAOutboundMessage } from './wa-message-mapper';
 
 const logger = createLogger('WhatsAppBot');
 
-let sock: WASocket | null = null;
-let connectionState: 'disconnected' | 'connecting' | 'connected' = 'disconnected';
-const AUTH_FOLDER = path.join(__dirname, '../../.whatsapp-auth');
+// --- Cloud API Config ---
+const API_VERSION = process.env.WHATSAPP_API_VERSION || 'v21.0';
+const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || '';
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
+const BOT_PHONE = process.env.WHATSAPP_BOT_PHONE || ''; // Actual phone number for wa.me links
+const API_BASE = `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}`;
 
-// Ensure auth folder exists
-if (!fs.existsSync(AUTH_FOLDER)) {
-  fs.mkdirSync(AUTH_FOLDER, { recursive: true });
+function isConfigured(): boolean {
+  return !!(PHONE_NUMBER_ID && ACCESS_TOKEN);
 }
 
+function apiHeaders() {
+  return {
+    Authorization: `Bearer ${ACCESS_TOKEN}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+// --- Express Router (webhook endpoints) ---
+
+export const whatsappWebhookRouter = Router();
+
 /**
- * Start the WhatsApp bot using Baileys.
- * Displays QR code in terminal for first-time linking.
+ * GET /webhook/whatsapp — Webhook verification (Meta sends this on setup).
+ * Must respond with the hub.challenge to prove we own the endpoint.
  */
-export async function startWhatsAppBot(): Promise<void> {
-  const enabled = process.env.WHATSAPP_ENABLED === 'true';
+whatsappWebhookRouter.get('/whatsapp', (req: Request, res: Response) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
 
-  if (!enabled) {
-    logger.info('WHATSAPP_ENABLED not set to true — WhatsApp bot disabled');
-    return;
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    logger.info('WhatsApp webhook verified successfully');
+    return res.status(200).send(challenge);
   }
 
-  if (connectionState === 'connecting') {
-    logger.info('WhatsApp bot already connecting, skipping...');
-    return;
-  }
+  logger.warn(`WhatsApp webhook verification failed (mode=${mode}, token=${token})`);
+  return res.sendStatus(403);
+});
 
-  connectionState = 'connecting';
+/**
+ * POST /webhook/whatsapp — Incoming messages from WhatsApp users.
+ * Meta sends a JSON payload with message data.
+ * Must always return 200 quickly to avoid retries.
+ */
+whatsappWebhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
+  // Always respond 200 immediately to prevent Meta retries
+  res.sendStatus(200);
 
   try {
-    logger.info('Starting WhatsApp bot with Baileys...');
+    const body = req.body;
 
-    // Load or create auth state (persists across restarts)
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+    // Validate this is a WhatsApp message event
+    if (body?.object !== 'whatsapp_business_account') return;
 
-    // Create WhatsApp socket connection with minimal logging
-    sock = makeWASocket({
-      auth: state,
-      printQRInTerminal: false, // We'll handle QR display ourselves
-      browser: ['Oorja Energy Bot', 'Chrome', '120.0.0'],
-      syncFullHistory: false,
-    });
+    const entries = body.entry || [];
+    for (const entry of entries) {
+      const changes = entry.changes || [];
+      for (const change of changes) {
+        if (change.field !== 'messages') continue;
 
-    // Save credentials when updated
-    sock.ev.on('creds.update', saveCreds);
+        const value = change.value;
+        if (!value?.messages) continue;
 
-    // Handle connection updates
-    sock.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, qr } = update;
 
-      if (qr) {
-        logger.info('');
-        logger.info('='.repeat(50));
-        logger.info('WHATSAPP: Scan this QR code with your phone');
-        logger.info('Go to WhatsApp → Settings → Linked Devices → Link a Device');
-        logger.info('='.repeat(50));
-        qrcode.generate(qr, { small: true });
-        logger.info('='.repeat(50));
-        logger.info('');
-      }
+        const contacts = value.contacts || [];
 
-      if (connection === 'close') {
-        connectionState = 'disconnected';
-        const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        for (const message of value.messages) {
+          const from = message.from; // phone number (e.g., "919876543210")
+          const contactName = contacts.find((c: any) => c.wa_id === from)?.profile?.name || '';
 
-        logger.info(`WhatsApp connection closed. Status: ${statusCode}. Reconnect: ${shouldReconnect}`);
-
-        if (shouldReconnect) {
-          // Wait a bit before reconnecting
-          setTimeout(() => {
-            startWhatsAppBot();
-          }, 3000);
-        } else {
-          logger.info('WhatsApp logged out. Delete .whatsapp-auth folder and restart to re-link.');
-        }
-      } else if (connection === 'open') {
-        connectionState = 'connected';
-        logger.info('WhatsApp bot connected successfully!');
-        logger.info('Bot number: +44 7405 987693');
-        logger.info('Users can now message this number to interact with Oorja.');
-      }
-    });
-
-    // Handle incoming messages
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      // Only process new messages (not history sync)
-      if (type !== 'notify') return;
-
-      for (const msg of messages) {
-        // Skip our own messages
-        if (msg.key.fromMe) continue;
-
-        // Skip status broadcasts
-        if (msg.key.remoteJid === 'status@broadcast') continue;
-
-        const chatId = msg.key.remoteJid;
-        if (!chatId) continue;
-
-        try {
-          await handleIncomingMessage(msg, chatId);
-        } catch (err: any) {
-          logger.error(`Error handling WhatsApp message: ${err.message}\n${err.stack}`);
-          await sendWhatsAppMessage(chatId, 'Something went wrong. Please try again.');
+          try {
+            await handleIncomingMessage(from, message, contactName);
+          } catch (err: any) {
+            logger.error(`Error handling WhatsApp message from ${from}: ${err.message}\n${err.stack}`);
+            await sendWhatsAppMessage(from, 'Something went wrong. Please try again.');
+          }
         }
       }
-    });
-
+    }
   } catch (err: any) {
-    connectionState = 'disconnected';
-    logger.error(`Failed to start WhatsApp bot: ${err.message}`);
-    sock = null;
+    logger.error(`Webhook processing error: ${err.message}`);
   }
-}
+});
+
+// --- Incoming Message Handler ---
 
 /**
- * Extract phone number from various WhatsApp message formats.
- * Handles both standard JID (@s.whatsapp.net) and LID (@lid) formats.
- */
-function extractPhoneFromMessage(msg: proto.IWebMessageInfo, chatId: string): string | null {
-  // Standard format: 447552335216@s.whatsapp.net
-  if (chatId.includes('@s.whatsapp.net')) {
-    return chatId.replace('@s.whatsapp.net', '');
-  }
-  
-  // LID format: Check participant or verifiedBizName or pushName for context
-  // The actual phone might be in msg.pushName or we need to use the chat ID as-is
-  
-  // Check if there's a participant field (used in groups, but might have info)
-  const participant = msg.key.participant;
-  if (participant && participant.includes('@s.whatsapp.net')) {
-    return participant.replace('@s.whatsapp.net', '');
-  }
-  
-  // For LID format, the number before @lid is NOT the phone number
-  // We need to check if the message has verifiedBizName context or use pushName
-  // For now, strip the @lid suffix but mark it specially
-  if (chatId.includes('@lid')) {
-    // LID is a WhatsApp internal ID, not a phone number
-    // We'll use it as platformId but can't match to user phone directly
-    logger.warn(`LID format detected: ${chatId} - cannot extract phone number directly`);
-    return null;
-  }
-  
-  // Fallback: return as-is (might be a different format)
-  return chatId.replace(/@.*$/, '');
-}
-
-/**
- * Handle incoming WhatsApp message based on type.
+ * Route incoming WhatsApp message based on type.
  */
 async function handleIncomingMessage(
-  msg: proto.IWebMessageInfo,
-  chatId: string
+  from: string,
+  message: any,
+  contactName: string
 ): Promise<void> {
-  const message = msg.message;
-  if (!message) return;
+  if (!isConfigured()) {
+    logger.warn('WhatsApp Cloud API not configured — ignoring message');
+    return;
+  }
 
-  // Extract phone number for logging
-  const phoneNumber = extractPhoneFromMessage(msg, chatId);
-  const isLidFormat = chatId.includes('@lid');
-  
-  logger.info(`WhatsApp message from ${isLidFormat ? 'LID:' : '+'}${phoneNumber || chatId}${isLidFormat ? ' (LID format - user lookup may fail)' : ''}`);
+  const chatId = `${from}@s.whatsapp.net`; // Keep consistent with existing session format
+  const msgType = message.type;
 
-  // Text message (regular or extended)
-  if (message.conversation || message.extendedTextMessage?.text) {
-    const text = message.conversation || message.extendedTextMessage?.text || '';
+  logger.info(`WhatsApp message from +${from} (${contactName || 'unknown'}), type: ${msgType}`);
+
+  // Mark message as read
+  markAsRead(message.id).catch(() => { });
+
+  switch (msgType) {
+    case 'text':
+      await handleTextMessage(chatId, message.text?.body || '');
+      break;
+
+    case 'audio':
+      await handleVoiceMessage(chatId, message.audio);
+      break;
+
+    case 'document':
+      await handleDocumentMessage(chatId, message.document);
+      break;
+
+    case 'image':
+      // Image with caption → treat caption as text
+      if (message.image?.caption) {
+        await handleTextMessage(chatId, message.image.caption);
+      } else {
+        await sendWhatsAppMessage(from, "I can process text messages, voice messages, and PDF/JSON documents. How can I help?");
+      }
+      break;
+
+    case 'interactive':
+      // Native button/list reply
+      await handleInteractiveReply(chatId, message.interactive);
+      break;
+
+    case 'button':
+      // Quick reply button tap
+      await handleTextMessage(chatId, message.button?.text || message.button?.payload || '');
+      break;
+
+    default:
+      await sendWhatsAppMessage(from, "I can help with text messages, voice messages, and PDF/JSON file uploads. How can I assist you today?");
+      break;
+  }
+}
+
+/**
+ * Handle interactive message replies (button taps and list selections).
+ */
+async function handleInteractiveReply(chatId: string, interactive: any): Promise<void> {
+  let text = '';
+
+  if (interactive?.type === 'button_reply') {
+    // Reply button: { id, title }
+    text = interactive.button_reply?.id || interactive.button_reply?.title || '';
+  } else if (interactive?.type === 'list_reply') {
+    // List selection: { id, title, description }
+    text = interactive.list_reply?.id || interactive.list_reply?.title || '';
+  }
+
+  if (text) {
     await handleTextMessage(chatId, text);
-    return;
   }
-
-  // Document (PDF/JSON)
-  if (message.documentMessage) {
-    await handleDocumentMessage(chatId, msg);
-    return;
-  }
-
-  // Voice/Audio message
-  if (message.audioMessage) {
-    await handleVoiceMessage(chatId, msg);
-    return;
-  }
-
-  // Image with caption (treat caption as text)
-  if (message.imageMessage?.caption) {
-    await handleTextMessage(chatId, message.imageMessage.caption);
-    return;
-  }
-
-  // Button response
-  if (message.buttonsResponseMessage) {
-    const selectedId = message.buttonsResponseMessage.selectedButtonId || '';
-    await handleTextMessage(chatId, selectedId);
-    return;
-  }
-
-  // List response
-  if (message.listResponseMessage) {
-    const selectedId = message.listResponseMessage.singleSelectReply?.selectedRowId || '';
-    await handleTextMessage(chatId, selectedId);
-    return;
-  }
-
-  // Unsupported message type - send helpful response
-  await sendWhatsAppMessage(
-    chatId,
-    "I can help with text messages, voice messages, and PDF/JSON file uploads. How can I assist you today?"
-  );
 }
 
 /**
  * Handle text messages.
  */
 async function handleTextMessage(chatId: string, text: string): Promise<void> {
-  // Normalize text
+  const from = chatId.replace('@s.whatsapp.net', '');
   const normalized = text.toLowerCase().trim();
 
-  // Detect "start", "hi", "hello" as /start equivalent (WhatsApp doesn't have commands)
+  // Detect "start", "hi", "hello" as /start equivalent
   const isStart = ['start', 'hi', 'hello', 'hey', 'help', 'menu', 'begin'].includes(normalized);
 
   // Handle reset command
@@ -258,7 +214,7 @@ async function handleTextMessage(chatId: string, text: string): Promise<void> {
         await prisma.chatSession.delete({ where: { id: session.id } });
       }
 
-      await sendWhatsAppMessage(chatId, 'Session reset! Send "hi" to start again.');
+      await sendWhatsAppMessage(from, 'Session reset! Send "hi" to start again.');
       return;
     } catch (err: any) {
       logger.error(`WhatsApp reset error: ${err.message}`);
@@ -272,59 +228,39 @@ async function handleTextMessage(chatId: string, text: string): Promise<void> {
     isStart ? '/start' : text
   );
 
-  // Send responses
-  for (const msg of response.messages) {
-    await sendWhatsAppMessage(chatId, msg.text, msg.buttons);
-    // Add delay between multiple messages
-    if (response.messages.length > 1 && msg.delay) {
-      await sleep(msg.delay);
-    }
+  // Map agent responses to WhatsApp-native formats (images, text, interactive)
+  const waMsgs = await mapAgentMessages(response.messages, response.responseLanguage);
+  for (const waMsg of waMsgs) {
+    await sendOutboundMessage(from, waMsg);
   }
 }
 
 /**
- * Handle voice messages - transcribe and process.
+ * Handle voice messages — download, transcribe, and process.
  */
 async function handleVoiceMessage(
   chatId: string,
-  msg: proto.IWebMessageInfo
+  audio: { id: string; mime_type: string }
 ): Promise<void> {
+  const from = chatId.replace('@s.whatsapp.net', '');
+
   if (!isSTTAvailable()) {
-    await sendWhatsAppMessage(
-      chatId,
-      "Voice messages aren't available right now. Please type your message instead."
-    );
+    await sendWhatsAppMessage(from, "Voice messages aren't available right now. Please type your message instead.");
     return;
   }
 
   try {
-    // Ensure sock is still connected
-    if (!sock) {
-      logger.warn('WhatsApp disconnected while handling voice message');
-      return;
-    }
-    
-    // Download audio (cast to WAMessage for type compatibility)
-    const buffer = await downloadMediaMessage(
-      msg as WAMessage,
-      'buffer',
-      {},
-      {
-        logger: logger as any,
-        reuploadRequest: sock.updateMediaMessage,
-      }
-    );
-
-    if (!buffer || !(buffer instanceof Buffer)) {
+    // Download audio from Cloud API
+    const buffer = await downloadMedia(audio.id);
+    if (!buffer) {
       throw new Error('Failed to download voice message');
     }
 
-    const mimeType = msg.message?.audioMessage?.mimetype || 'audio/ogg; codecs=opus';
-
+    const mimeType = audio.mime_type || 'audio/ogg; codecs=opus';
     logger.info(`Received WhatsApp voice: ${(buffer.length / 1024).toFixed(1)}KB, mime: ${mimeType}`);
 
     // Let user know we're processing
-    await sendWhatsAppMessage(chatId, '🎤 Processing your voice message...');
+    await sendWhatsAppMessage(from, '🎤 Processing your voice message...');
 
     // Transcribe using Sarvam
     let transcript: string;
@@ -340,7 +276,7 @@ async function handleVoiceMessage(
       if (error instanceof STTError) {
         logger.warn(`WhatsApp STT error: ${error.type} - ${error.message}`);
         await sendWhatsAppMessage(
-          chatId,
+          from,
           error.retryable
             ? `${error.message} Please try again.`
             : error.message
@@ -350,21 +286,20 @@ async function handleVoiceMessage(
       throw error;
     }
 
-    // Process through agent (pass detected voice language so agent responds in same language)
+    // Process through agent
     const response = await processMessage('WHATSAPP', chatId, transcript, undefined, undefined, {
       isVoiceInput: true,
       detectedLanguage: detectedLanguageCode,
     });
 
-    for (const msg of response.messages) {
-      await sendWhatsAppMessage(chatId, msg.text, msg.buttons);
+    // Map and send as rich messages
+    const waMsgs = await mapAgentMessages(response.messages, response.responseLanguage);
+    for (const waMsg of waMsgs) {
+      await sendOutboundMessage(from, waMsg);
     }
   } catch (err: any) {
     logger.error(`WhatsApp voice error: ${err.message}\n${err.stack}`);
-    await sendWhatsAppMessage(
-      chatId,
-      "I had trouble understanding that voice message. Please try again or type your message."
-    );
+    await sendWhatsAppMessage(from, "I had trouble understanding that voice message. Please try again or type your message.");
   }
 }
 
@@ -373,44 +308,25 @@ async function handleVoiceMessage(
  */
 async function handleDocumentMessage(
   chatId: string,
-  msg: proto.IWebMessageInfo
+  doc: { id: string; mime_type: string; filename?: string }
 ): Promise<void> {
-  const doc = msg.message?.documentMessage;
-  if (!doc) return;
-
-  const fileName = doc.fileName || '';
-  const mimeType = doc.mimetype || '';
+  const from = chatId.replace('@s.whatsapp.net', '');
+  const fileName = doc.filename || '';
+  const mimeType = doc.mime_type || '';
 
   const isPdf = mimeType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
   const isJson = mimeType.includes('json') || fileName.toLowerCase().endsWith('.json');
 
   if (!isPdf && !isJson) {
-    await sendWhatsAppMessage(chatId, 'Please upload your ID document (PDF or JSON file from your electricity company).');
+    await sendWhatsAppMessage(from, 'Please upload your ID document (PDF or JSON file from your electricity company).');
     return;
   }
 
   try {
-    // Ensure sock is still connected
-    if (!sock) {
-      logger.warn('WhatsApp disconnected while handling document');
-      return;
-    }
-    
-    // Let user know we're processing
-    await sendWhatsAppMessage(chatId, '📄 Processing your document...');
+    await sendWhatsAppMessage(from, '📄 Processing your document...');
 
-    // Download document (cast to WAMessage for type compatibility)
-    const buffer = await downloadMediaMessage(
-      msg as WAMessage,
-      'buffer',
-      {},
-      {
-        logger: logger as any,
-        reuploadRequest: sock.updateMediaMessage,
-      }
-    );
-
-    if (!buffer || !(buffer instanceof Buffer)) {
+    const buffer = await downloadMedia(doc.id);
+    if (!buffer) {
       throw new Error('Failed to download document');
     }
 
@@ -425,81 +341,338 @@ async function handleDocumentMessage(
     const label = isJson ? '[JSON credential uploaded]' : '[PDF uploaded]';
     const response = await processMessage('WHATSAPP', chatId, label, fileData);
 
-    for (const msg of response.messages) {
-      await sendWhatsAppMessage(chatId, msg.text, msg.buttons);
+    // Map and send as rich messages
+    const waMsgs = await mapAgentMessages(response.messages, response.responseLanguage);
+    for (const waMsg of waMsgs) {
+      await sendOutboundMessage(from, waMsg);
     }
   } catch (err: any) {
     logger.error(`WhatsApp document error: ${err.message}\n${err.stack}`);
-    await sendWhatsAppMessage(
-      chatId,
-      "I had trouble processing that document. Please try again."
-    );
+    await sendWhatsAppMessage(from, "I had trouble processing that document. Please try again.");
+  }
+}
+
+// --- Cloud API: Media Operations ---
+
+/**
+ * Download media from WhatsApp Cloud API.
+ * Two-step: GET /media/{id} for URL, then GET the URL for binary data.
+ */
+async function downloadMedia(mediaId: string): Promise<Buffer | null> {
+  try {
+    // Step 1: Get media URL
+    const metaRes = await axios.get(`https://graph.facebook.com/${API_VERSION}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+    });
+
+    const mediaUrl = metaRes.data.url;
+    if (!mediaUrl) {
+      logger.error(`No URL returned for media ${mediaId}`);
+      return null;
+    }
+
+    // Step 2: Download the actual file
+    const fileRes = await axios.get(mediaUrl, {
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+      responseType: 'arraybuffer',
+    });
+
+    return Buffer.from(fileRes.data);
+  } catch (err: any) {
+    logger.error(`Failed to download media ${mediaId}: ${err.message}`);
+    return null;
   }
 }
 
 /**
- * Send a message with optional buttons.
- * WhatsApp's native buttons via Baileys are unreliable (often don't render),
- * so we always show options as numbered text for consistency.
+ * Upload media to WhatsApp Cloud API.
+ * Returns the media_id to use in messages.
+ */
+async function uploadMedia(buffer: Buffer, mimeType: string, filename: string): Promise<string | null> {
+  try {
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', mimeType);
+    form.append('file', buffer, {
+      filename,
+      contentType: mimeType,
+    });
+
+    const res = await axios.post(`${API_BASE}/media`, form, {
+      headers: {
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
+        ...form.getHeaders(),
+      },
+      maxContentLength: 16 * 1024 * 1024, // 16MB limit
+    });
+
+    const mediaId = res.data.id;
+    logger.info(`Uploaded media: ${filename} (${(buffer.length / 1024).toFixed(1)}KB) → ${mediaId}`);
+    return mediaId;
+  } catch (err: any) {
+    logger.error(`Failed to upload media: ${err.response?.data?.error?.message || err.message}`);
+    return null;
+  }
+}
+
+// --- Cloud API: Sending Messages ---
+
+/**
+ * Send a text message.
+ * If buttons are provided, sends native interactive buttons (≤3)
+ * or a list menu (4-10), falling back to numbered text for >10.
  */
 async function sendWhatsAppMessage(
   to: string,
   text: string,
   buttons?: Array<{ text: string; callbackData?: string }>
 ): Promise<void> {
-  if (!sock || !text) return;
+  if (!isConfigured() || !text) return;
 
-  // Add small delay to seem more human-like and avoid rate limits
-  await sleep(300 + Math.random() * 500);
+  await sleep(200 + Math.random() * 300);
 
   try {
-    if (buttons && buttons.length > 0) {
-      // Always show buttons as numbered text options (more reliable than native buttons)
+    if (buttons && buttons.length > 0 && buttons.length <= 3) {
+      // Native reply buttons (up to 3)
+      await sendInteractiveButtons(to, text, buttons);
+    } else if (buttons && buttons.length > 3 && buttons.length <= 10) {
+      // Native list menu (4-10 options)
+      await sendInteractiveList(to, text, buttons);
+    } else if (buttons && buttons.length > 10) {
+      // Too many for native — fall back to numbered text
       const buttonText = buttons.map((b, i) => `${i + 1}. ${b.text}`).join('\n');
       const fullText = `${text}\n\nReply with a number:\n${buttonText}`;
-      
-      await sock.sendMessage(to, { text: fullText });
+      await sendTextMessage(to, fullText);
     } else {
-      await sock.sendMessage(to, { text });
+      await sendTextMessage(to, text);
     }
   } catch (err: any) {
-    logger.error(`Failed to send WhatsApp message: ${err.message}`);
+    logger.error(`Failed to send WhatsApp message: ${err.response?.data?.error?.message || err.message}`);
   }
 }
 
 /**
- * Stop the WhatsApp bot gracefully.
+ * Send a plain text message via Cloud API.
  */
-export function stopWhatsAppBot(): void {
-  if (sock) {
-    sock.end(undefined);
-    connectionState = 'disconnected';
-    logger.info('WhatsApp bot stopped');
-    sock = null;
+async function sendTextMessage(to: string, text: string): Promise<void> {
+  await axios.post(`${API_BASE}/messages`, {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'text',
+    text: { body: text },
+  }, { headers: apiHeaders() });
+}
+
+/**
+ * Send interactive reply buttons (up to 3 buttons).
+ */
+async function sendInteractiveButtons(
+  to: string,
+  body: string,
+  buttons: Array<{ text: string; callbackData?: string }>
+): Promise<void> {
+  const interactiveButtons = buttons.slice(0, 3).map((b, i) => ({
+    type: 'reply',
+    reply: {
+      id: b.callbackData || b.text.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 256),
+      title: b.text.slice(0, 20), // WhatsApp limit: 20 chars
+    },
+  }));
+
+  await axios.post(`${API_BASE}/messages`, {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: body.slice(0, 1024) }, // WhatsApp limit
+      action: {
+        buttons: interactiveButtons,
+      },
+    },
+  }, { headers: apiHeaders() });
+
+  logger.info(`Sent interactive buttons to ${to} (${buttons.length} buttons)`);
+}
+
+/**
+ * Send an interactive list menu (4-10 options).
+ */
+async function sendInteractiveList(
+  to: string,
+  body: string,
+  options: Array<{ text: string; callbackData?: string }>
+): Promise<void> {
+  const rows = options.slice(0, 10).map((o, i) => ({
+    id: o.callbackData || o.text.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 200),
+    title: o.text.slice(0, 24), // WhatsApp limit: 24 chars
+  }));
+
+  await axios.post(`${API_BASE}/messages`, {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'list',
+      body: { text: body.slice(0, 1024) },
+      action: {
+        button: 'Choose an option',
+        sections: [{
+          title: 'Options',
+          rows,
+        }],
+      },
+    },
+  }, { headers: apiHeaders() });
+
+  logger.info(`Sent interactive list to ${to} (${options.length} options)`);
+}
+
+/**
+ * Send an image message.
+ * Uploads the PNG buffer first, then sends with the media ID.
+ */
+async function sendImageMessage(
+  to: string,
+  imageBuffer: Buffer,
+  caption?: string
+): Promise<void> {
+  if (!isConfigured()) return;
+
+  await sleep(200 + Math.random() * 300);
+
+  try {
+    // Upload the image
+    const mediaId = await uploadMedia(imageBuffer, 'image/png', 'card.png');
+    if (!mediaId) {
+      // Fallback: send caption as text
+      if (caption) await sendWhatsAppMessage(to, caption);
+      return;
+    }
+
+    // Send the image message
+    await axios.post(`${API_BASE}/messages`, {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'image',
+      image: {
+        id: mediaId,
+        caption: caption || undefined,
+      },
+    }, { headers: apiHeaders() });
+
+    logger.info(`Sent image card to ${to} (${(imageBuffer.length / 1024).toFixed(1)}KB)`);
+  } catch (err: any) {
+    logger.error(`Failed to send WhatsApp image: ${err.response?.data?.error?.message || err.message}`);
+    // Fallback: send caption as text
+    if (caption) {
+      await sendWhatsAppMessage(to, caption);
+    }
   }
 }
 
 /**
- * Check if WhatsApp bot is connected.
+ * Send a voice note (audio message).
+ * Uploads the audio buffer first, then sends with the media ID.
+ */
+async function sendVoiceMessage(
+  to: string,
+  audioBuffer: Buffer
+): Promise<void> {
+  if (!isConfigured()) return;
+
+  await sleep(200 + Math.random() * 300);
+
+  try {
+    const mediaId = await uploadMedia(audioBuffer, 'audio/ogg; codecs=opus', 'voice.ogg');
+    if (!mediaId) return;
+
+    await axios.post(`${API_BASE}/messages`, {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'audio',
+      audio: { id: mediaId },
+    }, { headers: apiHeaders() });
+
+    logger.info(`Sent voice note to ${to} (${(audioBuffer.length / 1024).toFixed(1)}KB)`);
+  } catch (err: any) {
+    logger.error(`Failed to send WhatsApp voice note: ${err.response?.data?.error?.message || err.message}`);
+  }
+}
+
+/**
+ * Dispatch a WAOutboundMessage to the right send function.
+ */
+async function sendOutboundMessage(
+  to: string,
+  msg: WAOutboundMessage
+): Promise<void> {
+  switch (msg.type) {
+    case 'image':
+      if (msg.imageBuffer) {
+        await sendImageMessage(to, msg.imageBuffer, msg.imageCaption);
+      }
+      break;
+
+    case 'voice':
+      if (msg.audioBuffer) {
+        await sendVoiceMessage(to, msg.audioBuffer);
+      }
+      break;
+
+    case 'text':
+    default:
+      if (msg.text) {
+        await sendWhatsAppMessage(to, msg.text, msg.buttons);
+      }
+      break;
+  }
+}
+
+/**
+ * Mark a message as read (shows blue ticks).
+ */
+async function markAsRead(messageId: string): Promise<void> {
+  try {
+    await axios.post(`${API_BASE}/messages`, {
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: messageId,
+    }, { headers: apiHeaders() });
+  } catch {
+    // Non-critical — ignore errors
+  }
+}
+
+// --- Public API (for proactive messages, etc.) ---
+
+/**
+ * Check if WhatsApp Cloud API is configured.
  */
 export function isWhatsAppConnected(): boolean {
-  return connectionState === 'connected';
+  return isConfigured();
 }
 
 /**
  * Get WhatsApp connection state.
+ * Cloud API is stateless — configured means ready.
  */
 export function getWhatsAppState(): 'disconnected' | 'connecting' | 'connected' {
-  return connectionState;
+  return isConfigured() ? 'connected' : 'disconnected';
 }
 
 /**
  * Send a proactive message to a user by phone number.
  * Used for notifications (order updates, welcome messages, etc.)
  * 
- * @param phoneNumber - Phone number (with or without + prefix, e.g., "919876543210" or "+919876543210")
+ * @param phoneNumber - Phone number (with or without + prefix, e.g., "919876543210")
  * @param text - Message text
- * @param buttons - Optional buttons (will be shown as numbered text options)
+ * @param buttons - Optional buttons
  * @returns true if sent successfully, false otherwise
  */
 export async function sendProactiveMessage(
@@ -507,8 +680,8 @@ export async function sendProactiveMessage(
   text: string,
   buttons?: Array<{ text: string; callbackData?: string }>
 ): Promise<boolean> {
-  if (!sock || connectionState !== 'connected') {
-    logger.warn(`Cannot send proactive message: WhatsApp not connected (state: ${connectionState})`);
+  if (!isConfigured()) {
+    logger.warn('Cannot send proactive message: WhatsApp Cloud API not configured');
     return false;
   }
 
@@ -517,26 +690,21 @@ export async function sendProactiveMessage(
     return false;
   }
 
-  // Normalize phone number to WhatsApp JID format
-  // Remove any non-digit characters except leading +
+  // Normalize phone number — remove non-digits and leading +
   let normalized = phoneNumber.replace(/[^\d+]/g, '');
   if (normalized.startsWith('+')) {
     normalized = normalized.slice(1);
   }
-  
-  // Validate phone number is not empty and has reasonable length
+
   if (!normalized || normalized.length < 7) {
     logger.warn(`Cannot send proactive message: invalid phone number "${phoneNumber}"`);
     return false;
   }
-  
-  // Create WhatsApp JID (phone@s.whatsapp.net)
-  const jid = `${normalized}@s.whatsapp.net`;
 
   logger.info(`Sending proactive message to ${normalized}`);
 
   try {
-    await sendWhatsAppMessage(jid, text, buttons);
+    await sendWhatsAppMessage(normalized, text, buttons);
     logger.info(`Proactive message sent successfully to ${normalized}`);
     return true;
   } catch (err: any) {
@@ -549,11 +717,18 @@ export async function sendProactiveMessage(
  * Get the bot's WhatsApp number (for deep links).
  */
 export function getWhatsAppBotNumber(): string | null {
-  // Return the linked phone number (hardcoded for now, could be dynamic)
-  if (connectionState === 'connected') {
-    return '447405987693'; // UK number without +
+  if (isConfigured() && BOT_PHONE) {
+    return BOT_PHONE;
   }
   return null;
+}
+
+/**
+ * No-op for Cloud API (no persistent connection to stop).
+ * Kept for API compatibility with index.ts shutdown handler.
+ */
+export function stopWhatsAppBot(): void {
+  logger.info('WhatsApp Cloud API does not require shutdown');
 }
 
 function sleep(ms: number): Promise<void> {

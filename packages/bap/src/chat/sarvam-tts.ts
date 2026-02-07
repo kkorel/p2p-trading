@@ -1,11 +1,11 @@
 /**
  * Sarvam AI Text-to-Speech Integration
  * 
- * Uses Sarvam's Bulbul model for high-quality Indian language TTS.
- * Bulbul supports natural-sounding speech with human-like prosody
- * across 11 Indian languages.
+ * Uses Sarvam's Bulbul v2 model for TTS.
+ * Supports 11 Indian languages: Hindi, Bengali, Tamil, Telugu, Kannada,
+ * Malayalam, Marathi, Gujarati, Punjabi, Odia, and English.
  * 
- * API Documentation: https://docs.sarvam.ai/api-reference-docs/text-to-speech/convert
+ * API Documentation: https://docs.sarvam.ai/api-reference-docs/text-to-speech
  */
 
 import axios from 'axios';
@@ -16,67 +16,23 @@ const logger = createLogger('SarvamTTS');
 // Configuration
 const SARVAM_API_KEY = process.env.SARVAM_API_KEY || '';
 const SARVAM_TTS_URL = 'https://api.sarvam.ai/text-to-speech';
-const MAX_TEXT_LENGTH = 1500; // Bulbul v2 limit
 const REQUEST_TIMEOUT_MS = 30000; // 30 seconds
+const MAX_CHUNK_LENGTH = 500; // Sarvam TTS limit per request
+const MIN_TEXT_LENGTH = 5; // Skip very short texts
 
 /**
- * Available voice speakers for Bulbul v2
- * Per Sarvam docs: https://docs.sarvam.ai/api-reference-docs/endpoints/text-to-speech
+ * Available speaker voices for Bulbul v2.
  */
 export type TTSSpeaker =
-  | 'anushka'  // Female
-  | 'manisha'  // Female
-  | 'vidya'    // Female
-  | 'arya'     // Female
-  | 'abhilash' // Male, North Indian (default)
-  | 'karun'    // Male
-  | 'hitesh';  // Male
-
-// Default voice configuration
-export const DEFAULT_SPEAKER: TTSSpeaker = 'abhilash'; // Male, North Indian voice
-export const DEFAULT_PACE = 0.85; // Slightly slower for clarity
+  | 'anushka' | 'manisha' | 'vidya' | 'arya'  // female
+  | 'abhilash' | 'karun' | 'hitesh';           // male
 
 /**
- * Options for text-to-speech synthesis
+ * Error types for TTS operations
  */
-export interface TTSOptions {
-  /** Text to synthesize (max 1500 characters) */
-  text: string;
-  /** Target language code (e.g., 'hi-IN', 'ta-IN', 'en-IN') */
-  languageCode: string;
-  /** Voice speaker (default: 'anushka' for female voice) */
-  speaker?: TTSSpeaker;
-  /** Speech pace: 0.3-3.0 (default: 1.0) */
-  pace?: number;
-  /** Pitch adjustment: -0.75 to 0.75 (default: 0) */
-  pitch?: number;
-  /** Loudness: 0.1-3.0 (default: 1.0) */
-  loudness?: number;
-  /** Sample rate in Hz (default: 22050) */
-  sampleRate?: 8000 | 16000 | 22050 | 24000;
-}
-
-/**
- * Result from TTS synthesis
- */
-export interface TTSResult {
-  /** Base64 encoded WAV audio */
-  audio: string;
-  /** Audio duration in milliseconds (estimated) */
-  durationMs: number;
-  /** Language used for synthesis */
-  languageCode: string;
-  /** Request ID from Sarvam API */
-  requestId?: string;
-}
-
-/**
- * TTS Error types
- */
-export type TTSErrorType = 
+export type TTSErrorType =
   | 'api_key_missing'
-  | 'text_too_long'
-  | 'invalid_language'
+  | 'text_too_short'
   | 'synthesis_failed'
   | 'network_error'
   | 'rate_limited';
@@ -87,7 +43,7 @@ export type TTSErrorType =
 export class TTSError extends Error {
   type: TTSErrorType;
   retryable: boolean;
-  
+
   constructor(type: TTSErrorType, message: string, retryable = false) {
     super(message);
     this.name = 'TTSError';
@@ -97,125 +53,137 @@ export class TTSError extends Error {
 }
 
 /**
- * Supported languages for TTS
+ * Options for synthesizeSpeech (object form — used by web chat routes).
  */
-const SUPPORTED_LANGUAGES = new Set([
-  'en-IN', 'hi-IN', 'bn-IN', 'ta-IN', 'te-IN',
-  'kn-IN', 'ml-IN', 'mr-IN', 'gu-IN', 'pa-IN', 'od-IN'
-]);
+export interface TTSOptions {
+  text: string;
+  languageCode: string;
+  speaker?: TTSSpeaker;
+  pace?: number;
+}
 
 /**
- * Check if TTS is available (API key is configured)
+ * Result from synthesizeSpeech (object form — used by web chat routes).
+ */
+export interface TTSResult {
+  /** Base64-encoded WAV audio */
+  audio: string;
+  /** Estimated duration (0 if unknown) */
+  durationMs: number;
+  /** Language code used */
+  languageCode: string;
+}
+
+/**
+ * Check if TTS is available (same API key as STT).
  */
 export function isTTSAvailable(): boolean {
   return !!SARVAM_API_KEY;
 }
 
 /**
- * Check if a language is supported for TTS
- */
-export function isLanguageSupported(languageCode: string): boolean {
-  return SUPPORTED_LANGUAGES.has(languageCode);
-}
-
-/**
- * Split text into chunks that fit within the character limit.
- * Tries to split on sentence boundaries for natural speech.
- */
-function splitTextIntoChunks(text: string, maxLength: number = MAX_TEXT_LENGTH): string[] {
-  if (text.length <= maxLength) {
-    return [text];
-  }
-  
-  const chunks: string[] = [];
-  let remaining = text;
-  
-  while (remaining.length > 0) {
-    if (remaining.length <= maxLength) {
-      chunks.push(remaining);
-      break;
-    }
-    
-    // Try to split at sentence boundary
-    let splitPoint = maxLength;
-    const sentenceEnd = remaining.substring(0, maxLength).lastIndexOf('। '); // Hindi sentence end
-    const periodEnd = remaining.substring(0, maxLength).lastIndexOf('. ');
-    const questionEnd = remaining.substring(0, maxLength).lastIndexOf('? ');
-    
-    const bestEnd = Math.max(sentenceEnd, periodEnd, questionEnd);
-    if (bestEnd > maxLength * 0.5) {
-      splitPoint = bestEnd + 2; // Include the punctuation and space
-    } else {
-      // Fall back to word boundary
-      const spaceEnd = remaining.substring(0, maxLength).lastIndexOf(' ');
-      if (spaceEnd > maxLength * 0.5) {
-        splitPoint = spaceEnd + 1;
-      }
-    }
-    
-    chunks.push(remaining.substring(0, splitPoint).trim());
-    remaining = remaining.substring(splitPoint).trim();
-  }
-  
-  return chunks;
-}
-
-/**
- * Synthesize speech from text using Sarvam Bulbul model
+ * Synthesize speech — overloaded for both web and WhatsApp use cases.
  * 
- * @param options - TTS options including text and language
- * @returns TTS result with base64 audio
- * @throws TTSError on failure
+ * Object form (web routes):
+ *   synthesizeSpeech({ text, languageCode, speaker, pace }) → { audio, durationMs, languageCode }
+ * 
+ * Simple form (WhatsApp mapper):
+ *   synthesizeSpeech("hello", "en-IN") → Buffer
  */
-export async function synthesizeSpeech(options: TTSOptions): Promise<TTSResult> {
-  const startTime = Date.now();
-  
-  // Check API key
+export async function synthesizeSpeech(options: TTSOptions): Promise<TTSResult>;
+export async function synthesizeSpeech(text: string, targetLanguageCode?: string): Promise<Buffer>;
+export async function synthesizeSpeech(
+  textOrOptions: string | TTSOptions,
+  targetLanguageCode?: string
+): Promise<Buffer | TTSResult> {
+  if (typeof textOrOptions === 'object') {
+    // Object form (web routes) — WAV output for browser playback
+    const { text, languageCode, speaker, pace } = textOrOptions;
+    const buffer = await synthesizeSpeechInternal(text, languageCode, speaker, pace);
+    return {
+      audio: buffer.toString('base64'),
+      durationMs: 0,
+      languageCode,
+    };
+  } else {
+    // Simple form (WhatsApp mapper) — Opus output for voice notes
+    return synthesizeSpeechInternal(textOrOptions, targetLanguageCode || 'en-IN', undefined, undefined, 'opus');
+  }
+}
+
+/**
+ * Internal: run TTS pipeline — clean text, chunk, synthesize, concatenate.
+ */
+async function synthesizeSpeechInternal(
+  text: string,
+  languageCode: string,
+  speaker?: TTSSpeaker,
+  pace?: number,
+  codec?: string
+): Promise<Buffer> {
   if (!SARVAM_API_KEY) {
-    throw new TTSError(
-      'api_key_missing',
-      'Sarvam API key not configured. Voice output is unavailable.',
-      false
-    );
+    throw new TTSError('api_key_missing', 'Sarvam API key not configured. TTS unavailable.', false);
   }
-  
-  // Validate language
-  if (!isLanguageSupported(options.languageCode)) {
-    logger.warn(`Language ${options.languageCode} not officially supported, trying anyway`);
+
+  // Strip WhatsApp markdown for cleaner speech
+  const cleanText = stripWhatsAppMarkdown(text);
+
+  if (cleanText.length < MIN_TEXT_LENGTH) {
+    throw new TTSError('text_too_short', 'Text too short to synthesize.', false);
   }
-  
-  // Validate text length
-  if (options.text.length > MAX_TEXT_LENGTH) {
-    throw new TTSError(
-      'text_too_long',
-      `Text too long (${options.text.length} chars). Maximum is ${MAX_TEXT_LENGTH} characters.`,
-      false
-    );
+
+  // Normalize language code — Sarvam expects BCP-47 with region
+  const langCode = normalizeLanguageCode(languageCode);
+
+  logger.info(`TTS: ${cleanText.length} chars, lang: ${langCode}, speaker: ${speaker || 'Anushka'}, codec: ${codec || 'wav'}`);
+
+  // Split into chunks if text exceeds limit
+  const chunks = splitTextIntoChunks(cleanText, MAX_CHUNK_LENGTH);
+  const audioBuffers: Buffer[] = [];
+
+  for (const chunk of chunks) {
+    const buffer = await synthesizeChunk(chunk, langCode, speaker, pace, codec);
+    audioBuffers.push(buffer);
   }
-  
-  // Prepare request body
-  const requestBody: Record<string, any> = {
-    text: options.text,
-    target_language_code: options.languageCode,
-    speaker: options.speaker || DEFAULT_SPEAKER,
-    model: 'bulbul:v2',
-    enable_preprocessing: true,
-    // Apply default pace for slower, clearer speech
-    pace: Math.max(0.3, Math.min(3.0, options.pace ?? DEFAULT_PACE)),
-  };
-  if (options.pitch !== undefined) {
-    requestBody.pitch = Math.max(-0.75, Math.min(0.75, options.pitch));
-  }
-  if (options.loudness !== undefined) {
-    requestBody.loudness = Math.max(0.1, Math.min(3.0, options.loudness));
-  }
-  if (options.sampleRate !== undefined) {
-    requestBody.speech_sample_rate = options.sampleRate;
-  }
-  
-  logger.info(`Synthesizing speech: ${options.text.substring(0, 50)}... [${options.languageCode}] [${options.speaker || DEFAULT_SPEAKER}]`);
-  
+
+  // Concatenate all audio buffers
+  const combined = Buffer.concat(audioBuffers);
+  logger.info(`TTS complete: ${chunks.length} chunk(s), ${(combined.length / 1024).toFixed(1)}KB`);
+
+  return combined;
+}
+
+/**
+ * Synthesize a single text chunk (≤500 chars).
+ */
+async function synthesizeChunk(
+  text: string,
+  langCode: string,
+  speaker?: TTSSpeaker,
+  pace?: number,
+  codec?: string
+): Promise<Buffer> {
   try {
+    // Capitalize speaker name for API (anushka → Anushka)
+    const speakerName = speaker
+      ? speaker.charAt(0).toUpperCase() + speaker.slice(1)
+      : 'Anushka';
+
+    const requestBody: any = {
+      text,
+      target_language_code: langCode,
+      model: 'bulbul:v2',
+      speaker: speakerName,
+      enable_preprocessing: true,
+      pace: pace || 1.0,
+      loudness: 1.2,
+    };
+
+    // Add codec if specified (e.g., 'opus' for WhatsApp voice notes)
+    if (codec) {
+      requestBody.output_audio_codec = codec;
+    }
+
     const response = await axios.post(SARVAM_TTS_URL, requestBody, {
       headers: {
         'api-subscription-key': SARVAM_API_KEY,
@@ -224,130 +192,125 @@ export async function synthesizeSpeech(options: TTSOptions): Promise<TTSResult> 
       timeout: REQUEST_TIMEOUT_MS,
       validateStatus: () => true,
     });
-    
+
     // Handle HTTP errors
     if (response.status !== 200) {
       const errorText = typeof response.data === 'string'
         ? response.data
         : JSON.stringify(response.data) || 'Unknown error';
-      
+
       if (response.status === 429) {
-        throw new TTSError(
-          'rate_limited',
-          'Too many requests. Please wait a moment and try again.',
-          true
-        );
+        throw new TTSError('rate_limited', 'Too many requests. Please wait.', true);
       }
-      
+
       if (response.status >= 500) {
-        throw new TTSError(
-          'network_error',
-          'Sarvam service temporarily unavailable. Please try again.',
-          true
-        );
+        throw new TTSError('network_error', 'Sarvam TTS service temporarily unavailable.', true);
       }
-      
+
       logger.error(`Sarvam TTS error [${response.status}]: ${errorText}`);
-      throw new TTSError(
-        'synthesis_failed',
-        'Could not generate speech. Please try again.',
-        true
-      );
+      throw new TTSError('synthesis_failed', 'Could not synthesize speech.', true);
     }
-    
-    // Parse response
-    const data = response.data;
-    
-    // Sarvam returns an array of audio base64 strings in 'audios' field
-    const audioBase64 = data.audios?.[0];
-    if (!audioBase64) {
-      throw new TTSError(
-        'synthesis_failed',
-        'No audio generated. Please try again.',
-        true
-      );
+
+    // Parse response — audios is an array of base64 strings
+    const audios = response.data?.audios;
+
+    if (!audios || !audios.length || !audios[0]) {
+      logger.error('Sarvam TTS returned empty audios array');
+      throw new TTSError('synthesis_failed', 'No audio returned from TTS.', true);
     }
-    
-    const processingTimeMs = Date.now() - startTime;
-    
-    // Estimate duration based on text length and pace
-    // Average speaking rate is ~150 words per minute, ~5 chars per word
-    const wordsEstimate = options.text.length / 5;
-    const pace = options.pace || 1.0;
-    const durationMs = Math.round((wordsEstimate / 150) * 60 * 1000 / pace);
-    
-    logger.info(`TTS complete in ${processingTimeMs}ms, estimated duration: ${durationMs}ms`);
-    
-    return {
-      audio: audioBase64,
-      durationMs,
-      languageCode: options.languageCode,
-      requestId: data.request_id,
-    };
-    
+
+    // Decode base64 to buffer
+    return Buffer.from(audios[0], 'base64');
+
   } catch (error: unknown) {
-    // Re-throw TTSError as-is
-    if (error instanceof TTSError) {
-      throw error;
-    }
-    
-    // Handle axios errors
+    if (error instanceof TTSError) throw error;
+
     if (axios.isAxiosError(error)) {
       if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-        throw new TTSError(
-          'network_error',
-          'Request timed out. Please check your connection and try again.',
-          true
-        );
+        throw new TTSError('network_error', 'TTS request timed out.', true);
       }
-      
       if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-        throw new TTSError(
-          'network_error',
-          'Network error. Please check your connection.',
-          true
-        );
+        throw new TTSError('network_error', 'Network error during TTS.', true);
       }
     }
-    
-    // Unknown error
+
     const message = error instanceof Error ? error.message : 'Unknown error';
     logger.error(`Unexpected TTS error: ${message}`);
-    throw new TTSError(
-      'synthesis_failed',
-      'Something went wrong. Please try again.',
-      true
-    );
+    throw new TTSError('synthesis_failed', 'Something went wrong with TTS.', true);
   }
 }
 
+// --- Utilities ---
+
 /**
- * Synthesize speech for long text by chunking and concatenating.
- * Returns multiple audio segments that should be played in sequence.
- * 
- * @param text - Full text to synthesize (can exceed MAX_TEXT_LENGTH)
- * @param languageCode - Target language code
- * @param options - Additional TTS options
- * @returns Array of TTS results, one per chunk
+ * Strip WhatsApp markdown formatting for cleaner TTS.
  */
-export async function synthesizeLongText(
-  text: string,
-  languageCode: string,
-  options?: Partial<Omit<TTSOptions, 'text' | 'languageCode'>>
-): Promise<TTSResult[]> {
-  const chunks = splitTextIntoChunks(text);
-  
-  logger.info(`Synthesizing long text: ${chunks.length} chunks, total ${text.length} chars`);
-  
-  const results: TTSResult[] = [];
-  for (const chunk of chunks) {
-    const result = await synthesizeSpeech({
-      text: chunk,
-      languageCode,
-      ...options,
-    });
-    results.push(result);
+function stripWhatsAppMarkdown(text: string): string {
+  return text
+    .replace(/\*([^*]+)\*/g, '$1')          // *bold* → bold
+    .replace(/_([^_]+)_/g, '$1')            // _italic_ → italic
+    .replace(/~([^~]+)~/g, '$1')            // ~strike~ → strike
+    .replace(/```[^`]*```/g, '')            // ```code blocks``` → remove
+    .replace(/`([^`]+)`/g, '$1')            // `code` → code
+    .replace(/[📊⚡🛒💰🔋🏠✅❌🎯📈📉💵🔄⚙️🎤📄🔊]/g, '') // Remove emojis
+    .replace(/\n{3,}/g, '\n\n')             // Collapse excess newlines
+    .trim();
+}
+
+/**
+ * Normalize language code for Sarvam TTS API.
+ */
+function normalizeLanguageCode(code: string): string {
+  if (code.includes('-')) return code;
+  const mapping: Record<string, string> = {
+    'hi': 'hi-IN', 'bn': 'bn-IN', 'ta': 'ta-IN', 'te': 'te-IN',
+    'kn': 'kn-IN', 'ml': 'ml-IN', 'mr': 'mr-IN', 'gu': 'gu-IN',
+    'pa': 'pa-IN', 'od': 'od-IN', 'en': 'en-IN',
+  };
+  return mapping[code] || 'en-IN';
+}
+
+/**
+ * Split text into chunks at sentence boundaries.
+ */
+function splitTextIntoChunks(text: string, maxLength: number): string[] {
+  if (text.length <= maxLength) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLength) {
+      chunks.push(remaining.trim());
+      break;
+    }
+
+    let splitAt = -1;
+    const searchRange = remaining.substring(0, maxLength);
+
+    // Try sentence boundaries
+    for (const delimiter of ['. ', '? ', '! ', '। ', '\n']) {
+      const idx = searchRange.lastIndexOf(delimiter);
+      if (idx > maxLength * 0.3) {
+        splitAt = idx + delimiter.length;
+        break;
+      }
+    }
+
+    // Fallback: comma or space
+    if (splitAt === -1) {
+      const commaIdx = searchRange.lastIndexOf(', ');
+      if (commaIdx > maxLength * 0.3) {
+        splitAt = commaIdx + 2;
+      } else {
+        const spaceIdx = searchRange.lastIndexOf(' ');
+        splitAt = spaceIdx > 0 ? spaceIdx + 1 : maxLength;
+      }
+    }
+
+    chunks.push(remaining.substring(0, splitAt).trim());
+    remaining = remaining.substring(splitAt).trim();
   }
-  
-  return results;
+
+  return chunks.filter(c => c.length > 0);
 }

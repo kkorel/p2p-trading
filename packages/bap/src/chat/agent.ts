@@ -28,7 +28,7 @@ import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase,
 import { askLLM, classifyIntent, composeResponse, extractNameWithLLM, extractPhoneWithLLM, extractOtpWithLLM, matchDiscomWithLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
-import { sendProactiveMessage, isWhatsAppConnected, getWhatsAppBotNumber } from './whatsapp';
+import { sendProactiveMessage, isWhatsAppConnected } from './whatsapp';
 import { normalizeVoiceInput } from './voice-normalizer';
 
 const logger = createLogger('OorjaAgent');
@@ -1424,13 +1424,13 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
   // Build text message (fallback for WhatsApp/Telegram)
   const textMessage = selectionType === 'single' && offers.length === 1
     ? h(ctx,
-        `Found a match!\n\n• Seller: ${offers[0].providerName}\n• ${offers[0].quantity} kWh at Rs ${offers[0].price}/unit\n• Total: Rs ${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• Time: ${offers[0].timeWindow}\n\nDo you want to buy this?`,
-        `ऑफ़र मिल गया!\n\n• विक्रेता: ${offers[0].providerName}\n• ${offers[0].quantity} यूनिट ₹${offers[0].price}/यूनिट पर\n• कुल: ₹${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• समय: ${offers[0].timeWindow}\n\nये खरीदना है?`
-      )
+      `Found a match!\n\n• Seller: ${offers[0].providerName}\n• ${offers[0].quantity} kWh at Rs ${offers[0].price}/unit\n• Total: Rs ${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• Time: ${offers[0].timeWindow}\n\nDo you want to buy this?`,
+      `ऑफ़र मिल गया!\n\n• विक्रेता: ${offers[0].providerName}\n• ${offers[0].quantity} यूनिट ₹${offers[0].price}/यूनिट पर\n• कुल: ₹${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• समय: ${offers[0].timeWindow}\n\nये खरीदना है?`
+    )
     : h(ctx,
-        `Found best deals from ${offers.length} sellers!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nTotal: ${matchedOffersCard.summary.totalQuantity} kWh | Rs ${matchedOffersCard.summary.totalPrice.toFixed(2)}\nTime: ${timeWindow}\n\nAccept this deal?`,
-        `${offers.length} विक्रेताओं से बेस्ट डील मिली!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} यूनिट × ₹${o.price}/यूनिट = ₹${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nकुल: ${matchedOffersCard.summary.totalQuantity} यूनिट | ₹${matchedOffersCard.summary.totalPrice.toFixed(2)}\nसमय: ${timeWindow}\n\nये डील मंज़ूर है?`
-      );
+      `Found best deals from ${offers.length} sellers!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nTotal: ${matchedOffersCard.summary.totalQuantity} kWh | Rs ${matchedOffersCard.summary.totalPrice.toFixed(2)}\nTime: ${timeWindow}\n\nAccept this deal?`,
+      `${offers.length} विक्रेताओं से बेस्ट डील मिली!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} यूनिट × ₹${o.price}/यूनिट = ₹${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nकुल: ${matchedOffersCard.summary.totalQuantity} यूनिट | ₹${matchedOffersCard.summary.totalPrice.toFixed(2)}\nसमय: ${timeWindow}\n\nये डील मंज़ूर है?`
+    );
 
   return {
     messages: [
@@ -3237,7 +3237,6 @@ const states: Record<ChatState, StateHandler> = {
       // Send WhatsApp welcome for new users who registered via web
       if (result.isNewUser && ctx._platform === 'WEB' && ctx.phone && isWhatsAppConnected()) {
         const userName = ctx.name || 'friend';
-        const botNumber = getWhatsAppBotNumber();
         const welcomeMsg = h(ctx,
           `Hi ${userName}! Welcome to Oorja. You just registered on our website. You can continue chatting here on WhatsApp anytime! Just message me to pick up where you left off.`,
           `Namaste ${userName}! Oorja mein aapka swagat hai. Aapne website pe register kiya. Aap WhatsApp pe bhi baat kar sakte ho! Bas message bhejo.`
