@@ -1948,19 +1948,33 @@ async function handlePendingAutoBuyInput(ctx: SessionContext, message: string): 
         };
       }
 
-      // Move to max price step with slider
+      // Move to max price step with slider - show DISCOM comparison
+      const discomRate = 7.5; // DISCOM peak rate
+      const recommendedMax = 6; // Recommended max price
+      const savingsAtRecommended = Math.round(((discomRate - recommendedMax) / discomRate) * 100);
+
       return {
         messages: [{
           text: h(ctx,
-            `📝 *${qty} units daily*\n\nWhat's the maximum price per unit you're willing to pay?`,
-            `📝 *${qty} यूनिट रोज़*\n\nप्रति यूनिट अधिकतम कितना दाम दोगे?`
+            `📝 *${qty} units daily*\n\n` +
+            `💡 *Pricing Guide*\n` +
+            `• DISCOM rate: ₹${discomRate}/unit\n` +
+            `• Market range: ₹4-6/unit\n` +
+            `• Recommended max: ₹${recommendedMax}/unit (~${savingsAtRecommended}% savings)\n\n` +
+            `What's the maximum price per unit you're willing to pay?`,
+            `📝 *${qty} यूनिट रोज़*\n\n` +
+            `💡 *प्राइसिंग गाइड*\n` +
+            `• DISCOM दर: ₹${discomRate}/यूनिट\n` +
+            `• मार्केट रेंज: ₹4-6/यूनिट\n` +
+            `• सुझाव: ₹${recommendedMax}/यूनिट (~${savingsAtRecommended}% बचत)\n\n` +
+            `प्रति यूनिट अधिकतम कितना दाम दोगे?`
           ),
           slider: {
             type: 'price',
             min: 4,
-            max: 10,
+            max: 8,
             step: 0.5,
-            defaultValue: 6,
+            defaultValue: recommendedMax,
             unit: '₹/unit',
             callbackPrefix: 'autobuy_price',
           },
@@ -1981,15 +1995,25 @@ async function handlePendingAutoBuyInput(ctx: SessionContext, message: string): 
       }
 
       if (!price || price <= 0) {
+        const discomRate = 7.5;
+        const recommendedMax = 6;
+        const savingsAtRecommended = Math.round(((discomRate - recommendedMax) / discomRate) * 100);
         return {
           messages: [{
-            text: h(ctx, 'Please select or enter a valid price:', 'सही दाम चुनो या लिखो:'),
+            text: h(ctx,
+              `Please enter a valid price.\n\n` +
+              `💡 DISCOM rate: ₹${discomRate}/unit\n` +
+              `Recommended: ₹${recommendedMax}/unit (~${savingsAtRecommended}% savings)`,
+              `सही दाम डालो।\n\n` +
+              `💡 DISCOM दर: ₹${discomRate}/यूनिट\n` +
+              `सुझाव: ₹${recommendedMax}/यूनिट (~${savingsAtRecommended}% बचत)`
+            ),
             slider: {
               type: 'price',
               min: 4,
-              max: 10,
+              max: 8,
               step: 0.5,
-              defaultValue: 6,
+              defaultValue: recommendedMax,
               unit: '₹/unit',
               callbackPrefix: 'autobuy_price',
             },
