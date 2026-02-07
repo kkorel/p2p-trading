@@ -13,7 +13,7 @@
  */
 
 import axios from 'axios';
-import { config, createLogger, Order, prisma, secureAxiosBpp } from '@p2p/shared';
+import { config, createLogger, Order, prisma } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
@@ -199,11 +199,14 @@ export async function writeTradeToLedger(
         clientReference: `${transactionId}-${orderItemId}-${Date.now()}`,
       };
 
-      // Use secureAxiosBpp for signed requests (same as CDS publish)
-      const response = await secureAxiosBpp.post<LedgerWriteResponse>(
+      // Plain POST without signing (per Postman collection - ledger doesn't use Beckn signing)
+      const response = await axios.post<LedgerWriteResponse>(
         `${ledgerUrl}/ledger/put`,
         request,
-        { timeout: 10000 }
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10000,
+        }
       );
 
       if (response.data.success) {
@@ -278,10 +281,14 @@ async function writeSingleRecord(
     clientReference: `${opts.transactionId}-${opts.orderItemId}-${Date.now()}`,
   };
 
-  // Use secureAxiosBpp for signed requests (same as CDS publish)
-  const response = await secureAxiosBpp.post<LedgerWriteResponse>(
-    `${ledgerUrl}/ledger/put`, request,
-    { timeout: 10000 }
+  // Plain POST without signing (per Postman collection - ledger doesn't use Beckn signing)
+  const response = await axios.post<LedgerWriteResponse>(
+    `${ledgerUrl}/ledger/put`,
+    request,
+    {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 10000,
+    }
   );
 
   return response.data.success
