@@ -4500,6 +4500,37 @@ const states: Record<ChatState, StateHandler> = {
 
           case 'solar_advice': {
             const { getUserSolarAdvisory, getSolarTips } = await import('../auto-trade');
+
+            // Check if user mentioned past rain (it rained, baarish hui, etc.)
+            const mentionedPastRain = /rained|baarish (hui|ho gayi|thi)|barish (hui|ho gayi)|rain (this|today|yesterday)/i.test(message);
+
+            if (mentionedPastRain) {
+              // Give specific post-rain advice
+              return {
+                messages: [{
+                  text: h(ctx,
+                    '🌧️ *Post-Rain Panel Check*\n\nRain is nature\'s free panel cleaner! But sometimes residue remains.\n\n' +
+                    '✅ *Quick Check:*\n' +
+                    '1. Look for water spots or dried dirt patches\n' +
+                    '2. Check edges where dust accumulates\n' +
+                    '3. If residue visible, wipe with soft cloth\n\n' +
+                    '💡 Clean panels = 10-15% more power generation!',
+                    '🌧️ *बारिश के बाद पैनल चेक*\n\nबारिश मुफ्त में पैनल साफ करती है! लेकिन कभी-कभी गंदगी रह जाती है।\n\n' +
+                    '✅ *जल्दी चेक करो:*\n' +
+                    '1. पानी के धब्बे या सूखी मिट्टी देखो\n' +
+                    '2. किनारों पर धूल जमा होती है\n' +
+                    '3. गंदगी दिखे तो मुलायम कपड़े से पोंछो\n\n' +
+                    '💡 साफ पैनल = 10-15% ज़्यादा बिजली!'
+                  ),
+                  buttons: [
+                    { text: h(ctx, '✅ Panels look clean', '✅ पैनल साफ हैं'), callbackData: 'action:log_cleaning' },
+                    { text: h(ctx, '📋 More tips', '📋 और टिप्स'), callbackData: 'action:solar_tips' },
+                  ],
+                }],
+              };
+            }
+
+            // Regular advisory check
             const advisory = await getUserSolarAdvisory(ctx.userId!, ctx.language === 'hi-IN');
 
             if (advisory) {
