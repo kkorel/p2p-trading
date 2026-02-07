@@ -3781,18 +3781,33 @@ const states: Record<ChatState, StateHandler> = {
                   infoText = '\n\n⚠️ ' + tradeResult.warningMessage;
                 }
 
+                // Calculate tomorrow's 6 AM - 6 PM for the offer card
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const offerStartTime = new Date(tomorrow);
+                offerStartTime.setHours(6, 0, 0, 0);
+                const offerEndTime = new Date(tomorrow);
+                offerEndTime.setHours(18, 0, 0, 0);
+
+                // Get user's trade limit percentage
+                const userForLimit = await prisma.user.findUnique({
+                  where: { id: ctx.userId! },
+                  select: { allowedTradeLimit: true },
+                });
+                const tradeLimitPct = userForLimit?.allowedTradeLimit || 10;
+
                 return {
                   messages: [
                     {
                       text: h(ctx,
-                        `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${smartPrice}/unit.\n\nMonthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and add listings automatically.${infoText}`,
-                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं *${listedQty} kWh* ₹${smartPrice}/यूनिट पर लिस्ट कर रहा हूं।\n\nमासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।${infoText}`
+                        `✅ Auto-sell activated!\n\n🌤️ Based on tomorrow's weather forecast (${weatherPercent}% solar efficiency) and your ${tradeLimitPct}% trade limit, I've listed *${listedQty} kWh* at ₹${smartPrice}/unit.\n\n📊 Monthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the weather and your existing listings, then add what's needed.${infoText}`,
+                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर एफिशिएंसी) और आपकी ${tradeLimitPct}% ट्रेड लिमिट के हिसाब से, मैंने *${listedQty} kWh* ₹${smartPrice}/यूनिट पर लिस्ट किया है।\n\n📊 मासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे मौसम और मौजूदा लिस्टिंग देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।${infoText}`
                       ),
                       offerCreated: {
                         quantity: tradeResult.listedQuantity,
                         pricePerKwh: smartPrice,
-                        startTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                        endTime: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
+                        startTime: offerStartTime.toISOString(),
+                        endTime: offerEndTime.toISOString(),
                         energyType: 'SOLAR',
                       },
                       buttons: [
