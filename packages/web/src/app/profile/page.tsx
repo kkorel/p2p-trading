@@ -189,10 +189,17 @@ function P2PValueInsight() {
 
 
 const CREDENTIAL_META: Record<string, { icon: any; label: string }> = {
-  UTILITY_CUSTOMER: { icon: User, label: 'Utility Customer' },
+  // DEG-style credential type names (from backend)
+  UtilityCustomerCredential: { icon: User, label: 'Electricity Connection' },
+  GenerationProfileCredential: { icon: Sun, label: 'Solar Generation' },
+  ConsumptionProfileCredential: { icon: BarChart2, label: 'Consumption Profile' },
+  StorageProfileCredential: { icon: Battery, label: 'Battery Storage' },
+  UtilityProgramEnrollmentCredential: { icon: Award, label: 'Program Enrollment' },
+  // Legacy DB-style names (for backward compat)
+  UTILITY_CUSTOMER: { icon: User, label: 'Electricity Connection' },
+  GENERATION_PROFILE: { icon: Sun, label: 'Solar Generation' },
   CONSUMPTION_PROFILE: { icon: BarChart2, label: 'Consumption Profile' },
-  GENERATION_PROFILE: { icon: Sun, label: 'Generation Profile' },
-  STORAGE_PROFILE: { icon: Battery, label: 'Storage Profile' },
+  STORAGE_PROFILE: { icon: Battery, label: 'Battery Storage' },
   PROGRAM_ENROLLMENT: { icon: Award, label: 'Program Enrollment' },
 };
 

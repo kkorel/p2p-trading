@@ -22,6 +22,9 @@ import {
   extractNormalizedStorageProfileClaims,
   extractNormalizedProgramEnrollmentClaims,
   getIssuerId,
+  analyzeInstallation,
+  getSatelliteImageUrl,
+  type SolarAnalysis,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
 import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, generateDashboardData, getMarketInsights, getActivitySummary, getTopDeals, getBrowseMarketTable, getActiveListingsData, type ListingsCardData } from './trading-agent';
@@ -545,7 +548,92 @@ async function processCredentialUpload(
     }
   }
 
+  // Trigger solar analysis for address-based trading limits
+  // Run in background (fire-and-forget) for fast response
+  if (detectedType === 'UtilityCustomerCredential' && claims.installationAddress) {
+    logger.info(`[Chat] Triggering solar analysis for user ${userId} (UtilityCustomerCredential with address)`);
+    runSolarAnalysisForUser(userId, claims.installationAddress);
+  } else if (detectedType === 'GenerationProfileCredential' || detectedType === 'StorageProfileCredential') {
+    // Fallback: trigger if user has address from prior Utility VC but no solar analysis yet
+    const userWithAddress = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { installationAddress: true, solarAnalysis: true },
+    });
+    if (userWithAddress?.installationAddress && !userWithAddress.solarAnalysis) {
+      logger.info(`[Chat] Triggering solar analysis for user ${userId} (${detectedType} with existing address)`);
+      runSolarAnalysisForUser(userId, userWithAddress.installationAddress);
+    }
+  }
+
   return { success: true, credType: detectedType, summary, claims };
+}
+
+/**
+ * Run solar analysis in background (fire-and-forget).
+ * Updates UserSolarAnalysis and sets allowedTradeLimit (7-15%).
+ */
+async function runSolarAnalysisForUser(userId: string, address: string): Promise<void> {
+  try {
+    const analysis = await analyzeInstallation(address);
+
+    // Get satellite image URL if we have coordinates
+    let satelliteImageUrl: string | null = null;
+    if (analysis.location?.lat && analysis.location?.lon) {
+      satelliteImageUrl = getSatelliteImageUrl(analysis.location.lat, analysis.location.lon);
+    }
+
+    // Upsert UserSolarAnalysis record
+    await prisma.userSolarAnalysis.upsert({
+      where: { userId },
+      create: {
+        userId,
+        available: analysis.available,
+        latitude: analysis.location?.lat || null,
+        longitude: analysis.location?.lon || null,
+        formattedAddress: analysis.location?.formattedAddress || null,
+        maxSunshineHours: analysis.maxSunshineHours || null,
+        maxPanelCount: analysis.maxPanelCount || null,
+        yearlyEnergyKwh: analysis.yearlyEnergyKwh || null,
+        roofAreaM2: analysis.roofAreaM2 || null,
+        imageryQuality: analysis.imageryQuality || null,
+        carbonOffsetKg: analysis.carbonOffsetKg || null,
+        installationScore: analysis.installationScore,
+        tradingLimitPercent: analysis.tradingLimitPercent,
+        verificationMethod: analysis.verificationMethod,
+        errorReason: analysis.errorReason || null,
+        satelliteImageUrl,
+        analyzedAt: analysis.analyzedAt,
+      },
+      update: {
+        available: analysis.available,
+        latitude: analysis.location?.lat || null,
+        longitude: analysis.location?.lon || null,
+        formattedAddress: analysis.location?.formattedAddress || null,
+        maxSunshineHours: analysis.maxSunshineHours || null,
+        maxPanelCount: analysis.maxPanelCount || null,
+        yearlyEnergyKwh: analysis.yearlyEnergyKwh || null,
+        roofAreaM2: analysis.roofAreaM2 || null,
+        imageryQuality: analysis.imageryQuality || null,
+        carbonOffsetKg: analysis.carbonOffsetKg || null,
+        installationScore: analysis.installationScore,
+        tradingLimitPercent: analysis.tradingLimitPercent,
+        verificationMethod: analysis.verificationMethod,
+        errorReason: analysis.errorReason || null,
+        satelliteImageUrl,
+        analyzedAt: analysis.analyzedAt,
+      },
+    });
+
+    // Update user's allowedTradeLimit
+    await prisma.user.update({
+      where: { id: userId },
+      data: { allowedTradeLimit: analysis.tradingLimitPercent },
+    });
+
+    logger.info(`[Chat] ✓ Solar analysis complete for user ${userId}: limit=${analysis.tradingLimitPercent}%, score=${analysis.installationScore.toFixed(2)}`);
+  } catch (error: any) {
+    logger.warn(`[Chat] Solar analysis failed for user ${userId}: ${error.message}`);
+  }
 }
 
 function degTypeToDbType(degType: string): any {

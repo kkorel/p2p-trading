@@ -1997,39 +1997,32 @@ router.get('/me/credentials', authMiddleware, async (req: Request, res: Response
     }
 
     // Build list of credentials based on user's verification status
-    const credentials: Array<{
-      type: string;
-      status: 'verified' | 'pending' | 'not_submitted';
-      description: string;
-      verifiedAt?: string;
-      details?: Record<string, any>;
-    }> = [];
-
-    // Utility Customer Credential (required for energy trading)
-    credentials.push({
-      type: 'UtilityCustomerCredential',
-      status: user.meterDataAnalyzed ? 'verified' : 'not_submitted',
-      description: 'Proof of connection to the electricity grid',
-      details: user.meterDataAnalyzed ? {
-        verifiedCapacity: user.meterVerifiedCapacity,
-        pdfUploaded: !!user.meterPdfUrl,
-      } : undefined,
+    // Fetch actual credentials from database
+    const userCredentials = await prisma.userCredential.findMany({
+      where: { userId: req.user!.id },
+      orderBy: { createdAt: 'asc' },
     });
 
-    // DER Certificate (for sellers with solar panels)
-    if (user.providerId) {
-      credentials.push({
-        type: 'DERCertificateCredential',
-        status: 'pending', // Would check against stored VC
-        description: 'Certificate proving ownership of Distributed Energy Resource (e.g., solar panel)',
-      });
-    }
+    // Map DB credential types to display names
+    const CRED_TYPE_MAP: Record<string, string> = {
+      'UTILITY_CUSTOMER': 'UtilityCustomerCredential',
+      'GENERATION_PROFILE': 'GenerationProfileCredential',
+      'CONSUMPTION_PROFILE': 'ConsumptionProfileCredential',
+      'STORAGE_PROFILE': 'StorageProfileCredential',
+      'PROGRAM_ENROLLMENT': 'UtilityProgramEnrollmentCredential',
+    };
+
+    const credentials = userCredentials.map(cred => ({
+      type: CRED_TYPE_MAP[cred.credentialType] || cred.credentialType,
+      verified: cred.verified,
+      verifiedAt: cred.verifiedAt?.toISOString() || null,
+    }));
 
     res.json({
       success: true,
       credentials,
-      totalVerified: credentials.filter(c => c.status === 'verified').length,
-      totalPending: credentials.filter(c => c.status === 'pending').length,
+      totalVerified: credentials.filter(c => c.verified).length,
+      totalPending: credentials.filter(c => !c.verified).length,
     });
   } catch (error: any) {
     logger.error(`Get credentials error: ${error}`);
