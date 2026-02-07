@@ -186,6 +186,11 @@ export function createSecureAxiosInstance(useBppKeys: boolean = false): AxiosIns
   instance.interceptors.request.use(
     (config) => {
       const keyPair = useBppKeys ? (bppKeyPair || clientKeyPair) : clientKeyPair;
+      if (!signingEnabled) {
+        logger.warn(`[SIGNING-DISABLED] Request to ${config.url} sent WITHOUT signature`);
+      } else if (!keyPair) {
+        logger.warn(`[NO-KEYPAIR] Request to ${config.url} sent WITHOUT signature (no ${useBppKeys ? 'BPP' : 'BAP'} keys)`);
+      }
       if (
         signingEnabled &&
         keyPair &&
@@ -198,11 +203,10 @@ export function createSecureAxiosInstance(useBppKeys: boolean = false): AxiosIns
           Object.entries(signedHeaders).forEach(([key, value]) => {
             config.headers.set(key, value);
           });
-          logger.debug('Request signed', {
-            url: config.url,
-            keyId: keyPair.keyId,
-            role: useBppKeys ? 'BPP' : 'BAP'
-          });
+          // Log headers for debugging
+          logger.info(`[SIGNED-REQUEST] ${config.url}`);
+          logger.info(`[SIGNED-REQUEST] Authorization: ${signedHeaders['Authorization']?.substring(0, 100)}...`);
+          logger.info(`[SIGNED-REQUEST] keyId: ${keyPair.keyId}, role: ${useBppKeys ? 'BPP' : 'BAP'}`);
         } catch (error: any) {
           logger.error('Failed to sign request', { url: config.url, error: error.message });
         }
