@@ -4487,8 +4487,9 @@ export async function processMessage(
   // 1. Structured input (numbers, callbacks) → keep existing preference
   // 2. Voice input → KEEP existing preference (don't switch based on detected language)
   // 3. File uploads → KEEP existing preference (label is always English)
-  // 4. Native Indic script detected in TEXT → switch to that language
-  // 5. English detected in TEXT → switch to English
+  // 4. If language already set → KEEP it (don't switch to English for English input like names)
+  // 5. Native Indic script detected in TEXT → switch to that language
+  // 6. First message in English → default to English
   let userLang: SarvamLangCode;
   if (isStructuredInput || isCallbackData) {
     // Don't change language on button presses or numeric input
@@ -4503,11 +4504,19 @@ export async function processMessage(
     // User may say English words (like names) but expects response in their chosen language
     userLang = (ctx.language || 'en-IN') as SarvamLangCode;
     logger.info(`[Voice] Keeping existing language preference: ${userLang} (detected: ${detectedLang})`);
+  } else if (ctx.language && ctx.language !== 'en-IN' && detectedLang === 'en-IN') {
+    // IMPORTANT: If language is already set to non-English, KEEP it even if user types English
+    // Users often type English words (names, numbers, addresses) while expecting response in their language
+    userLang = ctx.language as SarvamLangCode;
+    logger.info(`[Language] Keeping ${userLang} despite English input: "${userMessage.substring(0, 30)}"`);
   } else if (detectedLang !== 'en-IN') {
     // Native Indic script typed (Devanagari, Bengali, etc.) → switch to that language
     userLang = detectedLang;
+  } else if (ctx.language) {
+    // Language already set, keep it
+    userLang = ctx.language as SarvamLangCode;
   } else {
-    // English typed → switch to English
+    // First message, default to English
     userLang = 'en-IN';
   }
 
