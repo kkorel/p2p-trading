@@ -438,7 +438,9 @@ export function useChatEngine() {
       const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
       const isJson = file.type === 'application/json' || file.name.endsWith('.json');
       // Use localStorage as source of truth for language (more reliable than React state)
-      const currentLang = (typeof window !== 'undefined' && localStorage.getItem('oorja_language')) || responseLanguage;
+      const storedLang = typeof window !== 'undefined' ? localStorage.getItem('oorja_language') : null;
+      const currentLang = storedLang || responseLanguage;
+      console.log(`[Upload] Language: stored=${storedLang}, state=${responseLanguage}, using=${currentLang}`);
       const msgs = getUploadMessages(currentLang);
 
       if (!isPdf && !isJson) {

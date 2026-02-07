@@ -3491,6 +3491,13 @@ const states: Record<ChatState, StateHandler> = {
                     `Done! Your energy is now listed for sale:\n${o.quantity} kWh at Rs ${o.pricePerKwh}/unit, tomorrow 6AM-6PM.\n\nBuyers can now purchase your energy!`,
                     `हो गया! आपकी बिजली अब बिकने को तैयार है:\n${o.quantity} यूनिट ₹${o.pricePerKwh} प्रति यूनिट पे, कल सुबह 6 से शाम 6 तक।\n\nअब खरीदार आपकी बिजली खरीद सकते हैं!`
                   ),
+                  offerCreated: {
+                    quantity: o.quantity,
+                    pricePerKwh: o.pricePerKwh,
+                    startTime: o.startTime,
+                    endTime: o.endTime,
+                    energyType: 'SOLAR',
+                  },
                   buttons: [
                     { text: h(ctx, '📋 View My Listings', '📋 मेरी लिस्टिंग देखो'), callbackData: 'action:show_listings' },
                     { text: h(ctx, '🔋 Buy Energy', '🔋 बिजली खरीदो'), callbackData: 'action:buy_energy' },

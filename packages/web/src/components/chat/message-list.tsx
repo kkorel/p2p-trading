@@ -41,6 +41,9 @@ export function MessageList({
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Debug: log language on every render
+  console.log(`[MessageList] responseLanguage = "${responseLanguage}"`);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);

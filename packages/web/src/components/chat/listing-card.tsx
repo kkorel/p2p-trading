@@ -64,6 +64,7 @@ function formatTimeWindow(startIso: string, endIso: string, isHindi: boolean): s
 }
 
 export function ListingCard({ data, language }: ListingCardProps) {
+  console.log(`[ListingCard] language prop = "${language}", isHindi = ${language === 'hi-IN'}`);
   const isHindi = language === 'hi-IN';
 
   return (

@@ -40,6 +40,7 @@ function getTrustColor(score: number): { bg: string; text: string; border: strin
 }
 
 export function DashboardCard({ data, language, onExplain }: DashboardCardProps) {
+  console.log(`[DashboardCard] language prop = "${language}", isHindi = ${language === 'hi-IN'}`);
   const isHindi = language === 'hi-IN';
   const trustColor = getTrustColor(data.trustScore);
 

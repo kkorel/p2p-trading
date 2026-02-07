@@ -153,6 +153,11 @@ export function ChatPage() {
     }
   }, [isAutoPlayActive, setAutoPlay, messages, responseLanguage, speaker, pace, playTTS, stopTTS]);
   
+  // Debug: log responseLanguage changes
+  useEffect(() => {
+    console.log(`[ChatPage] responseLanguage changed to: "${responseLanguage}"`);
+  }, [responseLanguage]);
+
   // Refresh balance + stats when new agent messages arrive (e.g. after auth, offer creation)
   useEffect(() => {
     if (messages.length > prevMsgCount.current && user) {
@@ -306,9 +311,9 @@ export function ChatPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto bg-gray-50/50">
-          <MessageList 
-            messages={messages} 
-            onButtonClick={handleButtonClick} 
+          <MessageList
+            messages={messages}
+            onButtonClick={handleButtonClick}
             isLoading={isLoading}
             responseLanguage={responseLanguage}
           />
