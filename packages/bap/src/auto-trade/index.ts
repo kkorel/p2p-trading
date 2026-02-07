@@ -54,5 +54,6 @@ export {
   calculateWindMultiplier,
   getBestTimeToBuyAdvice,
   getDailyWeatherSummary,
+  getTomorrowWeatherSummary,
   type DailyWeatherSummary,
 } from './weather-integration';

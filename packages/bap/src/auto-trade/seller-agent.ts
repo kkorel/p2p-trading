@@ -8,7 +8,7 @@ import { addCatalogItem, addOffer, getProviderOffers } from '../seller-catalog';
 import {
   getWeatherForAddress,
   calculateSolarMultiplier,
-  getDailyWeatherSummary,
+  getTomorrowWeatherSummary,
   type DailyWeatherSummary,
 } from './weather-integration';
 import { createLogger } from '@p2p/shared';
@@ -149,7 +149,8 @@ async function executeSellerAutoTrade(
   if (user.installationAddress) {
     const forecast = await getWeatherForAddress(user.installationAddress);
     if (forecast) {
-      weatherSummary = getDailyWeatherSummary(forecast);
+      // Use TOMORROW's weather since we're listing for tomorrow
+      weatherSummary = getTomorrowWeatherSummary(forecast);
       weatherMultiplier = weatherSummary.solarMultiplier;
     }
   }
@@ -438,7 +439,8 @@ export async function previewAutoTrade(userId: string): Promise<{
   if (user.installationAddress) {
     const forecast = await getWeatherForAddress(user.installationAddress);
     if (forecast) {
-      const summary = getDailyWeatherSummary(forecast);
+      // Use TOMORROW's weather for preview since listing is for tomorrow
+      const summary = getTomorrowWeatherSummary(forecast);
       weatherMultiplier = summary.solarMultiplier;
       condition = summary.condition;
       bestWindow = summary.bestWindow;

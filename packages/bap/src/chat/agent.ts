@@ -4178,84 +4178,86 @@ const states: Record<ChatState, StateHandler> = {
               };
             }
 
-            // Extract params or ask
-            const capacity = intent.params?.capacity_kwh;
-            const price = intent.params?.price_per_kwh;
+            // Auto-detect capacity from user's credentials
+            const userData = await prisma.user.findUnique({
+              where: { id: ctx.userId! },
+              include: { provider: true },
+            });
 
-            if (capacity && price) {
-              // Setup auto-trade and run immediately
-              const { setupSellerAutoTrade, runSingleSellerAutoTrade } = await import('../auto-trade');
-              const setupResult = await setupSellerAutoTrade(ctx.userId!, capacity, price);
+            // Get capacity from: meter verified > user declared > provider credential > default
+            const detectedCapacity = userData?.meterVerifiedCapacity
+              || userData?.productionCapacity
+              || userData?.provider?.capacityKW
+              || 10; // Default 10 kWh if nothing found
 
-              if (setupResult.success) {
-                // Run the first auto-trade immediately instead of waiting for 6 AM
-                const tradeResult = await runSingleSellerAutoTrade(ctx.userId!);
+            // Smart price: ₹6/unit (between DISCOM peak ₹7.50 and net metering ₹2)
+            const smartPrice = 6;
 
-                if (tradeResult && (tradeResult.status === 'success' || tradeResult.status === 'warning_oversell')) {
-                  const weatherPercent = Math.round(tradeResult.weatherMultiplier * 100);
-                  const listedQty = tradeResult.listedQuantity.toFixed(1);
+            // Use user-provided values if available, otherwise use detected/smart defaults
+            const capacity = intent.params?.capacity_kwh || detectedCapacity;
+            const price = intent.params?.price_per_kwh || smartPrice;
 
-                  let warningText = '';
-                  if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
-                    warningText = '\n\n⚠️ ' + tradeResult.warningMessage;
-                  }
+            // Setup auto-trade and run immediately - no questions asked!
+            const { setupSellerAutoTrade, runSingleSellerAutoTrade } = await import('../auto-trade');
+            const setupResult = await setupSellerAutoTrade(ctx.userId!, capacity, price);
 
-                  return {
-                    messages: [{
-                      text: h(ctx,
-                        `✅ Auto-sell activated!\n\n🌤️ Looking at today's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${price}/unit for tomorrow.\n\nEvery day at 6 AM, I'll:\n• Check the weather\n• Calculate your capacity\n• Create a listing automatically${warningText}`,
-                        `✅ ऑटो-सेल चालू!\n\n🌤️ आज के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं कल के लिए *${listedQty} kWh* ₹${price}/यूनिट पर लिस्ट कर रहा हूं।\n\nरोज़ सुबह 6 बजे:\n• मौसम देखूंगा\n• क्षमता गिनूंगा\n• ऑटो लिस्टिंग करूंगा${warningText}`
-                      ),
-                      buttons: [
-                        { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
-                        { text: h(ctx, '📊 Auto-Trade Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
-                        { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
-                      ],
-                    }],
-                  };
-                } else if (tradeResult && tradeResult.status === 'skipped') {
-                  // Skipped due to low capacity or other reason
-                  return {
-                    messages: [{
-                      text: h(ctx,
-                        `✅ Auto-sell enabled!\n\n⚠️ ${tradeResult.warningMessage || 'No listing created right now.'}\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.\n\nCapacity: ${capacity} kWh\nPrice: ₹${price}/unit`,
-                        `✅ ऑटो-सेल चालू!\n\n⚠️ ${tradeResult.warningMessage || 'अभी कोई लिस्टिंग नहीं बनी।'}\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।\n\nक्षमता: ${capacity} kWh\nदाम: ₹${price}/यूनिट`
-                      ),
-                      buttons: [
-                        { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
-                        { text: h(ctx, '🛑 Stop Auto-Trade', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
-                      ],
-                    }],
-                  };
+            if (setupResult.success) {
+              // Run the first auto-trade immediately
+              const tradeResult = await runSingleSellerAutoTrade(ctx.userId!);
+
+              if (tradeResult && (tradeResult.status === 'success' || tradeResult.status === 'warning_oversell')) {
+                const weatherPercent = Math.round(tradeResult.weatherMultiplier * 100);
+                const listedQty = tradeResult.listedQuantity.toFixed(1);
+
+                let warningText = '';
+                if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
+                  warningText = '\n\n⚠️ ' + tradeResult.warningMessage;
                 }
 
-                // Error or no result - still enabled but first trade failed
                 return {
                   messages: [{
                     text: h(ctx,
-                      `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nCapacity: ${capacity} kWh\nPrice: ₹${price}/unit`,
-                      `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा उपलब्ध नहीं'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nक्षमता: ${capacity} kWh\nदाम: ₹${price}/यूनिट`
+                      `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output), I'm listing *${listedQty} kWh* at ₹${price}/unit.\n\nYour capacity: ${capacity} kWh\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
+                      `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए, मैं *${listedQty} kWh* ₹${price}/यूनिट पर लिस्ट कर रहा हूं।\n\nआपकी क्षमता: ${capacity} kWh\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
+                    ),
+                    buttons: [
+                      { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
+                      { text: h(ctx, '📊 Status', '📊 स्टेटस'), callbackData: 'action:check_auto_trade' },
+                      { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                    ],
+                  }],
+                };
+              } else if (tradeResult && tradeResult.status === 'skipped') {
+                return {
+                  messages: [{
+                    text: h(ctx,
+                      `✅ Auto-sell enabled!\n\n⚠️ ${tradeResult.warningMessage || 'No listing created right now.'}\n\nYour capacity: ${capacity} kWh at ₹${price}/unit\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.`,
+                      `✅ ऑटो-सेल चालू!\n\n⚠️ ${tradeResult.warningMessage || 'अभी कोई लिस्टिंग नहीं बनी।'}\n\nआपकी क्षमता: ${capacity} kWh, दाम: ₹${price}/यूनिट\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।`
                     ),
                     buttons: [
                       { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
-                      { text: h(ctx, '🛑 Stop Auto-Trade', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                      { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
                     ],
                   }],
                 };
               }
+
+              // Error or no result - still enabled but first trade failed
               return {
-                messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
+                messages: [{
+                  text: h(ctx,
+                    `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nYour capacity: ${capacity} kWh at ₹${price}/unit`,
+                    `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा नहीं मिला'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nआपकी क्षमता: ${capacity} kWh, दाम: ₹${price}/यूनिट`
+                  ),
+                  buttons: [
+                    { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
+                    { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
+                  ],
+                }],
               };
             }
-
-            // Ask for details
             return {
-              messages: [{
-                text: h(ctx,
-                  '🤖 *Set Up Auto-Sell*\n\nI can sell energy for you automatically every day!\n\nTell me:\n• Your solar panel capacity (kWh)\n• Your desired price per unit\n\nExample: "I have 10 kWh capacity and want ₹6 per unit"',
-                  '🤖 *ऑटो-सेल सेटअप*\n\nमैं रोज़ आपके लिए बिजली बेच सकता हूं!\n\nबताओ:\n• सोलर पैनल की क्षमता (kWh)\n• प्रति यूनिट दाम\n\nउदाहरण: "मेरे पास 10 kWh है, ₹6 प्रति यूनिट चाहिए"'
-                ),
-              }],
+              messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
             };
           }
 

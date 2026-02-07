@@ -127,7 +127,7 @@ export function checkRainExpected(forecast: WeatherForecast): boolean {
 }
 
 /**
- * Get today's weather summary for auto-trade
+ * Get weather summary for auto-trade
  */
 export interface DailyWeatherSummary {
   avgCloudCover: number;
@@ -137,12 +137,15 @@ export interface DailyWeatherSummary {
   rainExpected: boolean;
 }
 
-export function getDailyWeatherSummary(forecast: WeatherForecast): DailyWeatherSummary {
-  const avgCloudCover = getAverageCloudCover(forecast);
+/**
+ * Get weather summary for a specific date (default: today)
+ */
+export function getDailyWeatherSummary(forecast: WeatherForecast, date: Date = new Date()): DailyWeatherSummary {
+  const avgCloudCover = getAverageCloudCoverForDate(forecast, date);
   const solarMultiplier = calculateSolarMultiplier(avgCloudCover);
-  const condition = getConditionString(forecast);
-  const bestWindow = findBestBuyingWindow(forecast);
-  const rainExpected = checkRainExpected(forecast);
+  const condition = getConditionStringForDate(forecast, date);
+  const bestWindow = findBestBuyingWindow(forecast, date);
+  const rainExpected = checkRainExpectedForDate(forecast, date);
 
   return {
     avgCloudCover,
@@ -151,4 +154,71 @@ export function getDailyWeatherSummary(forecast: WeatherForecast): DailyWeatherS
     bestWindow: bestWindow ? { start: bestWindow.start, end: bestWindow.end } : null,
     rainExpected,
   };
+}
+
+/**
+ * Get tomorrow's weather summary (for auto-sell listings)
+ */
+export function getTomorrowWeatherSummary(forecast: WeatherForecast): DailyWeatherSummary {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return getDailyWeatherSummary(forecast, tomorrow);
+}
+
+/**
+ * Get average cloud cover for a specific date
+ */
+function getAverageCloudCoverForDate(
+  forecast: WeatherForecast,
+  date: Date,
+  startHour: number = 6,
+  endHour: number = 18
+): number {
+  const dayStart = new Date(date);
+  dayStart.setHours(startHour, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(endHour, 0, 0, 0);
+
+  const relevantHours = forecast.hourly.filter(h =>
+    h.time >= dayStart && h.time <= dayEnd
+  );
+
+  if (relevantHours.length === 0) return 50; // Default to 50% if no data
+
+  return relevantHours.reduce((sum, h) => sum + h.cloudCover, 0) / relevantHours.length;
+}
+
+/**
+ * Get weather condition string for a specific date
+ */
+function getConditionStringForDate(forecast: WeatherForecast, date: Date): string {
+  const avgCloud = getAverageCloudCoverForDate(forecast, date);
+  const dayStart = new Date(date);
+  dayStart.setHours(6, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(18, 0, 0, 0);
+
+  const relevantHours = forecast.hourly.filter(h =>
+    h.time >= dayStart && h.time <= dayEnd
+  );
+  const avgWind = relevantHours.length > 0
+    ? relevantHours.reduce((sum, h) => sum + h.windSpeed, 0) / relevantHours.length
+    : 10;
+
+  return getWeatherConditionString(avgCloud, avgWind);
+}
+
+/**
+ * Check if rain is expected for a specific date
+ */
+function checkRainExpectedForDate(forecast: WeatherForecast, date: Date): boolean {
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const dayHours = forecast.hourly.filter(h =>
+    h.time >= dayStart && h.time <= dayEnd
+  );
+  return dayHours.some(h => h.precipitation > 5);
 }
