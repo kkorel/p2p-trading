@@ -4383,11 +4383,13 @@ export async function processMessage(
       if (user) {
         // User exists but hasn't completed onboarding — check how far they got
         const verifiedCreds = await getVerifiedCredentials(user.id);
+        const savedLang = (user.languagePreference as any) || undefined;
         const ctx: SessionContext = {
           userId: user.id,
           name: user.name || undefined,
           phone: user.phone || undefined,
           verifiedCreds,
+          language: savedLang,
         };
 
         let startState: ChatState = 'ASK_DISCOM';
@@ -4414,7 +4416,7 @@ export async function processMessage(
         await storeMessage(session.id, 'user', userMessage);
 
         const welcomeMsg: AgentMessage = {
-          text: `Welcome, ${user.name || 'friend'}! Let's finish setting up your profile.`,
+          text: h(ctx, `Welcome, ${user.name || 'friend'}! Let's finish setting up your profile.`, `स्वागत है, ${user.name || 'दोस्त'}! चलो प्रोफाइल पूरा करते हैं।`),
         };
         const enterResp = await states[startState].onEnter(ctx);
         const allMessages = [welcomeMsg, ...enterResp.messages];
@@ -4425,10 +4427,10 @@ export async function processMessage(
           await transitionState(session.id, enterResp.newState, enterResp.contextUpdate);
           const chainResp = await states[enterResp.newState as ChatState].onEnter({ ...ctx, ...enterResp.contextUpdate });
           await storeAgentMessages(session.id, chainResp.messages);
-          return { messages: [...allMessages, ...chainResp.messages], responseLanguage: 'en-IN' };
+          return { messages: [...allMessages, ...chainResp.messages], responseLanguage: savedLang || 'en-IN' };
         }
 
-        return { messages: allMessages, responseLanguage: 'en-IN' };
+        return { messages: allMessages, responseLanguage: savedLang || 'en-IN' };
       }
     }
 
@@ -4659,7 +4661,7 @@ export async function processMessage(
 
   if (!stateHandler) {
     logger.error(`Unknown state: ${currentState}`);
-    return { messages: [{ text: 'Something went wrong. Please try again.' }] };
+    return { messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }], responseLanguage: ctx.language || 'en-IN' };
   }
 
   // Check for universal commands (help, back, cancel, status, language)

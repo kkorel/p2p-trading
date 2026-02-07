@@ -305,6 +305,7 @@ export const chatApi = {
       sessionId: string;
       messages: Array<{ role: 'agent'; content: string; buttons?: Array<{ text: string; callbackData?: string }> }>;
       authToken?: string;
+      responseLanguage?: string;
     }>('/chat/upload', {
       method: 'POST',
       body: JSON.stringify({ pdfBase64, sessionId, fileName }),

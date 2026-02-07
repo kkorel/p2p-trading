@@ -484,6 +484,14 @@ export function useChatEngine() {
             })),
           ]);
         }
+
+        // Update response language from upload response
+        if (res.responseLanguage) {
+          setResponseLanguage(res.responseLanguage);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('oorja_language', res.responseLanguage);
+          }
+        }
       } catch {
         setMessages((prev) => [
           ...prev,
