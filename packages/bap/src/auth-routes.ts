@@ -12,6 +12,9 @@ import {
   deleteSession,
   deleteAllUserSessions,
   createLogger,
+  analyzeInstallation,
+  getSatelliteImageUrl,
+  SolarAnalysis,
 } from '@p2p/shared';
 import { authMiddleware, devModeOnly } from './middleware';
 import { sendFirstLoginWelcome } from './chat/notifications';
@@ -37,6 +40,90 @@ function parseDate(dateStr: string): Date | null {
   if (!isNaN(date.getTime())) return date;
 
   return null;
+}
+
+/**
+ * Run solar analysis on a user's installation address.
+ * Updates UserSolarAnalysis and sets allowedTradeLimit (7-15%).
+ * Called during onboarding when UtilityCustomerCredential is verified.
+ */
+async function runSolarAnalysisForUser(
+  userId: string,
+  installationAddress: string
+): Promise<SolarAnalysis | null> {
+  try {
+    logger.info(`Running solar analysis for user ${userId}`, { address: installationAddress });
+
+    // Call Google Solar API
+    const analysis = await analyzeInstallation(installationAddress);
+
+    // Get satellite image URL if we have coordinates
+    let satelliteImageUrl: string | null = null;
+    if (analysis.location?.lat && analysis.location?.lon) {
+      satelliteImageUrl = getSatelliteImageUrl(analysis.location.lat, analysis.location.lon);
+    }
+
+    // Upsert UserSolarAnalysis record
+    await prisma.userSolarAnalysis.upsert({
+      where: { userId },
+      create: {
+        userId,
+        available: analysis.available,
+        latitude: analysis.location?.lat || null,
+        longitude: analysis.location?.lon || null,
+        formattedAddress: analysis.location?.formattedAddress || null,
+        maxSunshineHours: analysis.maxSunshineHours || null,
+        maxPanelCount: analysis.maxPanelCount || null,
+        yearlyEnergyKwh: analysis.yearlyEnergyKwh || null,
+        roofAreaM2: analysis.roofAreaM2 || null,
+        imageryQuality: analysis.imageryQuality || null,
+        carbonOffsetKg: analysis.carbonOffsetKg || null,
+        installationScore: analysis.installationScore,
+        tradingLimitPercent: analysis.tradingLimitPercent,
+        verificationMethod: analysis.verificationMethod,
+        errorReason: analysis.errorReason || null,
+        satelliteImageUrl,
+        analyzedAt: analysis.analyzedAt,
+      },
+      update: {
+        available: analysis.available,
+        latitude: analysis.location?.lat || null,
+        longitude: analysis.location?.lon || null,
+        formattedAddress: analysis.location?.formattedAddress || null,
+        maxSunshineHours: analysis.maxSunshineHours || null,
+        maxPanelCount: analysis.maxPanelCount || null,
+        yearlyEnergyKwh: analysis.yearlyEnergyKwh || null,
+        roofAreaM2: analysis.roofAreaM2 || null,
+        imageryQuality: analysis.imageryQuality || null,
+        carbonOffsetKg: analysis.carbonOffsetKg || null,
+        installationScore: analysis.installationScore,
+        tradingLimitPercent: analysis.tradingLimitPercent,
+        verificationMethod: analysis.verificationMethod,
+        errorReason: analysis.errorReason || null,
+        satelliteImageUrl,
+        analyzedAt: analysis.analyzedAt,
+      },
+    });
+
+    // Update user's allowedTradeLimit based on solar analysis (7-15%)
+    await prisma.user.update({
+      where: { id: userId },
+      data: { allowedTradeLimit: analysis.tradingLimitPercent },
+    });
+
+    logger.info(`Solar analysis complete for user ${userId}`, {
+      available: analysis.available,
+      tradingLimit: analysis.tradingLimitPercent,
+      score: analysis.installationScore,
+      verificationMethod: analysis.verificationMethod,
+    });
+
+    return analysis;
+  } catch (error: any) {
+    logger.error(`Solar analysis failed for user ${userId}: ${error.message}`);
+    // Don't fail the onboarding - just use default limit
+    return null;
+  }
 }
 
 const router = Router();
@@ -566,6 +653,21 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
       }
     }
 
+    // Run solar analysis when UtilityCustomerCredential is verified (has address)
+    // This sets the initial trading limit (7-15%) based on solar potential
+    let solarAnalysisResult: SolarAnalysis | null = null;
+    if (credType === 'UtilityCustomerCredential' && verificationResult.verified && claims.installationAddress) {
+      // Run solar analysis in background (fire-and-forget for fast response)
+      // The trading limit will be updated asynchronously
+      runSolarAnalysisForUser(userId, claims.installationAddress).then(result => {
+        if (result) {
+          logger.info(`Solar analysis completed for user ${userId}: limit=${result.tradingLimitPercent}%`);
+        }
+      }).catch(err => {
+        logger.warn(`Background solar analysis failed for user ${userId}: ${err.message}`);
+      });
+    }
+
     // Fetch all credentials to return status
     const allCredentials = await prisma.userCredential.findMany({
       where: { userId },
@@ -668,6 +770,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
             successfulOrders: true,
           },
         },
+        solarAnalysis: true, // Include solar analysis data
       },
     });
 
@@ -695,6 +798,25 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
         meterDataAnalyzed: user.meterDataAnalyzed,
         productionCapacity: user.productionCapacity,
         meterVerifiedCapacity: user.meterVerifiedCapacity,
+        // Solar analysis data (for profile display)
+        solarAnalysis: user.solarAnalysis ? {
+          available: user.solarAnalysis.available,
+          location: user.solarAnalysis.latitude && user.solarAnalysis.longitude ? {
+            lat: user.solarAnalysis.latitude,
+            lon: user.solarAnalysis.longitude,
+            formattedAddress: user.solarAnalysis.formattedAddress,
+          } : null,
+          maxSunshineHours: user.solarAnalysis.maxSunshineHours,
+          yearlyEnergyKwh: user.solarAnalysis.yearlyEnergyKwh,
+          roofAreaM2: user.solarAnalysis.roofAreaM2,
+          imageryQuality: user.solarAnalysis.imageryQuality,
+          carbonOffsetKg: user.solarAnalysis.carbonOffsetKg,
+          installationScore: user.solarAnalysis.installationScore,
+          tradingLimitPercent: user.solarAnalysis.tradingLimitPercent,
+          verificationMethod: user.solarAnalysis.verificationMethod,
+          satelliteImageUrl: user.solarAnalysis.satelliteImageUrl,
+          analyzedAt: user.solarAnalysis.analyzedAt,
+        } : null,
       },
     });
   } catch (error: any) {
@@ -1293,14 +1415,15 @@ router.post('/verify-vc-pdf', authMiddleware, async (req: Request, res: Response
     const DAYS_PER_MONTH = 30;
     const estimatedMonthlyKWh = capacityKW * AVG_PEAK_SUN_HOURS * DAYS_PER_MONTH;
 
-    // Get current user for trust score
+    // Get current user for trust score and solar limit
     const currentUser = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      select: { trustScore: true },
+      select: { trustScore: true, solarAnalysis: { select: { tradingLimitPercent: true } } },
     });
 
     const trustScore = currentUser?.trustScore || 0.3;
-    const allowedLimit = calculateAllowedLimit(trustScore);
+    const solarLimit = currentUser?.solarAnalysis?.tradingLimitPercent;
+    const allowedLimit = calculateAllowedLimit(trustScore, undefined, solarLimit);
 
     // Update user: set capacity (kWh/month), mark profile complete
     const updatedUser = await prisma.user.update({
@@ -1582,6 +1705,19 @@ router.post('/verify-credential', authMiddleware, async (req: Request, res: Resp
       }
     }
 
+    // Run solar analysis when UtilityCustomerCredential is verified (has address)
+    // This sets the initial trading limit (7-15%) based on solar potential
+    if (credType === 'UtilityCustomerCredential' && verificationResult.verified && claims.installationAddress) {
+      // Run solar analysis in background (fire-and-forget for fast response)
+      runSolarAnalysisForUser(req.user!.id, claims.installationAddress).then(result => {
+        if (result) {
+          logger.info(`Solar analysis completed for user ${req.user!.id}: limit=${result.tradingLimitPercent}%`);
+        }
+      }).catch(err => {
+        logger.warn(`Background solar analysis failed for user ${req.user!.id}: ${err.message}`);
+      });
+    }
+
     // Fetch updated user + all credentials
     const updatedUser = await prisma.user.findUnique({
       where: { id: req.user!.id },
@@ -1650,14 +1786,15 @@ router.post('/complete-onboarding', authMiddleware, async (req: Request, res: Re
       });
     }
 
-    // Recalculate trade limit
+    // Recalculate trade limit (respecting solar-based limit if available)
     const { calculateAllowedLimit } = await import('@p2p/shared');
     const currentUser = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      select: { trustScore: true },
+      select: { trustScore: true, solarAnalysis: { select: { tradingLimitPercent: true } } },
     });
     const trustScore = currentUser?.trustScore || 0.3;
-    const allowedLimit = calculateAllowedLimit(trustScore);
+    const solarLimit = currentUser?.solarAnalysis?.tradingLimitPercent;
+    const allowedLimit = calculateAllowedLimit(trustScore, undefined, solarLimit);
 
     const updatedUser = await prisma.user.update({
       where: { id: req.user!.id },

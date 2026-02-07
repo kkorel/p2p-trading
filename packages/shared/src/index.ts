@@ -35,3 +35,6 @@ export * from './cds/sync-client';
 
 // Export Weather module
 export * from './weather';
+
+// Export Solar Analysis module
+export * from './solar';

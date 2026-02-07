@@ -47,19 +47,35 @@ export function getTrustConfig(): TrustConfig {
 
 /**
  * Calculate allowed trade limit from trust score
+ *
+ * @param trustScore - User's current trust score (0-1)
+ * @param config - Optional trust config override
+ * @param solarLimit - Optional solar-based limit from UserSolarAnalysis (7-15%)
+ *                     If provided, returns max(solarLimit, tierLimit) so solar analysis
+ *                     provides a floor that the tier system cannot go below
  */
-export function calculateAllowedLimit(trustScore: number, config?: TrustConfig): number {
+export function calculateAllowedLimit(
+    trustScore: number,
+    config?: TrustConfig,
+    solarLimit?: number
+): number {
     const cfg = config || getTrustConfig();
 
     // Find the highest tier the user qualifies for
-    let limit = cfg.defaultLimit;
+    let tierLimit = cfg.defaultLimit;
     for (const tier of cfg.limitTiers) {
         if (trustScore >= tier.minScore) {
-            limit = tier.maxLimit;
+            tierLimit = tier.maxLimit;
         }
     }
 
-    return limit;
+    // If solar limit is provided, use max of solar and tier
+    // This ensures solar-analyzed installations always get at least their solar-based limit
+    if (solarLimit !== undefined && solarLimit > 0) {
+        return Math.max(solarLimit, tierLimit);
+    }
+
+    return tierLimit;
 }
 
 /**

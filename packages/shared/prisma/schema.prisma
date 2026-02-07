@@ -96,6 +96,9 @@ model User {
   buyerAutoTradeConfig  BuyerAutoTradeConfig?
   solarMaintenanceLogs  SolarMaintenanceLog[]
 
+  // Solar analysis data (from Google Solar API during onboarding)
+  solarAnalysis         UserSolarAnalysis?
+
   @@index([phone])
   @@map("users")
 }
@@ -586,4 +589,47 @@ model SolarMaintenanceLog {
   @@index([userId])
   @@index([performedAt])
   @@map("solar_maintenance_logs")
+}
+
+// ============================================
+// Solar Analysis (Google Solar API)
+// ============================================
+
+model UserSolarAnalysis {
+  id                   String   @id @default(uuid())
+  userId               String   @unique @map("user_id")
+
+  // Location data
+  latitude             Float?
+  longitude            Float?
+  formattedAddress     String?  @map("formatted_address")
+
+  // Solar potential from Google Solar API
+  available            Boolean  @default(false)          // Whether Solar API returned data
+  maxSunshineHours     Float?   @map("max_sunshine_hours")      // Annual hours
+  maxPanelCount        Int?     @map("max_panel_count")
+  yearlyEnergyKwh      Float?   @map("yearly_energy_kwh")
+  roofAreaM2           Float?   @map("roof_area_m2")
+  imageryQuality       String?  @map("imagery_quality")         // HIGH, MEDIUM, LOW
+  carbonOffsetKg       Float?   @map("carbon_offset_kg")
+
+  // Calculated values
+  installationScore    Float    @default(0.5) @map("installation_score")  // 0.0-1.0
+  tradingLimitPercent  Float    @default(10) @map("trading_limit_percent") // 7-15%
+
+  // Verification
+  verificationMethod   String   @default("DEFAULT") @map("verification_method") // SOLAR_API or DEFAULT
+  errorReason          String?  @map("error_reason")
+
+  // Satellite image URL (for profile display)
+  satelliteImageUrl    String?  @map("satellite_image_url")
+
+  // Timestamps
+  analyzedAt           DateTime @default(now()) @map("analyzed_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_solar_analyses")
 }
