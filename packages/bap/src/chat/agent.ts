@@ -4301,14 +4301,45 @@ async function translateResponse(
     return { ...response, responseLanguage: targetLang };
   }
 
+  // Check if text is already in target language (contains native script)
+  // This prevents double-translation when h() already returns the correct text
+  const isAlreadyInTargetLang = (text: string): boolean => {
+    if (targetLang === 'hi-IN') {
+      // Hindi: Devanagari script range
+      return /[\u0900-\u097F]/.test(text);
+    }
+    if (targetLang === 'bn-IN') {
+      // Bengali: Bengali script range
+      return /[\u0980-\u09FF]/.test(text);
+    }
+    if (targetLang === 'ta-IN') {
+      // Tamil: Tamil script range
+      return /[\u0B80-\u0BFF]/.test(text);
+    }
+    if (targetLang === 'te-IN') {
+      // Telugu: Telugu script range
+      return /[\u0C00-\u0C7F]/.test(text);
+    }
+    if (targetLang === 'kn-IN') {
+      // Kannada: Kannada script range
+      return /[\u0C80-\u0CFF]/.test(text);
+    }
+    return false;
+  };
+
   const translatedMessages: AgentMessage[] = [];
   for (const msg of response.messages) {
-    const translatedText = await translateFromEnglish(msg.text, targetLang);
+    // Skip translation if text is already in the target language
+    const translatedText = isAlreadyInTargetLang(msg.text)
+      ? msg.text
+      : await translateFromEnglish(msg.text, targetLang);
     let translatedButtons = msg.buttons;
     if (msg.buttons && msg.buttons.length > 0) {
       translatedButtons = await Promise.all(
         msg.buttons.map(async (btn) => ({
-          text: await translateFromEnglish(btn.text, targetLang),
+          text: isAlreadyInTargetLang(btn.text)
+            ? btn.text
+            : await translateFromEnglish(btn.text, targetLang),
           callbackData: btn.callbackData,
         }))
       );
