@@ -292,6 +292,144 @@ Return ONLY the extracted name (one or two words max) or "UNCLEAR":`;
 }
 
 /**
+ * Extract a phone number from natural speech using LLM.
+ * Handles spoken numbers, Hindi number words, and various formats.
+ * Examples: "8 1 3 0 6 3 3 3 9 5" → "8130633395"
+ *           "आठ एक तीन शून्य छः तीन तीन तीन नौ पाँच" → "8130633395"
+ * Returns null if LLM unavailable or extraction fails.
+ */
+export async function extractPhoneWithLLM(userMessage: string, questionContext?: string): Promise<string | null> {
+  if (!OPENROUTER_API_KEY) return null;
+
+  const PHONE_EXTRACT_PROMPT = `Extract the 10-digit Indian phone number from this message. The user was asked for their phone number.
+
+Rules:
+- Return ONLY the 10-digit phone number, nothing else
+- Convert Hindi number words to digits:
+  शून्य/सुन्ना=0, एक=1, दो=2, तीन=3, चार=4, पाँच/पांच=5, छः/छह=6, सात=7, आठ=8, नौ=9
+- Convert English number words to digits: zero=0, one=1, two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9
+- Handle spaces between digits: "8 1 3 0 6 3 3 3 9 5" → "8130633395"
+- Handle mixed formats: "मेरा नंबर है आठ एक तीन zero six three three three nine five" → "8130633395"
+- Remove country code if present: "+91 8130633395" → "8130633395"
+- If you cannot find a valid 10-digit number, return "UNCLEAR"
+
+Examples:
+- "8 1 3 0 6 3 3 3 9 5" → "8130633395"
+- "आठ एक तीन शून्य छः तीन तीन तीन नौ पाँच" → "8130633395"
+- "मेरा नंबर 9876543210 है" → "9876543210"
+- "plus ninety one nine eight seven six five four three two one zero" → "9876543210"
+- "hello there" → "UNCLEAR"
+
+${questionContext ? `Context: The system asked: "${questionContext}"` : ''}
+
+User's message: "${userMessage}"
+
+Return ONLY the 10-digit number or "UNCLEAR":`;
+
+  try {
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
+      {
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'user', content: PHONE_EXTRACT_PROMPT },
+        ],
+        temperature: 0.1,
+        max_tokens: 20,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://p2p-energy-trading.local',
+          'X-Title': 'Oorja Phone Extractor',
+        },
+        timeout: 5000,
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content?.trim();
+    if (reply && reply !== 'UNCLEAR' && /^\d{10}$/.test(reply)) {
+      logger.debug(`Phone extracted: "${userMessage.substring(0, 30)}..." → "${reply}"`);
+      return reply;
+    }
+    return null;
+  } catch (error: any) {
+    logger.warn(`Phone extraction failed: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Extract an OTP code from natural speech using LLM.
+ * Handles spoken numbers, Hindi number words, and various formats.
+ * Examples: "एक दो तीन चार पाँच छः" → "123456"
+ *           "one two three four five six" → "123456"
+ * Returns null if LLM unavailable or extraction fails.
+ */
+export async function extractOtpWithLLM(userMessage: string, questionContext?: string): Promise<string | null> {
+  if (!OPENROUTER_API_KEY) return null;
+
+  const OTP_EXTRACT_PROMPT = `Extract the OTP code (4-6 digits) from this message. The user was asked to enter a verification code.
+
+Rules:
+- Return ONLY the 4-6 digit OTP code, nothing else
+- Convert Hindi number words to digits:
+  शून्य/सुन्ना=0, एक=1, दो=2, तीन=3, चार=4, पाँच/पांच=5, छः/छह=6, सात=7, आठ=8, नौ=9
+- Convert English number words to digits: zero=0, one=1, two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9
+- Handle spaces between digits: "1 2 3 4 5 6" → "123456"
+- Handle mixed Hindi-English: "एक two तीन four पाँच six" → "123456"
+- If you cannot find a valid 4-6 digit code, return "UNCLEAR"
+
+Examples:
+- "एक दो तीन चार पाँच छः" → "123456"
+- "1 2 3 4 5 6" → "123456"
+- "one two three four five six" → "123456"
+- "मेरा कोड है 789012" → "789012"
+- "कोड नहीं मिला" → "UNCLEAR"
+- "hello" → "UNCLEAR"
+
+${questionContext ? `Context: The system asked: "${questionContext}"` : ''}
+
+User's message: "${userMessage}"
+
+Return ONLY the 4-6 digit code or "UNCLEAR":`;
+
+  try {
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
+      {
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'user', content: OTP_EXTRACT_PROMPT },
+        ],
+        temperature: 0.1,
+        max_tokens: 10,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://p2p-energy-trading.local',
+          'X-Title': 'Oorja OTP Extractor',
+        },
+        timeout: 5000,
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content?.trim();
+    if (reply && reply !== 'UNCLEAR' && /^\d{4,6}$/.test(reply)) {
+      logger.debug(`OTP extracted: "${userMessage.substring(0, 30)}..." → "${reply}"`);
+      return reply;
+    }
+    return null;
+  } catch (error: any) {
+    logger.warn(`OTP extraction failed: ${error.message}`);
+    return null;
+  }
+}
+
+/**
  * Compose a natural, conversational response using LLM.
  * Takes the user's message, relevant data, and user context.
  * Returns null if LLM unavailable or fails.

@@ -25,7 +25,7 @@ import {
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
 import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, getMarketInsights, getActivitySummary, getTopDeals, getBrowseMarketTable } from './trading-agent';
-import { askLLM, classifyIntent, composeResponse, extractNameWithLLM } from './llm-fallback';
+import { askLLM, classifyIntent, composeResponse, extractNameWithLLM, extractPhoneWithLLM, extractOtpWithLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
 import { sendProactiveMessage, isWhatsAppConnected, getWhatsAppBotNumber } from './whatsapp';
@@ -1608,6 +1608,34 @@ const LANG_BUTTONS = [
   { text: 'ಕನ್ನಡ', callbackData: 'lang:kn-IN' },
 ];
 
+// Welcome messages translated for each supported language
+const WELCOME_MESSAGES: Record<string, { greeting: string; voiceNote: string }> = {
+  'en-IN': {
+    greeting: 'Namaste! I am Oorja.\nI will help you earn money from the electricity you generate at home. And for those who want to buy electricity, I will help them get it at the right price.\n\nIf you have any questions at any time, just ask me!',
+    voiceNote: '\n\n🔊 If you want to hear my messages, press the speaker button.',
+  },
+  'hi-IN': {
+    greeting: 'नमस्ते! मैं ऊर्जा हूँ।\nमैं आपको अपने घर पे बनाई बिजली से पैसे कमाने में मदद करूँगा। और जिन्हें बिजली खरीदनी है, उन्हें सही दाम पे दिलाऊँगा।\n\nअगर आपको किसी भी समय कोई भी सवाल हो, तो मुझे पूछ लेना!',
+    voiceNote: '\n\n🔊 अगर मेरी मैसेज सुनना चाहते हो, स्पीकर बटन दबाओ।',
+  },
+  'bn-IN': {
+    greeting: 'নমস্কার! আমি ঊর্জা।\nআমি আপনাকে বাড়িতে তৈরি বিদ্যুৎ থেকে টাকা উপার্জন করতে সাহায্য করব। আর যাদের বিদ্যুৎ কিনতে হবে, তাদের সঠিক দামে পেতে সাহায্য করব।\n\nযেকোনো সময় কোনো প্রশ্ন থাকলে আমাকে জিজ্ঞাসা করুন!',
+    voiceNote: '\n\n🔊 আমার মেসেজ শুনতে চাইলে স্পিকার বাটন টিপুন।',
+  },
+  'ta-IN': {
+    greeting: 'வணக்கம்! நான் ஊர்ஜா.\nவீட்டில் உருவாக்கும் மின்சாரத்தில் இருந்து பணம் சம்பாதிக்க நான் உங்களுக்கு உதவுவேன். மின்சாரம் வாங்க விரும்புவோருக்கு சரியான விலையில் வாங்க உதவுவேன்.\n\nஎந்த நேரத்திலும் ஏதேனும் கேள்வி இருந்தால், என்னிடம் கேளுங்கள்!',
+    voiceNote: '\n\n🔊 என் செய்திகளைக் கேட்க விரும்பினால், ஸ்பீக்கர் பட்டனை அழுத்தவும்.',
+  },
+  'te-IN': {
+    greeting: 'నమస్కారం! నేను ఊర్జా.\nమీరు ఇంట్లో తయారు చేసిన విద్యుత్ నుండి డబ్బు సంపాదించడానికి నేను మీకు సహాయం చేస్తాను. విద్యుత్ కొనాలనుకునే వారికి సరైన ధరలో అందించడానికి సహాయం చేస్తాను.\n\nఎప్పుడైనా ఏదైనా ప్రశ్న ఉంటే, నన్ను అడగండి!',
+    voiceNote: '\n\n🔊 నా సందేశాలు వినాలనుకుంటే, స్పీకర్ బటన్ నొక్కండి.',
+  },
+  'kn-IN': {
+    greeting: 'ನಮಸ್ಕಾರ! ನಾನು ಊರ್ಜಾ.\nಮನೆಯಲ್ಲಿ ಉತ್ಪಾದಿಸಿದ ವಿದ್ಯುತ್‌ನಿಂದ ಹಣ ಗಳಿಸಲು ನಾನು ನಿಮಗೆ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ. ವಿದ್ಯುತ್ ಖರೀದಿಸಲು ಬಯಸುವವರಿಗೆ ಸರಿಯಾದ ಬೆಲೆಗೆ ಪಡೆಯಲು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.\n\nಯಾವುದೇ ಸಮಯದಲ್ಲಿ ಪ್ರಶ್ನೆ ಇದ್ದರೆ, ನನ್ನನ್ನು ಕೇಳಿ!',
+    voiceNote: '\n\n🔊 ನನ್ನ ಸಂದೇಶಗಳನ್ನು ಕೇಳಲು ಬಯಸಿದರೆ, ಸ್ಪೀಕರ್ ಬಟನ್ ಒತ್ತಿ.',
+  },
+};
+
 const DISCOM_LIST = [
   { text: 'BSES Rajdhani', callbackData: 'discom:bses_rajdhani' },
   { text: 'BSES Yamuna', callbackData: 'discom:bses_yamuna' },
@@ -2075,7 +2103,7 @@ async function handleUniversalCommand(
   if (UNIVERSAL_COMMANDS.language.includes(normalized)) {
     return {
       messages: [{
-        text: h(ctx, 'Choose your language:', 'Apni bhasha chuno:'),
+        text: h(ctx, 'Choose your language:', 'अपनी भाषा चुनें:'),
         buttons: LANG_BUTTONS,
       }],
     };
@@ -2357,7 +2385,7 @@ const states: Record<ChatState, StateHandler> = {
       const messages: AgentMessage[] = [
         { text: `Namaste! Main Oorja hun.\nMain aapko apne ghar pe banai bijli se paise kamane mein madad karunga. Aur jinhe bijli khareedni hai, unhe sahi daam pe dilaunga.\n\nAgar aapko kisi bhi samay koi bhi sawaal ho, to mujhe pooch lena!${voiceNote}` },
         {
-          text: 'Apni bhasha chune / Choose your language:',
+          text: 'अपनी भाषा चुनें / Choose your language:',
           buttons: LANG_BUTTONS,
           delay: 300,
         },
@@ -2366,11 +2394,19 @@ const states: Record<ChatState, StateHandler> = {
       return { messages };
     },
     async onMessage(ctx, message) {
+      // Helper to get translated welcome message
+      const getWelcomeForLang = (lang: string, platform: string | undefined) => {
+        const welcome = WELCOME_MESSAGES[lang] || WELCOME_MESSAGES['en-IN'];
+        const voiceNote = platform === 'WEB' ? welcome.voiceNote : '';
+        return welcome.greeting + voiceNote;
+      };
+
       // Language selection from button callback
       if (message.startsWith('lang:')) {
         const lang = message.replace('lang:', '');
+        const welcomeText = getWelcomeForLang(lang, ctx._platform);
         return {
-          messages: [],
+          messages: [{ text: welcomeText }],
           newState: 'WAITING_NAME',
           contextUpdate: { language: lang as any, langPicked: true },
         };
@@ -2380,8 +2416,9 @@ const states: Record<ChatState, StateHandler> = {
       const numericCallback = convertNumericToCallback(message, LANG_BUTTONS);
       if (numericCallback && numericCallback.startsWith('lang:')) {
         const lang = numericCallback.replace('lang:', '');
+        const welcomeText = getWelcomeForLang(lang, ctx._platform);
         return {
-          messages: [],
+          messages: [{ text: welcomeText }],
           newState: 'WAITING_NAME',
           contextUpdate: { language: lang as any, langPicked: true },
         };
@@ -2390,7 +2427,7 @@ const states: Record<ChatState, StateHandler> = {
       // Free-text that isn't a language selection — re-show language buttons
       return {
         messages: [{
-          text: 'Please select a language to get started:\nAage badhne ke liye bhasha chuno:',
+          text: 'Please select a language to get started:\nआगे बढ़ने के लिए भाषा चुनें:',
           buttons: LANG_BUTTONS,
         }],
       };
@@ -2466,12 +2503,17 @@ const states: Record<ChatState, StateHandler> = {
       };
     },
     async onMessage(ctx, message) {
-      // First try to extract a clean phone from voice transcription
-      // Handles: "Plus 44 7552335216", "07552335216", "91 9876543210", etc.
-      let phone = extractIndianPhone(message);
+      // First try LLM extraction to handle Hindi number words and spoken digits
+      // Examples: "आठ एक तीन शून्य छः तीन तीन तीन नौ पाँच" → "8130633395"
+      let phone = await extractPhoneWithLLM(message, 'Your phone number?');
+
+      // Fallback to regex extraction if LLM unavailable or fails
+      if (!phone) {
+        phone = extractIndianPhone(message);
+      }
 
       if (!phone) {
-        // Fallback to basic cleaning for typed input
+        // Final fallback to basic cleaning for typed input
         phone = message.trim().replace(/[\s\-()]/g, '');
       }
 
@@ -2508,8 +2550,16 @@ const states: Record<ChatState, StateHandler> = {
       };
     },
     async onMessage(ctx, message) {
-      const otp = message.trim().replace(/\s/g, '');
       const attempts = (ctx.otpAttempts || 0) + 1;
+
+      // First try LLM extraction to handle Hindi number words
+      // Examples: "एक दो तीन चार पाँच छः" → "123456"
+      let otp = await extractOtpWithLLM(message, 'Enter the verification code');
+
+      // Fallback to basic cleaning if LLM unavailable or fails
+      if (!otp) {
+        otp = message.trim().replace(/\s/g, '');
+      }
 
       if (!/^\d{4,6}$/.test(otp)) {
         return {
@@ -3622,7 +3672,7 @@ const states: Record<ChatState, StateHandler> = {
           case 'change_language': {
             return {
               messages: [{
-                text: h(ctx, 'Choose your language:', 'Apni bhasha chuno:'),
+                text: h(ctx, 'Choose your language:', 'अपनी भाषा चुनें:'),
                 buttons: LANG_BUTTONS,
               }],
             };
