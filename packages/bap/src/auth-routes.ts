@@ -463,7 +463,7 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
 
     res.json({
       success: true,
-      credentialType: credType,
+      credentialType: prismaCredType, // Return Prisma enum name for frontend
       verification: {
         verified: verificationResult.verified,
         checks: verificationResult.checks,
