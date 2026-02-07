@@ -157,6 +157,34 @@ export interface AgentMessage {
     totalEarnings: number;
     walletBalance: number;
   };
+  /** Structured auto-trade status for AutoTradeStatusCard */
+  autoTradeStatus?: {
+    seller?: {
+      enabled: boolean;
+      capacityKwh: number;
+      pricePerKwh: number;
+      energyType: string;
+      lastRun?: {
+        executedAt: string;
+        status: string;
+        listedQuantity: number;
+        weatherMultiplier: number;
+      };
+    };
+    buyer?: {
+      enabled: boolean;
+      targetQuantity: number;
+      maxPrice: number;
+      preferredTime: string | null;
+      lastRun?: {
+        executedAt: string;
+        status: string;
+        quantityBought: number;
+        pricePerUnit: number;
+        totalSpent: number;
+      };
+    };
+  };
 }
 
 export interface AgentResponse {
@@ -4787,42 +4815,65 @@ const states: Record<ChatState, StateHandler> = {
             const sellerStatus = await getSellerAutoTradeStatus(ctx.userId!);
             const buyerStatus = await getBuyerAutoTradeStatus(ctx.userId!);
 
-            let statusText = '';
-            if (sellerStatus.enabled && sellerStatus.config) {
-              const lastExec = sellerStatus.lastExecution
-                ? h(ctx,
-                    `Last run: ${sellerStatus.lastExecution.listedQuantity} kWh listed`,
-                    `पिछला: ${sellerStatus.lastExecution.listedQuantity} kWh लिस्ट किया`
-                  )
-                : h(ctx, 'Not run yet', 'अभी तक नहीं चला');
-              statusText += h(ctx,
-                `🔋 *Auto-Sell*: Enabled\n• Capacity: ${sellerStatus.config.capacityKwh} kWh\n• Price: ₹${sellerStatus.config.pricePerKwh}/unit\n• ${lastExec}\n\n`,
-                `🔋 *ऑटो-सेल*: चालू\n• क्षमता: ${sellerStatus.config.capacityKwh} kWh\n• दाम: ₹${sellerStatus.config.pricePerKwh}/यूनिट\n• ${lastExec}\n\n`
-              );
-            }
-            if (buyerStatus.enabled && buyerStatus.config) {
-              const lastExec = buyerStatus.lastExecution
-                ? h(ctx,
-                    `Last run: ${buyerStatus.lastExecution.quantityBought} kWh bought at ₹${buyerStatus.lastExecution.pricePerUnit}/unit`,
-                    `पिछला: ${buyerStatus.lastExecution.quantityBought} kWh खरीदा ₹${buyerStatus.lastExecution.pricePerUnit}/यूनिट पर`
-                  )
-                : h(ctx, 'Not run yet', 'अभी तक नहीं चला');
-              statusText += h(ctx,
-                `🛒 *Auto-Buy*: Enabled\n• Target: ${buyerStatus.config.targetQuantity} kWh/day\n• Max price: ₹${buyerStatus.config.maxPrice}/unit\n• ${lastExec}`,
-                `🛒 *ऑटो-बाय*: चालू\n• रोज़: ${buyerStatus.config.targetQuantity} kWh\n• अधिकतम दाम: ₹${buyerStatus.config.maxPrice}/यूनिट\n• ${lastExec}`
-              );
+            const hasAnyConfig = sellerStatus.enabled || buyerStatus.enabled;
+
+            if (!hasAnyConfig) {
+              // No auto-trade configured - show setup options
+              return {
+                messages: [{
+                  text: h(ctx,
+                    'No auto-trade configured yet. Would you like to set it up?',
+                    'अभी कोई ऑटो-ट्रेड सेटअप नहीं है। सेटअप करना है?'
+                  ),
+                  buttons: [
+                    { text: h(ctx, '🔋 Setup Auto-Sell', '🔋 ऑटो-सेल सेटअप'), callbackData: 'action:setup_auto_sell' },
+                    { text: h(ctx, '🛒 Setup Auto-Buy', '🛒 ऑटो-बाय सेटअप'), callbackData: 'action:setup_auto_buy' },
+                  ],
+                }],
+              };
             }
 
-            if (!statusText) {
-              statusText = h(ctx,
-                'No auto-trade configured. Would you like to set it up?',
-                'कोई ऑटो-ट्रेड सेटअप नहीं है। सेटअप करना है?'
-              );
+            // Build structured auto-trade status card
+            const autoTradeStatus: NonNullable<AgentMessage['autoTradeStatus']> = {};
+
+            if (sellerStatus.enabled && sellerStatus.config) {
+              autoTradeStatus.seller = {
+                enabled: true,
+                capacityKwh: sellerStatus.config.capacityKwh,
+                pricePerKwh: sellerStatus.config.pricePerKwh,
+                energyType: sellerStatus.config.energyType,
+                lastRun: sellerStatus.lastExecution ? {
+                  executedAt: sellerStatus.lastExecution.executedAt.toISOString(),
+                  status: sellerStatus.lastExecution.status,
+                  listedQuantity: sellerStatus.lastExecution.listedQuantity,
+                  weatherMultiplier: sellerStatus.lastExecution.weatherMultiplier,
+                } : undefined,
+              };
+            }
+
+            if (buyerStatus.enabled && buyerStatus.config) {
+              autoTradeStatus.buyer = {
+                enabled: true,
+                targetQuantity: buyerStatus.config.targetQuantity,
+                maxPrice: buyerStatus.config.maxPrice,
+                preferredTime: buyerStatus.config.preferredTime,
+                lastRun: buyerStatus.lastExecution ? {
+                  executedAt: buyerStatus.lastExecution.executedAt.toISOString(),
+                  status: buyerStatus.lastExecution.status,
+                  quantityBought: buyerStatus.lastExecution.quantityBought,
+                  pricePerUnit: buyerStatus.lastExecution.pricePerUnit,
+                  totalSpent: buyerStatus.lastExecution.totalSpent,
+                } : undefined,
+              };
             }
 
             return {
               messages: [{
-                text: statusText,
+                text: h(ctx,
+                  'Here\'s your auto-trade status:',
+                  'आपका ऑटो-ट्रेड स्टेटस:'
+                ),
+                autoTradeStatus,
                 buttons: [
                   { text: h(ctx, '🔋 Setup Auto-Sell', '🔋 ऑटो-सेल सेटअप'), callbackData: 'action:setup_auto_sell' },
                   { text: h(ctx, '🛒 Setup Auto-Buy', '🛒 ऑटो-बाय सेटअप'), callbackData: 'action:setup_auto_buy' },
