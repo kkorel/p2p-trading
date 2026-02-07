@@ -37,4 +37,4 @@ export * from './cds/sync-client';
 export * from './weather';
 
 // Export Satellite Analysis module
-export * from './satellite';
+export * from './solar';

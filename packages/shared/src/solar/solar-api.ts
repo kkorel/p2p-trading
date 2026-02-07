@@ -1,29 +1,44 @@
 /**
- * Solar API Service
+ * Solar API Service — Standalone Module
  * Integrates with Google Solar API and Google Geocoding to analyze installations
  * and calculate initial trading limits based on satellite data.
+ * 
+ * This module is fully self-contained with no external dependencies.
+ * Import from '@p2p/shared' or directly from this folder.
+ * 
+ * Usage:
+ *   import { analyzeInstallation, getSatelliteImageUrl } from '@p2p/shared';
+ *   const analysis = await analyzeInstallation("42 MG Road, Mumbai");
+ *   const imageUrl = getSatelliteImageUrl(analysis.location.lat, analysis.location.lon);
  */
 
-import { createLogger } from '../utils';
 import type {
     SolarAnalysis,
     GoogleSolarBuildingInsights,
     GoogleGeocodingResult,
 } from './types';
 
-const logger = createLogger('SolarAPIService');
+// ─── Inline Logger (no external dependencies) ───────────────────────────────
+const logger = {
+    info: (msg: string, ctx?: Record<string, any>) =>
+        console.log(`[Solar] ${msg}`, ctx ? JSON.stringify(ctx) : ''),
+    warn: (msg: string, ctx?: Record<string, any>) =>
+        console.warn(`[Solar] ${msg}`, ctx ? JSON.stringify(ctx) : ''),
+    error: (msg: string, ctx?: Record<string, any>) =>
+        console.error(`[Solar] ${msg}`, ctx ? JSON.stringify(ctx) : ''),
+};
 
-// API endpoints
+// ─── API Endpoints ──────────────────────────────────────────────────────────
 const GOOGLE_SOLAR_API = 'https://solar.googleapis.com/v1';
 const GOOGLE_GEOCODING_API = 'https://maps.googleapis.com/maps/api/geocode/json';
 const GOOGLE_STATIC_MAPS_API = 'https://maps.googleapis.com/maps/api/staticmap';
 
-// Cache for demo addresses (populated at startup or on-demand)
+// ─── Cache ──────────────────────────────────────────────────────────────────
 const analysisCache = new Map<string, { data: SolarAnalysis; expiresAt: number }>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-// Trading limit thresholds
-const THRESHOLDS = {
+// ─── Trading Limit Thresholds ───────────────────────────────────────────────
+export const THRESHOLDS = {
     HIGH_SUNSHINE: 1800,
     MEDIUM_SUNSHINE: 1500,
     LOW_SUNSHINE: 1200,
@@ -32,9 +47,10 @@ const THRESHOLDS = {
     MIN_LIMIT: 7,
 };
 
+// ─── Geocoding ──────────────────────────────────────────────────────────────
+
 /**
  * Geocode an address using Google Geocoding API
- * Better India accuracy than Open-Meteo
  */
 export async function geocodeWithGoogle(
     address: string
@@ -68,10 +84,12 @@ export async function geocodeWithGoogle(
             formattedAddress: result.formatted_address,
         };
     } catch (error) {
-        logger.error('Geocoding failed', { error, address });
+        logger.error('Geocoding failed', { error: String(error), address });
         return null;
     }
 }
+
+// ─── Solar API ──────────────────────────────────────────────────────────────
 
 /**
  * Fetch building insights from Google Solar API
@@ -101,13 +119,15 @@ async function fetchBuildingInsights(
 
         return await response.json() as GoogleSolarBuildingInsights;
     } catch (error) {
-        logger.error('Solar API fetch failed', { error, lat, lon });
+        logger.error('Solar API fetch failed', { error: String(error), lat, lon });
         return null;
     }
 }
 
+// ─── Satellite Image ────────────────────────────────────────────────────────
+
 /**
- * Get satellite image URL for an address
+ * Get satellite image URL for coordinates
  */
 export function getSatelliteImageUrl(lat: number, lon: number, zoom: number = 19): string {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -116,14 +136,16 @@ export function getSatelliteImageUrl(lat: number, lon: number, zoom: number = 19
     return `${GOOGLE_STATIC_MAPS_API}?center=${lat},${lon}&zoom=${zoom}&size=400x300&maptype=satellite&key=${apiKey}`;
 }
 
+// ─── Score & Limit Calculation ──────────────────────────────────────────────
+
 /**
- * Calculate installation score from solar data
+ * Calculate installation score from solar data (0.0 - 1.0)
  */
 function calculateInstallationScore(insights: GoogleSolarBuildingInsights): number {
     const solarPotential = insights.solarPotential;
-    if (!solarPotential) return 0.5; // Default neutral score
+    if (!solarPotential) return 0.5;
 
-    let score = 0.5; // Base score
+    let score = 0.5; // Base
 
     // Sunshine hours factor (0-0.3)
     const sunshineHours = solarPotential.maxSunshineHoursPerYear || 0;
@@ -139,7 +161,7 @@ function calculateInstallationScore(insights: GoogleSolarBuildingInsights): numb
 }
 
 /**
- * Calculate trading limit from installation score
+ * Calculate trading limit percentage (7-15%)
  */
 function calculateTradingLimit(sunshineHours: number, imageryQuality: string): number {
     if (sunshineHours >= THRESHOLDS.HIGH_SUNSHINE && imageryQuality === 'HIGH') {
@@ -154,16 +176,20 @@ function calculateTradingLimit(sunshineHours: number, imageryQuality: string): n
     return THRESHOLDS.DEFAULT_LIMIT; // 10% default
 }
 
-/**
- * Normalize address for cache key
- */
+// ─── Address Normalization ──────────────────────────────────────────────────
+
 function normalizeAddress(address: string): string {
     return address.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// ─── Main Entry Point ───────────────────────────────────────────────────────
+
 /**
- * Main function: Analyze an installation address
- * Called during onboarding after VC verification
+ * Analyze an installation address using Google Solar API.
+ * Returns solar analysis with installation score and trading limit.
+ * 
+ * @param address - Street address to analyze (e.g. "42 MG Road, Mumbai")
+ * @returns SolarAnalysis with score, limit, and solar stats
  */
 export async function analyzeInstallation(address: string): Promise<SolarAnalysis> {
     // Check cache first
@@ -253,9 +279,8 @@ export async function analyzeInstallation(address: string): Promise<SolarAnalysi
     }
 }
 
-/**
- * Create a default analysis when data is unavailable
- */
+// ─── Default Analysis ───────────────────────────────────────────────────────
+
 function createDefaultAnalysis(
     reason: string,
     coords?: { lat: number; lon: number; formattedAddress: string }
@@ -273,20 +298,20 @@ function createDefaultAnalysis(
     };
 }
 
+// ─── Cache Warmup ───────────────────────────────────────────────────────────
+
 /**
  * Pre-populate cache for demo addresses (call at startup)
  */
 export async function warmupCache(addresses: string[]): Promise<void> {
-    logger.info('Warming up satellite analysis cache', { count: addresses.length });
+    logger.info('Warming up solar analysis cache', { count: addresses.length });
 
     for (const address of addresses) {
         try {
             await analyzeInstallation(address);
             logger.info('Cached analysis for demo address', { address });
         } catch (error) {
-            logger.warn('Failed to cache demo address', { address, error });
+            logger.warn('Failed to cache demo address', { address, error: String(error) });
         }
     }
 }
-
-export { THRESHOLDS };
