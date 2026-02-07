@@ -41,12 +41,29 @@ export interface DashboardData {
   };
 }
 
+export interface ListingData {
+  id: string;
+  quantity: number;
+  pricePerKwh: number;
+  startTime: string;
+  endTime: string;
+  energyType: string;
+}
+
+export interface ListingsCardData {
+  listings: ListingData[];
+  totalListed: number;
+  totalSold: number;
+  userName: string;
+}
+
 export interface ChatMessageData {
   role: 'agent' | 'user';
   content: string;
   buttons?: Array<{ text: string; callbackData?: string }>;
   offers?: OfferData[];
   dashboard?: DashboardData;
+  listings?: ListingsCardData;
 }
 
 /** Get stored session - prioritize authenticated session, then anonymous. */
@@ -200,6 +217,7 @@ export function useChatEngine() {
             content: m.content,
             buttons: m.buttons,
             dashboard: m.dashboard,
+            listings: m.listings,
           })),
         ]);
       }
@@ -411,6 +429,7 @@ export function useChatEngine() {
             content: m.content,
             buttons: m.buttons,
             dashboard: m.dashboard,
+            listings: m.listings,
           })),
         ]);
       }

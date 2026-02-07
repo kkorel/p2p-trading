@@ -24,7 +24,7 @@ import {
   getIssuerId,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
-import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, generateDashboardData, getMarketInsights, getActivitySummary, getTopDeals, getBrowseMarketTable } from './trading-agent';
+import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, generateDashboardData, getMarketInsights, getActivitySummary, getTopDeals, getBrowseMarketTable, getActiveListingsData, type ListingsCardData } from './trading-agent';
 import { askLLM, classifyIntent, composeResponse, extractNameWithLLM, extractPhoneWithLLM, extractOtpWithLLM, matchDiscomWithLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
@@ -82,6 +82,8 @@ export interface AgentMessage {
   }>;
   /** Structured dashboard for card UI rendering */
   dashboard?: DashboardData;
+  /** Structured listings for card UI rendering */
+  listings?: ListingsCardData;
 }
 
 export interface AgentResponse {
@@ -761,17 +763,45 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
 
   switch (pending.awaitingField) {
     case 'choose_mode': {
-      // Handle mode selection: Quick Sell vs Detailed
-      if (message === 'listing_mode:quick' || lower.includes('quick') || numInput === 1) {
-        const updated: PendingListing = {
-          ...pending,
-          quickSellMode: true,
-          energyType: QUICK_SELL_DEFAULTS.energyType,
-          awaitingField: undefined as any,
+      // Handle mode selection: Automatic (one-click) vs Detailed
+      if (message === 'listing_mode:quick' || lower.includes('quick') || lower.includes('auto') || numInput === 1) {
+        // ONE-CLICK: Directly create a default offer without asking anything
+        if (!ctx.userId) {
+          return {
+            messages: [{ text: h(ctx, 'Please log in first to sell energy.', 'बिजली बेचने के लिए पहले लॉग इन करो।') }],
+            contextUpdate: { pendingListing: undefined },
+          };
+        }
+        const result = await mockTradingAgent.createDefaultOffer(ctx.userId);
+        if (result.success && result.offer) {
+          const o = result.offer;
+          const start = new Date(o.startTime);
+          const end = new Date(o.endTime);
+          return {
+            messages: [{
+              text: h(ctx,
+                `✅ Done! Your energy is now on sale:\n\n• ${o.quantity} kWh at ₹${o.pricePerKwh}/unit\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} to ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}\n\nBuyers can now see and purchase your energy!`,
+                `✅ हो गया! आपकी बिजली बिक्री के लिए तैयार:\n\n• ${o.quantity} यूनिट ₹${o.pricePerKwh}/यूनिट पे\n• ${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} से ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} तक\n\nखरीदार अब आपकी बिजली खरीद सकते हैं!`
+              ),
+              buttons: [
+                { text: h(ctx, '📋 My Listings', '📋 मेरी लिस्टिंग'), callbackData: 'action:show_listings' },
+                { text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'), callbackData: 'action:browse' },
+                { text: h(ctx, '💰 My Earnings', '💰 मेरी कमाई'), callbackData: 'action:show_earnings' },
+              ],
+            }],
+            contextUpdate: { pendingListing: undefined },
+          };
+        }
+        return {
+          messages: [{
+            text: h(ctx, `Could not create listing: ${result.error || 'Unknown error'}. Please try again.`, `लिस्टिंग नहीं बन पाई: ${result.error || 'अज्ञात समस्या'}। दोबारा कोशिश करो।`),
+            buttons: [
+              { text: h(ctx, '☀️ Try Again', '☀️ फिर से कोशिश करो'), callbackData: 'action:create_listing' },
+            ],
+          }],
+          contextUpdate: { pendingListing: undefined },
         };
-        const next = askNextListingDetail(ctx, updated);
-        return next || { messages: [], contextUpdate: { pendingListing: updated } };
-      } else if (message === 'listing_mode:detailed' || lower.includes('detail') || numInput === 2) {
+      } else if (message === 'listing_mode:detailed' || lower.includes('detail') || lower.includes('vistar') || numInput === 2) {
         const updated: PendingListing = {
           ...pending,
           quickSellMode: false,
@@ -783,10 +813,10 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
       // Invalid selection - re-prompt
       return {
         messages: [{
-          text: h(ctx, 'Please select Automatic or Detailed:', 'Automatic ya Detailed chuno:'),
+          text: h(ctx, 'Please select Automatic or Detailed:', 'ऑटोमैटिक या विस्तार से चुनो:'),
           buttons: [
-            { text: h(ctx, '⚡ Sell Automatically', '⚡ Automatic Sell'), callbackData: 'listing_mode:quick' },
-            { text: h(ctx, '📝 Detailed', '📝 Detailed'), callbackData: 'listing_mode:detailed' },
+            { text: h(ctx, '⚡ Automatic', '⚡ ऑटोमैटिक'), callbackData: 'listing_mode:quick' },
+            { text: h(ctx, '📝 Detailed', '📝 विस्तार से'), callbackData: 'listing_mode:detailed' },
           ],
         }],
       };
@@ -1516,8 +1546,8 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
                 confirmMsg,
                 {
                   text: h(ctx,
-                    `Purchase successful!\n\n${offerList}\n\n• Total: ${s.totalQuantity} kWh at avg Rs ${s.averagePrice.toFixed(2)}/unit\n• Amount: Rs ${s.totalPrice.toFixed(2)}${bulkInfo}\n• Time: ${pending.discoveredOffers[0].timeWindow}\n\nYour energy will be delivered via the grid. Payment is held in escrow until delivery is verified.`,
-                    `Purchase ho gayi!\n\n${offerList}\n\n• Total: ${s.totalQuantity} kWh avg Rs ${s.averagePrice.toFixed(2)}/unit pe\n• Amount: Rs ${s.totalPrice.toFixed(2)}${bulkInfo}\n• Time: ${pending.discoveredOffers[0].timeWindow}\n\nAapki energy grid se deliver hogi. Payment escrow mein hai jab tak delivery verify nahi hoti.`
+                    `Purchase successful!\n\n${offerList}\n\n• Total: ${s.totalQuantity} kWh at avg Rs ${s.averagePrice.toFixed(2)}/unit\n• Amount: Rs ${s.totalPrice.toFixed(2)}${bulkInfo}\n• Time: ${pending.discoveredOffers[0].timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
+                    `खरीदारी हो गई!\n\n${offerList}\n\n• कुल: ${s.totalQuantity} यूनिट औसत ₹${s.averagePrice.toFixed(2)}/यूनिट\n• रकम: ₹${s.totalPrice.toFixed(2)}${bulkInfo}\n• समय: ${pending.discoveredOffers[0].timeWindow}\n\nआपकी बिजली ग्रिड से आएगी। आपका पैसा प्लेटफॉर्म पे सुरक्षित है - डिलीवरी के बाद सेलर को मिलेगा।`
                   ),
                 },
               ],
@@ -1533,8 +1563,8 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
                 confirmMsg,
                 {
                   text: h(ctx,
-                    `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will be delivered via the grid. Payment is held in escrow until delivery is verified.`,
-                    `Purchase ho gayi!\n• ${o.quantity} kWh ${o.providerName} se\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nAapki energy grid se deliver hogi. Payment escrow mein hai jab tak delivery verify nahi hoti.`
+                    `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
+                    `खरीदारी हो गई!\n• ${o.quantity} यूनिट ${o.providerName} से\n• ₹${o.pricePerKwh}/यूनिट (कुल: ₹${o.totalPrice.toFixed(2)})\n• समय: ${o.timeWindow}\n\nआपकी बिजली ग्रिड से आएगी। आपका पैसा प्लेटफॉर्म पे सुरक्षित है - डिलीवरी के बाद सेलर को मिलेगा।`
                   ),
                 },
               ],
@@ -1606,8 +1636,8 @@ async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPur
         { text: searchMsg },
         {
           text: h(ctx,
-            `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will be delivered via the grid. Payment is held in escrow until delivery is verified.`,
-            `Purchase ho gayi!\n• ${o.quantity} kWh ${o.providerName} se\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nAapki energy grid se deliver hogi. Payment escrow mein hai jab tak delivery verify nahi hoti.`
+            `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
+            `खरीदारी हो गई!\n• ${o.quantity} यूनिट ${o.providerName} से\n• ₹${o.pricePerKwh}/यूनिट (कुल: ₹${o.totalPrice.toFixed(2)})\n• समय: ${o.timeWindow}\n\nआपकी बिजली ग्रिड से आएगी। आपका पैसा प्लेटफॉर्म पे सुरक्षित है - डिलीवरी के बाद सेलर को मिलेगा।`
           ),
         },
       ],
@@ -3603,24 +3633,24 @@ const states: Record<ChatState, StateHandler> = {
         const field = message.replace('explain:', '');
         const explanations: Record<string, { en: string; hi: string }> = {
           balance: {
-            en: '💰 *Balance* is your wallet money on Oorja.\n\nWhen someone buys your energy, the payment goes to escrow first. After DISCOM confirms delivery, the money is released to your balance.\n\nYou can withdraw this anytime to your bank account.',
-            hi: '💰 *बैलेंस* ऊर्जा पर आपका वॉलेट पैसा है।\n\nजब कोई आपकी बिजली खरीदता है, पेमेंट पहले एस्क्रो में जाता है। बिजली कंपनी (DISCOM) द्वारा डिलीवरी पुष्टि के बाद, पैसा आपके बैलेंस में आ जाता है।\n\nआप इसे कभी भी अपने बैंक खाते में निकाल सकते हैं।'
+            en: '💰 *Balance* is your wallet money on Oorja.\n\nWhen someone buys your energy, the payment first goes to the platform. After DISCOM confirms delivery, the platform gives the money to your wallet.\n\nYou can withdraw this anytime to your bank account.',
+            hi: '💰 *बैलेंस* ऊर्जा ऐप पर आपका पैसा है।\n\nजब कोई आपकी बिजली खरीदता है, पैसा पहले प्लेटफॉर्म पे जाता है। बिजली कंपनी जब डिलीवरी पक्की करती है, तब प्लेटफॉर्म आपको पैसा दे देता है।\n\nआप इसे कभी भी अपने बैंक में निकाल सकते हो।'
           },
           trust: {
-            en: '🌟 *Trust Score* is like your credit score, but for energy trading!\n\nIt starts at 30% for new users. Each successful trade increases it. Higher trust = higher trade limits = more earnings!\n\nThe platform automatically manages this based on your delivery performance.',
-            hi: '🌟 *ट्रस्ट स्कोर* आपका एनर्जी ट्रेडिंग का क्रेडिट स्कोर है!\n\nनए यूज़र्स के लिए 30% से शुरू होता है। हर सफल ट्रेड से बढ़ता है। ज़्यादा ट्रस्ट = ज़्यादा ट्रेड लिमिट = ज़्यादा कमाई!\n\nप्लेटफॉर्म आपकी डिलीवरी परफॉर्मेंस के आधार पर इसे ऑटोमैटिक मैनेज करता है।'
+            en: '🌟 *Trust Score* shows how reliable you are!\n\nIt starts at 30% for new users. Each time you deliver energy properly, it goes up. Higher trust = you can sell more = more earnings!\n\nThe platform updates this by itself based on your deliveries.',
+            hi: '🌟 *भरोसा* बताता है कि आप कितने भरोसेमंद हो!\n\nनए लोगों के लिए 30% से शुरू होता है। जब भी आप सही से बिजली देते हो, ये बढ़ता है। ज़्यादा भरोसा = ज़्यादा बेच सकते हो = ज़्यादा कमाई!\n\nप्लेटफॉर्म खुद से इसे देखता रहता है।'
           },
           tradelimit: {
-            en: '📈 *Trade Limit* is the percentage of your solar production you can sell.\n\nNew sellers start at 10%. As your trust score grows, this increases up to 90%!\n\nExample: With 1000 kWh/month production and 10% limit, you can sell 100 kWh. At 50% limit, you could sell 500 kWh!',
-            hi: '📈 *ट्रेड लिमिट* आपकी सोलर प्रोडक्शन का वो प्रतिशत है जो आप बेच सकते हैं।\n\nनए सेलर्स 10% से शुरू करते हैं। जैसे-जैसे ट्रस्ट स्कोर बढ़ता है, ये 90% तक बढ़ सकता है!\n\nउदाहरण: 1000 किलोवाट घंटा प्रति महीना प्रोडक्शन और 10% लिमिट के साथ, आप 100 किलोवाट घंटा बेच सकते हैं। 50% लिमिट पर, 500 किलोवाट घंटा बेच सकते हैं!'
+            en: '📈 *Trade Limit* shows how much of your solar power you can sell.\n\nNew sellers start at 10%. As you deliver more successfully, this goes up to 90%!\n\nExample: If your panel makes 1000 units and limit is 10%, you can sell 100 units. At 50% limit, you can sell 500 units!',
+            hi: '📈 *बेचने की सीमा* बताती है कि आप अपनी सोलर बिजली का कितना हिस्सा बेच सकते हो।\n\nनए लोग 10% से शुरू करते हैं। जैसे-जैसे सही से बेचते रहोगे, ये 90% तक बढ़ सकता है!\n\nमिसाल: अगर आपका पैनल 1000 यूनिट बनाता है और सीमा 10% है, तो 100 यूनिट बेच सकते हो। 50% सीमा पे 500 यूनिट बेच सकते हो!'
           },
           seller: {
-            en: '📊 *Seller Stats* shows your selling activity:\n\n• Active Listings: Energy you have listed for sale right now\n• Weekly earnings: How much you earned this week\n• Total: Your all-time sales history\n\nList more energy to increase your earnings!',
-            hi: '📊 *सेलर स्टैट्स* आपकी बिक्री गतिविधि दिखाता है:\n\n• ऐक्टिव लिस्टिंग: अभी बिक्री के लिए लिस्ट की गई बिजली\n• इस हफ्ते की कमाई: इस हफ्ते कितना कमाया\n• टोटल: आपका पूरा बिक्री इतिहास\n\nज़्यादा बिजली लिस्ट करें, ज़्यादा कमाएं!'
+            en: '📊 *Selling* shows your sales:\n\n• Listed: Energy you put up for sale right now\n• This Week: How much you earned this week\n• Total: All your past sales\n\nList more energy to earn more!',
+            hi: '📊 *बिक्री* आपकी बिक्री दिखाता है:\n\n• लिस्टेड: अभी बेचने के लिए रखी बिजली\n• इस हफ्ते: इस हफ्ते कितना कमाया\n• कुल: अब तक की पूरी बिक्री\n\nज़्यादा बिजली रखो, ज़्यादा कमाओ!'
           },
           buyer: {
-            en: '🔋 *Buyer Stats* shows your purchase history:\n\n• Orders: Number of energy purchases you made\n• Energy Bought: Total kWh you have purchased\n• Total Spent: How much you paid for energy\n\nBuying P2P energy is often 20-40% cheaper than grid rates!',
-            hi: '🔋 *बायर स्टैट्स* आपकी खरीदारी का इतिहास दिखाता है:\n\n• ऑर्डर्स: आपने कितनी बार बिजली खरीदी\n• खरीदी गई बिजली: टोटल किलोवाट घंटा\n• टोटल खर्च: बिजली पर कितना खर्च हुआ\n\nP2P बिजली अक्सर ग्रिड रेट से 20-40% सस्ती होती है!'
+            en: '🔋 *Buying* shows your purchases:\n\n• Orders: How many times you bought energy\n• Units: How much energy you bought\n• Spent: How much you paid\n\nBuying from neighbors is often 20-40% cheaper than company rates!',
+            hi: '🔋 *खरीदारी* आपकी खरीदारी दिखाती है:\n\n• ऑर्डर: कितनी बार बिजली खरीदी\n• यूनिट: कितनी बिजली खरीदी\n• खर्च: कितना पैसा दिया\n\nपड़ोसियों से बिजली लेना अक्सर कंपनी से 20-40% सस्ता होता है!'
           },
         };
         const explanation = explanations[field];
@@ -3677,11 +3707,37 @@ const states: Record<ChatState, StateHandler> = {
       if (ctx.userId && intent) {
         switch (intent.intent) {
           case 'show_listings': {
-            dataContext = await mockTradingAgent.getActiveListings(ctx.userId, 'en');
-            fallbackText = ctx.language === 'hi-IN'
-              ? await mockTradingAgent.getActiveListings(ctx.userId, 'hi-IN')
-              : dataContext;
-            break;
+            const listingsData = await getActiveListingsData(ctx.userId);
+            if (listingsData && listingsData.listings.length > 0) {
+              const introText = h(ctx,
+                `Here are your active listings, ${listingsData.userName}. Total: ${listingsData.totalListed} kWh listed, ${listingsData.totalSold} kWh sold.`,
+                `${listingsData.userName}, यह रही आपकी लिस्टिंग। कुल: ${listingsData.totalListed} यूनिट लिस्टेड, ${listingsData.totalSold} यूनिट बिके।`
+              );
+              return {
+                messages: [{
+                  text: introText,
+                  listings: listingsData,
+                  buttons: [
+                    { text: h(ctx, '➕ Add Listing', '➕ नई लिस्टिंग'), callbackData: 'action:create_listing' },
+                    { text: h(ctx, '📊 Dashboard', '📊 डैशबोर्ड'), callbackData: 'action:dashboard' },
+                    { text: h(ctx, '💰 Earnings', '💰 कमाई'), callbackData: 'action:show_earnings' },
+                  ],
+                }],
+              };
+            }
+            // No listings - prompt to create
+            return {
+              messages: [{
+                text: h(ctx,
+                  'You have no active listings yet. Would you like to create one?',
+                  'आपकी कोई लिस्टिंग नहीं है। क्या एक बनाना चाहोगे?'
+                ),
+                buttons: [
+                  { text: h(ctx, '☀️ Sell Energy', '☀️ बिजली बेचो'), callbackData: 'action:create_listing' },
+                  { text: h(ctx, '📊 Dashboard', '📊 डैशबोर्ड'), callbackData: 'action:dashboard' },
+                ],
+              }],
+            };
           }
 
           case 'show_earnings': {

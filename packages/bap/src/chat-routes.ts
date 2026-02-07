@@ -165,6 +165,7 @@ router.post('/send', async (req: Request, res: Response) => {
       buttons: m.buttons || undefined,
       offers: m.offers || undefined,
       dashboard: m.dashboard || undefined,
+      listings: m.listings || undefined,
     }));
 
     res.json({
@@ -216,6 +217,7 @@ router.post('/upload', async (req: Request, res: Response) => {
       content: m.text,
       buttons: m.buttons || undefined,
       dashboard: m.dashboard || undefined,
+      listings: m.listings || undefined,
     }));
 
     res.json({
@@ -320,6 +322,7 @@ router.post('/voice', async (req: Request, res: Response) => {
       content: m.text,
       buttons: m.buttons || undefined,
       dashboard: m.dashboard || undefined,
+      listings: m.listings || undefined,
     }));
 
     res.json({

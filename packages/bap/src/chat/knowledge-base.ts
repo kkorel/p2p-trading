@@ -36,7 +36,7 @@ const entries: KBEntry[] = [
   {
     keywords: ['wallet', 'balance', 'paisa', 'money', 'payment', 'paise'],
     answer:
-      'Your wallet shows your account balance. When someone buys your energy, the payment is held safely (in escrow) until DISCOM confirms delivery. After verification, the money is released to your wallet.',
+      'Your wallet shows your account balance. When someone buys your energy, the payment first goes to the platform. After the electricity company confirms delivery, the platform gives the money to your wallet.',
   },
   {
     keywords: ['trust', 'trust score', 'vishwas', 'reputation'],
@@ -44,9 +44,9 @@ const entries: KBEntry[] = [
       'Your trust score (0-100%) shows how reliable you are as a seller. It starts at 30% for new users and increases when you successfully deliver energy. A higher trust score lets you sell more energy and makes buyers more likely to choose you.',
   },
   {
-    keywords: ['escrow', 'safe', 'payment safe', 'security'],
+    keywords: ['escrow', 'safe', 'payment safe', 'security', 'surakshit'],
     answer:
-      "Escrow means the buyer's payment is held safely by the platform until DISCOM confirms you delivered the energy. This protects both you and the buyer. Once delivery is verified, you get paid automatically!",
+      "Your payment is safe! When a buyer pays, the money goes to the platform first. The platform holds it until the electricity company confirms you delivered the energy. After that, the platform gives you the money. This way, no one can cheat!",
   },
   {
     keywords: ['cancel', 'rdd karna', 'cancel order'],
@@ -56,7 +56,7 @@ const entries: KBEntry[] = [
   {
     keywords: ['how does it work', 'process', 'steps', 'kaise kaam'],
     answer:
-      'Here is how it works:\n1. You upload your Solar ID document (from your electricity company)\n2. Your production capacity and trade limit are set automatically\n3. I create a sell offer with a fair price\n4. Buyers find and purchase your energy\n5. Your electricity company verifies delivery through the grid\n6. Payment is released to your wallet!',
+      'Here is how it works:\n1. You upload your Solar ID document (from your electricity company)\n2. The platform sets your production capacity and selling limit by itself\n3. I create a sell offer with a fair price\n4. Buyers find and purchase your energy\n5. Your electricity company confirms delivery through the grid\n6. The platform gives you your payment!',
   },
   {
     keywords: ['help', 'madad', 'commands', 'kya kar sakte', 'what can you do'],
@@ -96,17 +96,17 @@ const entries: KBEntry[] = [
   {
     keywords: ['safe', 'is it safe', 'kya safe hai', 'fraud', 'dhoka', 'scam'],
     answer:
-      'Yes, it is completely safe! Here is why:\n- Your ID documents are verified digitally\n- Buyer payments are held in escrow (locked) until your electricity company confirms delivery\n- They independently verify energy was actually delivered\n- You get paid automatically after verification\n\nNo one can cheat the system.',
+      'Yes, it is completely safe! Here is why:\n- Your ID documents are verified digitally\n- Buyer payment goes to the platform first (not directly to seller)\n- Your electricity company confirms the delivery separately\n- After delivery is confirmed, the platform gives you your money\n\nNo one can cheat the system.',
   },
   {
     keywords: ['how long', 'kitna time', 'when payment', 'kab milega', 'when will i get paid'],
     answer:
-      'After a buyer purchases your energy, DISCOM verifies the delivery (usually within a few hours). Once verified, the payment is automatically released to your wallet. You can see your balance anytime by asking me!',
+      'After a buyer purchases your energy, the electricity company confirms delivery (usually within a few hours). After they confirm, the platform gives the money to your wallet. You can check your balance anytime by asking me!',
   },
   {
     keywords: ['offer', 'sell offer', 'create offer', 'new offer', 'bechna'],
     answer:
-      'A sell offer is your listing on the marketplace. It says how much energy you want to sell, at what price, and during which hours. I can create offers for you automatically! Just say "create new offer" and I will set one up.',
+      'A sell offer is your listing on the marketplace. It says how much energy you want to sell, at what price, and during which hours. I can create offers for you! Just say "sell energy" and I will set it up.',
   },
   {
     keywords: ['surplus', 'extra energy', 'extra bijli', 'zyada bijli'],

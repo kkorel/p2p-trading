@@ -46,6 +46,71 @@ function translateStatus(status: string, lang?: string): string {
   return lang === 'hi-IN' ? entry.hi : entry.en;
 }
 
+/** Structured listing data for UI card display */
+export interface ListingData {
+  id: string;
+  quantity: number;
+  pricePerKwh: number;
+  startTime: string;
+  endTime: string;
+  energyType: string;
+}
+
+export interface ListingsCardData {
+  listings: ListingData[];
+  totalListed: number;
+  totalSold: number;
+  userName: string;
+}
+
+/**
+ * Get structured listings data for card display in the frontend.
+ */
+export async function getActiveListingsData(userId: string): Promise<ListingsCardData | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { providerId: true, name: true },
+  });
+
+  if (!user?.providerId) {
+    return null;
+  }
+
+  const offers = await prisma.catalogOffer.findMany({
+    where: { providerId: user.providerId },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    include: {
+      item: { select: { sourceType: true } },
+    },
+  });
+
+  // Get total sold from orders
+  const orders = await prisma.order.findMany({
+    where: {
+      providerId: user.providerId,
+      status: { in: ['ACTIVE', 'COMPLETED'] },
+    },
+    select: { totalQty: true },
+  });
+  const totalSold = orders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+  const totalListed = offers.reduce((sum, o) => sum + o.maxQty, 0);
+
+  return {
+    listings: offers.map(o => ({
+      id: o.id,
+      quantity: o.maxQty,
+      pricePerKwh: o.priceValue,
+      startTime: o.timeWindowStart.toISOString(),
+      endTime: o.timeWindowEnd.toISOString(),
+      energyType: o.item?.sourceType || 'SOLAR',
+    })),
+    totalListed,
+    totalSold,
+    userName: user.name || 'Seller',
+  };
+}
+
 export const mockTradingAgent = {
   /**
    * Create a default sell offer for a newly onboarded user.
@@ -425,7 +490,7 @@ export const mockTradingAgent = {
 
     return ht(lang,
       `Your listings (${offers.length}):\nTotal listed: ${totalListed} kWh | Sold: ${totalSold} kWh\n\n${lines.join('\n')}`,
-      `Aapki listings (${offers.length}):\nKul listed: ${totalListed} kWh | Bika: ${totalSold} kWh\n\n${lines.join('\n')}`
+      `आपकी लिस्टिंग (${offers.length}):\nकुल लिस्टेड: ${totalListed} यूनिट | बिका: ${totalSold} यूनिट\n\n${lines.join('\n')}`
     );
   },
 

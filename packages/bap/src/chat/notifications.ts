@@ -97,8 +97,8 @@ export async function notifyOrderConfirmed(params: {
     const buyer = await getUserContact(buyerId);
     if (buyer.phone && buyer.notifyOrderUpdates) {
       const message = msg(buyer.lang,
-        `✅ Order Confirmed!\n\n• ${quantity} kWh ${energyType || 'energy'}\n• ${formatCurrency(pricePerKwh)}/kWh\n• Total: ${formatCurrency(totalPrice)}\n${timeWindow ? `• Time: ${timeWindow}` : ''}\n\nPayment held in escrow. You'll be notified when energy is delivered.`,
-        `✅ Order Confirm Ho Gaya!\n\n• ${quantity} kWh ${energyType || 'bijli'}\n• ${formatCurrency(pricePerKwh)}/kWh\n• Total: ${formatCurrency(totalPrice)}\n${timeWindow ? `• Time: ${timeWindow}` : ''}\n\nPayment escrow mein hai. Delivery hone pe message milega.`
+        `✅ Order Confirmed!\n\n• ${quantity} kWh ${energyType || 'energy'}\n• ${formatCurrency(pricePerKwh)}/kWh\n• Total: ${formatCurrency(totalPrice)}\n${timeWindow ? `• Time: ${timeWindow}` : ''}\n\nPayment is safe with the platform. You'll be notified when energy is delivered.`,
+        `✅ ऑर्डर पक्का हो गया!\n\n• ${quantity} यूनिट ${energyType || 'बिजली'}\n• ${formatCurrency(pricePerKwh)}/यूनिट\n• कुल: ${formatCurrency(totalPrice)}\n${timeWindow ? `• समय: ${timeWindow}` : ''}\n\nआपका पैसा प्लेटफॉर्म पे सुरक्षित है। डिलीवरी होने पे मैसेज मिलेगा।`
       );
       
       sendProactiveMessage(buyer.phone, message).catch(err => {
@@ -141,12 +141,12 @@ export async function notifyPaymentEscrowed(params: {
   
   if (buyer.phone && buyer.notifyPayments) {
     const message = msg(buyer.lang,
-      `🔒 Payment Secured\n\n${formatCurrency(amount)} held in escrow.\nNew balance: ${formatCurrency(newBalance)}\n\nFunds will be released to seller after verified delivery.`,
-      `🔒 Payment Secure\n\n${formatCurrency(amount)} escrow mein rakha gaya.\nNaya balance: ${formatCurrency(newBalance)}\n\nDelivery verify hone pe seller ko milega.`
+      `🔒 Payment Secured\n\n${formatCurrency(amount)} is safe with the platform.\nNew balance: ${formatCurrency(newBalance)}\n\nSeller will get it after delivery is confirmed.`,
+      `🔒 पैसा सुरक्षित\n\n${formatCurrency(amount)} प्लेटफॉर्म पे सेफ है।\nनया बैलेंस: ${formatCurrency(newBalance)}\n\nडिलीवरी होने के बाद सेलर को मिलेगा।`
     );
-    
+
     sendProactiveMessage(buyer.phone, message).catch(err => {
-      logger.warn(`Failed to notify payment escrow: ${err.message}`);
+      logger.warn(`Failed to notify payment secured: ${err.message}`);
     });
   }
 }

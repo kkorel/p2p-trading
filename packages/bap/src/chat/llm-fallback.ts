@@ -24,7 +24,7 @@ Key facts about the platform:
 - The user can download a sample VC from: https://open-vcs.up.railway.app
 - Trade limit depends on solar panel capacity and trust score. New sellers start at 10% of production capacity
 - Trust score (0-100%) increases with successful energy deliveries
-- Payment is held in escrow until DISCOM verifies delivery
+- Payment first goes to the platform, then after DISCOM verifies delivery, the platform gives money to the seller
 - Cancellation is allowed within 30 minutes. Seller cancellation has a penalty
 
 Personality:

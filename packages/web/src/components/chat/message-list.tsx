@@ -6,6 +6,7 @@ import type { ChatMessageData } from '@/hooks/use-chat-engine';
 import { InlineSpeakerButton } from './speaker-button';
 import { OfferList } from './offer-list';
 import { DashboardCard } from './dashboard-card';
+import { ListingCard } from './listing-card';
 
 export type { ChatMessageData };
 
@@ -109,6 +110,14 @@ export function MessageList({
                   const displayText = isHindi ? `${name.hi} क्या है?` : `What is ${name.en}?`;
                   onButtonClick?.(`explain:${field}`, displayText);
                 }}
+              />
+            )}
+
+            {/* Listings card for seller view */}
+            {msg.role === 'agent' && msg.listings && msg.listings.listings.length > 0 && (
+              <ListingCard
+                data={msg.listings}
+                language={responseLanguage}
               />
             )}
 
