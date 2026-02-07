@@ -1484,6 +1484,14 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
         const next = await askNextPurchaseDetail(ctx, updated);
         return next || { messages: [], contextUpdate: { pendingPurchase: updated } };
       }
+      // Handle "Buy Automatically" selection - return null to let it flow to setup_auto_buy intent
+      if (message === 'action:setup_auto_buy' || lower.includes('auto') || lower.includes('automatic') || numInput === 1) {
+        // Clear pending purchase and return null to let GENERAL_CHAT handler process setup_auto_buy
+        return {
+          messages: [],
+          contextUpdate: { pendingPurchase: undefined, _helpShortcut: 'action:setup_auto_buy' },
+        };
+      }
       // Invalid selection - re-prompt
       return {
         messages: [{
