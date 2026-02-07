@@ -13,7 +13,7 @@
  */
 
 import axios from 'axios';
-import { config, createLogger, Order, prisma, secureAxiosBpp } from '@p2p/shared';
+import { config, createLogger, Order, prisma, secureAxiosBpp, secureAxios } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
@@ -199,8 +199,9 @@ export async function writeTradeToLedger(
         clientReference: `${transactionId}-${orderItemId}-${Date.now()}`,
       };
 
-      // Log full request before sending
-      logger.info('[LEDGER-PUT] Full request', { request });
+      // Log full request before sending (stringify in message since logger doesn't print context objects)
+      console.log('[LEDGER-PUT] Request body:', JSON.stringify(request, null, 2));
+      logger.info(`[LEDGER-PUT] Sending to ${ledgerUrl}/ledger/put`);
 
       // POST with BPP signing (ledger requires Beckn signature)
       const response = await secureAxiosBpp.post<LedgerWriteResponse>(
@@ -285,7 +286,8 @@ async function writeSingleRecord(
   };
 
   // Log full request before sending
-  logger.info('[LEDGER-PUT] Full request', { request });
+  console.log('[LEDGER-PUT] Request body:', JSON.stringify(request, null, 2));
+  logger.info(`[LEDGER-PUT] Sending to ${ledgerUrl}/ledger/put`);
 
   // POST with BPP signing (ledger requires Beckn signature)
   const response = await secureAxiosBpp.post<LedgerWriteResponse>(
@@ -304,53 +306,48 @@ async function writeSingleRecord(
 
 /**
  * Query trade records from the ledger
- * NOTE: Reads are mocked for now per team decision
+ * Uses BAP signing (BUYER role) per DEG Ledger spec
  */
 export async function getTradeFromLedger(
   transactionId: string,
   orderId?: string
 ): Promise<{ success: boolean; records?: LedgerRecord[]; error?: string }> {
-  // MOCKED: Per team decision, ledger reads are mocked for now
-  logger.info('Ledger read (mocked)', { transactionId, orderId });
+  // Check if ledger operations are enabled
+  if (!config.external.enableLedgerWrites) {
+    logger.info('Ledger reads disabled, returning mock', { transactionId });
+    return {
+      success: true,
+      records: [{
+        recordId: `mock-${transactionId}`,
+        transactionId,
+        orderItemId: orderId || 'unknown',
+        platformIdBuyer: config.bap.id,
+        platformIdSeller: config.bpp.id,
+        discomIdBuyer: process.env.DISCOM_ID_BUYER || 'DISCOM_BUYER_DEFAULT',
+        discomIdSeller: process.env.DISCOM_ID_SELLER || 'DISCOM_SELLER_DEFAULT',
+        buyerId: 'mock-buyer',
+        sellerId: 'mock-seller',
+        creationTime: new Date().toISOString(),
+        tradeDetails: [{ tradeType: 'ENERGY', tradeQty: 10, tradeUnit: 'KWH' }],
+      }],
+    };
+  }
 
-  // Return mock data
-  const mockRecord: LedgerRecord = {
-    recordId: `mock-${transactionId}`,
-    transactionId,
-    orderItemId: orderId || 'unknown',
-    platformIdBuyer: config.bap.id,
-    platformIdSeller: config.bpp.id,
-    discomIdBuyer: process.env.DISCOM_ID_BUYER || 'DISCOM_BUYER_DEFAULT',
-    discomIdSeller: process.env.DISCOM_ID_SELLER || 'DISCOM_SELLER_DEFAULT',
-    buyerId: 'mock-buyer',
-    sellerId: 'mock-seller',
-    creationTime: new Date().toISOString(),
-    tradeDetails: [
-      {
-        tradeType: 'ENERGY',
-        tradeQty: 10,
-        tradeUnit: 'KWH',
-      },
-    ],
-  };
-
-  return {
-    success: true,
-    records: [mockRecord],
-  };
-
-  // TODO: When enabling real reads, use this:
-  /*
   const ledgerUrl = config.external.ledger;
-  
+
   try {
     const request: LedgerGetRequest = {
       transactionId,
       orderItemId: orderId,
-      limit: 10,
+      limit: 50,
     };
 
-    const response = await axios.post<LedgerGetResponse>(
+    // Log request
+    console.log('[LEDGER-GET] Request body:', JSON.stringify(request, null, 2));
+    logger.info(`[LEDGER-GET] Querying ${ledgerUrl}/ledger/get`);
+
+    // POST with BAP signing (BUYER role reads ledger)
+    const response = await secureAxios.post<LedgerGetResponse>(
       `${ledgerUrl}/ledger/get`,
       request,
       {
@@ -359,17 +356,19 @@ export async function getTradeFromLedger(
       }
     );
 
+    logger.info(`[LEDGER-GET] Found ${response.data.records?.length || 0} records`);
+
     return {
       success: response.data.success,
       records: response.data.records,
     };
   } catch (error: any) {
+    logger.error(`[LEDGER-GET] Error: ${error.message} (${error.response?.status || error.code})`);
     return {
       success: false,
       error: error.message,
     };
   }
-  */
 }
 
 /**

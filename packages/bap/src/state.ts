@@ -107,7 +107,20 @@ export interface TransactionState {
   deliveryStatus?: string; // Overall delivery status from DISCOM updates
   totalDelivered?: number; // Aggregate kWh delivered
   totalCurtailed?: number; // Aggregate kWh curtailed
-  
+
+  // Payment tracking (from on_update with settlement)
+  // Status lifecycle: PENDING → INITIATED → AUTHORIZED → ADJUSTED → SETTLED
+  paymentStatus?: string;
+  paymentAmount?: number;
+  paymentCurrency?: string;
+  paymentUrl?: string; // Tracking URL from seller platform
+  billComponents?: Array<{
+    type: string; // UNIT, FEE
+    value: number;
+    currency?: string;
+    description?: string;
+  }>;
+
   status: 'DISCOVERING' | 'SELECTING' | 'INITIALIZING' | 'CONFIRMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
   updated_at: string;
