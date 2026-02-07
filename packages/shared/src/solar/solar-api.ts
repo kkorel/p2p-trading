@@ -60,30 +60,42 @@ export async function geocodeWithGoogle(
         return null;
     }
 
+    const startTime = Date.now();
     try {
         const url = `${GOOGLE_GEOCODING_API}?address=${encodeURIComponent(address)}&key=${apiKey}`;
+        logger.info('Calling Google Geocoding API', { address: address.substring(0, 50) + '...' });
+
         const response = await fetch(url);
+        const latencyMs = Date.now() - startTime;
 
         if (!response.ok) {
-            logger.warn('Google Geocoding API error', { status: response.status });
+            logger.warn('Google Geocoding API error', { status: response.status, latencyMs });
             return null;
         }
 
         const data = await response.json() as GoogleGeocodingResult;
 
         if (data.status !== 'OK' || !data.results || data.results.length === 0) {
-            logger.warn('No geocoding results', { address, status: data.status });
+            logger.warn('No geocoding results', { address, status: data.status, latencyMs });
             return null;
         }
 
         const result = data.results[0];
+        logger.info('✓ Google Geocoding API success', {
+            latencyMs,
+            lat: result.geometry.location.lat.toFixed(4),
+            lon: result.geometry.location.lng.toFixed(4),
+            formattedAddress: result.formatted_address.substring(0, 60),
+        });
+
         return {
             lat: result.geometry.location.lat,
             lon: result.geometry.location.lng,
             formattedAddress: result.formatted_address,
         };
     } catch (error) {
-        logger.error('Geocoding failed', { error: String(error), address });
+        const latencyMs = Date.now() - startTime;
+        logger.error('Geocoding failed', { error: String(error), address, latencyMs });
         return null;
     }
 }
@@ -101,22 +113,39 @@ async function fetchBuildingInsights(
         return null;
     }
 
+    const startTime = Date.now();
     try {
         const url = `${GOOGLE_SOLAR_API}/buildingInsights:findClosest?location.latitude=${lat}&location.longitude=${lon}&requiredQuality=MEDIUM&key=${apiKey}`;
+        logger.info('Calling Google Solar API', { lat: lat.toFixed(4), lon: lon.toFixed(4) });
+
         const response = await fetch(url);
+        const latencyMs = Date.now() - startTime;
 
         if (!response.ok) {
             if (response.status === 404) {
-                logger.info('No solar data for location', { lat, lon });
+                logger.info('No solar data for location (404)', { lat, lon, latencyMs });
                 return null;
             }
-            logger.warn('Solar API error', { status: response.status });
+            logger.warn('Google Solar API error', { status: response.status, latencyMs });
             return null;
         }
 
-        return await response.json() as GoogleSolarBuildingInsights;
+        const data = await response.json() as GoogleSolarBuildingInsights;
+        const sunshineHours = data.solarPotential?.maxSunshineHoursPerYear || 0;
+        const panelCount = data.solarPotential?.maxArrayPanelsCount || 0;
+
+        logger.info('✓ Google Solar API success', {
+            latencyMs,
+            imageryQuality: data.imageryQuality,
+            sunshineHours: Math.round(sunshineHours),
+            maxPanels: panelCount,
+            hasRoofData: !!data.solarPotential?.roofSegmentStats?.length,
+        });
+
+        return data;
     } catch (error) {
-        logger.error('Solar API fetch failed', { error: String(error), lat, lon });
+        const latencyMs = Date.now() - startTime;
+        logger.error('Solar API fetch failed', { error: String(error), lat, lon, latencyMs });
         return null;
     }
 }
@@ -259,12 +288,13 @@ export async function analyzeInstallation(address: string): Promise<SolarAnalysi
             analyzedAt: new Date(),
         };
 
-        logger.info('Installation analyzed', {
-            address,
-            score,
-            tradingLimit,
-            sunshineHours,
+        logger.info('✓ Solar analysis complete', {
+            address: address.substring(0, 40),
+            score: score.toFixed(2),
+            tradingLimit: `${tradingLimit}%`,
+            sunshineHours: Math.round(sunshineHours),
             imageryQuality,
+            yearlyEnergy: bestConfig?.yearlyEnergyDcKwh ? `${Math.round(bestConfig.yearlyEnergyDcKwh)} kWh` : 'N/A',
         });
 
         // Cache the result

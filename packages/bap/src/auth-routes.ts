@@ -655,17 +655,38 @@ router.post('/verify-credential-preauth', async (req: Request, res: Response) =>
 
     // Run solar analysis when UtilityCustomerCredential is verified (has address)
     // This sets the initial trading limit (7-15%) based on solar potential
-    let solarAnalysisResult: SolarAnalysis | null = null;
     if (credType === 'UtilityCustomerCredential' && verificationResult.verified && claims.installationAddress) {
+      logger.info(`Triggering solar analysis for user ${userId} (UtilityCustomerCredential with address)`);
       // Run solar analysis in background (fire-and-forget for fast response)
       // The trading limit will be updated asynchronously
       runSolarAnalysisForUser(userId, claims.installationAddress).then(result => {
         if (result) {
-          logger.info(`Solar analysis completed for user ${userId}: limit=${result.tradingLimitPercent}%`);
+          logger.info(`✓ Solar analysis completed for user ${userId}: limit=${result.tradingLimitPercent}%, score=${result.installationScore.toFixed(2)}`);
         }
       }).catch(err => {
         logger.warn(`Background solar analysis failed for user ${userId}: ${err.message}`);
       });
+    }
+
+    // Also trigger solar analysis when Generation/Storage VC is verified if:
+    // 1. User already has an installation address (from previous Utility VC)
+    // 2. No solar analysis has been done yet
+    if ((credType === 'GenerationProfileCredential' || credType === 'StorageProfileCredential') && verificationResult.verified) {
+      const userWithAddress = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { installationAddress: true, solarAnalysis: true },
+      });
+
+      if (userWithAddress?.installationAddress && !userWithAddress.solarAnalysis) {
+        logger.info(`Triggering solar analysis for user ${userId} (${credType} with existing address, no prior analysis)`);
+        runSolarAnalysisForUser(userId, userWithAddress.installationAddress).then(result => {
+          if (result) {
+            logger.info(`✓ Solar analysis completed for user ${userId}: limit=${result.tradingLimitPercent}%, score=${result.installationScore.toFixed(2)}`);
+          }
+        }).catch(err => {
+          logger.warn(`Background solar analysis failed for user ${userId}: ${err.message}`);
+        });
+      }
     }
 
     // Fetch all credentials to return status
@@ -1708,14 +1729,36 @@ router.post('/verify-credential', authMiddleware, async (req: Request, res: Resp
     // Run solar analysis when UtilityCustomerCredential is verified (has address)
     // This sets the initial trading limit (7-15%) based on solar potential
     if (credType === 'UtilityCustomerCredential' && verificationResult.verified && claims.installationAddress) {
+      logger.info(`Triggering solar analysis for user ${req.user!.id} (UtilityCustomerCredential with address)`);
       // Run solar analysis in background (fire-and-forget for fast response)
       runSolarAnalysisForUser(req.user!.id, claims.installationAddress).then(result => {
         if (result) {
-          logger.info(`Solar analysis completed for user ${req.user!.id}: limit=${result.tradingLimitPercent}%`);
+          logger.info(`✓ Solar analysis completed for user ${req.user!.id}: limit=${result.tradingLimitPercent}%, score=${result.installationScore.toFixed(2)}`);
         }
       }).catch(err => {
         logger.warn(`Background solar analysis failed for user ${req.user!.id}: ${err.message}`);
       });
+    }
+
+    // Also trigger solar analysis when Generation/Storage VC is verified if:
+    // 1. User already has an installation address (from previous Utility VC)
+    // 2. No solar analysis has been done yet
+    if ((credType === 'GenerationProfileCredential' || credType === 'StorageProfileCredential') && verificationResult.verified) {
+      const userWithAddress = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { installationAddress: true, solarAnalysis: true },
+      });
+
+      if (userWithAddress?.installationAddress && !userWithAddress.solarAnalysis) {
+        logger.info(`Triggering solar analysis for user ${req.user!.id} (${credType} with existing address, no prior analysis)`);
+        runSolarAnalysisForUser(req.user!.id, userWithAddress.installationAddress).then(result => {
+          if (result) {
+            logger.info(`✓ Solar analysis completed for user ${req.user!.id}: limit=${result.tradingLimitPercent}%, score=${result.installationScore.toFixed(2)}`);
+          }
+        }).catch(err => {
+          logger.warn(`Background solar analysis failed for user ${req.user!.id}: ${err.message}`);
+        });
+      }
     }
 
     // Fetch updated user + all credentials
