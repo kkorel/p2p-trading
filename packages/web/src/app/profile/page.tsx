@@ -108,11 +108,18 @@ function P2PValueInsight() {
 
       {/* Primary Value Display */}
       <div className="text-center py-3">
-        <p className={`text-3xl font-bold ${hasActivity ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
-          +{formatCurrency(totalValue)}
+        <p className={`text-3xl font-bold ${
+          totalValue > 0 ? 'text-[var(--color-success)]' :
+          totalValue < 0 ? 'text-[var(--color-error)]' :
+          'text-[var(--color-text-muted)]'
+        }`}>
+          {totalValue > 0 ? '+' : ''}{formatCurrency(totalValue)}
         </p>
         <p className="text-sm text-[var(--color-text-muted)] mt-1">
-          {hasActivity ? 'Extra value from P2P trading' : 'Start trading to see your savings!'}
+          {!hasActivity ? 'Start trading to see your savings!' :
+           totalValue > 0 ? 'Extra value from P2P trading' :
+           totalValue < 0 ? 'You paid more than DISCOM rates' :
+           'Break-even with DISCOM rates'}
         </p>
       </div>
 
