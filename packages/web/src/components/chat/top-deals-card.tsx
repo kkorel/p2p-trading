@@ -23,6 +23,7 @@ const LABELS = {
   perUnit: { en: '/unit', hi: '/यूनिट' },
   quickBuy: { en: 'Quick Buy', hi: 'जल्दी खरीदो' },
   customAmount: { en: 'Custom Amount', hi: 'अपनी मर्ज़ी से' },
+  best: { en: 'Best', hi: 'बेस्ट' },
 };
 
 function getLabel(key: keyof typeof LABELS, isHindi: boolean): string {
@@ -87,7 +88,7 @@ export function TopDealsCard({ data, language, onQuickBuy, onCustomAmount }: Top
                 </div>
                 {index === 0 && (
                   <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
-                    Best
+                    {getLabel('best', isHindi)}
                   </span>
                 )}
               </div>

@@ -17,7 +17,8 @@ const LABELS = {
   bestDeals: { en: 'Best Deals Found!', hi: 'बेस्ट डील मिली!' },
   bestDeal: { en: 'Best deal for your request', hi: 'आपकी मांग के लिए सबसे अच्छी डील' },
   combinedFrom: { en: 'Combined from', hi: '' },
-  sellers: { en: 'sellers', hi: 'किसानों से' },
+  sellers: { en: 'sellers', hi: 'किसान' },
+  sellersFrom: { en: 'sellers', hi: 'किसानों से' },
   seller: { en: 'Seller', hi: 'विक्रेता' },
   quantity: { en: 'Quantity', hi: 'मात्रा' },
   price: { en: 'Price', hi: 'दाम' },
@@ -69,7 +70,7 @@ export function MatchedOffersCard({ data, language, onAccept, onCancel }: Matche
               {isSingle
                 ? getLabel('bestDeal', isHindi)
                 : isHindi
-                  ? `${data.summary.offersUsed} ${getLabel('sellers', isHindi)}`
+                  ? `${data.summary.offersUsed} ${getLabel('sellersFrom', isHindi)}`
                   : `${getLabel('combinedFrom', isHindi)} ${data.summary.offersUsed} ${getLabel('sellers', isHindi)}`
               }
             </p>
@@ -121,7 +122,7 @@ export function MatchedOffersCard({ data, language, onAccept, onCancel }: Matche
                 <div className="flex justify-between">
                   <span className="text-gray-500">{getLabel('total', isHindi)}:</span>
                   <span className="font-medium">
-                    {data.summary.totalQuantity} {getLabel('unit', isHindi)} {getLabel('from', isHindi)} {data.summary.offersUsed} {isHindi ? 'किसान' : 'sellers'}
+                    {data.summary.totalQuantity} {getLabel('unit', isHindi)} {getLabel('from', isHindi)} {data.summary.offersUsed} {getLabel('sellers', isHindi)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -155,7 +156,7 @@ export function MatchedOffersCard({ data, language, onAccept, onCancel }: Matche
               ) : (
                 <>
                   <ChevronDown className="w-4 h-4" />
-                  {getLabel('viewSellers', isHindi)} {data.offers.length} {isHindi ? 'किसान' : 'sellers'}
+                  {getLabel('viewSellers', isHindi)} {data.offers.length} {getLabel('sellers', isHindi)}
                 </>
               )}
             </button>

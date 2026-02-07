@@ -11,6 +11,7 @@ import { OfferCreatedCard } from './offer-created-card';
 import { TopDealsCard } from './top-deals-card';
 import { MatchedOffersCard } from './matched-offers-card';
 import { OrderConfirmationCard } from './order-confirmation-card';
+import { EarningsCard } from './earnings-card';
 
 export type { ChatMessageData };
 
@@ -157,6 +158,14 @@ export function MessageList({
             {msg.role === 'agent' && msg.orderConfirmation && (
               <OrderConfirmationCard
                 data={msg.orderConfirmation}
+                language={responseLanguage}
+              />
+            )}
+
+            {/* Earnings card */}
+            {msg.role === 'agent' && msg.earnings && (
+              <EarningsCard
+                data={msg.earnings}
                 language={responseLanguage}
               />
             )}

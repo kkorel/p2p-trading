@@ -148,6 +148,15 @@ export interface AgentMessage {
     };
     timeWindow: string;
   };
+  /** Structured earnings data for EarningsCard */
+  earnings?: {
+    userName: string;
+    hasStartedSelling: boolean;
+    totalOrders: number;
+    totalEnergySold: number;
+    totalEarnings: number;
+    walletBalance: number;
+  };
 }
 
 export interface AgentResponse {
@@ -2375,23 +2384,19 @@ function getSmartSuggestions(ctx: SessionContext, currentState: string): Array<{
       });
     }
 
-    // Buyer suggestions (has consumption credential)
+    // Universal: Buy energy option (for both sellers and buyers)
+    suggestions.push({
+      text: h(ctx, '🔋 Buy Energy', '🔋 बिजली खरीदो'),
+      callbackData: 'action:buy_energy'
+    });
+
+    // Buyer-specific: My Orders
     if (hasConsumption && !hasGeneration && !hasStorage) {
-      suggestions.push({
-        text: h(ctx, '🔋 Buy Electricity', '🔋 बिजली खरीदो'),
-        callbackData: 'action:buy_energy'
-      });
       suggestions.push({
         text: h(ctx, '📦 My Orders', '📦 मेरे ऑर्डर'),
         callbackData: 'action:show_orders'
       });
     }
-
-    // Universal: Browse marketplace
-    suggestions.push({
-      text: h(ctx, '🏪 See Market', '🏪 बाज़ार देखो'),
-      callbackData: 'action:browse'
-    });
 
     // Cancel button for pending actions
     if (ctx.pendingListing || ctx.pendingPurchase) {
@@ -2482,7 +2487,7 @@ function getConfusedResponse(ctx: SessionContext, userMessage: string): AgentRes
     { text: h(ctx, '☀️ Sell Energy', '☀️ Energy Becho'), callbackData: 'action:create_listing' },
     { text: h(ctx, '⚡ Buy Energy', '⚡ Energy Kharido'), callbackData: 'action:buy_energy' },
     { text: h(ctx, '📊 Market Prices', '📊 Daam Dekho'), callbackData: 'action:market_insights' },
-    { text: h(ctx, '📋 Dashboard', '📋 Dashboard'), callbackData: 'action:dashboard' },
+    { text: h(ctx, '📊 My Electricity Info', '📊 मेरी बिजली की जानकारी'), callbackData: 'action:dashboard' },
   ];
 
   return {
@@ -3875,10 +3880,31 @@ const states: Record<ChatState, StateHandler> = {
           case 'show_earnings': {
             const period = parseTimePeriod(message);
             if (period) {
+              // Period-specific query - use text fallback
               dataContext = await mockTradingAgent.getSalesByPeriod(ctx.userId, period.startDate, period.endDate, period.label, 'en');
-            } else {
-              dataContext = await mockTradingAgent.getEarningsSummary(ctx.userId, 'en');
+              fallbackText = dataContext;
+              break;
             }
+            // Get structured earnings data for card UI
+            const earningsData = await mockTradingAgent.getEarningsData(ctx.userId);
+            if (earningsData) {
+              return {
+                messages: [{
+                  text: h(ctx,
+                    earningsData.hasStartedSelling
+                      ? `Here's your earnings summary, ${earningsData.userName}!`
+                      : `${earningsData.userName}, start selling to see your earnings here!`,
+                    earningsData.hasStartedSelling
+                      ? `${earningsData.userName}, यह रही आपकी कमाई!`
+                      : `${earningsData.userName}, बेचना शुरू करो और यहाँ कमाई देखो!`
+                  ),
+                  earnings: earningsData,
+                  buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+                }],
+              };
+            }
+            // Fallback to text
+            dataContext = await mockTradingAgent.getEarningsSummary(ctx.userId, 'en');
             fallbackText = dataContext;
             break;
           }
@@ -4104,6 +4130,23 @@ const states: Record<ChatState, StateHandler> = {
           return { messages: [{ text: await mockTradingAgent.getActiveListings(ctx.userId, ctx.language), buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT') }] };
         }
         if (lower.includes('earn') || lower.includes('kamai') || lower.includes('kamaya') || lower.includes('income') || lower.includes('munafa')) {
+          const earningsData = await mockTradingAgent.getEarningsData(ctx.userId);
+          if (earningsData) {
+            return {
+              messages: [{
+                text: h(ctx,
+                  earningsData.hasStartedSelling
+                    ? `Here's your earnings summary, ${earningsData.userName}!`
+                    : `${earningsData.userName}, start selling to see your earnings here!`,
+                  earningsData.hasStartedSelling
+                    ? `${earningsData.userName}, यह रही आपकी कमाई!`
+                    : `${earningsData.userName}, बेचना शुरू करो और यहाँ कमाई देखो!`
+                ),
+                earnings: earningsData,
+                buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
+              }],
+            };
+          }
           return { messages: [{ text: await mockTradingAgent.getEarningsSummary(ctx.userId, ctx.language), buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT') }] };
         }
         if (lower.includes('balance') || lower.includes('wallet') || lower.includes('paise') || lower.includes('khata')) {
@@ -4820,6 +4863,7 @@ async function storeAgentMessages(sessionId: string, messages: AgentMessage[]) {
     const metadata: Record<string, unknown> = {};
     if (msg.buttons) metadata.buttons = msg.buttons;
     if (msg.dashboard) metadata.dashboard = msg.dashboard;
+    if (msg.earnings) metadata.earnings = msg.earnings;
 
     await storeMessage(
       sessionId,

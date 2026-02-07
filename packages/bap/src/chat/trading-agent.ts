@@ -378,6 +378,58 @@ export const mockTradingAgent = {
   },
 
   /**
+   * Get structured earnings data for EarningsCard UI.
+   */
+  async getEarningsData(userId: string): Promise<{
+    userName: string;
+    hasStartedSelling: boolean;
+    totalOrders: number;
+    totalEnergySold: number;
+    totalEarnings: number;
+    walletBalance: number;
+  } | null> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { providerId: true, balance: true, name: true },
+    });
+
+    if (!user) return null;
+
+    const userName = user.name || 'Friend';
+
+    if (!user.providerId) {
+      return {
+        userName,
+        hasStartedSelling: false,
+        totalOrders: 0,
+        totalEnergySold: 0,
+        totalEarnings: 0,
+        walletBalance: user.balance,
+      };
+    }
+
+    const completedOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+
+    const totalEarnings = completedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const totalKwh = completedOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0);
+
+    return {
+      userName,
+      hasStartedSelling: true,
+      totalOrders: completedOrders.length,
+      totalEnergySold: totalKwh,
+      totalEarnings,
+      walletBalance: user.balance,
+    };
+  },
+
+  /**
    * Get order status summary.
    */
   async getOrdersSummary(userId: string, lang?: string): Promise<string> {

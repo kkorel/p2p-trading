@@ -32,15 +32,26 @@ function getLabel(key: keyof typeof LABELS, isHindi: boolean): string {
   return isHindi ? LABELS[key].hi : LABELS[key].en;
 }
 
-function formatTime(isoString: string, isHindi: boolean): string {
+function formatTime(isoString: string): string {
   const date = new Date(isoString);
-  const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  return timeStr;
+  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-function formatDate(isoString: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+function formatTimeWindow(startIso: string, endIso: string, isHindi: boolean): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+
+  // Format: "5 Feb, 10:00 - 18:00" or "5 फ़रवरी, 10:00 - 18:00"
+  const day = start.getDate();
+  const monthNames = isHindi
+    ? ['जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर']
+    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = monthNames[start.getMonth()];
+
+  const startTime = start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const endTime = end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  return `${day} ${month}, ${startTime} - ${endTime}`;
 }
 
 // Energy type emojis
@@ -102,7 +113,7 @@ export function OfferCreatedCard({ data, language }: OfferCreatedCardProps) {
               <span className="text-sm text-gray-600">{getLabel('time', isHindi)}</span>
             </div>
             <span className="text-sm font-medium text-gray-700">
-              {formatDate(data.startTime)} {formatTime(data.startTime, isHindi)} - {formatTime(data.endTime, isHindi)}
+              {formatTimeWindow(data.startTime, data.endTime, isHindi)}
             </span>
           </div>
         </div>

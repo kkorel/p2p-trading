@@ -128,6 +128,16 @@ export interface OrderConfirmationCardData {
   timeWindow: string;
 }
 
+// Earnings Card
+export interface EarningsCardData {
+  userName: string;
+  hasStartedSelling: boolean;
+  totalOrders: number;
+  totalEnergySold: number;
+  totalEarnings: number;
+  walletBalance: number;
+}
+
 export interface ChatMessageData {
   role: 'agent' | 'user';
   content: string;
@@ -139,6 +149,7 @@ export interface ChatMessageData {
   topDeals?: TopDealsCardData;
   matchedOffers?: MatchedOffersCardData;
   orderConfirmation?: OrderConfirmationCardData;
+  earnings?: EarningsCardData;
 }
 
 /** Get stored session - prioritize authenticated session, then anonymous. */
@@ -297,6 +308,7 @@ export function useChatEngine() {
             topDeals: m.topDeals,
             matchedOffers: m.matchedOffers,
             orderConfirmation: m.orderConfirmation,
+            earnings: m.earnings,
           })),
         ]);
       }
@@ -518,6 +530,7 @@ export function useChatEngine() {
             topDeals: m.topDeals,
             matchedOffers: m.matchedOffers,
             orderConfirmation: m.orderConfirmation,
+            earnings: m.earnings,
           })),
         ]);
       }

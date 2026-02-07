@@ -46,14 +46,21 @@ const ENERGY_EMOJI: Record<string, string> = {
   MIXED: '⚡',
 };
 
-function formatTime(isoString: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-}
+function formatTimeWindow(startIso: string, endIso: string, isHindi: boolean): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
 
-function formatDate(isoString: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  // Format: "5 Feb, 10:00 - 18:00" or "5 फ़रवरी, 10:00 - 18:00"
+  const day = start.getDate();
+  const monthNames = isHindi
+    ? ['जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर']
+    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = monthNames[start.getMonth()];
+
+  const startTime = start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const endTime = end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  return `${day} ${month}, ${startTime} - ${endTime}`;
 }
 
 export function ListingCard({ data, language }: ListingCardProps) {
@@ -116,7 +123,7 @@ export function ListingCard({ data, language }: ListingCardProps) {
               <div className="flex items-center gap-1 text-xs text-gray-500">
                 <Clock className="w-3 h-3" />
                 <span>
-                  {formatDate(listing.startTime)} {formatTime(listing.startTime)} - {formatTime(listing.endTime)}
+                  {formatTimeWindow(listing.startTime, listing.endTime, isHindi)}
                 </span>
               </div>
             </div>
