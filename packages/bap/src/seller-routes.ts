@@ -49,6 +49,13 @@ import {
   buildWireOrder,
   getBppKeyPair,
   isSigningEnabled,
+  // Weather module
+  getWeatherAdjustedCapacity,
+  getMaintenanceAlert,
+  extractMaintenanceData,
+  getWeatherForecast,
+  geocodeAddress,
+  type SourceType,
 } from '@p2p/shared';
 import {
   getOfferById,
@@ -1446,7 +1453,7 @@ router.post('/publish', async (req: Request, res: Response) => {
         const providerAttrs = providerInfo['beckn:providerAttributes'] || providerInfo.providerAttributes || {};
         const providerId = providerInfo['beckn:id'] || providerInfo.id || 'unknown-provider';
         const providerName = providerInfo['beckn:descriptor']?.['schema:name'] ||
-                            providerInfo.descriptor?.name || 'Energy Provider';
+          providerInfo.descriptor?.name || 'Energy Provider';
 
         // Build SyncProvider
         const syncProvider = {
@@ -1464,7 +1471,7 @@ router.post('/publish', async (req: Request, res: Response) => {
 
           // Extract available quantity from item attributes
           const availableQty = itemAttrs.availableQuantity || itemAttrs['beckn:availableQuantity'] ||
-                               itemAttrs.quantity?.value || 10; // Default to 10, not 100
+            itemAttrs.quantity?.value || 10; // Default to 10, not 100
 
           return {
             id: itemId,
@@ -1490,8 +1497,8 @@ router.post('/publish', async (req: Request, res: Response) => {
 
           // Extract max quantity from multiple possible sources
           const maxQty = price.applicableQuantity?.unitQuantity ||
-                         offerAttrs.maxQuantity || offerAttrs['beckn:maxQuantity'] ||
-                         offerAttrs.applicableQuantity?.unitQuantity || 10; // Default to 10, not 100
+            offerAttrs.maxQuantity || offerAttrs['beckn:maxQuantity'] ||
+            offerAttrs.applicableQuantity?.unitQuantity || 10; // Default to 10, not 100
 
           return {
             id: offerId,
@@ -2764,6 +2771,176 @@ router.post('/seller/cds-test-publish', authMiddleware, async (req: Request, res
       error: error.message,
       hint: 'Check if the external CDS is reachable and accepting requests',
     });
+  }
+});
+
+/**
+ * GET /seller/weather/capacity - Get weather-adjusted capacity for a seller
+ * Returns effective capacity limit based on weather conditions
+ */
+router.get('/seller/weather/capacity', authMiddleware, requireSellerVC, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const providerId = req.user!.providerId;
+
+    if (!providerId) {
+      return res.status(400).json({ error: 'No seller profile found' });
+    }
+
+    // Get user's production capacity, trust limit, address, and provider's generation type
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        productionCapacity: true,
+        allowedTradeLimit: true,
+        installationAddress: true,
+      },
+    });
+
+    // Query provider with raw SQL to get all fields
+    const providerResult = await prisma.$queryRaw<Array<{ installation_address: string | null; generation_type: string | null }>>`
+      SELECT installation_address, generation_type FROM providers WHERE id = ${providerId} LIMIT 1
+    `;
+    const providerData = providerResult[0];
+
+    if (!user?.productionCapacity || user.productionCapacity <= 0) {
+      return res.status(400).json({
+        error: 'Production capacity not set. Please update your profile.',
+      });
+    }
+
+    // Use provider's address first, fall back to user's address
+    const installationAddress = providerData?.installation_address || user.installationAddress;
+
+    if (!installationAddress) {
+      return res.status(400).json({
+        error: 'Installation address not found. Required for weather data.',
+      });
+    }
+
+    // Calculate base trade limit
+    const baseCapacity = (user.productionCapacity * (user.allowedTradeLimit ?? 10)) / 100;
+
+    // Map database generation type to SourceType (normalize to UPPERCASE)
+    const dbGenType = (providerData?.generation_type || 'SOLAR').toUpperCase();
+    const sourceType = ['SOLAR', 'WIND', 'HYDRO', 'OTHER'].includes(dbGenType)
+      ? dbGenType as 'SOLAR' | 'WIND' | 'HYDRO' | 'OTHER'
+      : 'SOLAR' as const;
+
+    // Get weather-adjusted capacity
+    const weatherCapacity = await getWeatherAdjustedCapacity(
+      baseCapacity,
+      installationAddress,
+      sourceType
+    );
+
+    // Get currently committed capacity (sold + active offers)
+    const soldOrders = await prisma.order.findMany({
+      where: {
+        providerId,
+        status: { in: ['PENDING', 'ACTIVE', 'COMPLETED'] },
+      },
+      select: { totalQty: true },
+    });
+
+    const totalSoldQty = soldOrders.reduce((sum, order) => sum + (order.totalQty || 0), 0);
+
+    const activeOffers = await prisma.catalogOffer.findMany({
+      where: { providerId },
+      include: {
+        blocks: {
+          where: { status: 'AVAILABLE' },
+        },
+      },
+    });
+
+    const totalUnsoldInOffers = activeOffers.reduce((sum, offer) => sum + offer.blocks.length, 0);
+    const totalCommitted = totalSoldQty + totalUnsoldInOffers;
+
+    res.json({
+      baseCapacity: Math.round(baseCapacity * 10) / 10,
+      effectiveCapacity: Math.round(weatherCapacity.effectiveCapacity * 10) / 10,
+      condition: weatherCapacity.condition,
+      bestWindow: weatherCapacity.bestWindow,
+      totalCommitted: Math.round(totalCommitted * 10) / 10,
+      remainingCapacity: Math.round((weatherCapacity.effectiveCapacity - totalCommitted) * 10) / 10,
+      sourceType,
+    });
+  } catch (error: any) {
+    logger.error('Weather capacity endpoint error', { error: error.message });
+    res.status(500).json({ error: 'Failed to get weather capacity' });
+  }
+});
+
+/**
+ * GET /seller/weather/alert - Check for maintenance alerts based on recent weather
+ */
+router.get('/seller/weather/alert', authMiddleware, requireSellerVC, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const providerId = req.user!.providerId;
+
+    if (!providerId) {
+      return res.status(400).json({ error: 'No seller profile found' });
+    }
+
+    // Get installation address from user first
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { installationAddress: true },
+    });
+
+    // Query provider with raw SQL to get installation address
+    const providerResult = await prisma.$queryRaw<Array<{ installation_address: string | null }>>`
+      SELECT installation_address FROM providers WHERE id = ${providerId} LIMIT 1
+    `;
+    const providerData = providerResult[0];
+
+    const installationAddress = providerData?.installation_address || user?.installationAddress;
+
+    if (!installationAddress) {
+      return res.json({ alert: null, reason: 'No installation address' });
+    }
+
+    // Get location
+    const location = await geocodeAddress(installationAddress);
+    if (!location) {
+      return res.json({ alert: null, reason: 'Could not geocode address' });
+    }
+
+    // Fetch weather with 48-hour history (to check last 24h)
+    const forecast = await getWeatherForecast(location.lat, location.lon);
+    if (!forecast) {
+      return res.json({ alert: null, reason: 'Could not fetch weather' });
+    }
+
+    // Extract maintenance data from last 24 hours
+    const maintenanceData = extractMaintenanceData(
+      forecast.hourly.map(h => ({
+        precipitation: h.precipitation,
+        windSpeed: h.windSpeed,
+        weatherCode: h.weatherCode,
+      })),
+      24
+    );
+
+    // Check for last alert date (could be stored in user prefs, for now just check without cooldown)
+    // In a full implementation, you'd track lastAlertDate per user
+    const alert = getMaintenanceAlert(maintenanceData);
+
+    res.json({
+      alert,
+      weather: {
+        precipitation24h: maintenanceData.precipitation24h,
+        maxWindSpeed: maintenanceData.maxWindSpeed,
+        hadThunderstorm: maintenanceData.hadThunderstorm,
+        hadHail: maintenanceData.hadHail,
+      },
+      location: location.city,
+    });
+  } catch (error: any) {
+    logger.error('Weather alert endpoint error', { error: error.message });
+    res.status(500).json({ error: 'Failed to check weather alerts' });
   }
 });
 

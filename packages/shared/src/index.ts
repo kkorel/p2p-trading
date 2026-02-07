@@ -32,3 +32,6 @@ export * from './trust';
 
 // Export CDS Sync Client
 export * from './cds/sync-client';
+
+// Export Weather module
+export * from './weather';

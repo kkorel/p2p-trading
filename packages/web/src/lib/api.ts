@@ -529,6 +529,12 @@ export const sellerApi = {
         body: JSON.stringify({ reason }),
       }
     ),
+
+  getWeatherCapacity: () =>
+    request<WeatherCapacityResponse>('/seller/weather/capacity'),
+
+  getWeatherAlert: () =>
+    request<WeatherAlertResponse>('/seller/weather/alert'),
 };
 
 // Types
@@ -756,6 +762,31 @@ export interface AddOfferDirectParams {
   currency?: string;
   max_qty: number;
   time_window: { startTime: string; endTime: string };
+}
+
+export interface WeatherCapacityResponse {
+  baseCapacity: number;
+  effectiveCapacity: number;
+  condition: string;           // "Slightly sunny ☀️", "Cloudy ☁️", etc.
+  bestWindow?: {
+    start: string;             // "10:00"
+    end: string;               // "14:00"
+  };
+  totalCommitted: number;
+  remainingCapacity: number;
+  sourceType: string;
+}
+
+export interface WeatherAlertResponse {
+  alert: string | null;
+  weather?: {
+    precipitation24h: number;
+    maxWindSpeed: number;
+    hadThunderstorm: boolean;
+    hadHail: boolean;
+  };
+  location?: string;
+  reason?: string;
 }
 
 export interface SettlementRecord {
