@@ -118,9 +118,35 @@ Respond ONLY with valid JSON, no markdown, no explanation:
 {"intent": "...", "params": {...}}`;
 
 /**
+ * Rule-based intent detection for common patterns (faster and more reliable than LLM)
+ */
+function detectIntentByRules(message: string): ClassifiedIntent | null {
+  const lower = message.toLowerCase();
+
+  // "best time to buy" patterns - should NOT trigger buy flow
+  if (/when.*(best|good|cheap|sasta|accha).*(time|samay).*buy|best time to buy|kab kharid|sasta kab|cheapest time/i.test(lower)) {
+    return { intent: 'best_time_to_buy' };
+  }
+
+  // "should I buy now" patterns - advice, not purchase
+  if (/should i buy|kya khareedna|kya lena chahiye|is it good time/i.test(lower) && !lower.includes('want to buy') && !lower.includes('need to buy')) {
+    return { intent: 'best_time_to_buy' };
+  }
+
+  return null;
+}
+
+/**
  * Classify user intent using LLM. Returns null if LLM unavailable.
  */
 export async function classifyIntent(userMessage: string): Promise<ClassifiedIntent | null> {
+  // First try rule-based detection for common patterns
+  const ruleBasedIntent = detectIntentByRules(userMessage);
+  if (ruleBasedIntent) {
+    logger.debug(`Intent (rule-based): "${userMessage.substring(0, 50)}" → ${ruleBasedIntent.intent}`);
+    return ruleBasedIntent;
+  }
+
   if (!OPENROUTER_API_KEY) return null;
 
   try {
