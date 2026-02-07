@@ -24,7 +24,7 @@ import {
   getIssuerId,
 } from '@p2p/shared';
 import { knowledgeBase } from './knowledge-base';
-import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, getMarketInsights, getActivitySummary, getTopDeals, getBrowseMarketTable } from './trading-agent';
+import { mockTradingAgent, parseTimePeriod, getWelcomeBackData, executePurchase, discoverBestOffer, completePurchase, generateDashboard, generateDashboardData, getMarketInsights, getActivitySummary, getTopDeals, getBrowseMarketTable } from './trading-agent';
 import { askLLM, classifyIntent, composeResponse, extractNameWithLLM, extractPhoneWithLLM, extractOtpWithLLM, matchDiscomWithLLM } from './llm-fallback';
 import { detectLanguage, translateToEnglish, translateFromEnglish, isTranslationAvailable, type SarvamLangCode } from './sarvam';
 import { extractVCFromPdf } from '../vc-pdf-analyzer';
@@ -39,6 +39,29 @@ export interface FileData {
   buffer: Buffer;
   mimeType: string;
   fileName: string;
+}
+
+/** Dashboard data for structured UI rendering */
+export interface DashboardData {
+  userName: string;
+  balance: number;
+  trustScore: number;
+  trustTier: { name: string; nameHi: string; emoji: string };
+  tradeLimit: number;
+  productionCapacity?: number;
+  seller?: {
+    activeListings: number;
+    totalListedKwh: number;
+    weeklyEarnings: number;
+    weeklyKwh: number;
+    totalEarnings: number;
+    totalKwh: number;
+  };
+  buyer?: {
+    totalOrders: number;
+    totalBoughtKwh: number;
+    totalSpent: number;
+  };
 }
 
 export interface AgentMessage {
@@ -57,6 +80,8 @@ export interface AgentMessage {
     timeWindow: string;
     savingsPercent?: number;
   }>;
+  /** Structured dashboard for card UI rendering */
+  dashboard?: DashboardData;
 }
 
 export interface AgentResponse {
@@ -3520,15 +3545,27 @@ const states: Record<ChatState, StateHandler> = {
         const action = message.replace('action:', '');
         switch (action) {
           case 'dashboard':
-            // Generate and return dashboard directly
+            // Generate and return structured dashboard
             if (ctx.userId) {
-              const dashboard = await generateDashboard(ctx.userId, ctx.language);
-              return {
-                messages: [{
-                  text: dashboard,
-                  buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
-                }],
-              };
+              const dashboardData = await generateDashboardData(ctx.userId);
+              if (dashboardData) {
+                // Generate a brief intro text (for TTS)
+                const introText = h(ctx,
+                  `Here's your dashboard, ${dashboardData.userName}. Tap any field to learn more.`,
+                  `${dashboardData.userName}, यह रहा आपका डैशबोर्ड। किसी भी फ़ील्ड पर टैप करके जानें।`
+                );
+                return {
+                  messages: [{
+                    text: introText,
+                    dashboard: dashboardData,
+                    buttons: [
+                      { text: h(ctx, '💰 What is Balance?', '💰 बैलेंस क्या है?'), callbackData: 'explain:balance' },
+                      { text: h(ctx, '🌟 What is Trust Score?', '🌟 ट्रस्ट स्कोर क्या है?'), callbackData: 'explain:trust' },
+                      { text: h(ctx, '📈 What is Trade Limit?', '📈 ट्रेड लिमिट क्या है?'), callbackData: 'explain:tradelimit' },
+                    ],
+                  }],
+                };
+              }
             }
             message = 'show my dashboard';
             break;
@@ -3558,6 +3595,44 @@ const states: Record<ChatState, StateHandler> = {
           case 'show_balance':
             message = 'show my balance';
             break;
+        }
+      }
+
+      // --- Handle dashboard field explanations ---
+      if (message.startsWith('explain:')) {
+        const field = message.replace('explain:', '');
+        const explanations: Record<string, { en: string; hi: string }> = {
+          balance: {
+            en: '💰 *Balance* is your wallet money on Oorja.\n\nWhen someone buys your energy, the payment goes to escrow first. After DISCOM confirms delivery, the money is released to your balance.\n\nYou can withdraw this anytime to your bank account.',
+            hi: '💰 *बैलेंस* ऊर्जा पर आपका वॉलेट पैसा है।\n\nजब कोई आपकी बिजली खरीदता है, पेमेंट पहले एस्क्रो में जाता है। बिजली कंपनी (DISCOM) द्वारा डिलीवरी पुष्टि के बाद, पैसा आपके बैलेंस में आ जाता है।\n\nआप इसे कभी भी अपने बैंक खाते में निकाल सकते हैं।'
+          },
+          trust: {
+            en: '🌟 *Trust Score* is like your credit score, but for energy trading!\n\nIt starts at 30% for new users. Each successful trade increases it. Higher trust = higher trade limits = more earnings!\n\nThe platform automatically manages this based on your delivery performance.',
+            hi: '🌟 *ट्रस्ट स्कोर* आपका एनर्जी ट्रेडिंग का क्रेडिट स्कोर है!\n\nनए यूज़र्स के लिए 30% से शुरू होता है। हर सफल ट्रेड से बढ़ता है। ज़्यादा ट्रस्ट = ज़्यादा ट्रेड लिमिट = ज़्यादा कमाई!\n\nप्लेटफॉर्म आपकी डिलीवरी परफॉर्मेंस के आधार पर इसे ऑटोमैटिक मैनेज करता है।'
+          },
+          tradelimit: {
+            en: '📈 *Trade Limit* is the percentage of your solar production you can sell.\n\nNew sellers start at 10%. As your trust score grows, this increases up to 90%!\n\nExample: With 1000 kWh/month production and 10% limit, you can sell 100 kWh. At 50% limit, you could sell 500 kWh!',
+            hi: '📈 *ट्रेड लिमिट* आपकी सोलर प्रोडक्शन का वो प्रतिशत है जो आप बेच सकते हैं।\n\nनए सेलर्स 10% से शुरू करते हैं। जैसे-जैसे ट्रस्ट स्कोर बढ़ता है, ये 90% तक बढ़ सकता है!\n\nउदाहरण: 1000 किलोवाट घंटा प्रति महीना प्रोडक्शन और 10% लिमिट के साथ, आप 100 किलोवाट घंटा बेच सकते हैं। 50% लिमिट पर, 500 किलोवाट घंटा बेच सकते हैं!'
+          },
+          seller: {
+            en: '📊 *Seller Stats* shows your selling activity:\n\n• Active Listings: Energy you have listed for sale right now\n• Weekly earnings: How much you earned this week\n• Total: Your all-time sales history\n\nList more energy to increase your earnings!',
+            hi: '📊 *सेलर स्टैट्स* आपकी बिक्री गतिविधि दिखाता है:\n\n• ऐक्टिव लिस्टिंग: अभी बिक्री के लिए लिस्ट की गई बिजली\n• इस हफ्ते की कमाई: इस हफ्ते कितना कमाया\n• टोटल: आपका पूरा बिक्री इतिहास\n\nज़्यादा बिजली लिस्ट करें, ज़्यादा कमाएं!'
+          },
+          buyer: {
+            en: '🔋 *Buyer Stats* shows your purchase history:\n\n• Orders: Number of energy purchases you made\n• Energy Bought: Total kWh you have purchased\n• Total Spent: How much you paid for energy\n\nBuying P2P energy is often 20-40% cheaper than grid rates!',
+            hi: '🔋 *बायर स्टैट्स* आपकी खरीदारी का इतिहास दिखाता है:\n\n• ऑर्डर्स: आपने कितनी बार बिजली खरीदी\n• खरीदी गई बिजली: टोटल किलोवाट घंटा\n• टोटल खर्च: बिजली पर कितना खर्च हुआ\n\nP2P बिजली अक्सर ग्रिड रेट से 20-40% सस्ती होती है!'
+          },
+        };
+        const explanation = explanations[field];
+        if (explanation) {
+          return {
+            messages: [{
+              text: h(ctx, explanation.en, explanation.hi),
+              buttons: [
+                { text: h(ctx, '📋 Back to Dashboard', '📋 डैशबोर्ड देखो'), callbackData: 'action:dashboard' },
+              ],
+            }],
+          };
         }
       }
 
@@ -3666,6 +3741,25 @@ const states: Record<ChatState, StateHandler> = {
           }
 
           case 'show_dashboard': {
+            const dashboardData = await generateDashboardData(ctx.userId);
+            if (dashboardData) {
+              const introText = h(ctx,
+                `Here's your dashboard, ${dashboardData.userName}. Tap any field to learn more.`,
+                `${dashboardData.userName}, यह रहा आपका डैशबोर्ड। किसी भी फ़ील्ड पर टैप करके जानें।`
+              );
+              return {
+                messages: [{
+                  text: introText,
+                  dashboard: dashboardData,
+                  buttons: [
+                    { text: h(ctx, '💰 What is Balance?', '💰 बैलेंस क्या है?'), callbackData: 'explain:balance' },
+                    { text: h(ctx, '🌟 What is Trust Score?', '🌟 ट्रस्ट स्कोर क्या है?'), callbackData: 'explain:trust' },
+                    { text: h(ctx, '📈 What is Trade Limit?', '📈 ट्रेड लिमिट क्या है?'), callbackData: 'explain:tradelimit' },
+                  ],
+                }],
+              };
+            }
+            // Fallback to text dashboard
             const dashboard = await generateDashboard(ctx.userId, ctx.language);
             return {
               messages: [{
@@ -4526,11 +4620,15 @@ async function storeMessage(sessionId: string, role: string, content: string, me
 
 async function storeAgentMessages(sessionId: string, messages: AgentMessage[]) {
   for (const msg of messages) {
+    const metadata: Record<string, unknown> = {};
+    if (msg.buttons) metadata.buttons = msg.buttons;
+    if (msg.dashboard) metadata.dashboard = msg.dashboard;
+
     await storeMessage(
       sessionId,
       'agent',
       msg.text,
-      msg.buttons ? { buttons: msg.buttons } : undefined
+      Object.keys(metadata).length > 0 ? metadata : undefined
     );
   }
 }

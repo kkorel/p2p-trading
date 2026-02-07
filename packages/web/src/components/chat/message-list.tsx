@@ -5,6 +5,7 @@ import { Bot, User, Check } from 'lucide-react';
 import type { ChatMessageData } from '@/hooks/use-chat-engine';
 import { InlineSpeakerButton } from './speaker-button';
 import { OfferList } from './offer-list';
+import { DashboardCard } from './dashboard-card';
 
 export type { ChatMessageData };
 
@@ -88,6 +89,15 @@ export function MessageList({
                 </span>
               )}
             </div>
+
+            {/* Dashboard card */}
+            {msg.role === 'agent' && msg.dashboard && (
+              <DashboardCard
+                data={msg.dashboard}
+                language={responseLanguage}
+                onExplain={(field) => onButtonClick?.(`explain:${field}`, `Explain ${field}`)}
+              />
+            )}
 
             {/* Offer cards for buy flow */}
             {msg.role === 'agent' && msg.offers && msg.offers.length > 0 && (

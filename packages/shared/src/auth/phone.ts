@@ -26,18 +26,46 @@ export interface PhoneAuthResult {
 
 /**
  * Validate phone number format.
- * Accepts 10+ digit numbers, optionally with + prefix.
+ * Accepts 10-digit Indian numbers (with or without +91 prefix).
  */
 export function validatePhoneNumber(phone: string): boolean {
   const cleaned = phone.replace(/[\s-]/g, '');
-  return /^\+?\d{10,15}$/.test(cleaned);
+  // Accept: 9876543210, +919876543210, 919876543210
+  return /^(\+?91)?[6-9]\d{9}$/.test(cleaned);
 }
 
 /**
- * Normalize phone number to a consistent format (strip spaces/dashes).
+ * Normalize phone number to +91 format (India only).
+ * Handles: "9876543210", "91 9876543210", "+91 9876543210", "09876543210"
  */
 export function normalizePhone(phone: string): string {
-  return phone.replace(/[\s-]/g, '');
+  // Remove all non-digits except leading +
+  let cleaned = phone.replace(/[\s-]/g, '');
+
+  // Remove leading + for processing
+  const hasPlus = cleaned.startsWith('+');
+  if (hasPlus) cleaned = cleaned.slice(1);
+
+  // Remove all non-digits
+  cleaned = cleaned.replace(/\D/g, '');
+
+  // Remove leading 0 if present
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.slice(1);
+  }
+
+  // Remove 91 prefix if present (to avoid +9191...)
+  if (cleaned.startsWith('91') && cleaned.length > 10) {
+    cleaned = cleaned.slice(2);
+  }
+
+  // Take last 10 digits if still longer
+  if (cleaned.length > 10) {
+    cleaned = cleaned.slice(-10);
+  }
+
+  // Return with +91 prefix
+  return '+91' + cleaned;
 }
 
 /**

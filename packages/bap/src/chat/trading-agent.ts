@@ -9,6 +9,24 @@ import axios from 'axios';
 
 const logger = createLogger('TradingAgent');
 
+/**
+ * Helper: Look up provider's user utility info for CDS publishing
+ */
+async function getProviderUtilityInfo(providerId: string): Promise<{ utilityId: string; utilityCustomerId: string }> {
+  try {
+    const user = await prisma.user.findFirst({
+      where: { providerId },
+      select: { consumerNumber: true },
+    });
+    return {
+      utilityId: config.utility.id,
+      utilityCustomerId: user?.consumerNumber || 'UNKNOWN',
+    };
+  } catch {
+    return { utilityId: config.utility.id, utilityCustomerId: 'UNKNOWN' };
+  }
+}
+
 type LangOption = string | undefined;
 function ht(lang: LangOption, en: string, hi: string): string {
   return lang === 'hi-IN' ? hi : en;
@@ -85,6 +103,7 @@ export const mockTradingAgent = {
 
       // Publish to CDS so the offer appears in discovery/buy page
       const providerName = user.name ? `${user.name} Energy` : 'Solar Energy';
+      const utilityInfo = await getProviderUtilityInfo(providerId);
       publishOfferToCDS(
         { id: providerId, name: providerName, trust_score: user.trustScore || 0.5 },
         {
@@ -95,6 +114,8 @@ export const mockTradingAgent = {
           available_qty: item.available_qty,
           production_windows: item.production_windows,
           meter_id: item.meter_id,
+          utility_id: utilityInfo.utilityId,
+          utility_customer_id: utilityInfo.utilityCustomerId,
         },
         {
           id: offer.id,
@@ -203,6 +224,7 @@ export const mockTradingAgent = {
 
       // Publish to CDS
       const providerName = user.name ? `${user.name} Energy` : 'Solar Energy';
+      const utilityInfo = await getProviderUtilityInfo(providerId);
       publishOfferToCDS(
         { id: providerId, name: providerName, trust_score: user.trustScore || 0.5 },
         {
@@ -213,6 +235,8 @@ export const mockTradingAgent = {
           available_qty: item.available_qty,
           production_windows: item.production_windows,
           meter_id: item.meter_id,
+          utility_id: utilityInfo.utilityId,
+          utility_customer_id: utilityInfo.utilityCustomerId,
         },
         {
           id: offer.id,
@@ -1273,12 +1297,120 @@ export async function generateDashboard(userId: string, lang?: string): Promise<
 }
 
 // Trust tier helper
-function getTrustTier(score: number): { name: string; emoji: string } {
-  if (score >= 0.9) return { name: 'Platinum', emoji: '💎' };
-  if (score >= 0.7) return { name: 'Gold', emoji: '🥇' };
-  if (score >= 0.5) return { name: 'Silver', emoji: '🥈' };
-  if (score >= 0.3) return { name: 'Bronze', emoji: '🥉' };
-  return { name: 'Starter', emoji: '🌱' };
+function getTrustTier(score: number): { name: string; nameHi: string; emoji: string } {
+  if (score >= 0.9) return { name: 'Platinum', nameHi: 'प्लैटिनम', emoji: '💎' };
+  if (score >= 0.7) return { name: 'Gold', nameHi: 'गोल्ड', emoji: '🥇' };
+  if (score >= 0.5) return { name: 'Silver', nameHi: 'सिल्वर', emoji: '🥈' };
+  if (score >= 0.3) return { name: 'Bronze', nameHi: 'ब्रॉन्ज़', emoji: '🥉' };
+  return { name: 'Starter', nameHi: 'स्टार्टर', emoji: '🌱' };
+}
+
+/** Dashboard data for structured UI rendering */
+export interface DashboardData {
+  userName: string;
+  balance: number;
+  trustScore: number;
+  trustTier: { name: string; nameHi: string; emoji: string };
+  tradeLimit: number;
+  productionCapacity?: number;
+  seller?: {
+    activeListings: number;
+    totalListedKwh: number;
+    weeklyEarnings: number;
+    weeklyKwh: number;
+    totalEarnings: number;
+    totalKwh: number;
+  };
+  buyer?: {
+    totalOrders: number;
+    totalBoughtKwh: number;
+    totalSpent: number;
+  };
+}
+
+/**
+ * Generate structured dashboard data for card UI rendering.
+ */
+export async function generateDashboardData(userId: string): Promise<DashboardData | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      name: true,
+      balance: true,
+      trustScore: true,
+      allowedTradeLimit: true,
+      providerId: true,
+      productionCapacity: true,
+    },
+  });
+
+  if (!user) return null;
+
+  const trustTier = getTrustTier(user.trustScore);
+
+  const data: DashboardData = {
+    userName: user.name || 'Trader',
+    balance: user.balance,
+    trustScore: user.trustScore,
+    trustTier,
+    tradeLimit: user.allowedTradeLimit,
+    productionCapacity: user.productionCapacity || undefined,
+  };
+
+  // Seller stats
+  if (user.providerId) {
+    const offers = await prisma.catalogOffer.findMany({
+      where: { providerId: user.providerId },
+      select: { maxQty: true },
+    });
+
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const recentOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        createdAt: { gte: weekAgo },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+
+    const allOrders = await prisma.order.findMany({
+      where: {
+        providerId: user.providerId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+      },
+      select: { totalPrice: true, totalQty: true },
+    });
+
+    data.seller = {
+      activeListings: offers.length,
+      totalListedKwh: offers.reduce((sum, o) => sum + o.maxQty, 0),
+      weeklyEarnings: recentOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0),
+      weeklyKwh: recentOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0),
+      totalEarnings: allOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0),
+      totalKwh: allOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0),
+    };
+  }
+
+  // Buyer stats
+  const buyerOrders = await prisma.order.findMany({
+    where: {
+      buyerId: userId,
+      status: { in: ['ACTIVE', 'COMPLETED'] },
+    },
+    select: { totalPrice: true, totalQty: true },
+  });
+
+  if (buyerOrders.length > 0) {
+    data.buyer = {
+      totalOrders: buyerOrders.length,
+      totalBoughtKwh: buyerOrders.reduce((sum, o) => sum + (o.totalQty || 0), 0),
+      totalSpent: buyerOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0),
+    };
+  }
+
+  return data;
 }
 
 /**

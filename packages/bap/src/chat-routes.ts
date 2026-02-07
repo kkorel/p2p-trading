@@ -101,6 +101,7 @@ router.post('/send', async (req: Request, res: Response) => {
       content: m.text,
       buttons: m.buttons || undefined,
       offers: m.offers || undefined,
+      dashboard: m.dashboard || undefined,
     }));
 
     res.json({
@@ -151,6 +152,7 @@ router.post('/upload', async (req: Request, res: Response) => {
       role: 'agent' as const,
       content: m.text,
       buttons: m.buttons || undefined,
+      dashboard: m.dashboard || undefined,
     }));
 
     res.json({
@@ -254,6 +256,7 @@ router.post('/voice', async (req: Request, res: Response) => {
       role: 'agent' as const,
       content: m.text,
       buttons: m.buttons || undefined,
+      dashboard: m.dashboard || undefined,
     }));
 
     res.json({
@@ -397,6 +400,7 @@ router.get('/history', async (req: Request, res: Response) => {
         role: m.role as 'agent' | 'user',
         content: m.content,
         buttons: meta?.buttons || undefined,
+        dashboard: meta?.dashboard || undefined,
         createdAt: m.createdAt,
       };
     });

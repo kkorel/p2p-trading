@@ -19,11 +19,34 @@ export interface OfferData {
   endTime: string;
 }
 
+export interface DashboardData {
+  userName: string;
+  balance: number;
+  trustScore: number;
+  trustTier: { name: string; nameHi: string; emoji: string };
+  tradeLimit: number;
+  productionCapacity?: number;
+  seller?: {
+    activeListings: number;
+    totalListedKwh: number;
+    weeklyEarnings: number;
+    weeklyKwh: number;
+    totalEarnings: number;
+    totalKwh: number;
+  };
+  buyer?: {
+    totalOrders: number;
+    totalBoughtKwh: number;
+    totalSpent: number;
+  };
+}
+
 export interface ChatMessageData {
   role: 'agent' | 'user';
   content: string;
   buttons?: Array<{ text: string; callbackData?: string }>;
   offers?: OfferData[];
+  dashboard?: DashboardData;
 }
 
 /** Get stored session - prioritize authenticated session, then anonymous. */
@@ -176,6 +199,7 @@ export function useChatEngine() {
             role: 'agent' as const,
             content: m.content,
             buttons: m.buttons,
+            dashboard: m.dashboard,
           })),
         ]);
       }
@@ -321,6 +345,7 @@ export function useChatEngine() {
               role: 'agent' as const,
               content: m.content,
               buttons: m.buttons,
+              dashboard: m.dashboard,
             })),
           ]);
         }
@@ -381,10 +406,11 @@ export function useChatEngine() {
       if (agentMessages && agentMessages.length > 0) {
         setMessages((prev) => [
           ...prev,
-          ...agentMessages.map((m) => ({
+          ...agentMessages.map((m: any) => ({
             role: 'agent' as const,
             content: m.content,
             buttons: m.buttons,
+            dashboard: m.dashboard,
           })),
         ]);
       }

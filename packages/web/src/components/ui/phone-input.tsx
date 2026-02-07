@@ -1,28 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 
-// Common countries with phone codes and flag emojis
-const COUNTRIES = [
-  { code: 'GB', name: 'United Kingdom', dialCode: '+44', flag: '🇬🇧', pattern: /^(\+44|44|0)?\d{10,11}$/ },
-  { code: 'IN', name: 'India', dialCode: '+91', flag: '🇮🇳', pattern: /^(\+91|91)?\d{10}$/ },
-  { code: 'US', name: 'United States', dialCode: '+1', flag: '🇺🇸', pattern: /^(\+1|1)?\d{10}$/ },
-  { code: 'DE', name: 'Germany', dialCode: '+49', flag: '🇩🇪', pattern: /^(\+49|49|0)?\d{10,11}$/ },
-  { code: 'FR', name: 'France', dialCode: '+33', flag: '🇫🇷', pattern: /^(\+33|33|0)?\d{9,10}$/ },
-  { code: 'AU', name: 'Australia', dialCode: '+61', flag: '🇦🇺', pattern: /^(\+61|61|0)?\d{9,10}$/ },
-  { code: 'CA', name: 'Canada', dialCode: '+1', flag: '🇨🇦', pattern: /^(\+1|1)?\d{10}$/ },
-  { code: 'BR', name: 'Brazil', dialCode: '+55', flag: '🇧🇷', pattern: /^(\+55|55)?\d{10,11}$/ },
-  { code: 'JP', name: 'Japan', dialCode: '+81', flag: '🇯🇵', pattern: /^(\+81|81|0)?\d{9,10}$/ },
-  { code: 'CN', name: 'China', dialCode: '+86', flag: '🇨🇳', pattern: /^(\+86|86)?\d{11}$/ },
-  { code: 'AE', name: 'UAE', dialCode: '+971', flag: '🇦🇪', pattern: /^(\+971|971|0)?\d{9}$/ },
-  { code: 'SG', name: 'Singapore', dialCode: '+65', flag: '🇸🇬', pattern: /^(\+65|65)?\d{8}$/ },
-  { code: 'NL', name: 'Netherlands', dialCode: '+31', flag: '🇳🇱', pattern: /^(\+31|31|0)?\d{9}$/ },
-  { code: 'ES', name: 'Spain', dialCode: '+34', flag: '🇪🇸', pattern: /^(\+34|34)?\d{9}$/ },
-  { code: 'IT', name: 'Italy', dialCode: '+39', flag: '🇮🇹', pattern: /^(\+39|39)?\d{9,10}$/ },
-] as const;
-
-type Country = (typeof COUNTRIES)[number];
+// India only - no country selection needed
+const INDIA = { code: 'IN', name: 'India', dialCode: '+91', flag: '🇮🇳' };
 
 interface PhoneInputProps {
   value: string;
@@ -38,110 +19,33 @@ export function PhoneInput({
   onChange,
   onBlur,
   disabled,
-  placeholder = '7911 123456',
+  placeholder = '98765 43210',
   className = '',
 }: PhoneInputProps) {
-  const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]); // Default to UK
-  const [isOpen, setIsOpen] = useState(false);
   const [localValue, setLocalValue] = useState(value);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Detect country from phone number input
-  useEffect(() => {
-    const cleaned = localValue.replace(/[\s-]/g, '');
-    
-    if (cleaned.startsWith('+')) {
-      // Find matching country by dial code
-      const matched = COUNTRIES.find((c) => cleaned.startsWith(c.dialCode));
-      if (matched && matched.code !== selectedCountry.code) {
-        setSelectedCountry(matched);
-      }
-    }
-  }, [localValue, selectedCountry.code]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
+    // Only allow digits and spaces
+    const newValue = e.target.value.replace(/[^\d\s]/g, '');
     setLocalValue(newValue);
-    
-    // Build full number with country code if not already present
-    const cleaned = newValue.replace(/[\s-]/g, '');
-    let fullNumber = cleaned;
-    
-    if (!cleaned.startsWith('+') && !cleaned.startsWith(selectedCountry.dialCode.slice(1))) {
-      // Add country code
-      fullNumber = selectedCountry.dialCode + cleaned;
-    } else if (!cleaned.startsWith('+') && cleaned.startsWith(selectedCountry.dialCode.slice(1))) {
-      // Has country code without +
-      fullNumber = '+' + cleaned;
-    }
-    
-    onChange(newValue, fullNumber);
-  };
 
-  const handleCountrySelect = (country: Country) => {
-    setSelectedCountry(country);
-    setIsOpen(false);
-    
-    // Update full number with new country code
-    const cleaned = localValue.replace(/[\s-]/g, '');
-    const withoutCode = cleaned.replace(/^\+?\d{1,4}/, ''); // Strip existing code
-    const fullNumber = country.dialCode + withoutCode;
-    onChange(localValue, fullNumber);
+    // Build full number with +91 prefix
+    const cleaned = newValue.replace(/\s/g, '');
+    const fullNumber = normalizeIndianPhone(cleaned);
+
+    onChange(newValue, fullNumber);
   };
 
   return (
     <div className={`relative flex ${className}`}>
-      {/* Country selector */}
-      <div ref={dropdownRef} className="relative">
-        <button
-          type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
-          disabled={disabled}
-          className="h-[44px] px-3 rounded-l-[12px] bg-[var(--color-surface)] border border-r-0 border-[var(--color-border)] flex items-center gap-1.5 hover:bg-[var(--color-border-subtle)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <span className="text-lg">{selectedCountry.flag}</span>
-          <ChevronDown className="h-3 w-3 text-[var(--color-text-muted)]" />
-        </button>
-
-        {/* Dropdown */}
-        {isOpen && (
-          <div className="absolute top-full left-0 mt-1 w-[200px] max-h-[240px] overflow-y-auto bg-[var(--color-bg)] border border-[var(--color-border)] rounded-[12px] shadow-lg z-50">
-            {COUNTRIES.map((country) => (
-              <button
-                key={country.code}
-                type="button"
-                onClick={() => handleCountrySelect(country)}
-                className={`w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-[var(--color-surface)] transition-colors ${
-                  country.code === selectedCountry.code ? 'bg-[var(--color-primary-light)]' : ''
-                }`}
-              >
-                <span className="text-lg">{country.flag}</span>
-                <span className="text-sm text-[var(--color-text)] flex-1">{country.name}</span>
-                <span className="text-xs text-[var(--color-text-muted)]">{country.dialCode}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Dial code display */}
-      <div className="h-[44px] px-2 flex items-center bg-[var(--color-surface)] border-y border-[var(--color-border)]">
+      {/* Fixed India country display */}
+      <div className="h-[44px] px-3 rounded-l-[12px] bg-[var(--color-surface)] border border-r-0 border-[var(--color-border)] flex items-center gap-1.5">
+        <span className="text-lg">{INDIA.flag}</span>
         <span className="text-sm text-[var(--color-text-muted)] select-none whitespace-nowrap">
-          {selectedCountry.dialCode}
+          {INDIA.dialCode}
         </span>
       </div>
-      
+
       {/* Phone input */}
       <input
         type="tel"
@@ -157,20 +61,35 @@ export function PhoneInput({
 }
 
 /**
- * Utility to get formatted phone number with country code
+ * Normalize an Indian phone number to +91 format
+ * Handles: "9876543210", "91 9876543210", "+91 9876543210", "09876543210"
  */
-export function formatPhoneForAPI(phone: string, countryDialCode: string): string {
-  const cleaned = phone.replace(/[\s-]/g, '');
-  
-  if (cleaned.startsWith('+')) {
-    return cleaned;
+export function normalizeIndianPhone(phone: string): string {
+  // Remove all non-digits
+  let cleaned = phone.replace(/\D/g, '');
+
+  // Remove leading 0 if present
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.slice(1);
   }
-  
-  if (cleaned.startsWith(countryDialCode.slice(1))) {
-    return '+' + cleaned;
+
+  // Remove 91 prefix if present (to avoid +9191...)
+  if (cleaned.startsWith('91') && cleaned.length > 10) {
+    cleaned = cleaned.slice(2);
   }
-  
-  // Remove leading 0 if present (common in UK/DE numbers)
-  const withoutLeadingZero = cleaned.startsWith('0') ? cleaned.slice(1) : cleaned;
-  return countryDialCode + withoutLeadingZero;
+
+  // Take last 10 digits if still longer
+  if (cleaned.length > 10) {
+    cleaned = cleaned.slice(-10);
+  }
+
+  // Add +91 prefix
+  return '+91' + cleaned;
+}
+
+/**
+ * Utility to format phone for API (India only)
+ */
+export function formatPhoneForAPI(phone: string): string {
+  return normalizeIndianPhone(phone);
 }
