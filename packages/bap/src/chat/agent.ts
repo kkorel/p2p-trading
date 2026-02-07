@@ -492,7 +492,26 @@ async function processCredentialUpload(
   });
 
   // Update user fields based on credential type
-  if (detectedType === 'GenerationProfileCredential' || detectedType === 'StorageProfileCredential') {
+  if (detectedType === 'UtilityCustomerCredential') {
+    // Save Utility VC claims to user record
+    const userUpdate: Record<string, any> = {};
+    if (claims.fullName) userUpdate.name = claims.fullName;
+    if (claims.consumerNumber) userUpdate.consumerNumber = claims.consumerNumber;
+    if (claims.meterNumber) userUpdate.meterNumber = claims.meterNumber;
+    if (claims.installationAddress) userUpdate.installationAddress = claims.installationAddress;
+    if (claims.serviceConnectionDate) {
+      const parsedDate = parseDate(claims.serviceConnectionDate);
+      if (parsedDate) userUpdate.serviceConnectionDate = parsedDate;
+    }
+
+    if (Object.keys(userUpdate).length > 0) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: userUpdate,
+      });
+      logger.info(`[Chat] Updated user ${userId} with Utility VC claims`, { address: claims.installationAddress?.substring(0, 40) });
+    }
+  } else if (detectedType === 'GenerationProfileCredential' || detectedType === 'StorageProfileCredential') {
     const capacityKW = claims.capacityKW || extractCapacity(credential);
     if (capacityKW && capacityKW > 0) {
       const AVG_PEAK_SUN_HOURS = 4.5;

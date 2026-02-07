@@ -993,7 +993,13 @@ export function detectCredentialType(vc: VerifiableCredential): DEGCredentialTyp
 export function extractNormalizedUtilityCustomerClaims(vc: VerifiableCredential) {
   const s = vc.credentialSubject as UtilityCustomerSubject;
   let address: string | undefined;
-  if (typeof s.installationAddress === 'string') {
+
+  // Check for fullAddress first (direct field in VC)
+  if (typeof (s as any).fullAddress === 'string') {
+    address = (s as any).fullAddress;
+  }
+  // Then check for installationAddress (legacy/alternative field)
+  else if (typeof s.installationAddress === 'string') {
     address = s.installationAddress;
   } else if (s.installationAddress && typeof s.installationAddress === 'object') {
     const a = s.installationAddress;
@@ -1001,11 +1007,12 @@ export function extractNormalizedUtilityCustomerClaims(vc: VerifiableCredential)
       .filter(Boolean)
       .join(', ');
   }
+
   return {
     fullName: s.fullName,
     consumerNumber: s.consumerNumber,
     meterNumber: s.meterNumber,
-    installationAddress: address,
+    installationAddress: address, // Maps fullAddress → installationAddress for internal use
     serviceConnectionDate: s.serviceConnectionDate,
     maskedIdNumber: s.maskedIdNumber,
     issuer: getIssuerId(vc.issuer),
