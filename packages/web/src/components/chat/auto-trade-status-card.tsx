@@ -191,6 +191,18 @@ export function AutoTradeStatusCard({ data, language = 'en-IN' }: AutoTradeStatu
                   </span>
                 </div>
               )}
+              {data.buyer.lastRun.status === 'error' && data.buyer.lastRun.error && (
+                <p className="text-xs text-red-600 mt-2">
+                  {data.buyer.lastRun.error}
+                </p>
+              )}
+              {(data.buyer.lastRun.status === 'no_deals' || data.buyer.lastRun.status === 'price_too_high') && (
+                <p className="text-xs text-amber-600 mt-2">
+                  {isHindi
+                    ? (data.buyer.lastRun.status === 'no_deals' ? 'कोई ऑफर उपलब्ध नहीं' : 'सभी ऑफर आपकी सीमा से महंगे')
+                    : (data.buyer.lastRun.status === 'no_deals' ? 'No offers available' : 'All offers above your max price')}
+                </p>
+              )}
             </div>
           )}
         </div>

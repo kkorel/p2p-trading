@@ -182,6 +182,7 @@ export interface AgentMessage {
         quantityBought: number;
         pricePerUnit: number;
         totalSpent: number;
+        error?: string;
       };
     };
   };
@@ -4990,6 +4991,7 @@ const states: Record<ChatState, StateHandler> = {
                   quantityBought: buyerStatus.lastExecution.quantityBought,
                   pricePerUnit: buyerStatus.lastExecution.pricePerUnit,
                   totalSpent: buyerStatus.lastExecution.totalSpent,
+                  error: buyerStatus.lastExecution.error || undefined,
                 } : undefined,
               };
             }

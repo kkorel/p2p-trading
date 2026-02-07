@@ -561,8 +561,9 @@ model BuyerAutoTradeExecution {
   quantityBought Float    @map("quantity_bought")
   pricePerUnit   Float    @map("price_per_unit")
   totalSpent     Float    @map("total_spent")
-  status         String   // 'success', 'no_deals', 'price_too_high'
+  status         String   // 'success', 'no_deals', 'price_too_high', 'error'
   orderId        String?  @map("order_id")
+  error          String?  // Error message if status is 'error'
 
   config BuyerAutoTradeConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
 

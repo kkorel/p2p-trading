@@ -174,6 +174,7 @@ export interface AutoTradeStatusData {
       quantityBought: number;
       pricePerUnit: number;
       totalSpent: number;
+      error?: string;
     };
   };
 }

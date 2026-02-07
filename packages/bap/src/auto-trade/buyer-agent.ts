@@ -58,6 +58,7 @@ export async function runBuyerAutoTrades(): Promise<BuyerAutoTradeResult[]> {
           totalSpent: result.totalSpent,
           status: result.status,
           orderId: result.orderId,
+          error: result.error,
         },
       });
 
@@ -240,6 +241,7 @@ export async function runSingleBuyerAutoTrade(userId: string): Promise<BuyerAuto
         totalSpent: result.totalSpent,
         status: result.status,
         orderId: result.orderId,
+        error: result.error,
       },
     });
 
@@ -295,6 +297,7 @@ export async function getBuyerAutoTradeStatus(userId: string): Promise<{
     quantityBought: number;
     pricePerUnit: number;
     totalSpent: number;
+    error?: string | null;
   };
 }> {
   const config = await prisma.buyerAutoTradeConfig.findUnique({
@@ -324,6 +327,7 @@ export async function getBuyerAutoTradeStatus(userId: string): Promise<{
           quantityBought: lastExecution.quantityBought,
           pricePerUnit: lastExecution.pricePerUnit,
           totalSpent: lastExecution.totalSpent,
+          error: lastExecution.error,
         }
       : undefined,
   };
