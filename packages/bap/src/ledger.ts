@@ -13,7 +13,7 @@
  */
 
 import axios from 'axios';
-import { config, createLogger, Order, prisma, secureAxios } from '@p2p/shared';
+import { config, createLogger, Order, prisma, secureAxios, secureAxiosBpp } from '@p2p/shared';
 
 const logger = createLogger('Ledger');
 
@@ -183,7 +183,7 @@ export async function writeTradeToLedger(
       }];
 
       const request: LedgerPutRequest = {
-        role: 'BUYER',
+        role: 'SELLER',
         transactionId,
         orderItemId,
         platformIdBuyer: config.bap.id,
@@ -203,8 +203,8 @@ export async function writeTradeToLedger(
       logger.info(`[LEDGER-PUT] ${ledgerUrl}/ledger/put`);
       logger.info(`[LEDGER-PUT] body: ${JSON.stringify(request)}`);
 
-      // POST with BAP signing (BUYER role = BAP keys)
-      const response = await secureAxios.post<LedgerWriteResponse>(
+      // POST with BPP signing (SELLER role on on_confirm = BPP keys)
+      const response = await secureAxiosBpp.post<LedgerWriteResponse>(
         `${ledgerUrl}/ledger/put`,
         request,
         {
@@ -269,7 +269,7 @@ async function writeSingleRecord(
   }
 ): Promise<{ success: boolean; recordId?: string; error?: string }> {
   const request: LedgerPutRequest = {
-    role: 'BUYER',
+    role: 'SELLER',
     transactionId: opts.transactionId,
     orderItemId: opts.orderItemId,
     platformIdBuyer: config.bap.id,
@@ -289,8 +289,8 @@ async function writeSingleRecord(
   logger.info(`[LEDGER-PUT] ${ledgerUrl}/ledger/put`);
   logger.info(`[LEDGER-PUT] body: ${JSON.stringify(request)}`);
 
-  // POST with BAP signing (BUYER role = BAP keys)
-  const response = await secureAxios.post<LedgerWriteResponse>(
+  // POST with BPP signing (SELLER role on on_confirm = BPP keys)
+  const response = await secureAxiosBpp.post<LedgerWriteResponse>(
     `${ledgerUrl}/ledger/put`,
     request,
     {
