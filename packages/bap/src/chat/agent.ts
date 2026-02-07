@@ -2874,7 +2874,16 @@ const states: Record<ChatState, StateHandler> = {
       }
 
       const verifiedCreds = await getVerifiedCredentials(ctx.userId);
-      const user = await prisma.user.findUnique({ where: { id: ctx.userId } });
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.userId },
+        select: { id: true, name: true, profileComplete: true, languagePreference: true },
+      });
+
+      // Ensure language is set - use user's saved preference as fallback
+      if (!ctx.language && user?.languagePreference) {
+        ctx.language = user.languagePreference as any;
+        logger.info(`[AUTHENTICATED] Restored language from user profile: ${ctx.language}`);
+      }
 
       if (user?.profileComplete) {
         const n = ctx.name || user.name || 'friend';
