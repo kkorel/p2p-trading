@@ -186,10 +186,10 @@ export default function CredentialsOnboarding() {
       <div className="max-w-[480px] mx-auto w-full min-h-screen flex flex-col px-4 py-8 bg-[var(--color-bg)] shadow-[var(--shadow-sm)]">
         {/* Progress Status Bar */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-center">
             {STEPS.map((step, index) => (
-              <div key={step.id} className="flex items-center flex-1">
-                <div className="flex flex-col items-center flex-1">
+              <div key={step.id} className="flex items-center">
+                <div className="flex flex-col items-center w-20">
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
                       index < currentStep
@@ -206,7 +206,7 @@ export default function CredentialsOnboarding() {
                     )}
                   </div>
                   <span
-                    className={`text-[10px] mt-1 ${
+                    className={`text-[10px] mt-1 text-center ${
                       index <= currentStep
                         ? 'text-[var(--color-text)]'
                         : 'text-[var(--color-text-muted)]'
@@ -217,7 +217,7 @@ export default function CredentialsOnboarding() {
                 </div>
                 {index < STEPS.length - 1 && (
                   <div
-                    className={`h-[2px] flex-1 mx-1 transition-colors ${
+                    className={`h-[2px] w-12 transition-colors ${
                       index < currentStep
                         ? 'bg-[var(--color-success)]'
                         : 'bg-[var(--color-border)]'
