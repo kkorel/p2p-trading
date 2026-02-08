@@ -135,7 +135,7 @@ async function synthesizeSpeechInternal(
   // Normalize language code — Sarvam expects BCP-47 with region
   const langCode = normalizeLanguageCode(languageCode);
 
-  logger.info(`TTS: ${cleanText.length} chars, lang: ${langCode}, speaker: ${speaker || 'Anushka'}, codec: ${codec || 'wav'}`);
+  logger.info(`TTS: ${cleanText.length} chars, lang: ${langCode}, speaker: ${speaker || 'anushka'}, codec: ${codec || 'wav'}`);
 
   // Split into chunks if text exceeds limit
   const chunks = splitTextIntoChunks(cleanText, MAX_CHUNK_LENGTH);
@@ -164,10 +164,8 @@ async function synthesizeChunk(
   codec?: string
 ): Promise<Buffer> {
   try {
-    // Capitalize speaker name for API (anushka → Anushka)
-    const speakerName = speaker
-      ? speaker.charAt(0).toUpperCase() + speaker.slice(1)
-      : 'Anushka';
+    // Sarvam API expects lowercase speaker names
+    const speakerName = speaker || 'anushka';
 
     const requestBody: any = {
       text,

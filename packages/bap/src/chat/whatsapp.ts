@@ -38,8 +38,6 @@ function isConfigured(): boolean {
   return !!(PHONE_NUMBER_ID && ACCESS_TOKEN);
 }
 
-// Debug: log config at module load to diagnose Railway env var issues
-logger.info(`WhatsApp config: PHONE_NUMBER_ID=${PHONE_NUMBER_ID ? PHONE_NUMBER_ID.substring(0, 6) + '...' : '(empty)'}, ACCESS_TOKEN=${ACCESS_TOKEN ? ACCESS_TOKEN.substring(0, 10) + '...' : '(empty)'}, VERIFY_TOKEN=${VERIFY_TOKEN ? '***set***' : '(empty)'}, configured=${isConfigured()}`);
 
 function apiHeaders() {
   return {
