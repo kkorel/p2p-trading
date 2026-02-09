@@ -752,16 +752,17 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       let filteredProviders = catalog.providers.filter(p => p.id !== excludeProviderId);
 
       // Apply time window filtering if a time window was requested
-      // TEST MODE: Shift the requested time window +1 month to show future offers
-      if (requestedTimeWindow) {
-        const shiftedTimeWindow = {
-          startTime: new Date(new Date(requestedTimeWindow.startTime).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          endTime: new Date(new Date(requestedTimeWindow.endTime).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        };
-        logger.info(`[TEST MODE] Shifting time window +1 month: ${requestedTimeWindow.startTime} -> ${shiftedTimeWindow.startTime}`);
-        const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, shiftedTimeWindow);
-        filteredProviders = timeFilteredCatalog.providers;
-      }
+      // TEST MODE: Always filter for offers ~1 month from current date (ignoring user's request)
+      // This shows offers scheduled for approximately 1 month in the future
+      const now = new Date();
+      const oneMonthFromNow = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000); // ~4 weeks from now
+      const testTimeWindow = {
+        startTime: new Date(oneMonthFromNow.getFullYear(), oneMonthFromNow.getMonth(), oneMonthFromNow.getDate(), 6, 0, 0).toISOString(),
+        endTime: new Date(oneMonthFromNow.getFullYear(), oneMonthFromNow.getMonth(), oneMonthFromNow.getDate(), 18, 0, 0).toISOString(),
+      };
+      logger.info(`[TEST MODE] Filtering for offers on ${oneMonthFromNow.toDateString()} (1 month from now), ignoring requested timeframe`);
+      const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, testTimeWindow);
+      filteredProviders = timeFilteredCatalog.providers;
 
       // Refresh local offer availability from actual block counts
       // This ensures discovery reflects the true current availability, not stale CDS data
@@ -848,15 +849,17 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     logger.info('Falling back to LOCAL catalog after CDS failure', { transaction_id: txnId });
     try {
       const now = new Date();
-      // TEST MODE: Shift the time filter +1 month to find future offers
-      const shiftedNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      logger.info(`[TEST MODE] Local fallback: shifting time filter +1 month to ${shiftedNow.toISOString()}`);
+      // TEST MODE: Filter for offers on the specific date ~1 month from now
+      const oneMonthFromNow = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
+      const targetDateStart = new Date(oneMonthFromNow.getFullYear(), oneMonthFromNow.getMonth(), oneMonthFromNow.getDate(), 0, 0, 0);
+      const targetDateEnd = new Date(oneMonthFromNow.getFullYear(), oneMonthFromNow.getMonth(), oneMonthFromNow.getDate(), 23, 59, 59);
+      logger.info(`[TEST MODE] Local fallback: filtering for offers on ${oneMonthFromNow.toDateString()}`);
       const localOffers = await prisma.catalogOffer.findMany({
         where: {
           ...(sourceType ? { item: { sourceType: sourceType } } : {}),
           ...(excludeProviderId ? { providerId: { not: excludeProviderId } } : {}),
-          // Filter out expired offers - TEST MODE: use shifted time
-          timeWindowEnd: { gt: shiftedNow },
+          // Filter for offers on the target date (~1 month from now)
+          timeWindowStart: { gte: targetDateStart, lte: targetDateEnd },
           blocks: { some: { status: 'AVAILABLE' } },
         },
         include: {
