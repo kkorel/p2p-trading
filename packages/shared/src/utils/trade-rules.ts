@@ -198,15 +198,6 @@ export interface TradeWindowCheck {
  * - After gate closure: no new trades, modifications, or cancellations
  */
 export function checkTradeWindow(deliveryStartTime: string, now?: Date): TradeWindowCheck {
-  // TEST MODE: Bypass all trade window restrictions
-  // This allows creating and buying offers for any time window (including 1 month in the future)
-  return {
-    allowed: true,
-    gateClosureTime: new Date(new Date(deliveryStartTime).getTime() - GATE_CLOSURE_HOURS * 60 * 60 * 1000).toISOString(),
-    tradeWindowOpens: new Date(new Date(deliveryStartTime).getTime() - TRADE_WINDOW_HOURS * 60 * 60 * 1000).toISOString(),
-  };
-
-  /* ORIGINAL LOGIC - uncomment to restore trade window enforcement
   const deliveryStart = new Date(deliveryStartTime);
   const currentTime = now || new Date();
 
@@ -255,7 +246,6 @@ export function checkTradeWindow(deliveryStartTime: string, now?: Date): TradeWi
     gateClosureTime: gateClosure.toISOString(),
     tradeWindowOpens: tradeWindowOpens.toISOString(),
   };
-  END OF ORIGINAL LOGIC */
 }
 
 /**

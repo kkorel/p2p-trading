@@ -690,16 +690,6 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   // Build discover message with both filters and intent
   // Filters: JSONPath expression for basic filtering
   // Intent: Time window and quantity for time-based matching
-  // TEST MODE: Always search for 09.03.2026 06:00-18:00 regardless of user's request
-  let cdsTimeWindow = effectiveTimeWindow;
-  if (effectiveTimeWindow) {
-    // Hardcode to 09.03.2026 06:00-18:00 for testing
-    cdsTimeWindow = {
-      startTime: '2026-03-09T06:00:00.000Z',
-      endTime: '2026-03-09T18:00:00.000Z',
-    };
-    logger.info(`[TEST MODE] CDS request: overriding to 09.03.2026 06:00-18:00 (ignoring user's ${effectiveTimeWindow.startTime})`);
-  }
   const discoverMessage = {
     context,
     message: {
@@ -708,9 +698,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         expression,
         expressionType: 'jsonpath',
       },
-      intent: cdsTimeWindow ? {
+      intent: effectiveTimeWindow ? {
         fulfillment: {
-          time: cdsTimeWindow,
+          time: effectiveTimeWindow,
         },
         quantity: minQuantity ? { value: minQuantity } : undefined,
       } : undefined,
@@ -762,14 +752,10 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       let filteredProviders = catalog.providers.filter(p => p.id !== excludeProviderId);
 
       // Apply time window filtering if a time window was requested
-      // TEST MODE: Always filter for offers on 09.03.2026 06:00-18:00 (ignoring user's request)
-      const testTimeWindow = {
-        startTime: '2026-03-09T06:00:00.000Z',
-        endTime: '2026-03-09T18:00:00.000Z',
-      };
-      logger.info(`[TEST MODE] Filtering for offers on 09.03.2026 06:00-18:00, ignoring requested timeframe`);
-      const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, testTimeWindow);
-      filteredProviders = timeFilteredCatalog.providers;
+      if (requestedTimeWindow) {
+        const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, requestedTimeWindow);
+        filteredProviders = timeFilteredCatalog.providers;
+      }
 
       // Refresh local offer availability from actual block counts
       // This ensures discovery reflects the true current availability, not stale CDS data
@@ -855,16 +841,13 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     // Fall back to local catalog so user still gets results
     logger.info('Falling back to LOCAL catalog after CDS failure', { transaction_id: txnId });
     try {
-      // TEST MODE: Always filter for offers on 09.03.2026 (ignoring user's request)
-      const targetDateStart = new Date('2026-03-09T00:00:00.000Z');
-      const targetDateEnd = new Date('2026-03-09T23:59:59.000Z');
-      logger.info(`[TEST MODE] Local fallback: filtering for offers on 09.03.2026`);
+      const now = new Date();
       const localOffers = await prisma.catalogOffer.findMany({
         where: {
           ...(sourceType ? { item: { sourceType: sourceType } } : {}),
           ...(excludeProviderId ? { providerId: { not: excludeProviderId } } : {}),
-          // Filter for offers on 09.03.2026
-          timeWindowStart: { gte: targetDateStart, lte: targetDateEnd },
+          // Filter out expired offers
+          timeWindowEnd: { gt: now },
           blocks: { some: { status: 'AVAILABLE' } },
         },
         include: {
@@ -1619,11 +1602,9 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
     // Confirm each order in parallel
     await Promise.all(txState.bulkOrders!.map(async (bulkOrder) => {
       try {
-        // Use parent transaction_id as fallback if bulkOrder.transactionId is missing
-        const orderTxId = bulkOrder.transactionId || transaction_id;
         const context = createContext({
           action: 'confirm',
-          transaction_id: orderTxId,
+          transaction_id: bulkOrder.transactionId,
           bap_id: config.bap.id,
           bap_uri: config.bap.uri,
           bpp_id: config.bpp.id,
@@ -1637,11 +1618,11 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
           },
         };
 
-        await logEvent(orderTxId, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
+        await logEvent(bulkOrder.transactionId, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
         await axios.post(targetUrl, confirmMessage);
         confirmedOrders.push(bulkOrder.id);
 
-        logger.info(`Bulk order confirmed: ${bulkOrder.id}`, { transaction_id: orderTxId });
+        logger.info(`Bulk order confirmed: ${bulkOrder.id}`, { transaction_id: bulkOrder.transactionId });
       } catch (error: any) {
         logger.error(`Failed to confirm bulk order ${bulkOrder.id}: ${error.message}`);
         failedOrders.push({ id: bulkOrder.id, error: error.message });

@@ -20,10 +20,6 @@ export function isValidTimeWindow(tw?: TimeWindow): boolean {
  * Returns true if either window is undefined/invalid (no filtering)
  */
 export function timeWindowsOverlap(a?: TimeWindow, b?: TimeWindow): boolean {
-  // TEST MODE: Always return true (bypass time window filtering)
-  return true;
-
-  /* ORIGINAL LOGIC - uncomment to restore time window filtering
   // If either window is undefined or invalid, treat as "always matches"
   if (!isValidTimeWindow(a) || !isValidTimeWindow(b)) {
     return true;
@@ -35,7 +31,6 @@ export function timeWindowsOverlap(a?: TimeWindow, b?: TimeWindow): boolean {
   const bEnd = new Date(b!.endTime).getTime();
   
   return aStart < bEnd && bStart < aEnd;
-  */
 }
 
 /**
@@ -74,10 +69,6 @@ export function getTimeWindowDuration(tw?: TimeWindow): number {
  * - If both have time windows: ratio of overlap to requested duration
  */
 export function calculateTimeWindowFit(offer?: TimeWindow, requested?: TimeWindow): number {
-  // TEST MODE: Always return 1.0 (perfect fit, bypass time window scoring)
-  return 1;
-
-  /* ORIGINAL LOGIC - uncomment to restore time window scoring
   // No requested time window = no constraint, perfect fit
   if (!isValidTimeWindow(requested)) return 1;
   
@@ -93,5 +84,4 @@ export function calculateTimeWindowFit(offer?: TimeWindow, requested?: TimeWindo
   
   // Return ratio: how much of the requested window is covered
   return Math.min(1, overlapDuration / requestedDuration);
-  */
 }
