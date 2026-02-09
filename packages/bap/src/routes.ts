@@ -690,14 +690,15 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   // Build discover message with both filters and intent
   // Filters: JSONPath expression for basic filtering
   // Intent: Time window and quantity for time-based matching
-  // TEST MODE: Shift the time window +1 month so CDS returns March offers when user requests Feb
+  // TEST MODE: Always search for 09.03.2026 06:00-18:00 regardless of user's request
   let cdsTimeWindow = effectiveTimeWindow;
   if (effectiveTimeWindow) {
+    // Hardcode to 09.03.2026 06:00-18:00 for testing
     cdsTimeWindow = {
-      startTime: new Date(new Date(effectiveTimeWindow.startTime).getTime() + 28 * 24 * 60 * 60 * 1000).toISOString(),
-      endTime: new Date(new Date(effectiveTimeWindow.endTime).getTime() + 28 * 24 * 60 * 60 * 1000).toISOString(),
+      startTime: '2026-03-09T06:00:00.000Z',
+      endTime: '2026-03-09T18:00:00.000Z',
     };
-    logger.info(`[TEST MODE] CDS request: shifting time window +1 month: ${effectiveTimeWindow.startTime} -> ${cdsTimeWindow.startTime}`);
+    logger.info(`[TEST MODE] CDS request: overriding to 09.03.2026 06:00-18:00 (ignoring user's ${effectiveTimeWindow.startTime})`);
   }
   const discoverMessage = {
     context,
@@ -761,15 +762,12 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       let filteredProviders = catalog.providers.filter(p => p.id !== excludeProviderId);
 
       // Apply time window filtering if a time window was requested
-      // TEST MODE: Always filter for offers ~1 month from current date (ignoring user's request)
-      // This shows offers scheduled for approximately 1 month in the future
-      const now = new Date();
-      const oneMonthFromNow = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000); // ~4 weeks from now
+      // TEST MODE: Always filter for offers on 09.03.2026 06:00-18:00 (ignoring user's request)
       const testTimeWindow = {
-        startTime: new Date(oneMonthFromNow.getFullYear(), oneMonthFromNow.getMonth(), oneMonthFromNow.getDate(), 6, 0, 0).toISOString(),
-        endTime: new Date(oneMonthFromNow.getFullYear(), oneMonthFromNow.getMonth(), oneMonthFromNow.getDate(), 18, 0, 0).toISOString(),
+        startTime: '2026-03-09T06:00:00.000Z',
+        endTime: '2026-03-09T18:00:00.000Z',
       };
-      logger.info(`[TEST MODE] Filtering for offers on ${oneMonthFromNow.toDateString()} (1 month from now), ignoring requested timeframe`);
+      logger.info(`[TEST MODE] Filtering for offers on 09.03.2026 06:00-18:00, ignoring requested timeframe`);
       const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, testTimeWindow);
       filteredProviders = timeFilteredCatalog.providers;
 
@@ -857,17 +855,15 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     // Fall back to local catalog so user still gets results
     logger.info('Falling back to LOCAL catalog after CDS failure', { transaction_id: txnId });
     try {
-      const now = new Date();
-      // TEST MODE: Filter for offers on the specific date ~1 month from now
-      const oneMonthFromNow = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
-      const targetDateStart = new Date(oneMonthFromNow.getFullYear(), oneMonthFromNow.getMonth(), oneMonthFromNow.getDate(), 0, 0, 0);
-      const targetDateEnd = new Date(oneMonthFromNow.getFullYear(), oneMonthFromNow.getMonth(), oneMonthFromNow.getDate(), 23, 59, 59);
-      logger.info(`[TEST MODE] Local fallback: filtering for offers on ${oneMonthFromNow.toDateString()}`);
+      // TEST MODE: Always filter for offers on 09.03.2026 (ignoring user's request)
+      const targetDateStart = new Date('2026-03-09T00:00:00.000Z');
+      const targetDateEnd = new Date('2026-03-09T23:59:59.000Z');
+      logger.info(`[TEST MODE] Local fallback: filtering for offers on 09.03.2026`);
       const localOffers = await prisma.catalogOffer.findMany({
         where: {
           ...(sourceType ? { item: { sourceType: sourceType } } : {}),
           ...(excludeProviderId ? { providerId: { not: excludeProviderId } } : {}),
-          // Filter for offers on the target date (~1 month from now)
+          // Filter for offers on 09.03.2026
           timeWindowStart: { gte: targetDateStart, lte: targetDateEnd },
           blocks: { some: { status: 'AVAILABLE' } },
         },
