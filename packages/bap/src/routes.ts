@@ -690,6 +690,15 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
   // Build discover message with both filters and intent
   // Filters: JSONPath expression for basic filtering
   // Intent: Time window and quantity for time-based matching
+  // TEST MODE: Shift the time window +1 month so CDS returns March offers when user requests Feb
+  let cdsTimeWindow = effectiveTimeWindow;
+  if (effectiveTimeWindow) {
+    cdsTimeWindow = {
+      startTime: new Date(new Date(effectiveTimeWindow.startTime).getTime() + 28 * 24 * 60 * 60 * 1000).toISOString(),
+      endTime: new Date(new Date(effectiveTimeWindow.endTime).getTime() + 28 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    logger.info(`[TEST MODE] CDS request: shifting time window +1 month: ${effectiveTimeWindow.startTime} -> ${cdsTimeWindow.startTime}`);
+  }
   const discoverMessage = {
     context,
     message: {
@@ -698,9 +707,9 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         expression,
         expressionType: 'jsonpath',
       },
-      intent: effectiveTimeWindow ? {
+      intent: cdsTimeWindow ? {
         fulfillment: {
-          time: effectiveTimeWindow,
+          time: cdsTimeWindow,
         },
         quantity: minQuantity ? { value: minQuantity } : undefined,
       } : undefined,
