@@ -752,8 +752,14 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
       let filteredProviders = catalog.providers.filter(p => p.id !== excludeProviderId);
 
       // Apply time window filtering if a time window was requested
+      // TEST MODE: Shift the requested time window +1 month to show future offers
       if (requestedTimeWindow) {
-        const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, requestedTimeWindow);
+        const shiftedTimeWindow = {
+          startTime: new Date(new Date(requestedTimeWindow.startTime).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          endTime: new Date(new Date(requestedTimeWindow.endTime).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        };
+        logger.info(`[TEST MODE] Shifting time window +1 month: ${requestedTimeWindow.startTime} -> ${shiftedTimeWindow.startTime}`);
+        const timeFilteredCatalog = filterCatalogByTimeWindow({ providers: filteredProviders }, shiftedTimeWindow);
         filteredProviders = timeFilteredCatalog.providers;
       }
 
@@ -842,12 +848,15 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
     logger.info('Falling back to LOCAL catalog after CDS failure', { transaction_id: txnId });
     try {
       const now = new Date();
+      // TEST MODE: Shift the time filter +1 month to find future offers
+      const shiftedNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      logger.info(`[TEST MODE] Local fallback: shifting time filter +1 month to ${shiftedNow.toISOString()}`);
       const localOffers = await prisma.catalogOffer.findMany({
         where: {
           ...(sourceType ? { item: { sourceType: sourceType } } : {}),
           ...(excludeProviderId ? { providerId: { not: excludeProviderId } } : {}),
-          // Filter out expired offers
-          timeWindowEnd: { gt: now },
+          // Filter out expired offers - TEST MODE: use shifted time
+          timeWindowEnd: { gt: shiftedNow },
           blocks: { some: { status: 'AVAILABLE' } },
         },
         include: {
