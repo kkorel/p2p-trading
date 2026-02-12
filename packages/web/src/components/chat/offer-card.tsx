@@ -99,7 +99,7 @@ export function OfferCard({ offer, onSelect, language = 'en-IN' }: OfferCardProp
                     </div>
                     <div>
                         <div className="font-semibold text-gray-900">
-                            {offer.quantityKWh} kWh
+                            {offer.quantityKWh} units
                         </div>
                         <div className="text-xs text-gray-500">
                             {offer.energyType.charAt(0) + offer.energyType.slice(1).toLowerCase()}

@@ -29,7 +29,7 @@ const LABELS = {
   active: { en: 'active', hi: 'चालू' },
   listed: { en: 'listed', hi: 'लिस्टेड' },
   sold: { en: 'Sold', hi: 'बिका' },
-  unit: { en: 'kWh', hi: 'यूनिट' },
+  unit: { en: 'units', hi: 'यूनिट' },
   perUnit: { en: '/unit', hi: '/यूनिट' },
   footer: { en: 'Buyers can see your energy', hi: 'खरीदार आपकी बिजली देख सकते हैं' },
 };

@@ -25,7 +25,7 @@ const LABELS = {
   total: { en: 'Total', hi: 'कुल' },
   time: { en: 'Time', hi: 'समय' },
   avgPrice: { en: 'Avg Price', hi: 'औसत दाम' },
-  unit: { en: 'kWh', hi: 'यूनिट' },
+  unit: { en: 'units', hi: 'यूनिट' },
   perUnit: { en: '/unit', hi: '/यूनिट' },
   viewSellers: { en: 'View', hi: 'देखो' },
   hideSellers: { en: 'Hide', hi: 'छुपाओ' },

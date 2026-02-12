@@ -19,7 +19,7 @@ const LABELS = {
   seller: { en: 'Seller', hi: 'विक्रेता' },
   save: { en: 'Save', hi: 'बचत' },
   total: { en: 'Total', hi: 'कुल' },
-  unit: { en: 'kWh', hi: 'यूनिट' },
+  unit: { en: 'units', hi: 'यूनिट' },
   perUnit: { en: '/unit', hi: '/यूनिट' },
   quickBuy: { en: 'Quick Buy', hi: 'जल्दी खरीदो' },
   customAmount: { en: 'Custom Amount', hi: 'अपनी मर्ज़ी से' },

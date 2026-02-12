@@ -196,7 +196,7 @@ export interface AgentMessage {
     max: number;
     step: number;
     defaultValue: number;
-    unit: string;  // 'kWh', '₹/unit', etc.
+    unit: string;  // 'units', '₹/unit', etc.
     callbackPrefix: string;  // e.g., 'listing_qty', 'autobuy_price'
   };
 }
@@ -455,7 +455,7 @@ async function processCredentialUpload(
     }
     case 'StorageProfileCredential': {
       claims = extractNormalizedStorageProfileClaims(credential);
-      summary = `${claims.storageCapacityKWh || '?'} kWh ${claims.storageType || 'Battery'}`;
+      summary = `${claims.storageCapacityKWh || '?'} units ${claims.storageType || 'Battery'}`;
       break;
     }
     case 'UtilityProgramEnrollmentCredential': {
@@ -516,7 +516,7 @@ async function processCredentialUpload(
     if (capacityKW && capacityKW > 0) {
       const AVG_PEAK_SUN_HOURS = 4.5;
       const DAYS_PER_MONTH = 30;
-      const monthlyKWh = Math.round(capacityKW * AVG_PEAK_SUN_HOURS * DAYS_PER_MONTH);
+      const monthlyKWh = roundTo500(capacityKW * AVG_PEAK_SUN_HOURS * DAYS_PER_MONTH);
       await prisma.user.update({
         where: { id: userId },
         data: { productionCapacity: monthlyKWh },
@@ -855,6 +855,11 @@ interface MarketPriceInsight {
   discomRate: number;
 }
 
+/** Round a number to the nearest 500 (for user-friendly estimates). */
+function roundTo500(n: number): number {
+  return Math.round(n / 500) * 500;
+}
+
 /**
  * Get market price insights for an energy type.
  * In production, this would query actual market data.
@@ -872,8 +877,8 @@ function getMarketPriceInsight(energyType: string): MarketPriceInsight {
   const savings = Math.round(((data.discom - data.avg) / data.discom) * 100);
 
   return {
-    en: `Current market: ₹${data.min} to ₹${data.max} per kWh. Average ₹${data.avg}.\n` +
-      `DISCOM rate: ₹${data.discom} per kWh.\n` +
+    en: `Current market: ₹${data.min} to ₹${data.max} per unit. Average ₹${data.avg}.\n` +
+      `DISCOM rate: ₹${data.discom} per unit.\n` +
       `Your buyers save around ${savings} percent versus DISCOM!`,
     hi: `मार्केट रेट: ₹${data.min} से ₹${data.max} प्रति यूनिट। औसत ₹${data.avg}।\n` +
       `DISCOM रेट: ₹${data.discom} प्रति यूनिट।\n` +
@@ -977,7 +982,7 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
           max: 200,
           step: 5,
           defaultValue: 25,
-          unit: 'kWh',
+          unit: 'units',
           callbackPrefix: 'listing_qty',
         },
       }],
@@ -1038,8 +1043,8 @@ function askNextListingDetail(ctx: SessionContext, pending: PendingListing): Age
   return {
     messages: [{
       text: h(ctx,
-        `Here's your listing:\n• ${pending.quantity} kWh of ${typeLabel} energy\n• ₹${pending.pricePerKwh}/unit\n• Time: ${timeLabel}\n\nShall I create it?`,
-        `आपकी लिस्टिंग:\n• ${pending.quantity} kWh ${typeLabelHi} एनर्जी\n• ₹${pending.pricePerKwh}/यूनिट\n• समय: ${timeLabelHi}\n\nबना दूं?`
+        `Here's your listing:\n• ${pending.quantity} units of ${typeLabel} energy\n• ₹${pending.pricePerKwh}/unit\n• Time: ${timeLabel}\n\nShall I create it?`,
+        `आपकी लिस्टिंग:\n• ${pending.quantity} यूनिट ${typeLabelHi} एनर्जी\n• ₹${pending.pricePerKwh}/यूनिट\n• समय: ${timeLabelHi}\n\nबना दूं?`
       ),
       buttons: [
         { text: h(ctx, '✅ Yes, create it!', '✅ हाँ, बना दो!'), callbackData: 'listing_confirm:yes' },
@@ -1384,7 +1389,7 @@ async function askNextPurchaseDetail(ctx: SessionContext, pending: PendingPurcha
           max: 200,
           step: 5,
           defaultValue: 25,
-          unit: 'kWh',
+          unit: 'units',
           callbackPrefix: 'purchase_qty',
         },
       }],
@@ -1532,11 +1537,11 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
   // Build text message (fallback for WhatsApp/Telegram)
   const textMessage = selectionType === 'single' && offers.length === 1
     ? h(ctx,
-        `Found a match!\n\n• Seller: ${offers[0].providerName}\n• ${offers[0].quantity} kWh at Rs ${offers[0].price}/unit\n• Total: Rs ${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• Time: ${offers[0].timeWindow}\n\nDo you want to buy this?`,
+        `Found a match!\n\n• Seller: ${offers[0].providerName}\n• ${offers[0].quantity} units at Rs ${offers[0].price}/unit\n• Total: Rs ${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• Time: ${offers[0].timeWindow}\n\nDo you want to buy this?`,
         `ऑफ़र मिल गया!\n\n• विक्रेता: ${offers[0].providerName}\n• ${offers[0].quantity} यूनिट ₹${offers[0].price}/यूनिट पर\n• कुल: ₹${(offers[0].subtotal || offers[0].price * offers[0].quantity).toFixed(2)}\n• समय: ${offers[0].timeWindow}\n\nये खरीदना है?`
       )
     : h(ctx,
-        `Found best deals from ${offers.length} sellers!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} kWh × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nTotal: ${matchedOffersCard.summary.totalQuantity} kWh | Rs ${matchedOffersCard.summary.totalPrice.toFixed(2)}\nTime: ${timeWindow}\n\nAccept this deal?`,
+        `Found best deals from ${offers.length} sellers!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} units × Rs ${o.price}/unit = Rs ${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nTotal: ${matchedOffersCard.summary.totalQuantity} units | Rs ${matchedOffersCard.summary.totalPrice.toFixed(2)}\nTime: ${timeWindow}\n\nAccept this deal?`,
         `${offers.length} विक्रेताओं से बेस्ट डील मिली!\n\n${offers.map((o, i) => `${i + 1}. ${o.providerName}\n   ${o.quantity} यूनिट × ₹${o.price}/यूनिट = ₹${o.subtotal.toFixed(2)}`).join('\n\n')}\n\nकुल: ${matchedOffersCard.summary.totalQuantity} यूनिट | ₹${matchedOffersCard.summary.totalPrice.toFixed(2)}\nसमय: ${timeWindow}\n\nये डील मंज़ूर है?`
       );
 
@@ -1747,7 +1752,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
               max: Math.max(100, sanctionedKW * 10),
               step: 5,
               defaultValue: defaultQty,
-              unit: 'kWh',
+              unit: 'units',
               callbackPrefix: 'autobuy_qty',
             },
           }],
@@ -1779,7 +1784,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
 
       if (!qty || qty <= 0) {
         return {
-          messages: [{ text: h(ctx, 'Please enter a valid number of kWh.', 'Sahi kWh number daalo.') }],
+          messages: [{ text: h(ctx, 'Please enter a valid number of units.', 'Sahi units number daalo.') }],
         };
       }
       const updated = { ...pending, quantity: Math.round(qty), awaitingField: undefined as any };
@@ -1908,7 +1913,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
           if (pending.selectionType === 'multiple' && pending.summary && pending.discoveredOffers) {
             const s = pending.summary;
             const offerList = pending.discoveredOffers.map((o, i) =>
-              `${i + 1}. ${o.providerName}: ${o.quantity} kWh × Rs ${o.price}/unit`
+              `${i + 1}. ${o.providerName}: ${o.quantity} units × Rs ${o.price}/unit`
             ).join('\n');
             const bulkInfo = result.bulkResult
               ? `\n• ${result.bulkResult.confirmedCount} order(s) confirmed`
@@ -1938,7 +1943,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
                 confirmMsg,
                 {
                   text: h(ctx,
-                    `Purchase successful!\n\n${offerList}\n\n• Total: ${s.totalQuantity} kWh at avg Rs ${s.averagePrice.toFixed(2)}/unit\n• Amount: Rs ${s.totalPrice.toFixed(2)}${bulkInfo}\n• Time: ${pending.discoveredOffers[0].timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
+                    `Purchase successful!\n\n${offerList}\n\n• Total: ${s.totalQuantity} units at avg Rs ${s.averagePrice.toFixed(2)}/unit\n• Amount: Rs ${s.totalPrice.toFixed(2)}${bulkInfo}\n• Time: ${pending.discoveredOffers[0].timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
                     `खरीदारी हो गई!\n\n${offerList}\n\n• कुल: ${s.totalQuantity} यूनिट औसत ₹${s.averagePrice.toFixed(2)}/यूनिट\n• रकम: ₹${s.totalPrice.toFixed(2)}${bulkInfo}\n• समय: ${pending.discoveredOffers[0].timeWindow}\n\nआपकी बिजली ग्रिड से आएगी। आपका पैसा प्लेटफॉर्म पे सुरक्षित है - डिलीवरी के बाद सेलर को मिलेगा।`
                   ),
                   orderConfirmation: orderConfirmationCard,
@@ -1976,7 +1981,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
                 confirmMsg,
                 {
                   text: h(ctx,
-                    `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
+                    `Purchase successful!\n• ${o.quantity} units from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
                     `खरीदारी हो गई!\n• ${o.quantity} यूनिट ${o.providerName} से\n• ₹${o.pricePerKwh}/यूनिट (कुल: ₹${o.totalPrice.toFixed(2)})\n• समय: ${o.timeWindow}\n\nआपकी बिजली ग्रिड से आएगी। आपका पैसा प्लेटफॉर्म पे सुरक्षित है - डिलीवरी के बाद सेलर को मिलेगा।`
                   ),
                   orderConfirmation: orderConfirmationCard,
@@ -2051,7 +2056,7 @@ async function handlePendingAutoBuyInput(ctx: SessionContext, message: string): 
               max: 200,
               step: 5,
               defaultValue: 20,
-              unit: 'kWh',
+              unit: 'units',
               callbackPrefix: 'autobuy_qty',
             },
           }],
@@ -2186,8 +2191,8 @@ async function handlePendingAutoBuyInput(ctx: SessionContext, message: string): 
           return {
             messages: [{
               text: h(ctx,
-                `✅ Auto-buy activated!\n\n🛒 Found a deal right now! Bought *${buyResult.quantityBought} kWh* at ₹${buyResult.pricePerUnit}/unit.\nTotal: ₹${buyResult.totalSpent.toFixed(0)}\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you at ≤₹${price}/unit (${timeLabel}).\n\n${advice.advice}`,
-                `✅ ऑटो-बाय चालू!\n\n🛒 अभी एक डील मिल गई! *${buyResult.quantityBought} kWh* ₹${buyResult.pricePerUnit}/यूनिट पर खरीद लिया।\nकुल: ₹${buyResult.totalSpent.toFixed(0)}\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट ≤₹${price}/यूनिट पर खरीदूंगा (${timeLabel})।\n\n${advice.advice}`
+                `✅ Auto-buy activated!\n\n🛒 Found a deal right now! Bought *${buyResult.quantityBought} units* at ₹${buyResult.pricePerUnit}/unit.\nTotal: ₹${buyResult.totalSpent.toFixed(0)}\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you at ≤₹${price}/unit (${timeLabel}).\n\n${advice.advice}`,
+                `✅ ऑटो-बाय चालू!\n\n🛒 अभी एक डील मिल गई! *${buyResult.quantityBought} यूनिट* ₹${buyResult.pricePerUnit}/यूनिट पर खरीद लिया।\nकुल: ₹${buyResult.totalSpent.toFixed(0)}\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट ≤₹${price}/यूनिट पर खरीदूंगा (${timeLabel})।\n\n${advice.advice}`
               ),
               buttons: [
                 { text: h(ctx, '📋 View Orders', '📋 ऑर्डर देखो'), callbackData: 'action:show_orders' },
@@ -2266,7 +2271,7 @@ async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPur
         { text: searchMsg },
         {
           text: h(ctx,
-            `Purchase successful!\n• ${o.quantity} kWh from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
+            `Purchase successful!\n• ${o.quantity} units from ${o.providerName}\n• Rs ${o.pricePerKwh}/unit (Total: Rs ${o.totalPrice.toFixed(2)})\n• Time: ${o.timeWindow}\n\nYour energy will come through the grid. Your payment is safe with the platform - seller will get it after delivery is confirmed.`,
             `खरीदारी हो गई!\n• ${o.quantity} यूनिट ${o.providerName} से\n• ₹${o.pricePerKwh}/यूनिट (कुल: ₹${o.totalPrice.toFixed(2)})\n• समय: ${o.timeWindow}\n\nआपकी बिजली ग्रिड से आएगी। आपका पैसा प्लेटफॉर्म पे सुरक्षित है - डिलीवरी के बाद सेलर को मिलेगा।`
           ),
         },
@@ -3855,7 +3860,7 @@ const states: Record<ChatState, StateHandler> = {
 
           // Calculate monthly savings: sanctioned_load * 24 * 30 * 0.3 * 1.5
           // This assumes 30% usage pattern and Rs 1.5 savings per unit
-          const monthlySavings = Math.round(sanctionedLoad * 24 * 30 * 0.3 * 1.5);
+          const monthlySavings = roundTo500(sanctionedLoad * 24 * 30 * 0.3 * 1.5);
 
           // Mark profile complete for buyers
           await prisma.user.update({
@@ -3951,7 +3956,7 @@ const states: Record<ChatState, StateHandler> = {
         let explainHi: string;
 
         if (hasGeneration) {
-          const capEn = capacity ? `Your solar panel generates ~${capacity} kWh per month. ` : '';
+          const capEn = capacity ? `Your solar panel generates ~${capacity} units per month. ` : '';
           const capHi = capacity ? `आपका सोलर पैनल ~${capacity} किलोवाट घंटा प्रति महीना बिजली बनाता है। ` : '';
 
           // Calculate expected monthly earnings
@@ -3959,9 +3964,9 @@ const states: Record<ChatState, StateHandler> = {
           let earningsHi = '';
           if (capacity) {
             const tradeableKwh = Math.floor(capacity * tradeLimitPct / 100);
-            // Show range based on potential price variation (Rs 6-9 per kWh)
-            const minMonthly = Math.round(tradeableKwh * 6);
-            const maxMonthly = Math.round(tradeableKwh * 9);
+            // Show range based on potential price variation (Rs 6-9 per unit)
+            const minMonthly = roundTo500(tradeableKwh * 6);
+            const maxMonthly = roundTo500(tradeableKwh * 9);
             earningsEn = `With your current ${tradeLimitPct}% trade limit, you can earn Rs ${minMonthly} to ${maxMonthly} per month. As you sell more successfully, your limit increases! `;
             earningsHi = `अभी आप ₹${minMonthly} से ₹${maxMonthly} महीना कमा सकते हो। जैसे-जैसे आप अच्छे से बेचते रहोगे, आप और ज़्यादा बेच पाओगे! `;
           }
@@ -4049,8 +4054,8 @@ const states: Record<ChatState, StateHandler> = {
                   messages: [
                     {
                       text: h(ctx,
-                        `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output):\n${tradeResult.warningMessage || 'Already have enough listed for tomorrow.'}\n\nMonthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and add more listings if needed.`,
-                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए:\n${tradeResult.warningMessage || 'कल के लिए पहले से काफी लिस्टेड है।'}\n\nमासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे मौसम देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।`
+                        `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output):\n${tradeResult.warningMessage || 'Already have enough listed for tomorrow.'}\n\nMonthly capacity: ${detectedCapacity} units (${dailyCapacity} units/day)\n\nEvery day at 6 AM, I'll check the next day's weather and add more listings if needed.`,
+                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए:\n${tradeResult.warningMessage || 'कल के लिए पहले से काफी लिस्टेड है।'}\n\nमासिक क्षमता: ${detectedCapacity} यूनिट (${dailyCapacity} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे मौसम देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।`
                       ),
                       buttons: [
                         { text: h(ctx, '📋 View Listings', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
@@ -4095,15 +4100,15 @@ const states: Record<ChatState, StateHandler> = {
                     // First message: Weather and trade limit explanation
                     {
                       text: h(ctx,
-                        `🌤️ Tomorrow's weather forecast shows *${weatherPercent}%* solar efficiency. Based on this and your *${tradeLimitPct}%* trade limit, I'm placing an offer for *${listedQty} kWh* at ₹${smartPrice}/unit.`,
-                        `🌤️ कल के मौसम में *${weatherPercent}%* सोलर एफिशिएंसी है। इसके और आपकी *${tradeLimitPct}%* ट्रेड लिमिट के हिसाब से, मैं *${listedQty} kWh* ₹${smartPrice}/यूनिट पर ऑफ़र लगा रहा हूं।`
+                        `🌤️ Tomorrow's weather forecast shows *${weatherPercent}%* solar efficiency. Based on this and your *${tradeLimitPct}%* trade limit, I'm placing an offer for *${listedQty} units* at ₹${smartPrice}/unit.`,
+                        `🌤️ कल के मौसम में *${weatherPercent}%* सोलर एफिशिएंसी है। इसके और आपकी *${tradeLimitPct}%* ट्रेड लिमिट के हिसाब से, मैं *${listedQty} यूनिट* ₹${smartPrice}/यूनिट पर ऑफ़र लगा रहा हूं।`
                       ),
                     },
                     // Second message: Offer card with confirmation and buttons
                     {
                       text: h(ctx,
-                        `✅ Auto-sell activated!\n\n📊 Monthly capacity: ${detectedCapacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the weather and your existing listings, then add what's needed.${infoText}`,
-                        `✅ ऑटो-सेल चालू!\n\n📊 मासिक क्षमता: ${detectedCapacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे मौसम और मौजूदा लिस्टिंग देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।${infoText}`
+                        `✅ Auto-sell activated!\n\n📊 Monthly capacity: ${detectedCapacity} units (${dailyCapacity} units/day)\n\nEvery day at 6 AM, I'll check the weather and your existing listings, then add what's needed.${infoText}`,
+                        `✅ ऑटो-सेल चालू!\n\n📊 मासिक क्षमता: ${detectedCapacity} यूनिट (${dailyCapacity} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे मौसम और मौजूदा लिस्टिंग देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।${infoText}`
                       ),
                       offerCreated: {
                         quantity: tradeResult.listedQuantity,
@@ -4132,7 +4137,7 @@ const states: Record<ChatState, StateHandler> = {
             messages: [
               {
                 text: h(ctx,
-                  'Profile set up! You can create offers from the Sell tab or tell me here (e.g. "list 50 kWh at Rs 6").',
+                  'Profile set up! You can create offers from the Sell tab or tell me here (e.g. "list 50 units at Rs 6").',
                   'प्रोफ़ाइल तैयार! Sell टैब से या मुझसे कहो (जैसे "50 यूनिट ₹6 पे डाल दो") और ऑफ़र बन जाएगा।'
                 ),
                 buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
@@ -4147,7 +4152,7 @@ const states: Record<ChatState, StateHandler> = {
             messages: [
               {
                 text: h(ctx,
-                  'Profile is set up! You can create offers by telling me (e.g. "list 50 kWh at Rs 6").',
+                  'Profile is set up! You can create offers by telling me (e.g. "list 50 units at Rs 6").',
                   'प्रोफ़ाइल तैयार है! मुझसे कहो (जैसे "50 यूनिट ₹6 पे डाल दो") और ऑफ़र बन जाएगा।'
                 ),
                 buttons: getSmartSuggestions(ctx, 'GENERAL_CHAT'),
@@ -4254,8 +4259,8 @@ const states: Record<ChatState, StateHandler> = {
             return {
               messages: [{
                 text: h(ctx,
-                  `Great! Let's continue with your listing.\n\nSo far:\n• Type: ${listing.energyType || 'Not set'}\n• Quantity: ${listing.quantity ? listing.quantity + ' kWh' : 'Not set'}\n• Price: ${listing.pricePerKwh ? '₹' + listing.pricePerKwh + '/kWh' : 'Not set'}\n\nWhat's next?`,
-                  `बहुत बढ़िया! आपकी लिस्टिंग जारी रखते हैं।\n\nअब तक:\n• टाइप: ${typeHi}\n• मात्रा: ${listing.quantity ? listing.quantity + ' kWh' : 'सेट नहीं'}\n• दाम: ${listing.pricePerKwh ? '₹' + listing.pricePerKwh + '/kWh' : 'सेट नहीं'}\n\nआगे क्या?`
+                  `Great! Let's continue with your listing.\n\nSo far:\n• Type: ${listing.energyType || 'Not set'}\n• Quantity: ${listing.quantity ? listing.quantity + ' units' : 'Not set'}\n• Price: ${listing.pricePerKwh ? '₹' + listing.pricePerKwh + '/unit' : 'Not set'}\n\nWhat's next?`,
+                  `बहुत बढ़िया! आपकी लिस्टिंग जारी रखते हैं।\n\nअब तक:\n• टाइप: ${typeHi}\n• मात्रा: ${listing.quantity ? listing.quantity + ' यूनिट' : 'सेट नहीं'}\n• दाम: ${listing.pricePerKwh ? '₹' + listing.pricePerKwh + '/unit' : 'सेट नहीं'}\n\nआगे क्या?`
                 ),
               }],
             };
@@ -4264,8 +4269,8 @@ const states: Record<ChatState, StateHandler> = {
             return {
               messages: [{
                 text: h(ctx,
-                  `Great! Let's continue with your purchase.\n\nSo far:\n• Quantity: ${purchase.quantity ? purchase.quantity + ' kWh' : 'Not set'}\n• Time: ${purchase.timeDesc || 'Not set'}\n\nWhat's next?`,
-                  `बहुत बढ़िया! आपकी खरीदारी जारी रखते हैं।\n\nअब तक:\n• मात्रा: ${purchase.quantity ? purchase.quantity + ' kWh' : 'सेट नहीं'}\n• समय: ${purchase.timeDesc || 'सेट नहीं'}\n\nआगे क्या?`
+                  `Great! Let's continue with your purchase.\n\nSo far:\n• Quantity: ${purchase.quantity ? purchase.quantity + ' units' : 'Not set'}\n• Time: ${purchase.timeDesc || 'Not set'}\n\nWhat's next?`,
+                  `बहुत बढ़िया! आपकी खरीदारी जारी रखते हैं।\n\nअब तक:\n• मात्रा: ${purchase.quantity ? purchase.quantity + ' यूनिट' : 'सेट नहीं'}\n• समय: ${purchase.timeDesc || 'सेट नहीं'}\n\nआगे क्या?`
                 ),
               }],
             };
@@ -4392,7 +4397,7 @@ const states: Record<ChatState, StateHandler> = {
               const listingsData = await getActiveListingsData(ctx.userId);
               if (listingsData && listingsData.listings.length > 0) {
                 const introText = h(ctx,
-                  `Here are your active listings, ${listingsData.userName}. Total: ${listingsData.totalListed} kWh listed, ${listingsData.totalSold} kWh sold.`,
+                  `Here are your active listings, ${listingsData.userName}. Total: ${listingsData.totalListed} units listed, ${listingsData.totalSold} units sold.`,
                   `${listingsData.userName}, यह रही आपकी लिस्टिंग। कुल: ${listingsData.totalListed} यूनिट लिस्टेड, ${listingsData.totalSold} यूनिट बिके।`
                 );
                 return {
@@ -4609,7 +4614,7 @@ const states: Record<ChatState, StateHandler> = {
             const listingsData = await getActiveListingsData(ctx.userId);
             if (listingsData && listingsData.listings.length > 0) {
               const introText = h(ctx,
-                `Here are your active listings, ${listingsData.userName}. Total: ${listingsData.totalListed} kWh listed, ${listingsData.totalSold} kWh sold.`,
+                `Here are your active listings, ${listingsData.userName}. Total: ${listingsData.totalListed} units listed, ${listingsData.totalSold} units sold.`,
                 `${listingsData.userName}, यह रही आपकी लिस्टिंग। कुल: ${listingsData.totalListed} यूनिट लिस्टेड, ${listingsData.totalSold} यूनिट बिके।`
               );
               return {
@@ -4884,15 +4889,15 @@ const states: Record<ChatState, StateHandler> = {
             const currentTradeableDaily = dailyCapacity * (currentLimit / 100);
             const futureTradeableDaily = dailyCapacity * 0.8; // Assume 80% limit with good trading
 
-            // Price assumptions (Rs per kWh)
+            // Price assumptions (Rs per unit)
             const lowPrice = 6;
             const highPrice = 8;
 
             // Calculate earnings for the projection period
-            const currentMinEarnings = Math.round(currentTradeableDaily * lowPrice * projectionDays);
-            const currentMaxEarnings = Math.round(currentTradeableDaily * highPrice * projectionDays);
-            const futureMinEarnings = Math.round(futureTradeableDaily * lowPrice * projectionDays);
-            const futureMaxEarnings = Math.round(futureTradeableDaily * highPrice * projectionDays);
+            const currentMinEarnings = roundTo500(currentTradeableDaily * lowPrice * projectionDays);
+            const currentMaxEarnings = roundTo500(currentTradeableDaily * highPrice * projectionDays);
+            const futureMinEarnings = roundTo500(futureTradeableDaily * lowPrice * projectionDays);
+            const futureMaxEarnings = roundTo500(futureTradeableDaily * highPrice * projectionDays);
 
             // Format period for display
             let periodEn = `${projectionDays} days`;
@@ -4907,7 +4912,7 @@ const states: Record<ChatState, StateHandler> = {
               messages: [{
                 text: h(ctx,
                   `📊 *Projected Earnings for ${periodEn}*\n\n` +
-                  `Your capacity: ${capacity} kWh per month.\n` +
+                  `Your capacity: ${capacity} units per month.\n` +
                   `Current trade limit: ${currentLimit}%.\n\n` +
                   `💰 *At current level:*\n` +
                   `₹${currentMinEarnings.toLocaleString('en-IN')} to ₹${currentMaxEarnings.toLocaleString('en-IN')}\n\n` +
@@ -4915,7 +4920,7 @@ const states: Record<ChatState, StateHandler> = {
                   `₹${futureMinEarnings.toLocaleString('en-IN')} to ₹${futureMaxEarnings.toLocaleString('en-IN')}\n\n` +
                   `💡 Trade regularly to increase your limit and maximize earnings!`,
                   `📊 *${periodHi} की अनुमानित कमाई*\n\n` +
-                  `आपकी क्षमता: ${capacity} kWh प्रति माह।\n` +
+                  `आपकी क्षमता: ${capacity} यूनिट प्रति माह।\n` +
                   `अभी की सीमा: ${currentLimit}%।\n\n` +
                   `💰 *अभी के लेवल पर:*\n` +
                   `₹${currentMinEarnings.toLocaleString('en-IN')} से ₹${currentMaxEarnings.toLocaleString('en-IN')}\n\n` +
@@ -4962,7 +4967,7 @@ const states: Record<ChatState, StateHandler> = {
             const detectedCapacity = userData?.meterVerifiedCapacity
               || userData?.productionCapacity
               || userData?.provider?.capacityKW
-              || 10; // Default 10 kWh if nothing found
+              || 10; // Default 10 units if nothing found
 
             // Smart price: ₹6/unit (between DISCOM peak ₹7.50 and net metering ₹2)
             const smartPrice = 6;
@@ -5001,15 +5006,15 @@ const states: Record<ChatState, StateHandler> = {
                     // First message: Weather and trade limit explanation
                     {
                       text: h(ctx,
-                        `🌤️ Tomorrow's weather forecast shows *${weatherPercent}%* solar efficiency. Based on this and your *${tradeLimitPct}%* trade limit, I'm placing an offer for *${listedQty} kWh* at ₹${price}/unit.`,
-                        `🌤️ कल के मौसम में *${weatherPercent}%* सोलर एफिशिएंसी है। इसके और आपकी *${tradeLimitPct}%* ट्रेड लिमिट के हिसाब से, मैं *${listedQty} kWh* ₹${price}/यूनिट पर ऑफ़र लगा रहा हूं।`
+                        `🌤️ Tomorrow's weather forecast shows *${weatherPercent}%* solar efficiency. Based on this and your *${tradeLimitPct}%* trade limit, I'm placing an offer for *${listedQty} units* at ₹${price}/unit.`,
+                        `🌤️ कल के मौसम में *${weatherPercent}%* सोलर एफिशिएंसी है। इसके और आपकी *${tradeLimitPct}%* ट्रेड लिमिट के हिसाब से, मैं *${listedQty} यूनिट* ₹${price}/यूनिट पर ऑफ़र लगा रहा हूं।`
                       ),
                     },
                     // Second message: Confirmation with buttons
                     {
                       text: h(ctx,
-                        `✅ Auto-sell activated!\n\n📊 Monthly capacity: ${capacity} kWh (${dailyCapacity} kWh/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
-                        `✅ ऑटो-सेल चालू!\n\n📊 मासिक क्षमता: ${capacity} kWh (${dailyCapacity} kWh/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
+                        `✅ Auto-sell activated!\n\n📊 Monthly capacity: ${capacity} units (${dailyCapacity} units/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
+                        `✅ ऑटो-सेल चालू!\n\n📊 मासिक क्षमता: ${capacity} यूनिट (${dailyCapacity} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
                       ),
                       buttons: [
                         { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
@@ -5024,8 +5029,8 @@ const states: Record<ChatState, StateHandler> = {
                 return {
                   messages: [{
                     text: h(ctx,
-                      `✅ Auto-sell enabled!\n\n⚠️ ${tradeResult.warningMessage || 'No listing created right now.'}\n\nMonthly capacity: ${capacity} kWh (${dailyCapacity} kWh/day) at ₹${price}/unit\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.`,
-                      `✅ ऑटो-सेल चालू!\n\n⚠️ ${tradeResult.warningMessage || 'अभी कोई लिस्टिंग नहीं बनी।'}\n\nमासिक क्षमता: ${capacity} kWh (${dailyCapacity} kWh/दिन), दाम: ₹${price}/यूनिट\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।`
+                      `✅ Auto-sell enabled!\n\n⚠️ ${tradeResult.warningMessage || 'No listing created right now.'}\n\nMonthly capacity: ${capacity} units (${dailyCapacity} units/day) at ₹${price}/unit\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.`,
+                      `✅ ऑटो-सेल चालू!\n\n⚠️ ${tradeResult.warningMessage || 'अभी कोई लिस्टिंग नहीं बनी।'}\n\nमासिक क्षमता: ${capacity} यूनिट (${dailyCapacity} यूनिट/दिन), दाम: ₹${price}/यूनिट\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।`
                     ),
                     buttons: [
                       { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
@@ -5040,8 +5045,8 @@ const states: Record<ChatState, StateHandler> = {
               return {
                 messages: [{
                   text: h(ctx,
-                    `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nMonthly capacity: ${capacity} kWh (${dailyCapacityErr} kWh/day) at ₹${price}/unit`,
-                    `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा नहीं मिला'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nमासिक क्षमता: ${capacity} kWh (${dailyCapacityErr} kWh/दिन), दाम: ₹${price}/यूनिट`
+                    `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nMonthly capacity: ${capacity} units (${dailyCapacityErr} units/day) at ₹${price}/unit`,
+                    `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा नहीं मिला'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nमासिक क्षमता: ${capacity} यूनिट (${dailyCapacityErr} यूनिट/दिन), दाम: ₹${price}/यूनिट`
                   ),
                   buttons: [
                     { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
@@ -5089,8 +5094,8 @@ const states: Record<ChatState, StateHandler> = {
                   return {
                     messages: [{
                       text: h(ctx,
-                        `✅ Auto-buy activated!\n\n🛒 Found a deal right now! Bought *${buyResult.quantityBought} kWh* at ₹${buyResult.pricePerUnit}/unit.\nTotal: ₹${buyResult.totalSpent.toFixed(0)}\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you at ≤₹${maxPrice}/unit.\n\n${advice.advice}`,
-                        `✅ ऑटो-बाय चालू!\n\n🛒 अभी एक डील मिल गई! *${buyResult.quantityBought} kWh* ₹${buyResult.pricePerUnit}/यूनिट पर खरीद लिया।\nकुल: ₹${buyResult.totalSpent.toFixed(0)}\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट ≤₹${maxPrice}/यूनिट पर खरीदूंगा।\n\n${advice.advice}`
+                        `✅ Auto-buy activated!\n\n🛒 Found a deal right now! Bought *${buyResult.quantityBought} units* at ₹${buyResult.pricePerUnit}/unit.\nTotal: ₹${buyResult.totalSpent.toFixed(0)}\n\nEvery day at 6:30 AM, I'll find the best deals and buy ${qty} units for you at ≤₹${maxPrice}/unit.\n\n${advice.advice}`,
+                        `✅ ऑटो-बाय चालू!\n\n🛒 अभी एक डील मिल गई! *${buyResult.quantityBought} यूनिट* ₹${buyResult.pricePerUnit}/यूनिट पर खरीद लिया।\nकुल: ₹${buyResult.totalSpent.toFixed(0)}\n\nरोज़ सुबह 6:30 बजे, मैं ${qty} यूनिट ≤₹${maxPrice}/यूनिट पर खरीदूंगा।\n\n${advice.advice}`
                       ),
                       buttons: [
                         { text: h(ctx, '📋 View Orders', '📋 ऑर्डर देखो'), callbackData: 'action:show_orders' },
@@ -5180,7 +5185,7 @@ const states: Record<ChatState, StateHandler> = {
                   max: Math.max(100, sanctionedKW * 10),
                   step: 5,
                   defaultValue: defaultQty,
-                  unit: 'kWh',
+                  unit: 'units',
                   callbackPrefix: 'autobuy_qty',
                 },
               }],

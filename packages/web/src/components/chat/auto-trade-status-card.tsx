@@ -73,7 +73,7 @@ export function AutoTradeStatusCard({ data, language = 'en-IN' }: AutoTradeStatu
                 {isHindi ? 'क्षमता' : 'Capacity'}
               </p>
               <p className="font-semibold text-gray-900">
-                {data.seller.capacityKwh} kWh
+                {data.seller.capacityKwh} units
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-2.5">
@@ -103,7 +103,7 @@ export function AutoTradeStatusCard({ data, language = 'en-IN' }: AutoTradeStatu
                 <div className="flex items-center gap-1.5">
                   <TrendingUp className="w-3.5 h-3.5 text-gray-400" />
                   <span className="text-sm text-gray-700">
-                    {data.seller.lastRun.listedQuantity} kWh
+                    {data.seller.lastRun.listedQuantity} units
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -141,7 +141,7 @@ export function AutoTradeStatusCard({ data, language = 'en-IN' }: AutoTradeStatu
                 {isHindi ? 'रोज़' : 'Daily'}
               </p>
               <p className="font-semibold text-gray-900">
-                {data.buyer.targetQuantity} kWh
+                {data.buyer.targetQuantity} units
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-2.5">
@@ -184,7 +184,7 @@ export function AutoTradeStatusCard({ data, language = 'en-IN' }: AutoTradeStatu
               {data.buyer.lastRun.status === 'success' && (
                 <div className="flex items-center gap-4 mt-2">
                   <span className="text-sm text-gray-700">
-                    {data.buyer.lastRun.quantityBought} kWh @ ₹{data.buyer.lastRun.pricePerUnit}
+                    {data.buyer.lastRun.quantityBought} units @ ₹{data.buyer.lastRun.pricePerUnit}
                   </span>
                   <span className="text-sm font-medium text-teal-600">
                     = ₹{data.buyer.lastRun.totalSpent.toFixed(0)}

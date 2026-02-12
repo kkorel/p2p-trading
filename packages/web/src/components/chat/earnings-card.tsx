@@ -28,7 +28,7 @@ const LABELS = {
   energySold: { en: 'Energy Sold', hi: 'बेची गई बिजली' },
   earnings: { en: 'Earnings', hi: 'कमाई' },
   wallet: { en: 'Wallet', hi: 'वॉलेट' },
-  unit: { en: 'kWh', hi: 'यूनिट' },
+  unit: { en: 'units', hi: 'यूनिट' },
 };
 
 function getLabel(key: keyof typeof LABELS, isHindi: boolean): string {

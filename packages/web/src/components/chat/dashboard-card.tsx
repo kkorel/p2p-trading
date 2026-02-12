@@ -20,7 +20,7 @@ const LABELS: Record<string, { en: string; hi: string }> = {
   thisWeek: { en: 'This Week', hi: 'इस हफ्ते' },
   allTime: { en: 'Total', hi: 'कुल' },
   orders: { en: 'Orders', hi: 'ऑर्डर' },
-  kWh: { en: 'kWh', hi: 'यूनिट' },
+  kWh: { en: 'units', hi: 'यूनिट' },
   totalSpent: { en: 'Spent', hi: 'खर्च' },
 };
 

@@ -23,7 +23,7 @@ const LABELS = {
   price: { en: 'Price', hi: 'दाम' },
   time: { en: 'Time', hi: 'समय' },
   unit: { en: 'unit', hi: 'यूनिट' },
-  kWh: { en: 'kWh', hi: 'यूनिट' },
+  kWh: { en: 'units', hi: 'यूनिट' },
   perUnit: { en: '/unit', hi: '/यूनिट' },
   buyersCanSee: { en: 'Buyers can now see and purchase your energy!', hi: 'खरीदार अब आपकी बिजली देख और खरीद सकते हैं!' },
 };

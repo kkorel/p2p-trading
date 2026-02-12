@@ -18,7 +18,7 @@ const LABELS = {
   time: { en: 'Time', hi: 'समय' },
   orders: { en: 'Orders', hi: 'ऑर्डर' },
   confirmed: { en: 'confirmed', hi: 'पक्के हुए' },
-  unit: { en: 'kWh', hi: 'यूनिट' },
+  unit: { en: 'units', hi: 'यूनिट' },
   paymentSecured: { en: 'Payment secured with platform', hi: 'पैसा प्लेटफॉर्म पे सुरक्षित है' },
   energyViaGrid: { en: 'Energy delivered via grid', hi: 'बिजली ग्रिड से आएगी' },
 };
