@@ -72,21 +72,57 @@ function numberToHindiWords(num: number): string {
 }
 
 /**
- * Preprocess text for TTS to make it more natural-sounding:
- * - Remove URLs (unpronounceable)
- * - Replace "/" with language-appropriate "per"
- * - Remove markdown formatting
- * - Convert numbers to Hindi words for Hindi TTS
- * - Handle other TTS-unfriendly symbols
+ * Preprocess text for TTS to make it more natural-sounding.
+ * Handles: URLs, emoji, markdown, bullets, newlines, punctuation,
+ * symbols, number ranges, parentheticals, and Hindi number words.
  */
 function preprocessTextForTTS(text: string, languageCode: string): string {
   let processed = text;
+  const isHindi = languageCode === 'hi-IN';
 
-  // Remove URLs (https://... http://... www...)
+  // 1. Remove URLs
   processed = processed.replace(/https?:\/\/[^\s]+/gi, '');
   processed = processed.replace(/www\.[^\s]+/gi, '');
 
-  // Replace forward slash with language-appropriate "per"
+  // 2. Remove emoji characters (TTS can't speak pictographs)
+  // eslint-disable-next-line no-control-regex
+  processed = processed.replace(/[\u2600-\u27BF\uFE0F\u200D\u20E3]/g, '');
+  // Remove supplementary plane emoji (surrogate pairs for U+1F000+)
+  processed = processed.replace(/[\uD83C-\uD83E][\uDC00-\uDFFF]/g, '');
+
+  // 3. Remove markdown formatting
+  processed = processed.replace(/\*\*([^*]+)\*\*/g, '$1');
+  processed = processed.replace(/\*([^*]+)\*/g, '$1');
+  processed = processed.replace(/_([^_]+)_/g, '$1');       // _italic_
+  processed = processed.replace(/`([^`]+)`/g, '$1');
+
+  // 3b. Remove decorative lines and quotes around commands
+  processed = processed.replace(/^[━═─—]+$/gm, '');        // ━━━━ separator lines
+  processed = processed.replace(/"([^"]+)"/g, '$1');        // "sell" → sell
+
+  // 4. Remove bullet and list markers
+  processed = processed.replace(/^[•●▪\-]\s*/gm, '');
+  processed = processed.replace(/^\d+[.)]\s*/gm, '');
+
+  // 5. Ensure each non-empty line ends with punctuation for TTS pauses
+  processed = processed.replace(/([^\.\?\!,।:\s])\s*$/gm, '$1.');
+
+  // 6. Convert newlines to sentence breaks.
+  //    If line already ends with punctuation, just add a space (not another period).
+  processed = processed.replace(/([.!?।,:])\s*\n\n*/g, '$1 ');
+  //    Any remaining newlines (lines that somehow lack punctuation)
+  processed = processed.replace(/\n/g, '. ');
+
+  // 7. Handle special characters
+  processed = processed.replace(/~/g, isHindi ? 'लगभग ' : 'approximately ');
+  processed = processed.replace(/≤/g, isHindi ? 'अधिकतम ' : 'at most ');
+  processed = processed.replace(/≥/g, isHindi ? 'कम से कम ' : 'at least ');
+  processed = processed.replace(/\s*@\s*/g, isHindi ? ' पर ' : ' at ');
+
+  // 8. Handle number ranges: "4-6" → "4 to 6" (before slash/symbol replacement)
+  processed = processed.replace(/(\d)\s*-\s*(\d)/g, isHindi ? '$1 से $2' : '$1 to $2');
+
+  // 9. Replace forward slash with language-appropriate "per"
   const perWord: Record<string, string> = {
     'en-IN': ' per ',
     'hi-IN': ' प्रति ',
@@ -96,33 +132,52 @@ function preprocessTextForTTS(text: string, languageCode: string): string {
     'kn-IN': ' ಪ್ರತಿ ',
   };
   const perReplacement = perWord[languageCode] || ' per ';
-  // Only replace / when it's used as "per" (e.g., Rs/kWh, km/h)
   processed = processed.replace(/(\S)\/(\S)/g, `$1${perReplacement}$2`);
 
-  // Remove markdown formatting
-  processed = processed.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
-  processed = processed.replace(/\*([^*]+)\*/g, '$1'); // *italic*
-  processed = processed.replace(/`([^`]+)`/g, '$1'); // `code`
+  // 10. Convert parenthetical asides to natural speech pauses
+  processed = processed.replace(/\s*\(([^)]+)\)/g, ', $1,');
 
-  // Replace common symbols with words
-  processed = processed.replace(/₹\s*/g, languageCode === 'hi-IN' ? 'रुपये ' : 'Rupees ');
-  processed = processed.replace(/Rs\.?\s*/gi, languageCode === 'hi-IN' ? 'रुपये ' : 'Rupees ');
-  processed = processed.replace(/kWh/gi, languageCode === 'hi-IN' ? 'किलोवाट घंटा' : 'kilowatt hour');
-  processed = processed.replace(/kW/gi, languageCode === 'hi-IN' ? 'किलोवाट' : 'kilowatt');
-  processed = processed.replace(/%/g, languageCode === 'hi-IN' ? ' प्रतिशत' : ' percent');
+  // 11. Replace common symbols with words
+  processed = processed.replace(/₹\s*/g, isHindi ? 'रुपये ' : 'Rupees ');
+  processed = processed.replace(/Rs\.?\s*/gi, isHindi ? 'रुपये ' : 'Rupees ');
+  processed = processed.replace(/kWh/gi, isHindi ? 'किलोवाट घंटा' : 'kilowatt hour');
+  processed = processed.replace(/kW/gi, isHindi ? 'किलोवाट' : 'kilowatt');
+  processed = processed.replace(/%/g, isHindi ? ' प्रतिशत' : ' percent');
+  // AM/PM → spoken form
+  processed = processed.replace(/(\d)\s*AM/gi, '$1 A M');
+  processed = processed.replace(/(\d)\s*PM/gi, '$1 P M');
 
-  // Convert numbers to Hindi words for Hindi TTS (so "4050" becomes "चार हज़ार पचास")
-  if (languageCode === 'hi-IN') {
-    processed = processed.replace(/\d+/g, (match) => {
-      const num = parseInt(match, 10);
-      if (num > 0 && num < 10000000) { // Up to 99 lakh
+  // 12. Convert numbers to Hindi words for Hindi TTS
+  if (isHindi) {
+    processed = processed.replace(/\d+(\.\d+)?/g, (match) => {
+      const num = parseFloat(match);
+      if (Number.isInteger(num) && num > 0 && num < 10000000) {
         return numberToHindiWords(num);
       }
-      return match; // Keep very large numbers as-is
+      // Decimal numbers: "7.5" → "सात दशमलव पांच"
+      if (!Number.isInteger(num) && num > 0 && num < 10000000) {
+        const parts = match.split('.');
+        const intPart = parseInt(parts[0], 10);
+        const decPart = parseInt(parts[1], 10);
+        const intWord = intPart > 0 ? numberToHindiWords(intPart) : 'शून्य';
+        const decWord = decPart > 0 ? numberToHindiWords(decPart) : '';
+        return decWord ? `${intWord} दशमलव ${decWord}` : intWord;
+      }
+      return match;
     });
   }
 
-  // Clean up extra whitespace
+  // 13. Clean up punctuation artifacts
+  processed = processed.replace(/\.\s*\./g, '.');      // .. → .
+  processed = processed.replace(/\?\s*\./g, '? ');     // ?. → ?
+  processed = processed.replace(/!\s*\./g, '! ');      // !. → !
+  processed = processed.replace(/,\s*\./g, '.');       // ,. → .
+  processed = processed.replace(/\.\s*,/g, '. ');      // ., → .
+  processed = processed.replace(/,\s*,/g, ',');        // ,, → ,
+  processed = processed.replace(/:\s*\./g, '. ');      // :. → .
+  processed = processed.replace(/\.\s*:/g, '. ');      // .: → .
+
+  // 14. Clean up extra whitespace
   processed = processed.replace(/\s+/g, ' ').trim();
 
   return processed;
