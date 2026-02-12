@@ -1065,8 +1065,9 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
 
   const lower = message.toLowerCase().trim();
 
-  // Allow cancellation at any point
-  if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop') {
+  // Allow cancellation at any point (including button callbacks)
+  if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop'
+    || message === 'listing_confirm:no' || message === 'cmd:cancel') {
     return {
       messages: [{
         text: h(ctx, 'Listing cancelled.', 'लिस्टिंग रद्द हो गई।'),
@@ -1588,8 +1589,9 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
 
   const lower = message.toLowerCase().trim();
 
-  // Allow cancellation at any point
-  if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop') {
+  // Allow cancellation at any point (including button callbacks)
+  if (lower === 'cancel' || lower === 'nahi' || lower === 'no' || lower === 'back' || lower === 'stop'
+    || message === 'purchase_offer_confirm:no' || message === 'purchase_confirm:no' || message === 'cmd:cancel') {
     return {
       messages: [{ text: h(ctx, 'Purchase cancelled.', 'खरीदारी रद्द हो गई।') }],
       contextUpdate: { pendingPurchase: undefined },
@@ -1794,6 +1796,23 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
     }
 
     case 'timeframe': {
+      // "Try different time" retry button — re-prompt for time selection
+      if (message === 'purchase_time:retry') {
+        return {
+          messages: [{
+            text: h(ctx,
+              'When do you need the energy?',
+              'बिजली कब चाहिए?'
+            ),
+            buttons: [
+              { text: h(ctx, '🌅 Tomorrow morning', '🌅 कल सुबह'), callbackData: 'purchase_time:tomorrow morning' },
+              { text: h(ctx, '☀️ Tomorrow afternoon', '☀️ कल दोपहर'), callbackData: 'purchase_time:tomorrow afternoon' },
+              { text: h(ctx, '🌆 Today evening', '🌆 आज शाम'), callbackData: 'purchase_time:today evening' },
+            ],
+          }],
+        };
+      }
+
       let timeDesc: string | undefined;
       if (message.startsWith('purchase_time:')) {
         timeDesc = message.replace('purchase_time:', '');
