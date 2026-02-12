@@ -13,7 +13,7 @@ interface DashboardCardProps {
 const LABELS: Record<string, { en: string; hi: string }> = {
   balance: { en: 'Balance', hi: 'बैलेंस' },
   trust: { en: 'Trust', hi: 'भरोसा' },
-  tradeLimit: { en: 'Trade Limit', hi: 'बेचने की सीमा' },
+  tradeLimit: { en: 'Trade Limit', hi: 'सीमा' },
   seller: { en: 'Selling', hi: 'बिक्री' },
   buyer: { en: 'Buying', hi: 'खरीदारी' },
   activeListings: { en: 'Listed', hi: 'लिस्टेड' },
@@ -68,39 +68,39 @@ export function DashboardCard({ data, language, onExplain }: DashboardCardProps)
         {/* Balance */}
         <button
           onClick={() => handleFieldClick('balance')}
-          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-center group"
+          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-center group flex flex-col items-center justify-between"
         >
-          <div className="flex items-center justify-center gap-1 mb-1">
-            <Wallet className="w-3.5 h-3.5 text-teal-600" />
+          <div className="flex items-center justify-center gap-1 mb-1 whitespace-nowrap">
+            <Wallet className="w-3.5 h-3.5 text-teal-600 shrink-0" />
             <span className="text-[10px] text-gray-500 uppercase tracking-wide">{getLabel('balance', isHindi)}</span>
-            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500" />
+            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500 shrink-0" />
           </div>
-          <div className="text-lg font-bold text-gray-900">₹{data.balance.toLocaleString('en-IN')}</div>
+          <div className="text-base font-bold text-gray-900">₹{data.balance.toLocaleString('en-IN')}</div>
         </button>
 
         {/* Trust Score - Color coded */}
         <button
           onClick={() => handleFieldClick('trust')}
-          className={`rounded-xl p-3 border hover:shadow-md transition-all text-center group ${trustColor.bg} ${trustColor.border}`}
+          className={`rounded-xl p-3 border hover:shadow-md transition-all text-center group flex flex-col items-center justify-between ${trustColor.bg} ${trustColor.border}`}
         >
-          <div className="flex items-center justify-center gap-1 mb-1">
+          <div className="flex items-center justify-center gap-1 mb-1 whitespace-nowrap">
             <span className="text-[10px] text-gray-600 uppercase tracking-wide">{getLabel('trust', isHindi)}</span>
-            <Info className={`w-3 h-3 opacity-50 group-hover:opacity-100 ${trustColor.text}`} />
+            <Info className={`w-3 h-3 opacity-50 group-hover:opacity-100 shrink-0 ${trustColor.text}`} />
           </div>
-          <div className={`text-lg font-bold ${trustColor.text}`}>{(data.trustScore * 100).toFixed(0)}%</div>
+          <div className={`text-base font-bold ${trustColor.text}`}>{(data.trustScore * 100).toFixed(0)}%</div>
         </button>
 
         {/* Trade Limit */}
         <button
           onClick={() => handleFieldClick('tradelimit')}
-          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-center group"
+          className="bg-white rounded-xl p-3 border border-gray-100 hover:border-teal-300 hover:shadow-md transition-all text-center group flex flex-col items-center justify-between"
         >
-          <div className="flex items-center justify-center gap-1 mb-1">
-            <TrendingUp className="w-3.5 h-3.5 text-green-600" />
+          <div className="flex items-center justify-center gap-1 mb-1 whitespace-nowrap">
+            <TrendingUp className="w-3.5 h-3.5 text-green-600 shrink-0" />
             <span className="text-[10px] text-gray-500 uppercase tracking-wide">{getLabel('tradeLimit', isHindi)}</span>
-            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500" />
+            <Info className="w-3 h-3 text-gray-300 group-hover:text-teal-500 shrink-0" />
           </div>
-          <div className="text-lg font-bold text-gray-900">{data.tradeLimit}%</div>
+          <div className="text-base font-bold text-gray-900">{data.tradeLimit}%</div>
         </button>
       </div>
 
