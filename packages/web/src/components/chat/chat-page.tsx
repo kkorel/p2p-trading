@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { Send, Paperclip, RotateCcw, LayoutGrid, TrendingUp, Wallet, Volume2, VolumeX } from 'lucide-react';
+import { Send, Paperclip, LayoutGrid, TrendingUp, Wallet, Volume2, VolumeX } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { MessageList } from './message-list';
 import { VoiceButton } from './voice-button';
@@ -259,56 +259,48 @@ export function ChatPage() {
     <div className="flex justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen bg-white">
         {/* Header — sticky */}
-        <div className="sticky top-0 z-30 flex items-center gap-2 px-3.5 py-2.5 bg-teal-600 text-white safe-top">
-          {/* Logo */}
-          <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-            <span className="text-lg font-bold">O</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold leading-tight">{headerStrings.name}</h1>
-            <p className="text-[11px] text-teal-200">{headerStrings.subtitle}</p>
-          </div>
+        <div className="sticky top-0 z-30 flex items-center justify-between px-3.5 py-2.5 bg-teal-600 text-white safe-top">
+          {/* Logo and title */}
+          <h1 className="text-2xl font-bold tracking-tight">{headerStrings.name}</h1>
 
-          {/* Balance info — shown only when logged in */}
-          {user && (
-            <>
-              <div
-                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shrink-0 ${
-                  totalValue >= 0 ? 'bg-white/20' : 'bg-red-500/30'
-                }`}
-                title="P2P Earnings"
-              >
-                <TrendingUp size={12} />
-                <span>{totalValue > 0 ? '+' : ''}{formatCurrency(totalValue)}</span>
+          {/* Right side: stacked values + App button */}
+          <div className="flex items-center gap-2">
+            {/* Stacked currency badges */}
+            {user && (
+              <div className="flex flex-col gap-1 items-end">
+                {!statsLoading && (
+                  <div
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      totalValue >= 0 ? 'bg-white/20' : 'bg-red-500/30'
+                    }`}
+                    title="P2P Earnings"
+                  >
+                    <TrendingUp size={11} />
+                    <span>{totalValue > 0 ? '+' : ''}{formatCurrency(totalValue)}</span>
+                  </div>
+                )}
+                <div
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium"
+                  title="Wallet Balance"
+                >
+                  <Wallet size={11} />
+                  <span>{formatCurrency(balance)}</span>
+                </div>
               </div>
-              <div
-                className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-xs font-medium shrink-0"
-                title="Wallet Balance"
-              >
-                <Wallet size={12} />
-                <span>{formatCurrency(balance)}</span>
-              </div>
-            </>
-          )}
+            )}
 
-          <button
-            onClick={handleReset}
-            className="p-1.5 rounded-full hover:bg-teal-500/80 transition-colors shrink-0"
-            title="New chat"
-          >
-            <RotateCcw size={16} />
-          </button>
-          <button
-            onClick={async () => {
-              await refreshUser();
-              router.push('/buy');
-            }}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium shrink-0"
-            title="Open App"
-          >
-            <LayoutGrid size={14} />
-            <span>App</span>
-          </button>
+            <button
+              onClick={async () => {
+                await refreshUser();
+                router.push('/buy');
+              }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium shrink-0"
+              title="Open App"
+            >
+              <LayoutGrid size={14} />
+              <span>App</span>
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
