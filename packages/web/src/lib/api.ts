@@ -286,7 +286,7 @@ export const authApi = {
 
 // Chat APIs (Oorja agent)
 export const chatApi = {
-  send: (message: string, sessionId?: string) =>
+  send: (message: string, sessionId?: string, displayText?: string) =>
     request<{
       success: boolean;
       sessionId: string;
@@ -296,7 +296,7 @@ export const chatApi = {
       responseLanguage?: string;
     }>('/chat/send', {
       method: 'POST',
-      body: JSON.stringify({ message, sessionId }),
+      body: JSON.stringify({ message, sessionId, displayText }),
     }),
 
   upload: (pdfBase64: string, sessionId?: string, fileName?: string) =>

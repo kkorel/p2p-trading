@@ -298,6 +298,15 @@ export function useChatEngine() {
                 role: m.role,
                 content: m.content,
                 buttons: m.buttons,
+                dashboard: m.dashboard,
+                listings: m.listings,
+                offerCreated: m.offerCreated,
+                topDeals: m.topDeals,
+                matchedOffers: m.matchedOffers,
+                orderConfirmation: m.orderConfirmation,
+                earnings: m.earnings,
+                slider: m.slider,
+                autoTradeStatus: m.autoTradeStatus,
               }))
             );
             // Restore language from session
@@ -319,7 +328,7 @@ export function useChatEngine() {
   }, [resetCounter]);
 
   // Internal send function that uses refs to avoid stale closure issues
-  const sendMessageToAgentInternal = async (text: string, hideUserMessage = false) => {
+  const sendMessageToAgentInternal = async (text: string, hideUserMessage = false, displayText?: string) => {
     setIsLoading(true);
 
     if (!hideUserMessage) {
@@ -329,7 +338,7 @@ export function useChatEngine() {
     try {
       // Use ref for current sessionId to avoid stale closure
       const currentSessionId = sessionIdRef.current;
-      const res = await chatApi.send(text, currentSessionId || undefined);
+      const res = await chatApi.send(text, currentSessionId || undefined, displayText);
 
       if (res.sessionId) {
         // Update both state and ref immediately
@@ -404,7 +413,7 @@ export function useChatEngine() {
 
   // Stable callback wrapper for external use
   const sendMessageToAgent = useCallback(
-    (text: string, hideUserMessage = false) => sendMessageToAgentInternal(text, hideUserMessage),
+    (text: string, hideUserMessage = false, displayText?: string) => sendMessageToAgentInternal(text, hideUserMessage, displayText),
     []
   );
 
@@ -436,7 +445,7 @@ export function useChatEngine() {
       }
 
       setMessages((prev) => [...prev, { role: 'user', content: displayText }]);
-      sendMessageToAgent(callbackData, true);
+      sendMessageToAgent(callbackData, true, displayText);
     },
     [isLoading, sendMessageToAgent]
   );

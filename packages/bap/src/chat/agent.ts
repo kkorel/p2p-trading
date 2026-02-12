@@ -5644,7 +5644,8 @@ export async function processMessage(
   userMessage: string,
   fileData?: FileData,
   authenticatedUserId?: string,
-  voiceOptions?: VoiceInputOptions
+  voiceOptions?: VoiceInputOptions,
+  displayText?: string,
 ): Promise<AgentResponse> {
   let session = await prisma.chatSession.findUnique({
     where: { platform_platformId: { platform, platformId } },
@@ -5686,7 +5687,7 @@ export async function processMessage(
           },
         });
 
-        await storeMessage(session.id, 'user', userMessage);
+        await storeMessage(session.id, 'user', displayText || userMessage);
 
         // Compose a welcome-back summary using LLM — respect saved language preference
         const savedLang = ctx.language;
@@ -5742,7 +5743,7 @@ export async function processMessage(
           },
         });
 
-        await storeMessage(session.id, 'user', userMessage);
+        await storeMessage(session.id, 'user', displayText || userMessage);
 
         const welcomeMsg: AgentMessage = {
           text: h(ctx, `Welcome, ${user.name || 'friend'}! Let's finish setting up your profile.`, `स्वागत है, ${user.name || 'दोस्त'}! चलो प्रोफाइल पूरा करते हैं।`),
@@ -5899,7 +5900,7 @@ export async function processMessage(
           },
         });
 
-        await storeMessage(session.id, 'user', userMessage);
+        await storeMessage(session.id, 'user', displayText || userMessage);
 
         // Welcome verified user with activity summary
         const savedLang = ctx.language;
@@ -5947,7 +5948,7 @@ export async function processMessage(
       update: { state: 'GREETING', contextJson: '{}' },
     });
 
-    await storeMessage(session.id, 'user', userMessage);
+    await storeMessage(session.id, 'user', displayText || userMessage);
 
     const anonCtx: SessionContext = {};
     anonCtx._platform = platform; // Set platform for state handlers
@@ -5958,7 +5959,7 @@ export async function processMessage(
   }
 
   // Existing session
-  await storeMessage(session.id, 'user', userMessage);
+  await storeMessage(session.id, 'user', displayText || userMessage);
   const ctx = JSON.parse(session.contextJson) as SessionContext;
   ctx._sessionId = session.id; // Runtime-only, not persisted
   ctx._platform = platform; // Runtime-only, not persisted
@@ -6202,6 +6203,14 @@ async function storeAgentMessages(sessionId: string, messages: AgentMessage[]) {
     if (msg.buttons) metadata.buttons = msg.buttons;
     if (msg.dashboard) metadata.dashboard = msg.dashboard;
     if (msg.earnings) metadata.earnings = msg.earnings;
+    if (msg.listings) metadata.listings = msg.listings;
+    if (msg.offerCreated) metadata.offerCreated = msg.offerCreated;
+    if (msg.topDeals) metadata.topDeals = msg.topDeals;
+    if (msg.matchedOffers) metadata.matchedOffers = msg.matchedOffers;
+    if (msg.orderConfirmation) metadata.orderConfirmation = msg.orderConfirmation;
+    if (msg.slider) metadata.slider = msg.slider;
+    if (msg.autoTradeStatus) metadata.autoTradeStatus = msg.autoTradeStatus;
+    if (msg.offers) metadata.offers = msg.offers;
 
     await storeMessage(
       sessionId,

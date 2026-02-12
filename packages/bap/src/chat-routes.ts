@@ -145,18 +145,18 @@ function resolvePlatformId(req: Request, sessionId?: string): string {
 
 /**
  * POST /chat/send
- * Body: { message: string, sessionId?: string }
+ * Body: { message: string, sessionId?: string, displayText?: string }
  */
 router.post('/send', async (req: Request, res: Response) => {
   try {
-    const { message, sessionId } = req.body;
+    const { message, sessionId, displayText } = req.body;
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return res.status(400).json({ success: false, error: 'message is required' });
     }
 
     const platformId = resolvePlatformId(req, sessionId);
-    const response = await processMessage('WEB', platformId, message.trim(), undefined, req.user?.id);
+    const response = await processMessage('WEB', platformId, message.trim(), undefined, req.user?.id, undefined, displayText);
 
     // Map agent messages to a simpler shape for the frontend
     const messages = response.messages.map((m) => ({
