@@ -261,7 +261,10 @@ export function ChatPage() {
         {/* Header — sticky */}
         <div className="sticky top-0 z-30 flex items-center justify-between px-3.5 py-2.5 bg-teal-600 text-white safe-top">
           {/* Logo and title */}
-          <h1 className="text-2xl font-bold tracking-tight">{headerStrings.name}</h1>
+          <div className="flex items-center gap-2">
+            <img src="/oorja-logo.png" alt="Oorja" className="w-9 h-9 rounded-full object-cover" />
+            <h1 className="text-2xl font-bold tracking-tight">{headerStrings.name}</h1>
+          </div>
 
           {/* Right side: stacked values + App button */}
           <div className="flex items-center gap-2">

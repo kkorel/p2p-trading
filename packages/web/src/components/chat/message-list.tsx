@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useMemo } from 'react';
-import { Bot, User, Check } from 'lucide-react';
+import { User, Check } from 'lucide-react';
 import type { ChatMessageData } from '@/hooks/use-chat-engine';
 import { InlineSpeakerButton } from './speaker-button';
 import { OfferList } from './offer-list';
@@ -73,12 +73,13 @@ export function MessageList({
           className={`flex items-end gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
         >
           {/* Avatar */}
-          <div
-            className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${msg.role === 'agent' ? 'bg-teal-100 text-teal-600' : 'bg-blue-100 text-blue-600'
-              }`}
-          >
-            {msg.role === 'agent' ? <Bot size={16} /> : <User size={16} />}
-          </div>
+          {msg.role === 'agent' ? (
+            <img src="/oorja-logo.png" alt="Oorja" className="flex-shrink-0 w-7 h-7 rounded-full object-cover" />
+          ) : (
+            <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-blue-100 text-blue-600">
+              <User size={16} />
+            </div>
+          )}
 
           {/* Bubble */}
           <div className="max-w-[80%] flex flex-col gap-1.5">
@@ -270,9 +271,7 @@ export function MessageList({
       {/* Typing indicator */}
       {isLoading && (
         <div className="flex items-end gap-2">
-          <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-teal-100 text-teal-600">
-            <Bot size={16} />
-          </div>
+          <img src="/oorja-logo.png" alt="Oorja" className="flex-shrink-0 w-7 h-7 rounded-full object-cover" />
           <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
             <div className="flex gap-1">
               <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
