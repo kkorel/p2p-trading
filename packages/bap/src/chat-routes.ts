@@ -217,7 +217,8 @@ router.post('/upload', async (req: Request, res: Response) => {
     };
 
     const label = isJson ? '[JSON credential uploaded]' : '[PDF uploaded]';
-    const response = await processMessage('WEB', platformId, label, fileData, req.user?.id);
+    const displayLabel = isJson ? `📎 ${name}` : `📄 ${name}`;
+    const response = await processMessage('WEB', platformId, label, fileData, req.user?.id, undefined, displayLabel);
 
     const messages = response.messages.map((m) => ({
       role: 'agent' as const,
