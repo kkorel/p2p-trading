@@ -3576,7 +3576,7 @@ const states: Record<ChatState, StateHandler> = {
     },
     async onMessage(ctx, message, fileData) {
       if (!fileData) {
-        const kbAnswer = knowledgeBase.findAnswer(message);
+        const kbAnswer = knowledgeBase.findAnswer(message, ctx.language);
         if (kbAnswer) {
           return {
             messages: [
@@ -3812,7 +3812,7 @@ const states: Record<ChatState, StateHandler> = {
     },
     async onMessage(ctx, message, fileData) {
       if (!fileData) {
-        const kbAnswer = knowledgeBase.findAnswer(message);
+        const kbAnswer = knowledgeBase.findAnswer(message, ctx.language);
         if (kbAnswer) {
           return {
             messages: [
@@ -4191,7 +4191,7 @@ const states: Record<ChatState, StateHandler> = {
         };
       }
 
-      const kbAnswer = knowledgeBase.findAnswer(message);
+      const kbAnswer = knowledgeBase.findAnswer(message, ctx.language);
       if (kbAnswer) {
         return {
           messages: [
@@ -5405,7 +5405,7 @@ const states: Record<ChatState, StateHandler> = {
       }
 
       // Enrich with knowledge base if relevant
-      const kbAnswer = knowledgeBase.findAnswer(message);
+      const kbAnswer = knowledgeBase.findAnswer(message, ctx.language);
       if (kbAnswer) {
         if (!dataContext) dataContext = kbAnswer;
         else dataContext += `\n\nAdditional info: ${kbAnswer}`;

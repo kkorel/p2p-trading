@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle, Target, ChevronDown, ChevronUp, Star, Clock, X } from 'lucide-react';
+import { CheckCircle, Target, ChevronDown, ChevronUp, Star, X } from 'lucide-react';
 import type { MatchedOffersCardData } from '@/hooks/use-chat-engine';
 
 interface MatchedOffersCardProps {
@@ -13,14 +13,13 @@ interface MatchedOffersCardProps {
 
 // Localized labels
 const LABELS = {
-  matchFound: { en: 'Found a Match!', hi: 'मैच मिल गया!' },
+  matchFound: { en: 'Match Found!', hi: 'मैच मिल गया!' },
   bestDeals: { en: 'Best Deals Found!', hi: 'बेस्ट डील मिली!' },
   bestDeal: { en: 'Best deal for your request', hi: 'आपकी मांग के लिए सबसे अच्छी डील' },
   combinedFrom: { en: 'Combined from', hi: '' },
   sellers: { en: 'sellers', hi: 'विक्रेता' },
   sellersFrom: { en: 'sellers', hi: 'विक्रेताओं से' },
-  seller: { en: 'Seller', hi: 'विक्रेता' },
-  quantity: { en: 'Quantity', hi: 'मात्रा' },
+  quantity: { en: 'Qty', hi: 'मात्रा' },
   price: { en: 'Price', hi: 'दाम' },
   total: { en: 'Total', hi: 'कुल' },
   time: { en: 'Time', hi: 'समय' },
@@ -47,6 +46,38 @@ const ENERGY_EMOJI: Record<string, string> = {
   MIXED: '⚡',
   GRID: '🔌',
 };
+
+/**
+ * Format raw timeWindow string like "13 Feb 06:00 am-06:00 pm"
+ * into a cleaner display: { date: "13 Feb", time: "6 AM – 6 PM" }
+ */
+function formatTimeWindow(raw: string, isHindi: boolean): { date: string; time: string } {
+  if (!raw || raw === 'Flexible') {
+    return { date: '', time: isHindi ? 'लचीला' : 'Flexible' };
+  }
+
+  // Try to parse "DD Mon HH:MM am-HH:MM pm" pattern
+  const match = raw.match(/^(\d{1,2}\s+\w+)\s+(\d{1,2}):(\d{2})\s*(am|pm)\s*-\s*(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (match) {
+    const datePart = match[1]; // "13 Feb"
+    const startH = parseInt(match[2], 10);
+    const startAmPm = match[4].toUpperCase();
+    const endH = parseInt(match[5], 10);
+    const endAmPm = match[7].toUpperCase();
+
+    // Clean up "06" → "6", drop :00 minutes
+    const startMin = match[3] === '00' ? '' : `:${match[3]}`;
+    const endMin = match[6] === '00' ? '' : `:${match[6]}`;
+
+    const startStr = `${startH}${startMin} ${startAmPm}`;
+    const endStr = `${endH}${endMin} ${endAmPm}`;
+
+    return { date: datePart, time: `${startStr} – ${endStr}` };
+  }
+
+  // Fallback: return raw string
+  return { date: '', time: raw };
+}
 
 export function MatchedOffersCard({ data, language, onAccept, onCancel }: MatchedOffersCardProps) {
   const isHindi = language === 'hi-IN';
@@ -81,64 +112,97 @@ export function MatchedOffersCard({ data, language, onAccept, onCancel }: Matche
       {/* Content */}
       <div className="p-3">
         {isSingle && singleOffer ? (
-          /* Single Offer View */
-          <div className="p-3 rounded-xl border bg-white border-teal-100">
-            {/* Seller info */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">{ENERGY_EMOJI[singleOffer.energyType] || ENERGY_EMOJI.SOLAR}</span>
-              <span className="font-semibold text-gray-900">{singleOffer.providerName}</span>
-              <div className="flex items-center gap-0.5 ml-auto">
-                <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                <span className="text-sm text-amber-600">{(singleOffer.trustScore * 5).toFixed(1)}</span>
+          /* ─── Single Offer View ─── */
+          <div className="rounded-xl border bg-white border-gray-100 overflow-hidden">
+            {/* Seller row */}
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-gray-100">
+              <span className="text-xl leading-none">{ENERGY_EMOJI[singleOffer.energyType] || ENERGY_EMOJI.SOLAR}</span>
+              <span className="font-semibold text-gray-900 flex-1">{singleOffer.providerName}</span>
+              <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-full">
+                <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                <span className="text-xs font-semibold text-amber-600">{(singleOffer.trustScore * 5).toFixed(1)}</span>
               </div>
             </div>
 
-            {/* Details grid */}
-            <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-              <div className="flex justify-between">
-                <span className="text-gray-500">{getLabel('quantity', isHindi)}:</span>
-                <span className="font-medium">{singleOffer.quantity} {getLabel('unit', isHindi)}</span>
+            {/* Quantity + Price row */}
+            <div className="grid grid-cols-2 divide-x divide-gray-100">
+              <div className="px-3.5 py-2.5 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{getLabel('quantity', isHindi)}</div>
+                <div className="text-lg font-bold text-gray-900">
+                  {singleOffer.quantity}
+                  <span className="text-xs font-normal text-gray-500 ml-1">{getLabel('unit', isHindi)}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">{getLabel('price', isHindi)}:</span>
-                <span className="font-medium text-green-600">₹{singleOffer.pricePerKwh}{getLabel('perUnit', isHindi)}</span>
+              <div className="px-3.5 py-2.5 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{getLabel('price', isHindi)}</div>
+                <div className="text-lg font-bold text-teal-600">
+                  ₹{singleOffer.pricePerKwh}
+                  <span className="text-xs font-normal text-gray-500">{getLabel('perUnit', isHindi)}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">{getLabel('total', isHindi)}:</span>
-                <span className="font-bold text-gray-900">₹{Math.round(singleOffer.subtotal)}</span>
+            </div>
+
+            {/* Total + Time row */}
+            <div className="grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100 bg-gray-50/60">
+              <div className="px-3.5 py-2.5 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{getLabel('total', isHindi)}</div>
+                <div className="text-lg font-extrabold text-gray-900">₹{Math.round(singleOffer.subtotal)}</div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">{getLabel('time', isHindi)}:</span>
-                <span className="font-medium">{data.timeWindow}</span>
+              <div className="px-3.5 py-2.5 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{getLabel('time', isHindi)}</div>
+                {(() => {
+                  const tw = formatTimeWindow(data.timeWindow, isHindi);
+                  return (
+                    <div>
+                      {tw.date && <div className="text-xs font-medium text-gray-700">{tw.date}</div>}
+                      <div className="text-xs font-medium text-gray-500">{tw.time}</div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
         ) : (
-          /* Multiple Offers View */
+          /* ─── Multiple Offers View ─── */
           <>
             {/* Summary */}
-            <div className="p-3 rounded-xl border bg-white border-teal-100 mb-2">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">{getLabel('total', isHindi)}:</span>
-                  <span className="font-medium">
-                    {data.summary.totalQuantity} {getLabel('unit', isHindi)} {getLabel('from', isHindi)} {data.summary.offersUsed} {getLabel('sellers', isHindi)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">{getLabel('avgPrice', isHindi)}:</span>
-                  <span className="font-medium text-green-600">₹{data.summary.averagePrice.toFixed(2)}{getLabel('perUnit', isHindi)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">{getLabel('total', isHindi)} {getLabel('price', isHindi)}:</span>
-                  <span className="font-bold text-gray-900">₹{Math.round(data.summary.totalPrice)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">{getLabel('time', isHindi)}:</span>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-gray-400" />
-                    <span className="font-medium">{data.timeWindow}</span>
+            <div className="rounded-xl border bg-white border-gray-100 overflow-hidden mb-2">
+              <div className="grid grid-cols-2 divide-x divide-gray-100">
+                <div className="px-3.5 py-2.5 text-center">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{getLabel('total', isHindi)} {getLabel('quantity', isHindi)}</div>
+                  <div className="text-lg font-bold text-gray-900">
+                    {data.summary.totalQuantity}
+                    <span className="text-xs font-normal text-gray-500 ml-1">{getLabel('unit', isHindi)}</span>
                   </div>
+                  <div className="text-[10px] text-gray-400">
+                    {getLabel('from', isHindi)} {data.summary.offersUsed} {getLabel('sellers', isHindi)}
+                  </div>
+                </div>
+                <div className="px-3.5 py-2.5 text-center">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{getLabel('avgPrice', isHindi)}</div>
+                  <div className="text-lg font-bold text-teal-600">
+                    ₹{data.summary.averagePrice.toFixed(1)}
+                    <span className="text-xs font-normal text-gray-500">{getLabel('perUnit', isHindi)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100 bg-gray-50/60">
+                <div className="px-3.5 py-2.5 text-center">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{getLabel('total', isHindi)} {getLabel('price', isHindi)}</div>
+                  <div className="text-lg font-extrabold text-gray-900">₹{Math.round(data.summary.totalPrice)}</div>
+                </div>
+                <div className="px-3.5 py-2.5 text-center">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{getLabel('time', isHindi)}</div>
+                  {(() => {
+                    const tw = formatTimeWindow(data.timeWindow, isHindi);
+                    return (
+                      <div>
+                        {tw.date && <div className="text-xs font-medium text-gray-700">{tw.date}</div>}
+                        <div className="text-xs font-medium text-gray-500">{tw.time}</div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -167,7 +231,7 @@ export function MatchedOffersCard({ data, language, onAccept, onCancel }: Matche
                 {data.offers.map((offer, index) => (
                   <div
                     key={offer.offerId}
-                    className="p-2 rounded-lg border bg-gray-50 border-gray-200"
+                    className="p-2.5 rounded-lg border bg-gray-50 border-gray-200"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -200,19 +264,19 @@ export function MatchedOffersCard({ data, language, onAccept, onCancel }: Matche
       </div>
 
       {/* Action Buttons */}
-      <div className="px-3 pb-3 flex justify-end gap-2">
+      <div className="px-3 pb-3 flex gap-2">
         <button
           onClick={onCancel}
-          className="px-3 py-2 border border-gray-300 hover:border-gray-400 text-gray-600 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5"
+          className="flex-1 px-3 py-2.5 border border-gray-200 hover:border-gray-300 text-gray-600 text-sm font-medium rounded-xl transition-colors flex items-center justify-center gap-1.5"
         >
           <X className="w-3.5 h-3.5" />
           {getLabel('cancel', isHindi)}
         </button>
         <button
           onClick={onAccept}
-          className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5"
+          className="flex-[2] px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-sm"
         >
-          <CheckCircle className="w-3.5 h-3.5" />
+          <CheckCircle className="w-4 h-4" />
           {isSingle ? getLabel('buyNow', isHindi) : getLabel('acceptAll', isHindi)}
         </button>
       </div>
