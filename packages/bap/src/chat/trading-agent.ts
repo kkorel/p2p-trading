@@ -1057,19 +1057,46 @@ export async function completePurchase(
   };
 
   try {
+    // Step 1: Init order
     logger.info(`[BuyFlow:Complete] Init order, txId=${transactionId}`);
     await axios.post(`${baseUrl}/api/init`, {
       transaction_id: transactionId,
     }, { headers, timeout: 15000 });
 
-    await sleep(2000);
+    // Step 2: Poll transaction state until order is created (like the UI does)
+    // The BPP processes init asynchronously and sends on_init callback
+    let txState: any = null;
+    let orderId: string | undefined;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await sleep(500);
+      try {
+        const txRes = await axios.get(`${baseUrl}/api/transactions/${transactionId}`, { headers, timeout: 5000 });
+        txState = txRes.data;
+        if (txState?.error) {
+          return { success: false, error: txState.error };
+        }
+        // Check if order or bulk orders are ready
+        if (txState?.order?.id || (txState?.bulkOrders && txState.bulkOrders.length > 0)) {
+          orderId = txState.order?.id;
+          break;
+        }
+      } catch {
+        // Polling failure — continue trying
+      }
+    }
 
-    logger.info(`[BuyFlow:Complete] Confirming order, txId=${transactionId}`);
+    if (!txState?.order && !txState?.bulkOrders?.length) {
+      return { success: false, error: 'Order creation timed out. Please try again.' };
+    }
+
+    // Step 3: Confirm order (pass order_id like the UI does)
+    logger.info(`[BuyFlow:Complete] Confirming order, txId=${transactionId}, orderId=${orderId}`);
     const confirmRes = await axios.post(`${baseUrl}/api/confirm`, {
       transaction_id: transactionId,
+      order_id: orderId,
     }, { headers, timeout: 15000 });
 
-    await sleep(1000);
+    await sleep(500);
 
     // Handle bulk mode confirm response
     if (confirmRes.data.bulk_mode) {
@@ -1089,20 +1116,19 @@ export async function completePurchase(
           timeWindow: discoveredOffer?.timeWindow || 'Flexible',
         },
         bulkResult: { confirmedCount, failedCount },
-        error: failedCount > 0 ? `${failedCount} order(s) failed to confirm` : undefined,
       };
     }
 
     // Single order confirm response
-    const orderId = confirmRes.data.order_id;
+    const confirmOrderId = confirmRes.data.order_id || orderId;
     const price = discoveredOffer?.price || 0;
     const totalPrice = price * quantity;
-    logger.info(`[BuyFlow:Complete] Purchase complete: order=${orderId}, ${quantity}kWh at Rs${price}/kWh = Rs${totalPrice}`);
+    logger.info(`[BuyFlow:Complete] Purchase complete: order=${confirmOrderId}, ${quantity}kWh at Rs${price}/kWh = Rs${totalPrice}`);
 
     return {
       success: true,
       order: {
-        orderId: orderId || transactionId,
+        orderId: confirmOrderId || transactionId,
         transactionId,
         quantity,
         pricePerKwh: price,
