@@ -209,6 +209,7 @@ export function MessageList({
                 defaultValue={msg.slider.defaultValue}
                 unit={msg.slider.unit}
                 callbackPrefix={msg.slider.callbackPrefix}
+                language={responseLanguage}
                 onSelect={(callbackData) => onButtonClick?.(callbackData, '')}
               />
             )}

@@ -14,7 +14,7 @@ export interface SliderInputProps {
   step: number;
   /** Default/initial value */
   defaultValue: number;
-  /** Unit label (e.g., 'kWh', '₹/unit') */
+  /** Unit label (e.g., 'units', '₹/unit') */
   unit: string;
   /** Callback prefix for sending value (e.g., 'autobuy_qty' -> 'autobuy_qty:25') */
   callbackPrefix: string;
@@ -22,8 +22,38 @@ export interface SliderInputProps {
   onSelect: (callbackData: string) => void;
   /** Optional label */
   label?: string;
+  /** Language code for localization */
+  language?: string;
   /** Optional class name */
   className?: string;
+}
+
+// Translations keyed by language code
+const L: Record<string, Record<string, string>> = {
+  'en-IN': {
+    confirmQty: 'Confirm Quantity',
+    confirmPrice: 'Confirm Price',
+    units: 'units',
+    perUnit: '₹/unit',
+  },
+  'hi-IN': {
+    confirmQty: 'मात्रा पक्की करो',
+    confirmPrice: 'दाम पक्का करो',
+    units: 'यूनिट',
+    perUnit: '₹/यूनिट',
+  },
+};
+
+function t(key: string, language?: string): string {
+  const lang = language && L[language] ? language : 'en-IN';
+  return L[lang][key] || L['en-IN'][key] || key;
+}
+
+/** Localize the unit prop based on language */
+function localizeUnit(unit: string, language?: string): string {
+  if (unit === 'units') return t('units', language);
+  if (unit === '₹/unit') return t('perUnit', language);
+  return unit;
 }
 
 export function SliderInput({
@@ -36,9 +66,11 @@ export function SliderInput({
   callbackPrefix,
   onSelect,
   label,
+  language,
   className,
 }: SliderInputProps) {
   const [value, setValue] = useState(defaultValue);
+  const displayUnit = localizeUnit(unit, language);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(Number(e.target.value));
@@ -70,7 +102,7 @@ export function SliderInput({
           {displayValue}
         </span>
         <span className="text-lg text-[var(--color-text-muted)]">
-          {unit}
+          {displayUnit}
         </span>
       </div>
 
@@ -91,8 +123,8 @@ export function SliderInput({
 
         {/* Min/Max labels */}
         <div className="flex justify-between mt-2 text-sm text-[var(--color-text-muted)]">
-          <span>{type === 'price' ? `₹${min}` : `${min} ${unit}`}</span>
-          <span>{type === 'price' ? `₹${max}` : `${max} ${unit}`}</span>
+          <span>{type === 'price' ? `₹${min}` : `${min} ${displayUnit}`}</span>
+          <span>{type === 'price' ? `₹${max}` : `${max} ${displayUnit}`}</span>
         </div>
       </div>
 
@@ -119,7 +151,7 @@ export function SliderInput({
         onClick={handleConfirm}
         className="w-full py-3 rounded-xl bg-[var(--color-primary)] text-white font-semibold hover:opacity-90 transition-opacity"
       >
-        {type === 'quantity' ? 'Confirm Quantity' : 'Confirm Price'}
+        {type === 'quantity' ? t('confirmQty', language) : t('confirmPrice', language)}
       </button>
 
       <style jsx>{`
