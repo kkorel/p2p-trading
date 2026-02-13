@@ -892,73 +892,65 @@ router.post('/confirm', async (req: Request, res: Response) => {
               }
             }
 
-            // IMPORTANT: Republish the full catalog to CDS with updated availableQuantity
-            // This ensures the external CDS reflects the reduced inventory after a purchase
+            // Republish catalog to CDS in background (non-blocking, fire-and-forget)
+            // This ensures order confirmation + escrow + on_confirm are not blocked by CDS issues
             if (order!.items && order!.items.length > 0) {
               const sellerProviderId = order!.items[0].provider_id;
               if (sellerProviderId) {
-                try {
-                  const providerInfo = await getProvider(sellerProviderId);
-                  const providerName = providerInfo?.name || 'Energy Provider';
-                  const allItems = await getProviderItems(sellerProviderId);
-                  const allOffers = await getProviderOffers(sellerProviderId);
+                (async () => {
+                  try {
+                    const providerInfo = await getProvider(sellerProviderId);
+                    const providerName = providerInfo?.name || 'Energy Provider';
+                    const allItems = await getProviderItems(sellerProviderId);
+                    const allOffers = await getProviderOffers(sellerProviderId);
 
-                  // Convert to sync format with UPDATED availableQuantity from database
-                  const rawSyncItems = allItems.map(item => ({
-                    id: item.id,
-                    provider_id: item.provider_id,
-                    source_type: item.source_type,
-                    delivery_mode: item.delivery_mode,
-                    available_qty: item.available_qty,
-                    production_windows: item.production_windows,
-                    meter_id: item.meter_id,
-                  }));
-                  const syncItems = await enrichSyncItems(rawSyncItems, sellerProviderId);
+                    const rawSyncItems = allItems.map(item => ({
+                      id: item.id,
+                      provider_id: item.provider_id,
+                      source_type: item.source_type,
+                      delivery_mode: item.delivery_mode,
+                      available_qty: item.available_qty,
+                      production_windows: item.production_windows,
+                      meter_id: item.meter_id,
+                    }));
+                    const syncItems = await enrichSyncItems(rawSyncItems, sellerProviderId);
 
-                  // For offers, use the available block count as the actual available quantity
-                  const syncOffers = await Promise.all(allOffers.map(async (offer) => {
-                    const availableBlocks = await getAvailableBlockCount(offer.id);
-                    return {
-                      id: offer.id,
-                      item_id: offer.item_id,
-                      provider_id: offer.provider_id,
-                      price_value: offer.price.value,
-                      currency: offer.price.currency,
-                      max_qty: availableBlocks, // Use AVAILABLE blocks, not total maxQuantity
-                      time_window: offer.timeWindow,
-                      pricing_model: offer.offerAttributes.pricingModel,
-                      settlement_type: offer.offerAttributes.settlementType,
-                    };
-                  }));
+                    const syncOffers = await Promise.all(allOffers.map(async (offer) => {
+                      const availableBlocks = await getAvailableBlockCount(offer.id);
+                      return {
+                        id: offer.id,
+                        item_id: offer.item_id,
+                        provider_id: offer.provider_id,
+                        price_value: offer.price.value,
+                        currency: offer.price.currency,
+                        max_qty: availableBlocks,
+                        time_window: offer.timeWindow,
+                        pricing_model: offer.offerAttributes.pricingModel,
+                        settlement_type: offer.offerAttributes.settlementType,
+                      };
+                    }));
 
-                  // Filter out offers with 0 available blocks (sold out)
-                  const activeOffers = syncOffers.filter(o => o.max_qty > 0);
+                    const activeOffers = syncOffers.filter(o => o.max_qty > 0);
+                    const publishSuccess = await publishCatalogToCDS(
+                      { id: sellerProviderId, name: providerName },
+                      syncItems,
+                      activeOffers,
+                      activeOffers.length > 0
+                    );
 
-                  // Republish catalog with updated quantities
-                  const publishSuccess = await publishCatalogToCDS(
-                    { id: sellerProviderId, name: providerName },
-                    syncItems,
-                    activeOffers,
-                    activeOffers.length > 0 // isActive: true if offers remain
-                  );
-
-                  if (publishSuccess) {
-                    logger.info(`Catalog republished to CDS with updated inventory after order ${order!.id}`, {
-                      providerId: sellerProviderId,
-                      remainingOffers: activeOffers.length,
-                      transaction_id: context.transaction_id,
-                    });
-                  } else {
-                    logger.warn('Failed to republish catalog to CDS after order confirmation', {
-                      providerId: sellerProviderId,
+                    if (publishSuccess) {
+                      logger.info(`Catalog republished to CDS after order ${order!.id}`, {
+                        providerId: sellerProviderId,
+                        remainingOffers: activeOffers.length,
+                        transaction_id: context.transaction_id,
+                      });
+                    }
+                  } catch (syncError: any) {
+                    logger.error(`Failed to republish catalog after order: ${syncError.message}`, {
                       transaction_id: context.transaction_id,
                     });
                   }
-                } catch (syncError: any) {
-                  logger.error(`Failed to republish catalog after order: ${syncError.message}`, {
-                    transaction_id: context.transaction_id,
-                  });
-                }
+                })().catch(() => {}); // Ensure no unhandled rejection
               }
             }
           }

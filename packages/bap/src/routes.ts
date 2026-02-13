@@ -1697,7 +1697,16 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
       ? await secureAxios.post(targetUrl, confirmMessage)
       : await axios.post(targetUrl, confirmMessage);
 
-    // Best-effort settlement initiation (idempotent)
+    // Respond immediately so the client is not blocked by settlement or BPP async processing
+    res.json({
+      status: 'ok',
+      transaction_id,
+      message_id: context.message_id,
+      order_id: orderId,
+      ack: response.data,
+    });
+
+    // Best-effort settlement initiation (idempotent, non-blocking)
     try {
       const txState = await getTransaction(transaction_id);
       const order = txState?.order;
@@ -1746,17 +1755,11 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
     } catch (error: any) {
       logger.warn(`Settlement initiation skipped: ${error.message}`, { transaction_id });
     }
-
-    res.json({
-      status: 'ok',
-      transaction_id,
-      message_id: context.message_id,
-      order_id: orderId,
-      ack: response.data,
-    });
   } catch (error: any) {
     logger.error(`Confirm request failed: ${error.message}`, { transaction_id });
-    res.status(500).json({ error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 
