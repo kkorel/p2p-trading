@@ -27,6 +27,24 @@ function getLabel(key: keyof typeof LABELS, isHindi: boolean): string {
   return isHindi ? LABELS[key].hi : LABELS[key].en;
 }
 
+/**
+ * Split time window into date and time range.
+ * Input: "Feb 14, 06:00 AM-06:00 PM" or "14 Feb, 06:00 am - 06:00 pm"
+ */
+function splitTimeWindow(tw: string): { date: string; time: string } {
+  if (!tw) return { date: '', time: '' };
+  const commaIdx = tw.indexOf(',');
+  if (commaIdx > 0) {
+    return { date: tw.slice(0, commaIdx).trim(), time: tw.slice(commaIdx + 1).trim() };
+  }
+  // Try splitting on space before time pattern (e.g. "14 Feb 06:00")
+  const timeMatch = tw.match(/^(.+?)\s+(\d{1,2}:\d{2}.*)$/);
+  if (timeMatch) {
+    return { date: timeMatch[1], time: timeMatch[2] };
+  }
+  return { date: '', time: tw };
+}
+
 export function OrderConfirmationCard({ data, language }: OrderConfirmationCardProps) {
   const isHindi = language === 'hi-IN';
 
@@ -78,12 +96,20 @@ export function OrderConfirmationCard({ data, language }: OrderConfirmationCardP
               <span className="text-gray-500">{getLabel('amount', isHindi)}:</span>
               <span className="font-bold text-green-600">₹{Math.round(data.summary.totalPrice)}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500">{getLabel('time', isHindi)}:</span>
-              <div className="flex items-center gap-1">
-                <Clock className="w-3 h-3 text-gray-400" />
-                <span className="font-medium">{data.timeWindow}</span>
-              </div>
+            <div className="col-span-2 flex items-start gap-1.5">
+              <span className="text-gray-500 mt-px">{getLabel('time', isHindi)}:</span>
+              <Clock className="w-3 h-3 text-gray-400 mt-1" />
+              {(() => {
+                const { date, time } = splitTimeWindow(data.timeWindow);
+                return date ? (
+                  <span className="font-medium leading-tight">
+                    <span className="block">{date}</span>
+                    <span className="block whitespace-nowrap">{time}</span>
+                  </span>
+                ) : (
+                  <span className="font-medium whitespace-nowrap">{data.timeWindow}</span>
+                );
+              })()}
             </div>
             {data.summary.ordersConfirmed > 1 && (
               <div className="flex justify-between">
