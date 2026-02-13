@@ -428,7 +428,11 @@ router.post('/on_init', async (req: Request, res: Response) => {
   if (content.bulkOrders && content.bulkOrders.length > 0) {
     await updateTransaction(context.transaction_id, {
       order: internalOrder, // Primary order for compatibility
-      bulkOrders: content.bulkOrders, // All orders from bulk purchase
+      bulkOrders: content.bulkOrders.map((o: any) => ({
+        id: o['beckn:id'] || o.id,
+        transactionId: o.transactionId || o.transaction_id,
+        status: o.status,
+      })), // Normalize field names to match TransactionState type
       bulkGroupId: content.bulkGroupId,
       status: 'CONFIRMING',
       error: undefined,

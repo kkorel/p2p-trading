@@ -1610,9 +1610,11 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
     // Confirm each order in parallel
     await Promise.all(txState.bulkOrders!.map(async (bulkOrder) => {
       try {
+        // bulkOrder may have transaction_id (snake_case from toOrder) or transactionId (camelCase from type)
+        const bulkTxnId = bulkOrder.transactionId || (bulkOrder as any).transaction_id;
         const context = createContext({
           action: 'confirm',
-          transaction_id: bulkOrder.transactionId,
+          transaction_id: bulkTxnId,
           bap_id: config.bap.id,
           bap_uri: config.bap.uri,
           bpp_id: config.bpp.id,
@@ -1626,11 +1628,11 @@ router.post('/api/confirm', authMiddleware, async (req: Request, res: Response) 
           },
         };
 
-        await logEvent(bulkOrder.transactionId, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
+        await logEvent(bulkTxnId, context.message_id, 'confirm', 'OUTBOUND', JSON.stringify(confirmMessage));
         await axios.post(targetUrl, confirmMessage);
         confirmedOrders.push(bulkOrder.id);
 
-        logger.info(`Bulk order confirmed: ${bulkOrder.id}`, { transaction_id: bulkOrder.transactionId });
+        logger.info(`Bulk order confirmed: ${bulkOrder.id}`, { transaction_id: bulkTxnId });
       } catch (error: any) {
         logger.error(`Failed to confirm bulk order ${bulkOrder.id}: ${error.message}`);
         failedOrders.push({ id: bulkOrder.id, error: error.message });

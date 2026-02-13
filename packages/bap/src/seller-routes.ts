@@ -566,7 +566,7 @@ router.post('/init', async (req: Request, res: Response) => {
         await updateTransactionState(context.transaction_id, {
           bulkOrders: createdOrders.map(o => ({
             id: o.id,
-            transactionId: o.transactionId,
+            transactionId: o.transactionId || o.transaction_id,
             status: o.status,
           })),
         });
