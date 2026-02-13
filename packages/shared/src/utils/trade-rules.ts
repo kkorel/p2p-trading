@@ -21,7 +21,7 @@ export const DELIVERY_END_HOUR = 18;
 export const GATE_CLOSURE_HOURS = 4;
 
 /** Trade window: trades allowed up to this many hours before delivery start */
-export const TRADE_WINDOW_HOURS = 24;
+export const TRADE_WINDOW_HOURS = 168; // 7 days
 
 /** Minimum trade size in kWh */
 export const MIN_TRADE_KWH = 1;
