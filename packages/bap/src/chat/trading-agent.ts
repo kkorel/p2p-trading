@@ -898,7 +898,7 @@ export async function discoverBestOffer(
     const discoverRes = await axios.post(`${baseUrl}/api/discover`, {
       minQuantity: 1,
       timeWindow,
-    }, { headers, timeout: 15000 });
+    }, { headers, timeout: 20000 });
 
     const txId = discoverRes.data.transaction_id;
     if (!txId) {

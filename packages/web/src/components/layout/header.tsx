@@ -46,7 +46,7 @@ export function Header({ title }: HeaderProps) {
                 <TrendingUp className={`h-3.5 w-3.5 ${
                   totalValue >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
                 }`} />
-                <span className={`text-sm font-semibold ${
+                <span className={`text-xs font-semibold whitespace-nowrap ${
                   totalValue >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
                 }`}>
                   {totalValue > 0 ? '+' : ''}{formatCurrency(totalValue)}

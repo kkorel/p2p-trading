@@ -691,6 +691,25 @@ function h(ctx: SessionContext | { language?: string }, en: string, alt: string)
   return alt;
 }
 
+/** Localize common API error messages for Hindi users */
+function localizeError(ctx: SessionContext | { language?: string }, error: string | undefined): string {
+  if (!error) return h(ctx, 'Unknown error', 'अज्ञात समस्या');
+  if (!ctx.language || ctx.language === 'en-IN') return error;
+  // Map common English errors to Hindi
+  const lower = error.toLowerCase();
+  if (lower.includes('timeout') || lower.includes('timed out')) return 'सर्वर से जवाब नहीं आया। दोबारा कोशिश करो।';
+  if (lower.includes('no energy offers found') || lower.includes('no matching offer')) return 'कोई ऑफ़र नहीं मिला। अलग समय या मात्रा आज़माओ।';
+  if (lower.includes('no offers match the requested time')) return 'इस समय के लिए कोई ऑफ़र नहीं है। अलग समय आज़माओ।';
+  if (lower.includes('session has expired') || lower.includes('log in again')) return 'आपका सेशन समाप्त हो गया। /start से दोबारा लॉगिन करो।';
+  if (lower.includes('discovery failed')) return 'ऑफ़र ढूंढने में समस्या हुई। दोबारा कोशिश करो।';
+  if (lower.includes('order creation timed out')) return 'ऑर्डर बनने में समय लग रहा है। दोबारा कोशिश करो।';
+  if (lower.includes('no valid session')) return 'सेशन नहीं मिला। /start से लॉगिन करो।';
+  if (lower.includes('gate closed') || lower.includes('trade not allowed')) return 'इस समय के लिए ट्रेड बंद है। बाद का समय चुनो।';
+  if (lower.includes('not allowed') || lower.includes('not permitted')) return 'यह कार्य अभी संभव नहीं है।';
+  // Fallback: return the English error as-is (better than nothing)
+  return error;
+}
+
 /** Localize auto-trade warning/info messages based on result data */
 function localizeTradeWarning(
   ctx: SessionContext | { language?: string },
@@ -1511,7 +1530,8 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
 
     // Build suggestion message with alternative time windows
     const messages: AgentMessage[] = [searchMsg];
-    let errorText = result.error || 'No matching offers found.';
+    const localizedErr = localizeError(ctx, result.error) || h(ctx, 'No matching offers found.', 'कोई ऑफ़र नहीं मिला।');
+    let errorText = localizedErr;
 
     if (result.availableWindows && result.availableWindows.length > 0) {
       const windowStrs = result.availableWindows.slice(0, 3).map(tw => {
@@ -1531,7 +1551,7 @@ async function discoverAndShowOffer(ctx: SessionContext, pending: PendingPurchas
     }
 
     messages.push({
-      text: h(ctx, errorText, errorText),
+      text: errorText,
       buttons: [
         { text: h(ctx, '🔄 Try different time', '🔄 अलग समय'), callbackData: 'purchase_time:retry' },
         { text: h(ctx, '❌ Cancel', '❌ रद्द करो'), callbackData: 'purchase_offer_confirm:no' },
@@ -2065,7 +2085,7 @@ async function handlePendingPurchaseInput(ctx: SessionContext, message: string):
             {
               text: h(ctx,
                 `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`,
-                `खरीदारी नहीं हो पाई: ${result.error || 'Unknown error'}। दोबारा कोशिश करो।`
+                `खरीदारी नहीं हो पाई: ${localizeError(ctx, result.error)}। दोबारा कोशिश करो।`
               )
             },
           ],
@@ -2350,7 +2370,7 @@ async function executeAndReportPurchase(ctx: SessionContext, pending: PendingPur
   return {
     messages: [
       { text: searchMsg },
-      { text: h(ctx, `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`, `खरीदारी नहीं हो पाई: ${result.error || 'Unknown error'}। दोबारा कोशिश करो।`) },
+      { text: h(ctx, `Could not complete purchase: ${result.error || 'Unknown error'}. Please try again.`, `खरीदारी नहीं हो पाई: ${localizeError(ctx, result.error)}। दोबारा कोशिश करो।`) },
     ],
     contextUpdate: { pendingPurchase: undefined },
   };
