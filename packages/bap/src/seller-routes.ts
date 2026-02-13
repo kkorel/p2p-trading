@@ -174,11 +174,38 @@ async function enrichSyncItems(items: Array<{ id: string; provider_id: string; s
 
 /**
  * Helper: Get buyer ID from transaction state
+ * Handles bulk sub-transactions (e.g. "main-uuid_0") by trying the parent transaction,
+ * and falls back to looking up the Order record in the database.
  */
-async function getBuyerIdFromTransaction(transactionId: string): Promise<string | null> {
+async function getBuyerIdFromTransaction(transactionId: string, orderId?: string): Promise<string | null> {
   try {
+    // 1. Direct Redis lookup
     const txState = await getTransaction(transactionId);
-    return txState?.buyerId || null;
+    if (txState?.buyerId) return txState.buyerId;
+
+    // 2. For sub-transactions (bulk mode: "main-uuid_0"), try parent transaction
+    const underscoreIdx = transactionId.lastIndexOf('_');
+    if (underscoreIdx > 0) {
+      const parentTxnId = transactionId.slice(0, underscoreIdx);
+      const parentState = await getTransaction(parentTxnId);
+      if (parentState?.buyerId) return parentState.buyerId;
+    }
+
+    // 3. Fallback: look up from the Order record in DB
+    if (orderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { buyerId: true },
+      });
+      if (order?.buyerId) return order.buyerId;
+    }
+
+    // 4. Last resort: find any order with this transactionId
+    const orderByTxn = await prisma.order.findFirst({
+      where: { transactionId },
+      select: { buyerId: true },
+    });
+    return orderByTxn?.buyerId || null;
   } catch {
     return null;
   }
@@ -956,11 +983,12 @@ router.post('/confirm', async (req: Request, res: Response) => {
           }
           // ESCROW: Deduct payment from buyer (funds held until delivery verification)
           try {
-            const orderTotal = order!.quote?.price?.value || 0;
+            const rawOrderTotal = order!.quote?.price?.value;
+            const orderTotal = Number(rawOrderTotal) || 0; // Ensure numeric
             const platformFeeRate = 0.025; // 2.5% platform fee
             const platformFee = Math.round(orderTotal * platformFeeRate * 100) / 100;
             const totalDeduction = orderTotal + platformFee; // Total to deduct from buyer
-            const buyerId = await getBuyerIdFromTransaction(context.transaction_id);
+            const buyerId = await getBuyerIdFromTransaction(context.transaction_id, order!.id);
 
             if (buyerId && orderTotal > 0) {
               await prisma.$transaction(async (tx) => {
@@ -1003,9 +1031,15 @@ router.post('/confirm', async (req: Request, res: Response) => {
                 buyerId,
                 transaction_id: context.transaction_id,
               });
+            } else {
+              logger.warn(`Escrow skipped: buyerId=${buyerId}, orderTotal=${orderTotal}`, {
+                transaction_id: context.transaction_id,
+                order_id: order!.id,
+                rawOrderTotal: rawOrderTotal,
+              });
             }
           } catch (escrowError: any) {
-            logger.error(`Failed to escrow payment: ${escrowError.message}`, { transaction_id: context.transaction_id });
+            logger.error(`Failed to escrow payment: ${escrowError.message}`, { transaction_id: context.transaction_id, order_id: order!.id });
             // Don't fail the order confirmation if escrow fails - can be handled manually
           }
         } else {
@@ -1207,7 +1241,7 @@ router.post('/cancel', async (req: Request, res: Response) => {
           return;
         }
 
-        const buyerIdForCancel = await getBuyerIdFromTransaction(context.transaction_id);
+        const buyerIdForCancel = await getBuyerIdFromTransaction(context.transaction_id, order.id);
 
         // 1. Update order status to CANCELLED
         await prisma.order.update({
@@ -2403,7 +2437,7 @@ router.post('/seller/orders/:orderId/cancel', authMiddleware, async (req: Reques
       const refundTotal = escrowPayment?.totalAmount ?? orderTotal + platformFee;
       const sellerPenalty = Math.round(orderTotal * config.fees.sellerCancellationPenalty * 100) / 100;
 
-      const buyerId = currentOrder.buyerId || await getBuyerIdFromTransaction(currentOrder.transactionId);
+      const buyerId = currentOrder.buyerId || await getBuyerIdFromTransaction(currentOrder.transactionId, currentOrder.id);
 
       await prisma.$transaction(async (tx) => {
         // 1. Update order status to CANCELLED with refund/penalty info
