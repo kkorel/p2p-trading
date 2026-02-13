@@ -691,6 +691,54 @@ function h(ctx: SessionContext | { language?: string }, en: string, alt: string)
   return alt;
 }
 
+/** Localize auto-trade warning/info messages based on result data */
+function localizeTradeWarning(
+  ctx: SessionContext | { language?: string },
+  result: { status: string; warningMessage?: string; effectiveCapacity: number; listedQuantity: number },
+): string {
+  const msg = result.warningMessage || '';
+  // "Already have X units listed for tomorrow (target: Y units)"
+  const alreadyMatch = msg.match(/Already have ([\d.]+) (?:kWh|units) listed.*target: ([\d.]+) (?:kWh|units)/);
+  if (alreadyMatch) {
+    return h(ctx,
+      `Already have ${alreadyMatch[1]} units listed for tomorrow (target: ${alreadyMatch[2]} units)`,
+      `कल के लिए पहले से ${alreadyMatch[1]} यूनिट लिस्टेड हैं (लक्ष्य: ${alreadyMatch[2]} यूनिट)`
+    );
+  }
+  // "Added X units (already had Y units listed)"
+  const addedMatch = msg.match(/Added ([\d.]+) (?:kWh|units).*already had ([\d.]+) (?:kWh|units)/);
+  if (addedMatch) {
+    return h(ctx,
+      `Added ${addedMatch[1]} units (already had ${addedMatch[2]} units listed)`,
+      `${addedMatch[1]} यूनिट जोड़ी (पहले से ${addedMatch[2]} यूनिट लिस्टेड थीं)`
+    );
+  }
+  // "Warning: Total commitment (X units) exceeds daily capacity (Y units)."
+  const oversellMatch = msg.match(/Total commitment \(([\d.]+) (?:kWh|units)\).*daily capacity \(([\d.]+) (?:kWh|units)\)/);
+  if (oversellMatch) {
+    return h(ctx,
+      `Warning: Total commitment (${oversellMatch[1]} units) exceeds daily capacity (${oversellMatch[2]} units)`,
+      `चेतावनी: कुल लिस्टिंग (${oversellMatch[1]} यूनिट) रोज़ की क्षमता (${oversellMatch[2]} यूनिट) से ज़्यादा है`
+    );
+  }
+  // "Effective capacity too low to list (< 1 kWh)"
+  if (msg.includes('too low')) {
+    return h(ctx,
+      'Effective capacity too low to list (< 1 unit)',
+      'क्षमता बहुत कम है, लिस्ट नहीं कर सकते (< 1 यूनिट)'
+    );
+  }
+  // "User is not registered as a provider"
+  if (msg.includes('not registered')) {
+    return h(ctx,
+      'You are not registered as a seller yet',
+      'आप अभी बेचने वाले के रूप में रजिस्टर नहीं हैं'
+    );
+  }
+  // Fallback: return as-is (shouldn't happen often)
+  return msg;
+}
+
 /**
  * Extract a valid Indian phone number from messy voice transcriptions.
  * Handles: "Plus 44 7552335216", "07552335216", "91 9876543210", etc.
@@ -4053,16 +4101,21 @@ const states: Record<ChatState, StateHandler> = {
 
             if (tradeResult) {
               const weatherPercent = Math.round(tradeResult.weatherMultiplier * 100);
-              const dailyCapacity = (detectedCapacity / 30).toFixed(1);
+              // Show effective daily target (with trade limit applied), not raw capacity
+              const effectiveDaily = tradeResult.effectiveCapacity;
+              const effectiveMonthly = effectiveDaily * 30;
 
               // Handle skipped case (already have enough listed)
               if (tradeResult.status === 'skipped') {
+                const skipWarning = tradeResult.warningMessage
+                  ? localizeTradeWarning(ctx, tradeResult)
+                  : h(ctx, 'Already have enough listed for tomorrow.', 'कल के लिए पहले से काफी लिस्टेड है।');
                 return {
                   messages: [
                     {
                       text: h(ctx,
-                        `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output):\n${tradeResult.warningMessage || 'Already have enough listed for tomorrow.'}\n\nMonthly capacity: ${detectedCapacity} units (${dailyCapacity} units/day)\n\nEvery day at 6 AM, I'll check the next day's weather and add more listings if needed.`,
-                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए:\n${tradeResult.warningMessage || 'कल के लिए पहले से काफी लिस्टेड है।'}\n\nमासिक क्षमता: ${detectedCapacity} यूनिट (${dailyCapacity} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे मौसम देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।`
+                        `✅ Auto-sell activated!\n\n🌤️ Looking at tomorrow's weather (${weatherPercent}% solar output):\n${skipWarning}\n\nTradeable capacity: ~${effectiveMonthly} units/month (~${effectiveDaily} units/day)\n\nEvery day at 6 AM, I'll check the next day's weather and add more listings if needed.`,
+                        `✅ ऑटो-सेल चालू!\n\n🌤️ कल के मौसम (${weatherPercent}% सोलर आउटपुट) को देखते हुए:\n${skipWarning}\n\nबेचने योग्य क्षमता: ~${effectiveMonthly} यूनिट/माह (~${effectiveDaily} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे मौसम देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।`
                       ),
                       buttons: [
                         { text: h(ctx, '📋 View Listings', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
@@ -4082,9 +4135,9 @@ const states: Record<ChatState, StateHandler> = {
                 let infoText = '';
                 if (tradeResult.warningMessage && tradeResult.status === 'success') {
                   // This is the delta info, not a warning
-                  infoText = '\n\n📝 ' + tradeResult.warningMessage;
+                  infoText = '\n\n📝 ' + localizeTradeWarning(ctx, tradeResult);
                 } else if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
-                  infoText = '\n\n⚠️ ' + tradeResult.warningMessage;
+                  infoText = '\n\n⚠️ ' + localizeTradeWarning(ctx, tradeResult);
                 }
 
                 // Calculate tomorrow's 6 AM - 6 PM for the offer card
@@ -4114,8 +4167,8 @@ const states: Record<ChatState, StateHandler> = {
                     // Second message: Offer card with confirmation and buttons
                     {
                       text: h(ctx,
-                        `✅ Auto-sell activated!\n\n📊 Monthly capacity: ${detectedCapacity} units (${dailyCapacity} units/day)\n\nEvery day at 6 AM, I'll check the weather and your existing listings, then add what's needed.${infoText}`,
-                        `✅ ऑटो-सेल चालू!\n\n📊 मासिक क्षमता: ${detectedCapacity} यूनिट (${dailyCapacity} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे मौसम और मौजूदा लिस्टिंग देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।${infoText}`
+                        `✅ Auto-sell activated!\n\n📊 Tradeable capacity: ~${effectiveMonthly} units/month (~${effectiveDaily} units/day)\n\nEvery day at 6 AM, I'll check the weather and your existing listings, then add what's needed.${infoText}`,
+                        `✅ ऑटो-सेल चालू!\n\n📊 बेचने योग्य क्षमता: ~${effectiveMonthly} यूनिट/माह (~${effectiveDaily} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे मौसम और मौजूदा लिस्टिंग देखकर ज़रूरत के हिसाब से और लिस्ट करूंगा।${infoText}`
                       ),
                       offerCreated: {
                         quantity: tradeResult.listedQuantity,
@@ -4482,20 +4535,6 @@ const states: Record<ChatState, StateHandler> = {
             break;
           case 'show_balance':
             message = 'show my balance';
-            break;
-          case 'setup_auto_sell':
-            // Clear any pending listing to avoid conflict with choose_mode handler
-            ctx.pendingListing = undefined;
-            message = 'setup auto sell';
-            break;
-          case 'setup_auto_buy':
-            message = 'setup auto buy';
-            break;
-          case 'check_auto_trade':
-            message = 'check auto trade status';
-            break;
-          case 'stop_auto_trade':
-            message = 'stop auto trade';
             break;
           case 'log_cleaning': {
             // Log panel cleaning
@@ -4947,6 +4986,8 @@ const states: Record<ChatState, StateHandler> = {
           // ============ Auto-Trade Intents ============
 
           case 'setup_auto_sell': {
+            // Clear any pending listing to avoid conflict with choose_mode handler
+            ctx.pendingListing = undefined;
             // Credential gate
             if (!verifiedCreds.includes('GENERATION_PROFILE')) {
               return {
@@ -4994,7 +5035,8 @@ const states: Record<ChatState, StateHandler> = {
               if (tradeResult && (tradeResult.status === 'success' || tradeResult.status === 'warning_oversell')) {
                 const weatherPercent = Math.round(tradeResult.weatherMultiplier * 100);
                 const listedQty = tradeResult.listedQuantity.toFixed(1);
-                const dailyCapacity = (capacity / 30).toFixed(1);
+                const effectiveDaily2 = tradeResult.effectiveCapacity;
+                const effectiveMonthly2 = effectiveDaily2 * 30;
 
                 // Get trade limit for explanation from trust score
                 const userForLimit = await prisma.user.findUnique({
@@ -5005,7 +5047,7 @@ const states: Record<ChatState, StateHandler> = {
 
                 let warningText = '';
                 if (tradeResult.status === 'warning_oversell' && tradeResult.warningMessage) {
-                  warningText = '\n\n⚠️ ' + tradeResult.warningMessage;
+                  warningText = '\n\n⚠️ ' + localizeTradeWarning(ctx, tradeResult);
                 }
 
                 return {
@@ -5020,8 +5062,8 @@ const states: Record<ChatState, StateHandler> = {
                     // Second message: Confirmation with buttons
                     {
                       text: h(ctx,
-                        `✅ Auto-sell activated!\n\n📊 Monthly capacity: ${capacity} units (${dailyCapacity} units/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
-                        `✅ ऑटो-सेल चालू!\n\n📊 मासिक क्षमता: ${capacity} यूनिट (${dailyCapacity} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
+                        `✅ Auto-sell activated!\n\n📊 Tradeable capacity: ~${effectiveMonthly2} units/month (~${effectiveDaily2} units/day)\n\nEvery day at 6 AM, I'll check the next day's weather and create listings automatically.${warningText}`,
+                        `✅ ऑटो-सेल चालू!\n\n📊 बेचने योग्य क्षमता: ~${effectiveMonthly2} यूनिट/माह (~${effectiveDaily2} यूनिट/दिन)\n\nरोज़ सुबह 6 बजे अगले दिन का मौसम देखकर लिस्टिंग करूंगा।${warningText}`
                       ),
                       buttons: [
                         { text: h(ctx, '📋 View Listing', '📋 लिस्टिंग देखो'), callbackData: 'action:show_listings' },
@@ -5032,12 +5074,16 @@ const states: Record<ChatState, StateHandler> = {
                   ],
                 };
               } else if (tradeResult && tradeResult.status === 'skipped') {
-                const dailyCapacity = (capacity / 30).toFixed(1);
+                const effectiveDailySkip = tradeResult.effectiveCapacity;
+                const effectiveMonthlySkip = effectiveDailySkip * 30;
+                const skipMsg = tradeResult.warningMessage
+                  ? localizeTradeWarning(ctx, tradeResult)
+                  : h(ctx, 'No listing created right now.', 'अभी कोई लिस्टिंग नहीं बनी।');
                 return {
                   messages: [{
                     text: h(ctx,
-                      `✅ Auto-sell enabled!\n\n⚠️ ${tradeResult.warningMessage || 'No listing created right now.'}\n\nMonthly capacity: ${capacity} units (${dailyCapacity} units/day) at ₹${price}/unit\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.`,
-                      `✅ ऑटो-सेल चालू!\n\n⚠️ ${tradeResult.warningMessage || 'अभी कोई लिस्टिंग नहीं बनी।'}\n\nमासिक क्षमता: ${capacity} यूनिट (${dailyCapacity} यूनिट/दिन), दाम: ₹${price}/यूनिट\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।`
+                      `✅ Auto-sell enabled!\n\n⚠️ ${skipMsg}\n\nTradeable capacity: ~${effectiveMonthlySkip} units/month (~${effectiveDailySkip} units/day) at ₹${price}/unit\n\nEvery day at 6 AM, I'll check the weather and create listings when conditions are right.`,
+                      `✅ ऑटो-सेल चालू!\n\n⚠️ ${skipMsg}\n\nबेचने योग्य क्षमता: ~${effectiveMonthlySkip} यूनिट/माह (~${effectiveDailySkip} यूनिट/दिन), दाम: ₹${price}/यूनिट\n\nरोज़ सुबह 6 बजे मौसम देखकर लिस्टिंग करूंगा।`
                     ),
                     buttons: [
                       { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
@@ -5048,12 +5094,19 @@ const states: Record<ChatState, StateHandler> = {
               }
 
               // Error or no result - still enabled but first trade failed
-              const dailyCapacityErr = (capacity / 30).toFixed(1);
+              // Estimate tradeable capacity using trade limit (weather unknown)
+              const userForLimitErr = await prisma.user.findUnique({
+                where: { id: ctx.userId! },
+                select: { trustScore: true },
+              });
+              const tradeLimitErr = calculateAllowedLimit(userForLimitErr?.trustScore ?? 0.3);
+              const estDailyErr = Math.floor((tradeLimitErr / 100) * (capacity / 30));
+              const estMonthlyErr = estDailyErr * 30;
               return {
                 messages: [{
                   text: h(ctx,
-                    `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nMonthly capacity: ${capacity} units (${dailyCapacityErr} units/day) at ₹${price}/unit`,
-                    `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा नहीं मिला'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nमासिक क्षमता: ${capacity} यूनिट (${dailyCapacityErr} यूनिट/दिन), दाम: ₹${price}/यूनिट`
+                    `✅ Auto-sell enabled!\n\nCouldn't create today's listing (${tradeResult?.error || 'weather data unavailable'}), but I'll try again at 6 AM tomorrow.\n\nTradeable capacity: ~${estMonthlyErr} units/month (~${estDailyErr} units/day) at ₹${price}/unit`,
+                    `✅ ऑटो-सेल चालू!\n\nआज की लिस्टिंग नहीं बन पाई (${tradeResult?.error || 'मौसम डेटा नहीं मिला'}), लेकिन कल सुबह 6 बजे कोशिश करूंगा।\n\nबेचने योग्य क्षमता: ~${estMonthlyErr} यूनिट/माह (~${estDailyErr} यूनिट/दिन), दाम: ₹${price}/यूनिट`
                   ),
                   buttons: [
                     { text: h(ctx, '📊 View Status', '📊 स्टेटस देखो'), callbackData: 'action:check_auto_trade' },
@@ -5068,6 +5121,8 @@ const states: Record<ChatState, StateHandler> = {
           }
 
           case 'setup_auto_buy': {
+            // Clear any pending purchase to avoid conflict
+            ctx.pendingPurchase = undefined;
             // Credential gate
             if (!verifiedCreds.includes('CONSUMPTION_PROFILE')) {
               return {

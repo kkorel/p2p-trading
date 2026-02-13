@@ -231,15 +231,7 @@ export function checkTradeWindow(deliveryStartTime: string, now?: Date): TradeWi
     };
   }
 
-  // Check trade window (not too far in future)
-  if (currentTime < tradeWindowOpens) {
-    return {
-      allowed: false,
-      reason: `Trade window not open yet: opens at ${tradeWindowOpens.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} on ${tradeWindowOpens.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`,
-      gateClosureTime: gateClosure.toISOString(),
-      tradeWindowOpens: tradeWindowOpens.toISOString(),
-    };
-  }
+  // No upper limit on how far in advance trades can be placed
 
   return {
     allowed: true,

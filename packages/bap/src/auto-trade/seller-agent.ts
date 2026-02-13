@@ -191,7 +191,7 @@ async function executeSellerAutoTrade(
 
   if ((totalActiveCommitment + roundedDelta) > dailyCapacity * 1.1) { // 10% buffer
     status = 'warning_oversell';
-    warningMessage = `Warning: Total commitment (${totalActiveCommitment + roundedDelta} kWh) exceeds daily capacity (${Math.floor(dailyCapacity)} kWh).`;
+    warningMessage = `Warning: Total commitment (${totalActiveCommitment + roundedDelta} units) exceeds daily capacity (${Math.floor(dailyCapacity)} units).`;
     logger.warn(`Over-sell warning for user ${config.userId}: ${warningMessage}`);
   }
 
@@ -205,8 +205,8 @@ async function executeSellerAutoTrade(
       listedQuantity: 0,
       weatherMultiplier,
       warningMessage: alreadyListed > 0
-        ? `Already have ${alreadyListed} kWh listed for tomorrow (target: ${roundedTarget} kWh)`
-        : 'Effective capacity too low to list (< 1 kWh)',
+        ? `Already have ${alreadyListed} units listed for tomorrow (target: ${roundedTarget} units)`
+        : 'Effective capacity too low to list (< 1 unit)',
     };
   }
 
@@ -260,7 +260,7 @@ async function executeSellerAutoTrade(
     listedQuantity: roundedDelta,
     weatherMultiplier,
     warningMessage: alreadyListed > 0
-      ? `Added ${roundedDelta} kWh (already had ${alreadyListed} kWh listed)`
+      ? `Added ${roundedDelta} units (already had ${alreadyListed} units listed)`
       : undefined,
     offerId: offer.id,
   };
