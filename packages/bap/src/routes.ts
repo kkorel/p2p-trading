@@ -857,9 +857,11 @@ router.post('/api/discover', optionalAuthMiddleware, async (req: Request, res: R
         },
       });
 
+      // Don't filter individual offers by minQuantity — smart buy can combine
+      // multiple smaller offers to fulfill the total requested quantity
       const filteredOffers = localOffers.filter(offer => {
         const availableQty = offer.blocks.length;
-        return !minQuantity || availableQty >= minQuantity;
+        return availableQty > 0;
       });
 
       const providerMap = new Map<string, any>();

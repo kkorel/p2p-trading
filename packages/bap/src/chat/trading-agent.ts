@@ -892,10 +892,11 @@ export async function discoverBestOffer(
   }
 
   try {
-    // Step 1: Discover available offers
+    // Step 1: Discover available offers (use minQuantity: 1 to get ALL offers,
+    // then let /api/select with smartBuy combine multiple offers to fulfill the total quantity)
     logger.info(`[BuyFlow:Discover] Discovering offers for user ${userId}: ${params.quantity} kWh`);
     const discoverRes = await axios.post(`${baseUrl}/api/discover`, {
-      minQuantity: params.quantity,
+      minQuantity: 1,
       timeWindow,
     }, { headers, timeout: 15000 });
 

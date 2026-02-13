@@ -1144,9 +1144,9 @@ async function handlePendingListingInput(ctx: SessionContext, message: string): 
 
   switch (pending.awaitingField) {
     case 'choose_mode': {
-      // Handle "Sell Automatically" (auto-trade setup) - return null to let action handler process it
-      if (message === 'action:setup_auto_sell') {
-        // Clear pendingListing in context but return null so action handler can take over
+      // Pass through ALL action: callbacks to the main action handler (e.g. setup_auto_sell, check_auto_trade, stop_auto_trade)
+      if (message.startsWith('action:')) {
+        // Clear pendingListing in context so the action handler starts clean
         ctx.pendingListing = undefined;
         return null;
       }
@@ -5001,7 +5001,7 @@ const states: Record<ChatState, StateHandler> = {
                   ],
                 }],
                 newState: 'OFFER_OPTIONAL_CREDS',
-                contextUpdate: { expectedCredType: 'GenerationProfileCredential' },
+                contextUpdate: { expectedCredType: 'GenerationProfileCredential', pendingListing: undefined },
               };
             }
 
@@ -5072,6 +5072,7 @@ const states: Record<ChatState, StateHandler> = {
                       ],
                     },
                   ],
+                  contextUpdate: { pendingListing: undefined },
                 };
               } else if (tradeResult && tradeResult.status === 'skipped') {
                 const effectiveDailySkip = tradeResult.effectiveCapacity;
@@ -5090,6 +5091,7 @@ const states: Record<ChatState, StateHandler> = {
                       { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
                     ],
                   }],
+                  contextUpdate: { pendingListing: undefined },
                 };
               }
 
@@ -5113,10 +5115,12 @@ const states: Record<ChatState, StateHandler> = {
                     { text: h(ctx, '🛑 Stop', '🛑 बंद करो'), callbackData: 'action:stop_auto_trade' },
                   ],
                 }],
+                contextUpdate: { pendingListing: undefined },
               };
             }
             return {
               messages: [{ text: h(ctx, 'Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। दोबारा कोशिश करो।') }],
+              contextUpdate: { pendingListing: undefined },
             };
           }
 

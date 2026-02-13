@@ -37,23 +37,6 @@ function formatTime(isoString: string): string {
   return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-function formatTimeWindow(startIso: string, endIso: string, isHindi: boolean): string {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-
-  // Format: "5 Feb, 10:00 - 18:00" or "5 फ़रवरी, 10:00 - 18:00"
-  const day = start.getDate();
-  const monthNames = isHindi
-    ? ['जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर']
-    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = monthNames[start.getMonth()];
-
-  const startTime = start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
-  const endTime = end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-  return `${day} ${month}, ${startTime} - ${endTime}`;
-}
-
 // Energy type emojis
 const ENERGY_EMOJI: Record<string, string> = {
   SOLAR: '☀️',
@@ -112,9 +95,21 @@ export function OfferCreatedCard({ data, language }: OfferCreatedCardProps) {
               <Clock className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">{getLabel('time', isHindi)}</span>
             </div>
-            <span className="text-sm font-medium text-gray-700">
-              {formatTimeWindow(data.startTime, data.endTime, isHindi)}
-            </span>
+            <div className="text-right">
+              <div className="text-sm font-medium text-gray-700">
+                {(() => {
+                  const start = new Date(data.startTime);
+                  const day = start.getDate();
+                  const monthNames = isHindi
+                    ? ['जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर']
+                    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  return `${day} ${monthNames[start.getMonth()]}`;
+                })()}
+              </div>
+              <div className="text-xs text-gray-500">
+                {formatTime(data.startTime)} – {formatTime(data.endTime)}
+              </div>
+            </div>
           </div>
         </div>
 
