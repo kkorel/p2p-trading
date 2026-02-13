@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { chatApi } from '@/lib/api';
+import { prefetchTTS } from '@/lib/tts-cache';
 
 const SESSION_KEY = 'oorja_chat_session';
 const ANON_SESSION_KEY = 'oorja_anon_session'; // Temporary session for anonymous users
@@ -389,6 +390,16 @@ export function useChatEngine() {
         }
       } else {
         console.log(`[sendMessageToAgent] No responseLanguage in response`);
+      }
+
+      // Pre-fetch TTS audio for agent messages so speaker button plays instantly
+      const ttsLang = res.responseLanguage || responseLanguage;
+      if (res.messages && res.messages.length > 0) {
+        for (const m of res.messages) {
+          if (m.content && m.content.length > 0) {
+            prefetchTTS(m.content, ttsLang);
+          }
+        }
       }
 
       // Sync voice preference from server

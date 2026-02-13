@@ -13,7 +13,7 @@ import { prisma, createLogger } from '@p2p/shared';
 import { optionalAuthMiddleware } from './middleware';
 import { processMessage, FileData, VoiceInputOptions } from './chat/agent';
 import { transcribeBase64Audio, isSTTAvailable, STTError } from './chat/sarvam-stt';
-import { synthesizeSpeech, isTTSAvailable, TTSError, type TTSSpeaker } from './chat/sarvam-tts';
+import { synthesizeSpeech, synthesizeLongText, isTTSAvailable, TTSError, type TTSSpeaker, type TTSResult } from './chat/sarvam-tts';
 import { transliterateToNativeScript, type SarvamLangCode } from './chat/sarvam';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -147,7 +147,11 @@ function preprocessTextForTTS(text: string, languageCode: string): string {
   processed = processed.replace(/(\d)\s*AM/gi, '$1 A M');
   processed = processed.replace(/(\d)\s*PM/gi, '$1 P M');
 
-  // 12. Convert numbers to Hindi words for Hindi TTS
+  // 12. Strip commas from formatted numbers (Indian style: 1,00,000 or 29,000)
+  //     so "29,000" becomes "29000" before number-to-word conversion
+  processed = processed.replace(/\d{1,3}(,\d{2,3})+/g, (match) => match.replace(/,/g, ''));
+
+  // 13. Convert numbers to Hindi words for Hindi TTS
   if (isHindi) {
     processed = processed.replace(/\d+(\.\d+)?/g, (match) => {
       const num = parseFloat(match);
@@ -167,7 +171,7 @@ function preprocessTextForTTS(text: string, languageCode: string): string {
     });
   }
 
-  // 13. Clean up punctuation artifacts
+  // 14. Clean up punctuation artifacts
   processed = processed.replace(/\.\s*\./g, '.');      // .. → .
   processed = processed.replace(/\?\s*\./g, '? ');     // ?. → ?
   processed = processed.replace(/!\s*\./g, '! ');      // !. → !
@@ -177,7 +181,7 @@ function preprocessTextForTTS(text: string, languageCode: string): string {
   processed = processed.replace(/:\s*\./g, '. ');      // :. → .
   processed = processed.replace(/\.\s*:/g, '. ');      // .: → .
 
-  // 14. Clean up extra whitespace
+  // 15. Clean up extra whitespace
   processed = processed.replace(/\s+/g, ' ').trim();
 
   return processed;
@@ -474,15 +478,60 @@ router.post('/tts', async (req: Request, res: Response) => {
       });
     }
 
-    // Synthesize speech
-    let result;
+    // Synthesize speech (supports long text via chunking)
+    let result: TTSResult;
     try {
-      result = await synthesizeSpeech({
-        text: processedText,
-        languageCode,
-        speaker: (speaker as TTSSpeaker) || 'anushka',
-        pace: pace ? parseFloat(pace) : undefined,
-      });
+      if (processedText.length <= 1500) {
+        result = await synthesizeSpeech({
+          text: processedText,
+          languageCode,
+          speaker: (speaker as TTSSpeaker) || 'anushka',
+          pace: pace ? parseFloat(pace) : undefined,
+        });
+      } else {
+        // Long text: synthesize in chunks and concatenate WAV audio
+        const chunks = await synthesizeLongText(processedText, languageCode, {
+          speaker: (speaker as TTSSpeaker) || 'anushka',
+          pace: pace ? parseFloat(pace) : undefined,
+        });
+
+        if (chunks.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'No audio generated',
+            errorType: 'synthesis_failed',
+          });
+        }
+
+        if (chunks.length === 1) {
+          result = chunks[0];
+        } else {
+          // Concatenate WAV chunks: keep header from first, append raw PCM from rest
+          // Standard WAV header is 44 bytes
+          const WAV_HEADER_SIZE = 44;
+          const buffers = chunks.map(c => Buffer.from(c.audio, 'base64'));
+          const totalPcmSize = buffers.reduce((sum, buf) => sum + Math.max(0, buf.length - WAV_HEADER_SIZE), 0);
+
+          // Build new WAV: first chunk's header (updated with total size) + all PCM data
+          const firstHeader = Buffer.from(buffers[0].subarray(0, WAV_HEADER_SIZE));
+          // Update RIFF chunk size (bytes 4-7): total file size - 8
+          const totalFileSize = WAV_HEADER_SIZE + totalPcmSize;
+          firstHeader.writeUInt32LE(totalFileSize - 8, 4);
+          // Update data sub-chunk size (bytes 40-43): total PCM size
+          firstHeader.writeUInt32LE(totalPcmSize, 40);
+
+          const combined = Buffer.concat([
+            firstHeader,
+            ...buffers.map((buf, i) => i === 0 ? buf.subarray(WAV_HEADER_SIZE) : buf.subarray(WAV_HEADER_SIZE)),
+          ]);
+
+          result = {
+            audio: combined.toString('base64'),
+            durationMs: chunks.reduce((sum, c) => sum + c.durationMs, 0),
+            languageCode: chunks[0].languageCode,
+          };
+        }
+      }
     } catch (error) {
       if (error instanceof TTSError) {
         logger.warn(`TTS error: ${error.type} - ${error.message}`);

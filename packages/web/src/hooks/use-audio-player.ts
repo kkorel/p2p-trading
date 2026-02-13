@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useId } from 'react';
 import { chatApi } from '@/lib/api';
 import { stopGlobalAudio, playGlobalAudio, isPlayerActive } from '@/lib/audio-manager';
+import { getCached, setCached } from '@/lib/tts-cache';
 
 /**
  * Audio player state
@@ -160,9 +161,18 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
       setError(null);
       setProgress(0);
 
-      // Check cache first
+      // Check local cache first, then shared (pre-fetch) cache
       const cacheKey = getCacheKey(text, languageCode);
-      const cached = cacheRef.current.get(cacheKey);
+      let cached = cacheRef.current.get(cacheKey);
+
+      // Fall back to shared pre-fetch cache
+      if (!cached) {
+        const sharedDataUrl = getCached(text, languageCode);
+        if (sharedDataUrl) {
+          cached = { dataUrl: sharedDataUrl, text, languageCode };
+          cacheRef.current.set(cacheKey, cached);
+        }
+      }
 
       if (cached) {
         // Create fresh audio element from cached data URL
@@ -265,6 +275,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
 
         // Cache the data URL (not the audio element) for reuse
         cacheRef.current.set(cacheKey, { dataUrl, text, languageCode });
+        setCached(text, languageCode, dataUrl);
 
         // Keep cache size reasonable (max 20 entries)
         if (cacheRef.current.size > 20) {
